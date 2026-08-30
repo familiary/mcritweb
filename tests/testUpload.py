@@ -537,3 +537,136 @@ def test_the_status_line_cannot_be_built_out_of_a_filename(client, as_role):
 
     assert "textContent" in options, "the status line is not written as text"
     assert "innerHTML" not in options, "a filename reaches the page as markup"
+
+
+# --- "dedumped" is not a dump - issue #44 -------------------------------------------
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "sample_dedumped.bin",
+        # a de-dumped file often keeps the base address of the dump it came from in its
+        # name; that must not turn it back into a dump either
+        "sample_dedumped_0x00400000.bin",
+        "dedumped_thing",
+    ],
+)
+def test_a_dedumped_file_is_offered_as_unmapped(client, as_role, filename):
+    """`dedumped` contains `dump`, so the substring test used to answer "dump" for a
+    file that is precisely the opposite - un-mapped again. The form then opened its
+    dump fields, prefilled with the empty base address the filename does not carry,
+    and submitting that took the request down."""
+    as_role("contributor")
+    assert filename_info(client, filename) == {"dump": False}
+
+
+@pytest.mark.parametrize(
+    "filename, bitness, base_addr",
+    [
+        ("malware_dump_0x140000000.bin", 64, "0x140000000"),
+        ("malware_dump_0x00400000.bin", 32, "0x400000"),
+        # no base address in the name, but still a dump the user has to fill in
+        ("notepad.dumped", None, ""),
+        ("memdump", None, ""),
+    ],
+)
+def test_a_genuine_dump_is_still_recognised(client, as_role, filename, bitness, base_addr):
+    """The narrowed test must only remove `dedumped`, nothing else that reads as a
+    dump."""
+    as_role("contributor")
+    assert filename_info(client, filename) == {
+        "dump": True,
+        "bitness": bitness,
+        "base_addr": base_addr,
+    }
+
+
+# --- the dump fields are user input, so they are validated - issue #44 --------------
+
+def query_binary(client, content, filename="sample.bin", **fields):
+    """POST to the query half of the same dropzone."""
+    data = dict({"options": "unmapped"}, **fields)
+    data["file"] = (io.BytesIO(content), filename)
+    return client.post("/analyze/query", data=data, content_type="multipart/form-data")
+
+
+#: Everything a browser can put in the base address field that is not an address. The
+#: field is a free text input and the dropzone serialises the form by hand, so none of
+#: this is filtered before it reaches the view.
+BAD_BASE_ADDRESSES = [
+    "",                       # what a prefilled 'dedumped' form submits
+    "   ",
+    "0x",
+    "not an address",
+    "0xdeadbeefzz",
+    "-0x400000",              # int(_, 16) accepts this, MCRIT cannot map it
+    "0x1_0000",               # so does int(_, 16), via PEP 515 separators
+    "0x10000000000000000",    # one bit past a 64 bit address space
+]
+
+
+@pytest.mark.parametrize("base_addr", BAD_BASE_ADDRESSES)
+def test_a_dump_submit_without_a_usable_base_address_is_refused(client, as_role, fake_mcrit, base_addr):
+    """`int(request.form['base_addr'], 16)` had no guard, so an empty field - the one a
+    'dedumped' filename used to produce - was a 500 on ordinary user input."""
+    as_role("contributor")
+    response = submit_binary(client, b"MZ dumped", options="dumped", bitness="32", base_addr=base_addr)
+
+    assert response.status_code == 400, response.get_data(as_text=True)[:200]
+    assert not [call for call in fake_mcrit.calls if call[0] == "addBinarySample"], \
+        "a sample was submitted without a base address the user actually gave"
+
+
+@pytest.mark.parametrize("base_addr", BAD_BASE_ADDRESSES)
+def test_a_dump_query_without_a_usable_base_address_is_refused(client, as_role, fake_mcrit, base_addr):
+    """The same field on the query half of the same form, which parses it separately."""
+    as_role("contributor")
+    response = query_binary(client, b"MZ dumped", options="dumped", base_addr=base_addr)
+
+    assert response.status_code == 400, response.get_data(as_text=True)[:200]
+    assert not [call for call in fake_mcrit.calls if call[0] == "requestMatchesForMappedBinary"], \
+        "a match was requested at a base address the user never gave"
+
+
+def test_a_dump_submit_without_any_base_address_field_is_refused(client, as_role):
+    """An absent field, not an empty one: `request.form['base_addr']` raised a
+    KeyError, which at least was a 400 - but silently, with nothing said to the user."""
+    as_role("contributor")
+    data = {"family": "f", "version": "1", "options": "dumped", "bitness": "32",
+            "file": (io.BytesIO(b"MZ dumped"), "sample_dedumped.bin")}
+    response = client.post("/data/submit", data=data, content_type="multipart/form-data")
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize("bitness", ["", "0", "48", "thirtytwo", "32.0", "0x20"])
+def test_a_dump_submit_without_a_usable_bitness_is_refused(client, as_role, fake_mcrit, bitness):
+    """An unchecked radio is simply absent from the serialised form, and `int()` on
+    whatever else arrives is the same unguarded crash."""
+    as_role("contributor")
+    response = submit_binary(client, b"MZ dumped", options="dumped", bitness=bitness, base_addr="0x400000")
+
+    assert response.status_code == 400, response.get_data(as_text=True)[:200]
+    assert not [call for call in fake_mcrit.calls if call[0] == "addBinarySample"]
+
+
+def test_a_dump_submit_with_no_bitness_field_at_all_is_refused(client, as_role):
+    """What the browser actually sends when neither bitness radio was ever clicked."""
+    as_role("contributor")
+    data = {"family": "f", "version": "1", "options": "dumped", "base_addr": "0x400000",
+            "file": (io.BytesIO(b"MZ dumped"), "sample_dedumped.bin")}
+    response = client.post("/data/submit", data=data, content_type="multipart/form-data")
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize("base_addr, parsed", [("0x400000", 0x400000), ("400000", 0x400000),
+                                               ("0X400000", 0x400000), (" 0x400000 ", 0x400000),
+                                               ("0xffffffffffffffff", 0xFFFFFFFFFFFFFFFF), ("0x0", 0)])
+def test_a_well_formed_base_address_still_reaches_the_backend(client, as_role, fake_mcrit, base_addr, parsed):
+    """The guard must not narrow what used to work: `int(_, 16)` accepted a bare hex
+    string, an 0x prefix in either case, and surrounding whitespace."""
+    as_role("contributor")
+    response = query_binary(client, b"MZ dumped", options="dumped", base_addr=base_addr)
+
+    assert response.status_code < 400, response.get_data(as_text=True)[:200]
+    _, args, _ = next(c for c in fake_mcrit.calls if c[0] == "requestMatchesForMappedBinary")
+    assert args[1] == parsed

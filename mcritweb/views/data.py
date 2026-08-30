@@ -26,6 +26,8 @@ from mcritweb.views.MatchReportRenderer import MatchReportRenderer
 from mcritweb.views.memo import app_memo
 from mcritweb.views.pagination import Pagination
 from mcritweb.views.params import (
+    parse_base_addr_form_param,
+    parse_bitness_form_param,
     parse_checkbox_query_param,
     parse_integer_list_query_param,
     parse_integer_query_param,
@@ -1440,7 +1442,9 @@ def request_filename_info():
         match_baseaddr = re.search(r'"base_addr": (?P<base_addr>\d+)', file_header)
         if match_baseaddr:
             result['base_addr'] = hex(int(match_baseaddr.group('base_addr')))
-    elif 'dump' in filename:
+    # NOTE: 'dedumped' contains 'dump', but names a sample that has been *un*mapped
+    # again, so it must not be offered as a dump - see issue #44
+    elif 'dump' in filename and 'dedumped' not in filename:
         result['dump'] = True
         base_address, result['bitness'] = parseBaseAddrAndBitnessFromFilename(filename)
         result['base_addr'] = "" if not base_address else hex(base_address)
@@ -1481,8 +1485,14 @@ def submit():
         is_dump = form_options == "dumped"
         is_dump_or_smda = form_options in ['dumped', 'smda']
         if is_dump_or_smda:
-            bitness = int(request.form['bitness'])
-            base_address = int(request.form['base_addr'], 16)
+            bitness = parse_bitness_form_param(request)
+            if bitness is None:
+                flash("Please select the bitness of the sample.", category='error')
+                return "", 400 # Bad Request
+            base_address = parse_base_addr_form_param(request)
+            if base_address is None:
+                flash("Please enter the base address of the sample as a hexadecimal number, e.g. 0x400000.", category='error')
+                return "", 400 # Bad Request
 
         binary_content = f.read()
         if form_options == "smda":

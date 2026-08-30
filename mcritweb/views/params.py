@@ -164,6 +164,35 @@ def parse_checkbox_post_param(request, query_param:str):
     return param
 
 
+def parse_base_addr_form_param(request):
+    """ Try to find the base address the submit/query form carries for a dump or SMDA report
+
+    The field is a free text input, and the dropzone serialises the form by hand, so the
+    browser never validates it: an empty or malformed value is ordinary user input rather
+    than a broken client. Returns None for anything that is not a plain hexadecimal
+    address fitting into 64 bit, so the caller can reject the request instead of guessing
+    a base address for a memory dump.
+    """
+    value = request.form.get('base_addr', '').strip()
+    if not re.fullmatch("(0[xX])?[0-9a-fA-F]+", value):
+        return None
+    base_addr = int(value, 16)
+    # anything wider than a 64 bit address space is not an address MCRIT could map
+    return base_addr if base_addr <= 0xFFFFFFFFFFFFFFFF else None
+
+
+def parse_bitness_form_param(request):
+    """ Try to find the bitness the submit form carries for a dump or SMDA report
+
+    Neither bitness radio is checked until the user - or the filename probe - picks one,
+    and an unchecked radio is simply absent from the serialised form, so a missing value
+    is ordinary user input as well. Returns None for anything that is not a bitness MCRIT
+    knows.
+    """
+    value = request.form.get('bitness', '').strip()
+    return int(value) if value in ('16', '32', '64') else None
+
+
 def parseBaseAddrAndBitnessFromFilename(filename):
     """(base_addr, bitness) as a dump's filename declares them, or (None, None).
 
