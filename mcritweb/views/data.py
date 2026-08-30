@@ -33,6 +33,7 @@ from mcritweb.views.params import (
     parse_integer_query_param,
     parse_str_query_param,
     parseBaseAddrAndBitnessFromFilename,
+    parseIsDumpFromFilename,
 )
 from mcritweb.views.ScoreColorProvider import ScoreColorProvider
 from mcritweb.views.utility import get_session_user_id, mcrit_server_required, query_upload_path
@@ -1442,9 +1443,7 @@ def request_filename_info():
         match_baseaddr = re.search(r'"base_addr": (?P<base_addr>\d+)', file_header)
         if match_baseaddr:
             result['base_addr'] = hex(int(match_baseaddr.group('base_addr')))
-    # NOTE: 'dedumped' contains 'dump', but names a sample that has been *un*mapped
-    # again, so it must not be offered as a dump - see issue #44
-    elif 'dump' in filename and 'dedumped' not in filename:
+    elif parseIsDumpFromFilename(filename):
         result['dump'] = True
         base_address, result['bitness'] = parseBaseAddrAndBitnessFromFilename(filename)
         result['base_addr'] = "" if not base_address else hex(base_address)
@@ -1483,8 +1482,9 @@ def submit():
         base_address = None
         form_options = request.form['options']
         is_dump = form_options == "dumped"
-        is_dump_or_smda = form_options in ['dumped', 'smda']
-        if is_dump_or_smda:
+        # only a memory dump needs these two: an SMDA report carries its own base address
+        # and bitness, and addReport() - where the smda branch below ends - takes neither
+        if is_dump:
             bitness = parse_bitness_form_param(request)
             if bitness is None:
                 flash("Please select the bitness of the sample.", category='error')
@@ -1496,8 +1496,17 @@ def submit():
 
         binary_content = f.read()
         if form_options == "smda":
-            content_as_dict = json.loads(binary_content)
-            smda_report = SmdaReport.fromDict(content_as_dict)
+            # the file is whatever was dropped on the page, so a body that is not a
+            # readable SMDA report is ordinary user input and has to become a message.
+            # It used to be covered by accident: the base address was demanded first,
+            # and an empty one answered 400 before anything was parsed. That check is
+            # now correctly limited to a dump, so this needs its own.
+            try:
+                smda_report = SmdaReport.fromDict(json.loads(binary_content))
+            except Exception:
+                current_app.logger.warning("data.submit - the uploaded file is not a readable SMDA report")
+                flash('That file could not be read as an SMDA report.', category='error')
+                return "", 400 # Bad Request
             upload_sha256 = smda_report.sha256
         else:
             # check here if it is already part of corpus

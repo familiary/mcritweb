@@ -165,7 +165,7 @@ def parse_checkbox_post_param(request, query_param:str):
 
 
 def parse_base_addr_form_param(request):
-    """ Try to find the base address the submit/query form carries for a dump or SMDA report
+    """ Try to find the base address the submit/query form carries for a memory dump
 
     The field is a free text input, and the dropzone serialises the form by hand, so the
     browser never validates it: an empty or malformed value is ordinary user input rather
@@ -182,7 +182,7 @@ def parse_base_addr_form_param(request):
 
 
 def parse_bitness_form_param(request):
-    """ Try to find the bitness the submit form carries for a dump or SMDA report
+    """ Try to find the bitness the submit form carries for a memory dump
 
     Neither bitness radio is checked until the user - or the filename probe - picks one,
     and an unchecked radio is simply absent from the serialised form, so a missing value
@@ -191,6 +191,23 @@ def parse_bitness_form_param(request):
     """
     value = request.form.get('bitness', '').strip()
     return int(value) if value in ('16', '32', '64') else None
+
+
+#: A sample that was dumped and then *un*mapped again is not a dump, however its name
+#: spells that - see issue #44. The marker is anchored on its left rather than matched
+#: as a whole word: "_" is a word character to re, so \b would not see "sample_dedumped"
+#: as a token at all. "de" opens a de-dump wherever it starts a token ("de_dumped",
+#: ".DEDUMPED."), and is just the tail of the word before it where it does not
+#: ("widedump", "sidedump").
+DEDUMP_IN_FILENAME = re.compile(r"(?<![a-zA-Z])de[-_. ]?dump", re.IGNORECASE)
+DUMP_IN_FILENAME = re.compile(r"dump", re.IGNORECASE)
+
+
+def parseIsDumpFromFilename(filename):
+    # try to infer from the filename whether the sample is a memory dump.
+    # a name can carry both markers ("dump_dedumped_0x400000"), so drop the de-dumps and
+    # ask what is left, which keeps the dump such a name still claims
+    return bool(DUMP_IN_FILENAME.search(DEDUMP_IN_FILENAME.sub("", filename)))
 
 
 def parseBaseAddrAndBitnessFromFilename(filename):

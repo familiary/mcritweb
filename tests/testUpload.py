@@ -436,10 +436,22 @@ def test_an_smda_report_is_read_out_of_the_uploaded_header(client, as_role):
     assert result["base_addr"] == "0x400000"
 
 
-def test_an_ordinary_filename_claims_nothing(client, as_role):
-    """No pattern matched must mean "not a dump", not a half-filled form."""
+def test_an_unreadable_probe_body_claims_nothing(client, as_role):
+    """The probe swallows a body it cannot read and carries on with an empty filename,
+    which every test below has to survive as an ordinary input rather than a 500."""
     as_role("contributor")
-    assert filename_info(client, "sample.exe") == {"dump": False}
+    response = client.post("/data/request_filename_info", data=b"{not json",
+                           content_type="application/json")
+    assert response.status_code == 200
+    assert json.loads(response.get_data(as_text=True)) == {"dump": False}
+
+
+@pytest.mark.parametrize("filename", ["sample.exe", "notepad_0x00400000.bin", "d.u.m.p"])
+def test_an_ordinary_filename_claims_nothing(client, as_role, filename):
+    """No pattern matched must mean "not a dump", not a half-filled form - not even for
+    a name that carries a base address, or the letters of "dump" spelled apart."""
+    as_role("contributor")
+    assert filename_info(client, filename) == {"dump": False}
 
 
 def test_a_realistically_serialised_smda_report_fills_every_field(client, as_role):
@@ -549,6 +561,21 @@ def test_the_status_line_cannot_be_built_out_of_a_filename(client, as_role):
         # name; that must not turn it back into a dump either
         "sample_dedumped_0x00400000.bin",
         "dedumped_thing",
+        # the separator is a matter of taste, and so is the stem: excluding the single
+        # literal "dedumped" left every one of these reading as a dump
+        "sample_de-dumped.bin",
+        "sample_de_dumped.bin",
+        "sample_de.dumped.bin",
+        "sample de dumped.bin",
+        "sample_dedump.bin",
+        "sample_dedumping.bin",
+        "sample_dedumped2.bin",
+        # case only ever cancelled out: "DeDumped" was excluded by the *positive* test
+        # being case-sensitive too, and "DEdumped" was excluded by neither
+        "sample_DeDumped.bin",
+        "sample.DEDUMPED.bin",
+        "sample_DEdumped.bin",
+        "SAMPLE_DEDUMPED.BIN",
     ],
 )
 def test_a_dedumped_file_is_offered_as_unmapped(client, as_role, filename):
@@ -568,10 +595,24 @@ def test_a_dedumped_file_is_offered_as_unmapped(client, as_role, filename):
         # no base address in the name, but still a dump the user has to fill in
         ("notepad.dumped", None, ""),
         ("memdump", None, ""),
+        # "de" only marks a de-dump where it starts a token - inside a word it is just
+        # the tail of the word before it
+        ("widedump.bin", None, ""),
+        ("sidedump.bin", None, ""),
+        ("WideDump.bin", None, ""),
+        # both markers: the name carries a de-dump marker *and* a dump of its own, so
+        # the dump wins. The other way round costs the user a base address they have
+        ("dump_dedumped_0x400000.bin", None, ""),
+        ("dump_dedumped_0x00400000.bin", 32, "0x400000"),
+        # a behaviour change: master matched "dump" case-sensitively, so a name a
+        # Windows tool wrote in caps was not offered as a dump at all
+        ("SAMPLE_DUMP.BIN", None, ""),
+        ("SAMPLE_DUMP_0x00400000.BIN", 32, "0x400000"),
+        ("Sample_Dump.bin", None, ""),
     ],
 )
 def test_a_genuine_dump_is_still_recognised(client, as_role, filename, bitness, base_addr):
-    """The narrowed test must only remove `dedumped`, nothing else that reads as a
+    """The narrowed test must only remove de-dumps, nothing else that reads as a
     dump."""
     as_role("contributor")
     assert filename_info(client, filename) == {
@@ -670,3 +711,115 @@ def test_a_well_formed_base_address_still_reaches_the_backend(client, as_role, f
     assert response.status_code < 400, response.get_data(as_text=True)[:200]
     _, args, _ = next(c for c in fake_mcrit.calls if c[0] == "requestMatchesForMappedBinary")
     assert args[1] == parsed
+
+
+# --- an .smda report is not a memory dump, and carries its own address -------------
+
+def smda_upload(client, route, filename="report.smda", **fields):
+    """POST a serialised SMDA report through either half of the dropzone, with only
+    the fields the browser actually sends for one: `#base_addr` and the bitness radios
+    belong to the "Dumped" option and stay empty here."""
+    data = dict({"family": "test.family", "version": "1.0", "options": "smda"}, **fields)
+    data["file"] = (io.BytesIO(smda_report_text().encode()), filename)
+    return client.post(route, data=data, content_type="multipart/form-data")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [b"not json", b"[]", b'{"a": 1}', b"", b"\x00\x01\x02"],
+    ids=["not-json", "not-an-object", "incomplete", "empty", "binary"],
+)
+@pytest.mark.parametrize("route", ["/data/submit", "/analyze/query"])
+def test_a_body_that_is_not_a_readable_smda_report_is_refused(client, as_role, fake_mcrit, route, body):
+    """The file is whatever was dropped on the page, so an unreadable one is ordinary
+    input and has to become a message rather than a stack trace.
+
+    This used to be covered by accident on the `smda` option: the base address was
+    demanded first, so an empty one answered 400 before anything was parsed. That check
+    now correctly applies only to a dump - the SMDA path never reads a base address -
+    which leaves the parse as the first thing an unreadable body reaches. Without a
+    guard of its own that is a 500, and it was already one on master whenever the
+    dropzone had filled the address in, which it does for a `.smda` drop.
+    """
+    as_role("contributor")
+    response = client.post(
+        route,
+        data={
+            "family": "test.family", "version": "1.0", "options": "smda",
+            "file": (io.BytesIO(body), "report.smda"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert not [call for call in fake_mcrit.calls if call[0] in ("addReport", "addBinarySample", "requestMatchesForSmdaReport")], \
+        "an unreadable report reached the backend"
+
+
+@pytest.mark.parametrize("base_addr", ["", "not an address"])
+def test_an_smda_submit_ignores_the_dump_fields(client, as_role, fake_mcrit, base_addr):
+    """`McritClient.addReport` takes the report and nothing else - the base address and
+    bitness it uses are the ones inside the report. Validating the dump form fields on
+    this path refuses a perfectly good report over a field nobody reads, and the probe
+    that pre-fills those fields clears them for a .smda drop."""
+    as_role("contributor")
+    response = smda_upload(client, "/data/submit", base_addr=base_addr)
+
+    assert response.status_code == 202, response.get_data(as_text=True)[:200]
+    reported = [call for call in fake_mcrit.calls if call[0] == "addReport"]
+    assert len(reported) == 1, "the report never reached the backend"
+    assert reported[0][1][0].base_addr == 0x400000
+    assert not [call for call in fake_mcrit.calls if call[0] == "addBinarySample"], \
+        "the report was submitted as a raw binary instead"
+
+
+def test_an_smda_submit_needs_no_dump_fields_at_all(client, as_role, fake_mcrit):
+    """The fields are absent, not empty, whenever the user never opened the dump
+    option - which is every .smda upload the probe recognises, and every report the
+    user picks "SMDA" for by hand because its name does not end in .smda."""
+    as_role("contributor")
+    data = {"family": "f", "version": "1", "options": "smda",
+            "file": (io.BytesIO(smda_report_text().encode()), "report.json")}
+    response = client.post("/data/submit", data=data, content_type="multipart/form-data")
+
+    assert response.status_code == 202, response.get_data(as_text=True)[:200]
+    assert [call for call in fake_mcrit.calls if call[0] == "addReport"]
+
+
+@pytest.mark.parametrize("base_addr", ["", "not an address"])
+def test_an_smda_query_ignores_the_dump_fields(client, as_role, fake_mcrit, base_addr):
+    """`requestMatchesForSmdaReport` takes no base address either, so the query half
+    must not refuse the upload over one."""
+    as_role("contributor")
+    response = smda_upload(client, "/analyze/query", base_addr=base_addr)
+
+    assert response.status_code == 202, response.get_data(as_text=True)[:200]
+    queried = [call for call in fake_mcrit.calls if call[0] == "requestMatchesForSmdaReport"]
+    assert len(queried) == 1, "the report never reached the backend"
+    assert queried[0][1][0].base_addr == 0x400000
+
+
+def test_an_smda_query_needs_no_dump_fields_at_all(client, as_role, fake_mcrit):
+    """The query form has no bitness radios at all, so this is what it sends whenever
+    the user has not typed a base address into the field the "Dumped" option owns."""
+    as_role("contributor")
+    data = {"options": "smda",
+            "file": (io.BytesIO(smda_report_text().encode()), "report.smda")}
+    response = client.post("/analyze/query", data=data, content_type="multipart/form-data")
+
+    assert response.status_code == 202, response.get_data(as_text=True)[:200]
+    assert [call for call in fake_mcrit.calls if call[0] == "requestMatchesForSmdaReport"]
+
+
+def test_the_refusal_message_survives_to_the_page_the_dropzone_reloads(client, as_role):
+    """`flash()` followed by an empty 400 body says nothing by itself - the dropzone's
+    own error handler is what shows it: `myDropzone.on('error', ... location.reload())`
+    in table/submit_or_query_dropzone.html re-renders the page, and the message is
+    still in the session waiting for it."""
+    as_role("contributor")
+    refused = submit_binary(client, b"MZ dumped", options="dumped", bitness="32", base_addr="")
+    assert refused.status_code == 400
+    assert refused.get_data() == b"", "the 400 body is empty, so the flash is all the user gets"
+
+    reloaded = client.get("/data/submit").get_data(as_text=True)
+    assert "Please enter the base address" in reloaded
