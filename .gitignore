@@ -71,3 +71,6 @@ analyze_*.py
 coverage-html
 instance/*
 data/*
+
+# local manual-test harness: holds a dev session cookie, never commit it
+work/harness/

@@ -56,11 +56,11 @@ $(document).ready(function(){
   $('#compare_search_form_a').submit(function(eventObj) {
     eventObj.preventDefault();
     eventObj.stopPropagation();
-    base_url = window.location.href;
-    args = fetchState();
+    const base_url = window.location.href;
+    const args = fetchState();
     args.selected_a = null;
     args._anchor = "Search_a";
-    null_keys = {{ pagination_a.params_list|tojson }};
+    const null_keys = {{ pagination_a.params_list|tojson }};
     for(var i = 0, size = null_keys.length; i < size ; i++){
       args[null_keys[i]] = null;
     }
@@ -73,11 +73,11 @@ $(document).ready(function(){
   $('#compare_search_form_b').submit(function(eventObj) {
     eventObj.preventDefault();
     eventObj.stopPropagation();
-    base_url = window.location.href;
-    args = fetchState();
+    const base_url = window.location.href;
+    const args = fetchState();
     args.selected_b = null;
     args._anchor = "Search_b";
-    null_keys = {{ pagination_b.params_list|tojson }};
+    const null_keys = {{ pagination_b.params_list|tojson }};
     for(var i = 0, size = null_keys.length; i < size ; i++){
       args[null_keys[i]] = null;
     }

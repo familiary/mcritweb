@@ -12,7 +12,6 @@ Results for Job: {{ job_info.job_id }}
 {% endblock %}
 {% block content %}
 <h1>Results for Job: {{ matching_result.method }}</h1>
-<p>Showing matches against family: {{ matching_result.getFamilyNameByFamilyId(famid) }}</p>
 
 {{ matching_result_job_column_table(job_info) }}
 

@@ -24,7 +24,7 @@ Families
     </div>
   </div>
 
-{{ family_table(families, show_export=True, show_edit=True, sort_pagination=pagination, column_setup=user_column_setup) }}
+{{ family_table(families, show_export=True, show_edit=True, sort_pagination=pagination, column_setup=user_column_setup, row_decorations=row_decorations) }}
 {% if families %}
 {{ pagination_widget(pagination) }}
 {% endif %}

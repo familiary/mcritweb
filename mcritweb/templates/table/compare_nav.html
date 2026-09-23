@@ -10,6 +10,9 @@
     <a class="nav-link {% if active=='cross' %}active{% endif %}" href="{{ url_for('analyze.cross_compare') }}">Cross</a>
   </li>
   <li class="nav-item">
+    <a class="nav-link {% if active=='blocks' %}active{% endif %}" href="{{ url_for('analyze.unique_blocks') }}">Blocks</a>
+  </li>
+  <li class="nav-item">
     <a class="nav-link {% if active=='query' %}active{% endif %}"  href="{{ url_for('analyze.query') }}">Query</a>
   </li>
 </ul>

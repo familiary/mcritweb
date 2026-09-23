@@ -20,6 +20,15 @@ Overview for Job: {{ job_info.job_id }}
 {{ job_column_table(job_info, show_progress=True) }}
 
 
+{# a shorter list on its own would misreport the job - a cross compare would look like
+   it combined nothing - so say how many are gone rather than quietly leaving them out #}
+{% if missing_children %}
+<div class="alert alert-warning mt-3" role="alert">
+  {{ missing_children }} of this job's {{ missing_children + child_jobs|length }} sub-jobs
+  {{ 'is' if missing_children == 1 else 'are' }} no longer in the system and cannot be shown.
+</div>
+{% endif %}
+
 {% if child_jobs %}
     {{ job_table(child_jobs, families_by_id=families, samples_by_id=samples) }}
 {% endif %}

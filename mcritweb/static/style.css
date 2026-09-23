@@ -221,3 +221,68 @@ html {
   .manual h3, .manual h4, .manual h5 {
     margin-top: 1.25rem;
   }
+
+/* Issue #52. Both of these are sized by their content, so a narrow viewport wraps
+   them and the row grows a second line for no information:
+
+   - a two-word column heading ("Num Functions") splits, and in a sortable header the
+     float-right sort arrow can end up below the label rather than beside it;
+   - a row's action buttons (analyze, export, edit) split across two lines.
+
+   Scoped to `table.table`, which is the Bootstrap class the application's own tables
+   carry - the manual's markdown tables are plain <table> and still wrap normally. */
+table.table thead th {
+  white-space: nowrap;
+}
+
+table.table td.buttons {
+  white-space: nowrap;
+}
+
+/* function comparison page (data.match_functions), issue #74 */
+#xcfg_combined {
+  position: relative;
+  overflow: hidden;
+  background-color: #FFFFFF;
+  width: 100%;
+  min-height: 100px;
+  height: calc(100vh - 106px);
+}
+#graphContainer_c {
+  width: 100%;
+  height: 100%;
+}
+/* a block on the other side that matched the hovered one */
+.node.matched rect {
+  stroke: #ff7f00;
+  stroke-width: 9;
+}
+#tooltip_c {
+  position: absolute;
+  max-width: 45%;
+  padding: 3px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+#tooltip_c p {
+  margin: 0;
+  font-family: monospace;
+  white-space: pre;
+}
+.cfg-legend span.swatch {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 1px solid #444;
+  vertical-align: middle;
+  margin: 0 2px 0 8px;
+}
+.cfg-legend span.edge-swatch {
+  display: inline-block;
+  width: 1.4em;
+  border-top: 3px solid #444;
+  vertical-align: middle;
+  margin: 0 2px 0 8px;
+}

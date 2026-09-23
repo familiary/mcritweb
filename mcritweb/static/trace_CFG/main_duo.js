@@ -15,6 +15,54 @@
   edgesAll = {};
   edgeLabelsAll = {}; 
 
+  // mcritweb: issue #69 - this page draws two graphs, so every per-graph store
+  // needs one of its own. Sharing a single set of the dicts above let the panel
+  // that finished loading second overwrite the first's entries for every block
+  // offset the two functions have in common, and sharing loopsObj let it erase
+  // the first's loops outright.
+  // "colors" records the diff colour each block was rendered with, so the loop
+  // and cycle highlights can be taken back off again without leaving the graph
+  // uncoloured.
+  // "container" and "pane" are the panel's two elements - the svg its graph is drawn
+  // in, and the half of the page holding that - so a handler can find its own panel's
+  // markup instead of hardcoding one side. "rendered" is the graph dagre actually laid
+  // out, which is the one the edge ids in the DOM belong to.
+  var cfgPanels = {
+    a: {graph: null, rendered: null, loops: [], nodes: {}, edges: {}, edgeLabels: {}, colors: {},
+        container: "#graphContainer_a", pane: "#xcfg_left"},
+    b: {graph: null, rendered: null, loops: [], nodes: {}, edges: {}, edgeLabels: {}, colors: {},
+        container: "#graphContainer_b", pane: "#xcfg_right"}
+  };
+
+  // Points the shared dicts at one panel. The vendored modules and most of the
+  // code below reach for them by name, so a panel is made current for the span of
+  // the code that fills it rather than every reader being rewritten.
+  //
+  // Be clear about what this does and does not fix. The per-panel dicts are now
+  // private and lossless - that is the issue #69 bug. But these four globals still
+  // end up pointing at whichever panel rendered last, and which one that is is still
+  // a race: 12 reloads of the same comparison page gave b 10 times and a twice. No
+  // reachable reader observes it today, because every remaining one is dead code on
+  // this page - the node-drag and brush handlers are behind controls the duo template
+  // does not render (`#enableNodeDrag` is inside an HTML comment, `#enableBrush` and
+  // `#countEncoding` appear nowhere), and `setupTrace()` and `getCodefromGraph()` have
+  // no live call site. Everything that *is* reachable - the hover, the tooltip, the
+  // edge click and the Backspace keybinding - takes its panel from `cfgPanels`, as
+  // does the highlight code below. So this is latent, not active - but anyone wiring
+  // up `setupTrace` has to take the panel from `cfgPanels` rather than trusting these.
+  //
+  // The dead code is not harmless just for being dead. `setupTrace` is what fills
+  // `nodeToTextGroups`, and the three taint highlighters that read it write their
+  // result into `innerHTML`; they escape now (see `escapeHtml`), and they have to
+  // keep escaping, because wiring `setupTrace` up is all it would take to reach them.
+  function usePanel(panel){
+    nodesAll = panel.nodes;
+    edgesAll = panel.edges;
+    edgeLabelsAll = panel.edgeLabels;
+    loopsObj = panel.loops;
+    return panel;
+  }
+
   // keys are nodeId and values are the array of p elements that are instances of the node/CFG block
   var nodeToTextGroups = {};
 
@@ -51,11 +99,16 @@
   var nodeGroupsArray = []; // Array of group of nodes  
   var currentTempGrp = [];  // Used as temporary storage while creating new groups
 
-  var currentNode;    // Used to highlight the node when hovered or active, also used to delete the active node  
+  var currentNode;    // Used to highlight the node when hovered or active, also used to delete the active node
+  var currentNodePanel = null;  // mcritweb: issue #69 - which panel currentNode is in
   var currentText;    // Used to highlight the text when hovered or active
   g = null;  // The main graph 
   var graph_to_display_a = null;
   var graph_to_display_b = null;
+  // mcritweb, issue #74: the zoom behaviour of each graph, keyed "a" / "b", so that
+  // function_compare.js can synchronise and re-centre them. `zoom` below is a
+  // single global that showGraph() overwrites per graph and cannot serve for that.
+  var graph_zooms = {};
 
   var traceText; // The trace file
   var codes = []; // The array of blocks forming the text on the right side
@@ -87,6 +140,8 @@
   var isRtDragStarted = false;
 
   var isCycleShown = false;
+
+  var isLoopShown = false;
 
   var isTraceSupplied = false;
 
@@ -568,7 +623,7 @@
 
                               lines[l] = "<span style = 'background-color: " + color + " ; " 
                               + "color: white; "
-                              + "'>" + line + "</span>";
+                              + "'>" + escapeHtml(line) + "</span>";  // mcritweb: issue #69
 
 
                               break;
@@ -843,6 +898,10 @@ function highlightUERs(UERtype){
 
                         for(var l=0; l<lines.length; l++){
                           var line = lines[l];
+                          // mcritweb: issue #69 - escaped once here rather than in the
+                          // loop below, which appends a span per match and would
+                          // otherwise escape the markup left by the previous pass.
+                          lines[l] = escapeHtml(lines[l]);
 
                           for(var k=0; k<matched_addresses.length; k++){
                             var thisAddress = matched_addresses[k][0];
@@ -856,9 +915,11 @@ function highlightUERs(UERtype){
                               // }
 
                               // re = new RegExp("\\b" + escapeRegExp(matched_addresses[k][1]) + "\\b", 'i');
-                              re = new RegExp(escapeRegExp(matched_addresses[k][1]), 'i');
+                              // mcritweb: issue #69 - needle escaped to match the
+                              // escaped line above; `line` stays raw for the test.
+                              re = new RegExp(escapeRegExp(escapeHtml(matched_addresses[k][1])), 'i');
 
-                              lines[l] = lines[l].replace(re, "<span class = 'taint'>" + matched_addresses[k][1] + "</span>");
+                              lines[l] = lines[l].replace(re, "<span class = 'taint'>" + escapeHtml(matched_addresses[k][1]) + "</span>");
                               // lines[l] = "<span class = 'taint'>" + line + "</span>";
 
                               // var color = "#8856a7";
@@ -1187,7 +1248,7 @@ function highlightUERs(UERtype){
 
                           lines[l] = "<span style = 'background-color: " + color + " ; " 
                           + "color: white; "
-                          + "'>" + line + "</span>";
+                          + "'>" + escapeHtml(line) + "</span>";  // mcritweb: issue #69
 
 
                           break;
@@ -1246,6 +1307,25 @@ function highlightUERs(UERtype){
         }
       );
 
+  // mcritweb: issue #69 - reads a /explore/findLoops/ response. Loop detection
+  // needs a single entry node and reports an error for a CFG that has more than
+  // one, so a failure here is expected rather than exceptional; it must leave the
+  // panel without loops instead of aborting the render that follows it.
+  function parseLoops(err, result){
+    if(err || !result){
+      console.warn("loop detection request failed", err);
+      return [];
+    }
+    var parsed;
+    try {
+      parsed = JSON.parse(result.responseText);
+    } catch(e) {
+      console.warn("loop detection returned no usable result", e);
+      return [];
+    }
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
     function loadWithDotGraphAndFunctionIdA(function_id, node_colors) {
       isTraceSupplied = false;
       // Send request for loop information; load when ready
@@ -1254,6 +1334,7 @@ function highlightUERs(UERtype){
           dot_graph = result.responseText;
           dotFile_a = dot_graph.replace(/\\l/g, "\n");
           g_a = graphlibDot.parse(dotFile_a);
+          cfgPanels.a.graph = g_a;  // mcritweb: issue #69
           // Send request for loop information; load when ready
           d3.xhr(window.location.origin + "/explore/findLoops/")
             .header("X-CSRFToken", csrfToken())  // mcritweb: issue #83
@@ -1261,18 +1342,25 @@ function highlightUERs(UERtype){
             .post(dotFile_a,
               function(err, result){
                 // console.log("Response: ", result.responseText);
-                loopsObj = JSON.parse(result.responseText);
-                
+                // mcritweb: issue #69 - each panel keeps its own loops, and the
+                // graph is drawn even when loop detection could not answer.
+                cfgPanels.a.loops = parseLoops(err, result);
+
                 // loopify_dagre.init();
                 var modifiedDotFile_a = loopify_dagre.modifiedDotFile;
                 var modifiedDotFile_a = dotFile_a;
                 // console.log(modifiedDotFile);
                 graph_to_display_a = graphlibDot.parse(modifiedDotFile_a);
+                cfgPanels.a.rendered = graph_to_display_a;  // mcritweb: issue #69
       
       
                 showGraph("a", node_colors);
-                // loopify_dagre.addBackground();
-      
+                // mcritweb: issue #69 - the two panels load independently, so a
+                // highlight switched on while this one was still in flight has
+                // already painted the other and would never reach these nodes.
+                reapplyHighlight();
+                renderLoopBoundaries("a");  // mcritweb: issue #69, was loopify_dagre.addBackground()
+
                 fnManip.init();
                 // loopCollapser.init();
               });
@@ -1290,6 +1378,7 @@ function highlightUERs(UERtype){
         dot_graph = result.responseText;
         dotFile_b = dot_graph.replace(/\\l/g, "\n");
         g_b = graphlibDot.parse(dotFile_b);
+        cfgPanels.b.graph = g_b;  // mcritweb: issue #69
         // Send request for loop information; load when ready
         d3.xhr(window.location.origin + "/explore/findLoops/")
           .header("X-CSRFToken", csrfToken())  // mcritweb: issue #83
@@ -1297,18 +1386,23 @@ function highlightUERs(UERtype){
           .post(dotFile_b,
             function(err, result){
               // console.log("Response: ", result.responseText);
-              loopsObj = JSON.parse(result.responseText);
-              
+              // mcritweb: issue #69 - each panel keeps its own loops, and the
+              // graph is drawn even when loop detection could not answer.
+              cfgPanels.b.loops = parseLoops(err, result);
+
               // loopify_dagre.init();
               var modifiedDotFile_b = loopify_dagre.modifiedDotFile;
               var modifiedDotFile_b = dotFile_b;
               // console.log(modifiedDotFile);
               graph_to_display_b = graphlibDot.parse(modifiedDotFile_b);
+              cfgPanels.b.rendered = graph_to_display_b;  // mcritweb: issue #69
     
     
               showGraph("b", node_colors);
-              // loopify_dagre.addBackground();
-    
+              // mcritweb: issue #69 - see the "a" loader.
+              reapplyHighlight();
+              renderLoopBoundaries("b");  // mcritweb: issue #69, see the "a" loader
+
               fnManip.init();
               // loopCollapser.init();
             });
@@ -1322,6 +1416,10 @@ function highlightUERs(UERtype){
   function fillNodesandEdgesA(node_colors){
 
     var container_id = "#graphContainer_a"
+
+    // mcritweb: issue #69 - everything below writes into nodesAll/edgesAll/
+    // edgeLabelsAll, so point those at this panel first.
+    var panel = usePanel(cfgPanels.a);
 
     // compute the degrees of the node i.e. sum of indegrees or sum of outdegrees
     var re = /ct:(\d+)/i;
@@ -1390,6 +1488,7 @@ function highlightUERs(UERtype){
             // nodesAll[d].select("rect").style("fill", degreeScale(Math.log10(deg)));
             if (d in node_colors["a"]) {
               nodesAll[d].select("rect").style("fill", node_colors["a"][d]);
+              panel.colors[d] = node_colors["a"][d];  // mcritweb: issue #69
             }
 
             // Change this stroke-width property to stroke property i.e. border fill instead of background fill
@@ -1453,6 +1552,9 @@ function highlightUERs(UERtype){
   function fillNodesandEdgesB(node_colors){
 
     var container_id = "#graphContainer_b"
+
+    // mcritweb: issue #69 - see fillNodesandEdgesA.
+    var panel = usePanel(cfgPanels.b);
 
     // compute the degrees of the node i.e. sum of indegrees or sum of outdegrees
     var re = /ct:(\d+)/i;
@@ -1521,6 +1623,7 @@ function highlightUERs(UERtype){
             // nodesAll[d].select("rect").style("fill", degreeScale(Math.log10(deg)));
             if (d in node_colors["b"]) {
               nodesAll[d].select("rect").style("fill", node_colors["b"][d]);
+              panel.colors[d] = node_colors["b"][d];  // mcritweb: issue #69
             }
             // Change this stroke-width property to stroke property i.e. border fill instead of background fill
             nodesAll[d].select("rect").style("stroke-width", degreeBorderScale(Math.log10(deg)));
@@ -2079,7 +2182,21 @@ function highlightUERs(UERtype){
   // The main function that sets up the graph, initializes all variables and 
   // sets up event listeners
   function showGraph(graph_id, node_colors) {
-    var container_id = "#graphContainer" + "_" + graph_id
+    // mcritweb: issue #69 - showGraph runs once per panel, and the handlers it
+    // binds at the bottom used to say nothing about which panel they were for.
+    // Everything they need comes off the panel table instead:
+    //  - panel        the per-panel stores (blocks, colours, loops, both graphs)
+    //  - container_id the svg this panel's graph is drawn in
+    //  - pane_id      the half of the page holding it; both halves are
+    //                 position:relative, so it is also the frame the tooltip is
+    //                 positioned and clamped against
+    //  - tooltip_id   this panel's tooltip. The single-graph template has one
+    //                 #tooltip/#value; this one has a pair per panel.
+    var panel = cfgPanels[graph_id];
+    var container_id = panel.container;
+    var pane_id = panel.pane;
+    var tooltip_id = "#tooltip_" + graph_id;
+    var value_id = "#value_" + graph_id;
 
     var svg = d3.select(container_id);
     var inner = d3.select(container_id + " g");
@@ -2089,11 +2206,11 @@ function highlightUERs(UERtype){
     // renderer.run(g, d3.select("#graphContainer g"));
 
     //Render the modified file (output from loopified code) i.e. the file with invisible edges, ports etc.
-    if (graph_id == "a") {
-      renderer.run(graph_to_display_a, d3.select(container_id + " g"));
-    } else {
-      renderer.run(graph_to_display_b, d3.select(container_id + " g"));
-    }
+    // mcritweb: issue #69 - panel.rendered is the graph laid out here, so it is the
+    // one the edge ids in the DOM belong to. panel.graph is a second parse of the
+    // same string and yields the same ids, so either would resolve; this is simply
+    // the object the markup came from, and it does not rely on that holding.
+    renderer.run(panel.rendered, d3.select(container_id + " g"));
     // Collapse all nodes by default
     // d3.selectAll("#graphContainer g.node.enter")
     // .each(function(d) { 
@@ -2147,6 +2264,12 @@ function highlightUERs(UERtype){
       // .translate([0 , 20])
       .scale(initialScale)
       .event(svg);
+
+    // mcritweb, issue #74: hand the rendered graph to function_compare.js
+    graph_zooms[graph_id] = {zoom: zoom, svg: svg, inner: inner, initialScale: initialScale};
+    if (typeof onGraphShown === "function") {
+      onGraphShown(graph_id);
+    }
   
   var nodes = svg.selectAll("g.node.enter");
   var brush = svg.append("g")
@@ -2172,17 +2295,20 @@ function highlightUERs(UERtype){
 
     if(isTripCountShown){
       //enable 
-          d3.selectAll("g.node.enter")
+          // mcritweb: issue #69 - scoped to this panel and read off its own
+          // graph. #countEncoding is not in this template, so none of this runs
+          // today; it would have thrown on the null global `g` if it ever did.
+          d3.selectAll(container_id + " " + "g.node.enter")
       .each(function(d) { 
-        nodesAll[d] = d3.select(this);
+        panel.nodes[d] = d3.select(this);
         
-          if("degree" in g.node(d)){
-            var deg = g.node(d).degree;
+          if("degree" in panel.rendered.node(d)){
+            var deg = panel.rendered.node(d).degree;
             
             // Change the fill to stroke property
             // nodesAll[d].select("rect").style("fill", degreeScale(Math.log10(deg)));
 
-            nodesAll[d].select("rect").style("stroke-width", degreeBorderScale(Math.log10(deg)));
+            panel.nodes[d].select("rect").style("stroke-width", degreeBorderScale(Math.log10(deg)));
 
           }
 
@@ -2190,17 +2316,17 @@ function highlightUERs(UERtype){
 
     } else {
       //disable 
-          d3.selectAll("g.node.enter")
+          d3.selectAll(container_id + " " + "g.node.enter")  // mcritweb: issue #69
       .each(function(d) { 
-        nodesAll[d] = d3.select(this);
+        panel.nodes[d] = d3.select(this);
         
-          if("degree" in g.node(d)){
+          if("degree" in panel.rendered.node(d)){
             // var deg = g.node(d).degree;
 
             // Change this property from fill to stroke-width
             // nodesAll[d].select("rect").style("fill", "");
 
-            nodesAll[d].select("rect").style("stroke-width", "");
+            panel.nodes[d].select("rect").style("stroke-width", "");
 
           }
 
@@ -2211,21 +2337,10 @@ function highlightUERs(UERtype){
   });
 
   d3.select("#loopBgFill").on("change", function(){
+     // mcritweb: issue #69 - the boundaries are drawn per panel here, so this
+     // toggles both groups instead of the one-graph page's single #bgFill.
      isLoopBoundaryShown = this.checked;
-
-     if(isLoopBoundaryShown){
-        //remove bgFill
-        // d3.select("#bgFill").remove();
-        // loopify_dagre.addBackground();
-
-        d3.select("#bgFill").style("display", "unset");
-
-        
-     }  else {
-
-        d3.select("#bgFill").style("display", "none");
-     }
-
+     setLoopBoundaryVisibility();
   });
 
   //enable or disable brush using checkbox
@@ -2335,16 +2450,15 @@ function highlightUERs(UERtype){
     
     d3.select("#showCycles")
         .on("click", function(){
-        	if(!isCycleShown){
-          		showCycles();
-          		isCycleShown = true;
-          		d3.select(this).attr("value", "Hide Cycles");
-      		}	else {
-      			d3.selectAll("g.node.enter").select("rect").style("fill", "");
-      			d3.selectAll("g.node.enter").attr("fill", "");
-      			isCycleShown = false;
-            d3.select(this).attr("value", "Show Cycles");
-      		}
+          setHighlightMode(isCycleShown ? null : "cycles");
+        }
+      );
+
+    // mcritweb: issue #69 - Show Loops was only ever bound by loopCollapser.init(),
+    // which this page does not call, so the button did nothing at all.
+    d3.select("#showLoops")
+        .on("click", function(){
+          setHighlightMode(isLoopShown ? null : "loops");
         }
       );
 
@@ -2367,13 +2481,24 @@ function highlightUERs(UERtype){
           }
 
     			if(currentNode)	{
+            // mcritweb: issue #69 - this hid the block first and only then read the
+            // global `g` for its edges. `g` is null on this page, so the block went,
+            // its edges stayed behind pointing at nothing, there was no way to bring
+            // it back, and *then* it threw: 27 visible blocks became 26 with all 36
+            // edges still drawn. The lookup now happens first, against the panel the
+            // hovered block is actually in, and the edge selection is scoped to that
+            // panel - unscoped it would have hidden the other graph's edges too.
+            var hovered = cfgPanels[currentNodePanel];
+            if(!hovered || !hovered.rendered){
+              return;
+            }
+            var nodeId = d3.select(currentNode).datum();
+            var inEdges = hovered.rendered.inEdges(nodeId);
+            var outEdges = hovered.rendered.outEdges(nodeId);
     				d3.select(currentNode)
     					.style("display", "none");
-            var nodeId = d3.select(currentNode).datum();
-            var inEdges = g.inEdges(nodeId);
-            var outEdges = g.outEdges(nodeId);
             if(inEdges.length != 0 || outEdges.length != 0) {
-              d3.selectAll("g.edgePath.enter")
+              d3.selectAll(hovered.container + " " + "g.edgePath.enter")
                 .filter(function(d){
                   for(var i=0; i<inEdges.length; i++){
                     if(inEdges[i] === d){
@@ -2562,7 +2687,10 @@ function highlightUERs(UERtype){
      // .call(rtClickdrag);
 
 
-    d3.selectAll("g.edgePath.enter")
+    // mcritweb: issue #69 - scoped to this panel. Unscoped, the second panel to
+    // finish rendering rebound the first panel's edges to its own graph as well,
+    // so an edge of A was looked up in B's graph.
+    d3.selectAll(container_id + " " + "g.edgePath.enter")
       .on("mouseover", function(){
 
 
@@ -2574,14 +2702,19 @@ function highlightUERs(UERtype){
       })
       .on("click", function(){
         
-        var incidences = g._strictGetEdge(d3.select(this).datum());
+        // mcritweb: issue #69 - was `g._strictGetEdge(...)` and `nodesAll[...]`.
+        // The global `g` is assigned by the single-graph page's loader and stays
+        // null here, so every edge click threw "Cannot read properties of null
+        // (reading '_strictGetEdge')" on this line and moved nothing. Both the
+        // graph and the rendered blocks now come from this panel.
+        var incidences = panel.rendered._strictGetEdge(d3.select(this).datum());
         var u = incidences.u;
         var v = incidences.v;
         
         var clickPt = d3.mouse(this);     
 
-        var uTransform = nodesAll[u].attr("transform");
-        var vTransform = nodesAll[v].attr("transform");
+        var uTransform = panel.nodes[u].attr("transform");
+        var vTransform = panel.nodes[v].attr("transform");
 
         var ut = []
         var vt = [];
@@ -2602,19 +2735,19 @@ function highlightUERs(UERtype){
           vt[1] = clickPt[1] + 30;
         }        
 
-        nodesAll[u].transition().duration(500)
+        panel.nodes[u].transition().duration(500)
         .ease("exp-out")
         .attr("transform", "translate(" + ut[0] + "," + ut[1] + ")");
         
-        nodesAll[u].transition().duration(250).delay(1000)
+        panel.nodes[u].transition().duration(250).delay(1000)
         .ease("exp-in")
         .attr("transform", uTransform);
 
-        nodesAll[v].transition().duration(500)
+        panel.nodes[v].transition().duration(500)
         .ease("exp-out")
         .attr("transform", "translate(" + vt[0] + "," + vt[1] + ")");
         
-        nodesAll[v].transition().duration(250).delay(1000)
+        panel.nodes[v].transition().duration(250).delay(1000)
         .ease("exp-in")
         .attr("transform", vTransform);
 
@@ -2628,7 +2761,9 @@ function highlightUERs(UERtype){
     });
 
       
-    d3.selectAll("g.node.enter")
+    // mcritweb: issue #69 - scoped to this panel, so the handlers below know which
+    // of the two tooltips and which block registry they are for.
+    d3.selectAll(container_id + " " + "g.node.enter")
       // .on("click", function()){
       // 		currentNode = this;
       // })	
@@ -2676,25 +2811,23 @@ function highlightUERs(UERtype){
         thisNode.classed("active", true);
 
         currentNode = this;
+        currentNodePanel = graph_id;  // mcritweb: issue #69
         var nodeId = thisNode.datum(); 
 
         var textToHighlight = [];
 
         // Linked Highlighting
-        if(isTraceSupplied){
-          if(nodeId in nodeToTextGroups){
-            textToHighlight = nodeToTextGroups[nodeId];
-          }
-        } else {
-          if(nodeId in nodeToTextGroups){
-            textToHighlight = nodeToTextGroups[nodeId];
-          } else {
-            textToHighlight = d3.selectAll("#text_code p")
-              .filter(function(d) {
-                return nodeId === d;
-              });
-          }
-
+        // mcritweb: issue #69 - this used to branch on isTraceSupplied, and the
+        // "no trace" arm fell back to "#text_code p", the paragraphs of the code
+        // panel the single-function page renders beside its graph. This template
+        // has no #text_code at all, and d3 3.4.11 answers a miss with a selection -
+        // an array holding one empty group - rather than with nothing, so the
+        // length test below passed, `[0]` was a plain Array, and `.node()` threw
+        // "textToHighlight[i].node is not a function" on every hover of every
+        // block. With no code panel to link to, both arms became the same lookup,
+        // so there is no branch left to make.
+        if(nodeId in nodeToTextGroups){
+          textToHighlight = nodeToTextGroups[nodeId];
         }
         
         for(var i=0; i<currTextHighlight.length; i++){
@@ -2711,39 +2844,87 @@ function highlightUERs(UERtype){
           //   .style("border-width", "2px");
 
           textToHighlight[i].classed("highlight", true);
-          if(i==0){
-            //Scroll to the first matching block
-            d3.select("#xcfg_right").node().scrollTop = textToHighlight[i].node().offsetTop;
-          }
+          // mcritweb: issue #69 - "scroll the code panel to the first matching
+          // block" used to be here, hardcoded to #xcfg_right. On this page that id
+          // is the *other graph*, so the one thing it could not do is scroll a code
+          // panel; it survived only because textToHighlight is always empty here.
+          // Whoever gives this page a code panel scrolls that panel, by its own id.
 
         }
          
          if(isTooltipEnabled){
 
+            // mcritweb: issue #69 - "Enable Tooltip" was a dead control: it set
+            // the flag, and everything below then wrote to "#tooltip"/"#value",
+            // which the single-graph template has and this one does not - it has
+            // #tooltip_a/#value_a and #tooltip_b/#value_b. The panel this handler
+            // was bound for now supplies all four of the ids, and the position is
+            // taken against that panel's own div rather than always the left one.
+
             //Get the mouse event's x/y values relative to the containing div
             var pos = [0,0];
-            pos = d3.mouse(d3.select("#xcfg_left").node());
+            var frame = d3.select(pane_id).node();
+            pos = d3.mouse(frame);
             var xPosition = pos[0];	
             var yPosition = pos[1];
 
+            // mcritweb: issue #69 - and this is why the two are one change. The
+            // lines below are the dot graph's node label, which carries the api
+            // names smda read out of the analysed binary (`toDotGraph(with_api=
+            // True)`) - so whoever gets a sample submitted writes part of them.
+            // They used to be joined with "<br/>" and assigned into .innerHTML,
+            // which made an import called `<img src=x onerror=...>` run. Nothing
+            // reached the sink only because the hover threw a few lines above, so
+            // repairing either of those two arms it. Joined with newlines and set
+            // as text instead; the tooltip is told to keep the line breaks.
             var text = "";
             thisNode.selectAll("text tspan").each(function(){
-              text+=d3.select(this).text() + "<br/>";
+              text+=d3.select(this).text() + "\n";
             });
 
-            var width = rect.node().getBBox().width;
+            // mcritweb: issue #69 - getBBox is in the graph's own units while the
+            // graph is drawn at whatever the zoom currently is, so an unscaled width
+            // was wrong by that factor, and nothing held the result inside the panel:
+            // a wide block gave a 344px tooltip in a 558px half and overflowed it by
+            // 43.7px, clipping the text. Scaled, then clamped to the frame, with the
+            // left edge clamped so the right edge lands inside it too.
+            var graph_transform = inner.attr("transform");
+            var graph_scale = graph_transform ? d3.transform(graph_transform).scale[0] : 1;
+            var box_padding = 6;  // the 3px this handler sets, on both sides
+            var frame_width = frame.clientWidth;
+            var width = rect.node().getBBox().width * graph_scale * 1.25;
+            width = Math.min(width, frame_width - box_padding - 2);
+            xPosition = Math.max(0, Math.min(xPosition, frame_width - width - box_padding - 1));
 
             //Update the tooltip position and value
-            d3.select("#tooltip")
+            // The stylesheet under static/trace_CFG/ is vendored and styles
+            // "#tooltip" and "#tooltip p" by id, so it reaches neither of this
+            // page's two; the properties that make the tooltip readable are set
+            // here instead, and they are the same ones - without margin:0 the
+            // paragraph keeps Bootstrap reboot's 16px margin-bottom inside a box
+            // padded by 3.
+            d3.select(tooltip_id)
+              .style("position", "absolute")
+              .style("z-index", "10")
+              .style("padding", "3px")
+              .style("border-radius", "10px")
+              .style("box-shadow", "4px 4px 10px rgba(0, 0, 0, 0.4)")
+              .style("background-color", "white")
+              .style("pointer-events", "none")
+              .style("white-space", "pre")
+              .style("font-family", "monospace")
               .style("left", xPosition + "px")
               .style("top", yPosition + "px")
-              .style("width", function(){return (width*1.25) + "px"})
-              .select("#value")
-              .node().innerHTML = text;
-              // .text(text);
+              .style("width", function(){return width + "px"})
+              .select(value_id)
+              .text(text);
+
+            d3.select(tooltip_id).select("p")
+              .style("margin", "0")
+              .style("font-size", "1.25em");
 
             //Show the tooltip
-            d3.select("#tooltip").classed("hidden", false);
+            d3.select(tooltip_id).classed("hidden", false);
           }
 
       })
@@ -2764,9 +2945,10 @@ function highlightUERs(UERtype){
 
         // currTextHighlight = [];
         currentNode = null;
+        currentNodePanel = null;  // mcritweb: issue #69
         
         //Hide the tooltip
-        d3.select("#tooltip").classed("hidden", true);
+        d3.select(tooltip_id).classed("hidden", true);  // mcritweb: issue #69
 
       })
     .call(drag);
@@ -3414,25 +3596,203 @@ function highlightUERs(UERtype){
   }
 
   // Shows cycle nodes in different colors
+  // mcritweb: issue #69 - this used to run against the global g, which this page
+  // never assigns, so every click threw. Each panel is coloured from its own graph.
   function showCycles(){
-    var cycles = graphlib.alg.findCycles(g);
-    // console.log(cycles);
-    var num_cycles = cycles.length;
+    for(var key in cfgPanels) {
+      var panel = cfgPanels[key];
+      colorNodeGroups(panel, panel.graph ? graphlib.alg.findCycles(panel.graph) : []);
+    }
+  }
 
-    for(var i=0; i<num_cycles; i++) {
-      var loop_size = cycles[i].length;
-      // console.log(loop_size);
-    
-      for(var j=0; j<loop_size; j++) {
-        
-          nodesAll[cycles[i][j]]
-          .attr("fill", "white")
+  // Shows the nodes of each natural loop in different colors.
+  // mcritweb: issue #69 - the single-graph page gets this from loopCollapser.init(),
+  // which the duo loaders cannot call: it is a singleton over the same globals and
+  // binds one button, so the second panel would simply displace the first. The
+  // loops themselves come from the server, per panel, and colouring them is the
+  // whole of what the button does.
+  function showLoops(){
+    for(var key in cfgPanels) {
+      var panel = cfgPanels[key];
+      var groups = [];
+      for(var i=0; i<panel.loops.length; i++) {
+        var loop = panel.loops[i];
+        groups.push(loop && loop.nodes ? loop.nodes : []);
+      }
+      colorNodeGroups(panel, groups);
+    }
+  }
+
+  // Paints one color per group over the nodes of a single panel.
+  function colorNodeGroups(panel, groups){
+    for(var i=0; i<groups.length; i++) {
+      var group = groups[i] || [];
+      for(var j=0; j<group.length; j++) {
+        // a loop or cycle may name a node the renderer dropped, and the names come
+        // off the wire - hasOwnProperty so that "constructor" and friends cannot
+        // reach Object.prototype and break the whole highlight
+        if(!panel.nodes.hasOwnProperty(group[j])) { continue; }
+        var node = panel.nodes[group[j]];
+        node.attr("fill", "white")
           .select("rect")
-          .style("fill", function(d){
-              return colores_g[i%colores_g.length];  
-          });  
+          .style("fill", colores_g[i%colores_g.length]);
       }
     }
+  }
+
+  // Puts every node back to the per-block diff color it was rendered with, so
+  // switching a highlight off does not strip the comparison this page is for.
+  function resetNodeFills(){
+    for(var key in cfgPanels) {
+      var panel = cfgPanels[key];
+      for(var nodeId in panel.nodes) {
+        if(!panel.nodes.hasOwnProperty(nodeId)) { continue; }
+        panel.nodes[nodeId]
+          // null removes the attribute; "" would leave fill="" behind, which is not a
+          // valid SVG presentation value. Browsers ignore it either way, but a pristine
+          // node has no fill attribute at all and un-highlighting should restore that.
+          .attr("fill", null)
+          .select("rect")
+          .style("fill", panel.colors.hasOwnProperty(nodeId) ? panel.colors[nodeId] : "");
+      }
+    }
+  }
+
+  // Paints whichever highlight is currently on, without touching the buttons. A
+  // panel that finished loading after the user pressed one has just drawn its nodes
+  // in their ordinary diff colours, so the highlight has to be laid over it again -
+  // otherwise the button reads "Hide Cycles" while one panel shows none.
+  function reapplyHighlight(){
+    if(isCycleShown) { showCycles(); }
+    if(isLoopShown) { showLoops(); }
+  }
+
+  // mcritweb: issue #69 - loop boundaries.
+  //
+  // "Show Loop Boundaries" was inert on this page. loopify_dagre draws them on the
+  // single-graph page, but it cannot be reused here: it is a singleton over the
+  // globals `dotFile` and `loopsObj`, it rewrites the dot graph into a layout of its
+  // own that this page deliberately does not render (`modifiedDotFile_a = dotFile_a`
+  // above), and it appends its one `#bgFill` to a `#graphContainer g.zoom` that does
+  // not exist here. What the control actually shows is a filled hull per loop, so
+  // that is what these draw - per panel, from the panel's own loops and its own
+  // rendered blocks.
+
+  // Fill per nesting depth. loopify_dagre's palette, so the two views read alike -
+  // and the first of these is the swatch on the checkbox in the template.
+  var loopBgColors = ['#fdd0a2', '#fdae6b', '#fd8d3c', '#f16913', '#d94801', '#8c2d04'];
+
+  // How far outside the blocks the hull is drawn, in layout units. loopify_dagre
+  // hulls the block corners exactly, which leaves the fill showing only in the gaps
+  // between blocks; a margin is what makes it read as a boundary around the loop.
+  var loopBoundaryPadding = 12;
+
+  // Nesting depth of every loop in a /explore/findLoops/ response. The detector
+  // sorts loops by size and gives each the index of the smallest loop containing it
+  // as "parent" ("" for an outermost one), so the depth is the length of that chain.
+  function loopDepths(loops){
+    var depths = [];
+    for(var i=0; i<loops.length; i++) {
+      var depth = 0;
+      var at = i;
+      // parent indices are strictly increasing by construction, so this terminates -
+      // but the response comes off the wire, so bound the walk rather than trust it
+      while(depth < loops.length) {
+        var parent = loops[at] ? loops[at].parent : "";
+        if(parent === "" || parent === null || parent === undefined) { break; }
+        parent = parseInt(parent, 10);
+        if(isNaN(parent) || parent < 0 || parent >= loops.length || parent === at) { break; }
+        at = parent;
+        depth++;
+      }
+      depths.push(depth);
+    }
+    return depths;
+  }
+
+  // The four corners of one block, in its panel's layout coordinates, grown by the
+  // padding. Mirrors loopify_dagre's getRectanglePoints, but reads the panel's own
+  // node dict rather than the shared one.
+  function blockCorners(panel, nodeId){
+    if(!panel.nodes.hasOwnProperty(nodeId)) { return []; }
+    var node = panel.nodes[nodeId];
+    var rect = node.select("rect");
+    if(rect.empty()) { return []; }
+    var translate = d3.transform(node.attr("transform")).translate;
+    var x = Number(rect.attr("x")) + translate[0] - loopBoundaryPadding;
+    var y = Number(rect.attr("y")) + translate[1] - loopBoundaryPadding;
+    var width = Number(rect.attr("width")) + 2 * loopBoundaryPadding;
+    var height = Number(rect.attr("height")) + 2 * loopBoundaryPadding;
+    return [
+      {x: x, y: y},
+      {x: x + width, y: y},
+      {x: x, y: y + height},
+      {x: x + width, y: y + height}
+    ];
+  }
+
+  // Draws one panel's loop boundaries. Call after its showGraph(), which is what
+  // fills panel.nodes with the rendered blocks these are measured from.
+  function renderLoopBoundaries(key){
+    var panel = cfgPanels[key];
+    var svg = d3.select("#graphContainer_" + key);
+    // the group dagre rendered into, which is also the one zoom transforms - so the
+    // boundaries pan and scale with the graph instead of drifting off it
+    var inner = svg.select("g");
+    if(inner.empty()) { return; }
+
+    svg.select("#bgFill_" + key).remove();
+    var group = inner.append("g")
+      .attr("id", "bgFill_" + key)
+      .attr("class", "bgFill");
+    // first child, so the fills sit behind the blocks and edges rather than over them
+    group.node().parentNode.insertBefore(group.node(), group.node().parentNode.firstChild);
+
+    var depths = loopDepths(panel.loops);
+    var order = [];
+    for(var i=0; i<panel.loops.length; i++) { order.push(i); }
+    // outermost first, so a nested loop's fill lands on top of the one containing it
+    order.sort(function(x, y){ return depths[x] - depths[y]; });
+
+    for(var j=0; j<order.length; j++) {
+      var loop = panel.loops[order[j]];
+      var blocks = (loop && loop.nodes) ? loop.nodes : [];
+      var points = [];
+      for(var k=0; k<blocks.length; k++) {
+        Array.prototype.push.apply(points, blockCorners(panel, blocks[k]));
+      }
+      var hull = points.length ? convexHull(points) : [];
+      // a loop whose blocks the renderer dropped, or that came back collinear, has
+      // no area to fill - skip it rather than emit a degenerate path
+      if(hull.length < 3) { continue; }
+      var d = "M " + hull[0].x + " " + hull[0].y;
+      for(var p=1; p<hull.length; p++) {
+        d += " L " + hull[p].x + " " + hull[p].y;
+      }
+      group.append("path")
+        .attr("fill", loopBgColors[depths[order[j]] % loopBgColors.length])
+        .attr("stroke", "none")
+        .attr("d", d + " Z");
+    }
+
+    // the checkbox may have been unticked while this panel was still loading
+    setLoopBoundaryVisibility();
+  }
+
+  function setLoopBoundaryVisibility(){
+    // one group per panel here, rather than the single #bgFill the one-graph page has
+    d3.selectAll("g.bgFill").style("display", isLoopBoundaryShown ? null : "none");
+  }
+
+  // The two highlights paint the same rects, so at most one of them is on.
+  function setHighlightMode(mode){
+    resetNodeFills();
+    isCycleShown = (mode == "cycles");
+    isLoopShown = (mode == "loops");
+    if(isCycleShown) { showCycles(); }
+    if(isLoopShown) { showLoops(); }
+    d3.select("#showCycles").attr("value", isCycleShown ? "Hide Cycles" : "Show Cycles");
+    d3.select("#showLoops").attr("value", isLoopShown ? "Hide Loops" : "Show Loops");
   }
 
   function scrollToNode(node){
@@ -3531,6 +3891,21 @@ function highlightUERs(UERtype){
 
   function escapeRegExp(str) {
     return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+  }
+
+  // mcritweb: issue #69 - the three taint highlighters build a coloured span around a
+  // line of block text and assign the result into innerHTML. The markup is the
+  // highlight, so those three cannot become .text() calls the way the tooltip did; the
+  // untrusted half goes through here instead. Block text comes out of the dot graph,
+  // which carries the api names smda read out of the analysed binary.
+  // tests/testScriptEscaping.py fails on any interpolation into a span that skips it.
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
 

@@ -20,6 +20,7 @@ import os
 import re
 
 import pytest
+from markupsafe import escape
 from mcrit.storage.FamilyEntry import FamilyEntry
 
 LOG = logging.getLogger(__name__)
@@ -86,12 +87,45 @@ def fake_mcrit(corpus_mcrit):
     return corpus_mcrit
 
 
-@pytest.mark.parametrize("path", ["/explore/families", "/explore/samples"])
+@pytest.mark.parametrize("path", ["/explore/families", "/explore/samples", "/data/submit"])
 def test_a_family_name_cannot_break_out_of_a_script_string(client, as_role, fake_mcrit, path):
-    """`js/ac_family_names.html` builds the autocomplete list from backend family names.
+    """A family name is chosen by whoever submits or renames a family, so it is user
+    input arriving by way of the backend - exactly what AGENTS.md says must never reach
+    `|safe`.
 
-    A family name is chosen by whoever submits or renames a family, so it is user input
-    arriving by way of the backend - exactly what AGENTS.md says must never reach `|safe`.
+    `/data/submit` is the remaining page that embeds the names in its source, through
+    `table/submit_or_query_dropzone.html`. The two explore listings used to do the same
+    through `js/ac_family_names.html`; #77 moved them onto `explore.family_names`, which
+    the test below covers. They stay in this list so that re-embedding a name there
+    would have to pass this again.
+    """
+    family_id, family_entry = next(iter(fake_mcrit._families.items()))
+    fake_mcrit._families[family_id] = FamilyEntry.fromDict(
+        dict(family_entry.toDict(), family_name=BREAKOUT_NAME)
+    )
+    as_role("contributor")
+
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert b"<script>alert(1)</script>" not in response.data, (
+        f"a crafted family name broke out of the JS string literal on {path}"
+    )
+
+
+def test_a_family_name_stays_a_string_in_the_type_ahead_response(client, as_role, fake_mcrit):
+    """Where those names travel since #77: JSON, fetched by `js/ac_family_names.html`.
+
+    A JSON body is not a script context and is not served as one, so part of what this
+    pins is that the endpoint stays JSON and the name stays a string *value* in it -
+    never concatenated into a document.
+
+    The rest is the sink the transport never covered. `Autocomplete.createItem` in
+    `static/autocomplete.js` builds its dropdown by interpolating the label into an HTML
+    string, so a name that *is* markup executes there however safely it travelled. #168
+    escapes the names the page embeds; this endpoint is the other way into the same
+    widget, so it escapes through the same function (`mcritweb.autocomplete`) and the
+    raw name must not survive the round trip.
     """
     family_id, family_entry = next(iter(fake_mcrit._families.items()))
     fake_mcrit._families[family_id] = FamilyEntry.fromDict(
@@ -99,9 +133,77 @@ def test_a_family_name_cannot_break_out_of_a_script_string(client, as_role, fake
     )
     as_role("visitor")
 
-    response = client.get(path)
+    response = client.get("/explore/familyNames?q=evil")
 
     assert response.status_code == 200
-    assert b"<script>alert(1)</script>" not in response.data, (
-        f"a crafted family name broke out of the JS string literal on {path}"
+    assert response.mimetype == "application/json"
+    escaped = str(escape(BREAKOUT_NAME))
+    assert response.json["suggestions"] == [{"label": escaped, "value": escaped}]
+    assert BREAKOUT_NAME not in response.get_data(as_text=True), (
+        "the unescaped name reached the widget, which renders it through innerHTML"
+    )
+
+
+# --- the CFG page's own script ---------------------------------------------------
+
+#: `static/trace_CFG/main_duo.js` is a project fork we maintain (see AGENTS.md), and it
+#: assigns into `innerHTML` in four places. Three of them build a `<span>` around a line
+#: of block text taken out of the dot graph - which carries the api names smda read out
+#: of the analysed binary - so the value being wrapped is attacker-influenced even
+#: though the wrapper is not. `main.js` is stock and is deliberately not scanned: it is
+#: not ours to change, and it has the same construct.
+MAIN_DUO = os.path.join(PACKAGE_ROOT, "static", "trace_CFG", "main_duo.js")
+
+#: The shape all three sinks share: something dropped straight after the `>` that closes
+#: a tag opener and straight before the matching `</span>`.
+SPAN_INTERPOLATION = re.compile(r">\"\s*\+\s*(?P<value>.+?)\s*\+\s*\"</span>")
+
+#: Whole-line comments. Commented-out code cannot run, and this file has a lot of it -
+#: including earlier drafts of the very lines being linted.
+JS_LINE_COMMENT = re.compile(r"^\s*//")
+
+
+def main_duo_lines():
+    with open(MAIN_DUO, encoding="utf-8") as script:
+        for number, line in enumerate(script, start=1):
+            if not JS_LINE_COMMENT.match(line):
+                yield number, line
+
+
+def span_interpolations():
+    """Every value interpolated into a `<span>` in main_duo.js, as (line, expression)."""
+    for number, line in main_duo_lines():
+        for hit in SPAN_INTERPOLATION.finditer(line):
+            yield number, hit.group("value").strip()
+
+
+def test_the_main_duo_scan_still_sees_something():
+    """A guard on the guard, as above: the file could be refreshed from upstream, or the
+    construct rewritten, and this lint would then pass by finding nothing."""
+    found = list(span_interpolations())
+    assert len(found) >= 3, (
+        f"only {len(found)} span interpolations found in main_duo.js - the scan has "
+        "stopped watching the taint highlighters"
+    )
+
+
+def test_block_text_is_escaped_before_it_is_built_into_markup():
+    """The tooltip's `innerHTML` sink was closed by switching it to `.text()`. These three
+    cannot be: the markup is the point - they wrap a line of code in a coloured span and
+    that is what the highlight *is*. So the untrusted half is escaped instead, and this
+    lint is what keeps it that way.
+
+    All three are unreachable today: `updateTaint` and `highlightUERs` are driven by
+    `#doTaint`, `#myTaintSlider` and `#analysisSelector`, none of which this template
+    renders, and they read `nodeToTextGroups`, which only `setupTrace()` fills and which
+    nothing calls. That is precisely the argument this change refused to accept for the
+    tooltip, so it is not accepted here either: `usePanel`'s comment invites someone to
+    wire `setupTrace` up, and the sink must already be shut when they do.
+    """
+    unescaped = [f"main_duo.js:{number} interpolates {value}"
+                 for number, value in span_interpolations()
+                 if not value.startswith("escapeHtml(")]
+    assert not unescaped, (
+        "text is built into markup without escaping at: " + "; ".join(unescaped)
+        + ". Wrap the value in escapeHtml() - these strings are assigned into innerHTML."
     )

@@ -35,6 +35,7 @@ captured.
 | `matches_for_query.*` | query report — `is_query`, negative sample id |
 | `cross_compare.*` | cross compare over five samples |
 | `unique_blocks.*` | unique blocks for a family, with its YARA rule |
+| `maintenance_*.*` | the three maintenance jobs (`rebuildIndex`, `recalculatePicHashes`, `recalculateMinHashes`) and their results, one per branch of `result_maintenance.html` |
 | `functions_reference_<id>` | first 100 functions of a reference sample, graphs intact |
 | `functions_matched` | every function the 1-vs-1 page resolves by id, graphs dropped |
 

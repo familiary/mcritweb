@@ -50,6 +50,10 @@ REPORTS = {
     "matches_for_query": "getMatchesForMappedBinary",
     "cross_compare": "combineMatchesToCross",
     "unique_blocks": "getUniqueBlocks",
+    # maintenance jobs: their results are small and shaped per method (a dict, a dict, an int)
+    "maintenance_rebuild_index": "rebuildIndex",
+    "maintenance_recalculate_pichashes": "recalculatePicHashes",
+    "maintenance_recalculate_minhashes": "recalculateMinHashes",
 }
 
 FUNCTIONS_PER_REFERENCE_SAMPLE = 100

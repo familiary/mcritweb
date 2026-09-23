@@ -1,8 +1,9 @@
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name_tuple, format_family_id, format_sample_id, format_function_id, format_sha_short_clipboard %}
 {% from 'table/column_table.html' import function_column_table %}
+{% from 'table/function_details.html' import api_usage_modal, api_usage_button, cfg_legend %}
 {% extends 'base.html' %}
 {% block style %}
-<!-- 
+<!--
 <script src="{{ url_for('static', filename='trace_CFG/lib/jquery-3.1.1.min.js') }}"></script>
 <script src="{{ url_for('static', filename='trace_CFG/lib/split.js') }}"></script>
 -->
@@ -25,21 +26,38 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
 <div class="container">
 <span><h1>Function Comparison: {{ format_function_id(function_id_a) }} vs. {{ format_function_id(function_id_b) }}</h1></span>
     <div id="match_score">
-        <h3>Match Score: <span id="match_score_value"></span>{% if match_result.matched_score is not none %}{{ "%d"|format(match_result.matched_score) }}{% endif %}</h3>
+        <h3>Match Score: <span id="match_score_value"></span>{% if match_result.matched_score is not none %}{{ "%d"|format(match_result.matched_score) }}{% else %}n/a{% endif %}
+          {% if match_result.match_is_pichash %}<span class="badge bg-primary" title="Both functions have the same PicHash">PicHash</span>{% endif %}
+          {% if match_result.match_is_minhash %}<span class="badge bg-secondary" title="MinHash score above the matching threshold">MinHash</span>{% endif %}
+          {% if match_result.match_is_library %}<span class="badge bg-success" title="Function B belongs to a library sample">Library</span>{% endif %}
+        </h3>
     </div>
-<span style="float:right"><a href="#function_xcfg">go to cfg</a></span>
+<div style="float:right">
+  {{ api_usage_button("apiUsageModal") }}
+  <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" role="button" title="Go to the control flow graphs"><i class="fa-solid fa-diagram-project"></i></a>
+</div>
 {% if entry_a is not none and entry_b is not none %}
     {{ function_column_table(
       ("Function Info A", entry_a, sample_entry_a, pichash_matches_a),
       ("Function Info B", entry_b, sample_entry_b, pichash_matches_b)
-      ) 
+      )
     }}
+
+    {{ api_usage_modal("apiUsageModal", "API usage for this comparison", [
+      ("This comparison", "/matches/function/%d/%d" % (function_id_a, function_id_b)),
+      ("Function A with its CFG", "/functions/%d?with_xcfg=true" % function_id_a),
+      ("Function B with its CFG", "/functions/%d?with_xcfg=true" % function_id_b),
+    ], "match_info = client.getMatchFunctionVs(%d, %d)\nprint(match_info[\"match_entry\"])" % (function_id_a, function_id_b)) }}
 
     <script type="text/javascript">
     window.onload = function() {
         var js_function_id_a = {{ function_id_a }};
         var js_function_id_b = {{ function_id_b }};
         var js_node_colors = {{ node_colors|tojson }};
+        FunctionCompare.init({
+            nodeMatches: {{ node_matches|tojson }},
+            combinedUrl: {{ url_for('explore.fetchCombinedDotGraph', function_id_a=function_id_a, function_id_b=function_id_b)|tojson }}
+        });
         loadWithDotGraphAndFunctionIdA(js_function_id_a, js_node_colors)
         loadWithDotGraphAndFunctionIdB(js_function_id_b, js_node_colors)
     };
@@ -48,14 +66,26 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
 
 
 
-    <div id="xcfg_top" style="height: 90px;">
+    <div id="xcfg_top" style="min-height: 90px;">
         <span><h3 id="function_xcfg">Function CFGs</h3></span>
         <span style="float:right"><a href="#top">go to top</a></span>
-        <input style=" margin: 3px;" type="button" id="showCycles" value="Show Cycles"/>
-        <input style=" margin: 3px;" type="button" id="showLoops" value="Show Loops"/>
-        <label style=" margin:3px; background-color:#fdd0a2; padding:1px"><input style=" margin: 3px;" type="checkbox" id="loopBgFill" value="loopBgFill" checked>Show Loop Boundaries</label>
-        <!-- <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableNodeDrag" value="enableNodeDrag">Enable Node Dragging</label> -->
-        <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableTooltip" value="enableTooltip">Enable Tooltip</label>
+        <div class="d-flex flex-wrap align-items-center" style="gap: 4px 12px;">
+          <span>
+            <label style="margin:3px; padding:3px;"><input type="radio" name="viewMode" value="side-by-side" id="viewSideBySide" checked> Side by side</label>
+            <label style="margin:3px; padding:3px;"><input type="radio" name="viewMode" value="combined" id="viewCombined" disabled title="Available once both graphs are rendered"> Combined</label>
+          </span>
+          <label style="margin:3px; padding:3px;" title="Pan and zoom both graphs together"><input style="margin:3px;" type="checkbox" id="syncGraphs" checked> Sync graphs</label>
+          <input style="margin:3px;" type="button" id="resetView" value="Reset view" title="Fit each graph to its pane again, at its own scale. Both graphs are fitted independently, so panning and zooming preserves whatever offset they started with - this puts them back."/>
+          <span>
+            <input style="margin:3px;" type="button" id="showCycles" value="Show Cycles"/>
+            <input style="margin:3px;" type="button" id="showLoops" value="Show Loops"/>
+            <label style="margin:3px; background-color:#fdd0a2; padding:1px"><input style="margin:3px;" type="checkbox" id="loopBgFill" value="loopBgFill" checked>Show Loop Boundaries</label>
+            <!-- <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableNodeDrag" value="enableNodeDrag">Enable Node Dragging</label> -->
+            <label style="margin:3px; padding:3px;"><input style="margin:3px;" type="checkbox" id="enableTooltip" value="enableTooltip">Enable Tooltip</label>
+          </span>
+        </div>
+        <div class="mb-1">{{ cfg_legend(combined=True) }}</div>
+        <div style="font-size: 0.85em; color: grey;">Hover a block to outline its matches, click to centre the other graph on the first match. In the combined view, hovering a block that differs shows B's code.</div>
     </div>
     <div id="xcfg_container">
         <div id="xcfg_left">
@@ -81,11 +111,26 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
             </svg>
         </div>
     </div>
+    <div id="xcfg_combined" style="display: none;">
+        <div id="tooltip_c" class="hidden">
+          <p><span id="value_c"></span></p>
+        </div>
+        <div id="loading_c" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:#3f51b5 ; ">
+        Loading. Please Wait!
+        </div>
+        <div id="combined_error" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:darkred;">
+        The combined graph could not be loaded.
+        </div>
+        <svg id="graphContainer_c">
+        <g/>
+        </svg>
+    </div>
     <script src="{{ url_for('static', filename='trace_CFG/main_duo.js') }}"></script>
     <script src="{{ url_for('static', filename='trace_CFG/fnManip.js') }}"></script>
     <script src="{{ url_for('static', filename='trace_CFG/loopCollapser.js') }}"></script>
     <script src="{{ url_for('static', filename='trace_CFG/loopify_dagre.js') }}"></script>
-    <!-- 
+    <script src="{{ url_for('static', filename='function_compare.js') }}"></script>
+    <!--
     -->
 </div>
 {% endblock %}

@@ -1,5 +1,6 @@
 {% from 'table/pagination_widget.html' import sortable_header_col %}
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
+{% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro family_row_std_js() %}
 <script>
@@ -50,12 +51,13 @@
 {% endmacro %}
 
 
-{% macro family_header(sort_pagination=None, column_setup=None) %}
+{% macro family_header(sort_pagination=None, column_setup=None, row_decorations=None) %}
   {# accept but discard additional kwargs #}
   {% if False %}{{ kwargs }}{% endif %}
   {% if column_setup is none %}
     {% set column_setup = ["family_id", "family_name", "num_samples", "num_functions", "is_library"] %}
   {% endif %}
+  {{ badge_column_header(row_decorations) }}
   {% for column_type in column_setup %}
     {% if column_type == "family_id" %}
       {% call sortable_header_col(sort_pagination, "family_id") %}
@@ -83,11 +85,12 @@
   </tr>
 {% endmacro %}  
   
-{% macro family_row(family, show_export=False, show_edit=False, column_setup=None) %}
+{% macro family_row(family, show_export=False, show_edit=False, column_setup=None, row_decorations=None) %}
   {% if column_setup is none %}
     {% set column_setup = ["family_id", "family_name", "num_samples", "num_functions", "is_library"] %}
   {% endif %}
-  <tr class="family-row parent_{{ kwargs['parent'] }}" >
+  <tr class="family-row parent_{{ kwargs['parent'] }}"{{ row_tint(row_decorations, family.family_id) }} >
+  {{ badge_column_cell(row_decorations, family.family_id) }}
   {% for column_type in column_setup %}
     {% if column_type == "family_id" %}
       <th align="right" valign="middle" class="id" scope="row">{{ "%d"|format(family.family_id) }}</th>
@@ -101,7 +104,7 @@
       <td align="center" valign="middle"><i {% if family.is_library %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
     {% endif %}
   {% endfor %}
-    <td align="center" valign="middle">
+    <td align="center" valign="middle" class="buttons">
       <a class="btn btn-outline-dark btn-sm" name="compare" href="{{ url_for('analyze.compare', query=family.family_name, rematch='true') }}" role="button" target="_self"><i class="fa-solid fa-flask"></i></a>
       <a class="btn btn-outline-dark btn-sm" name="family_blocks" href="{{ url_for('analyze.blocks_family', family_id=family.family_id) }}" role="button" target="_self"><i class="fa-solid fa-cubes-stacked"></i></a>
       {% if show_export %}

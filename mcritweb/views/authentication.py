@@ -1,16 +1,15 @@
 import functools
-import hashlib
 import os
 import re
+import secrets
 import sqlite3
 import uuid
-from datetime import datetime
 
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo
+from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, utc_now
 from mcritweb.views.utility import get_session_user_id
 
 bp = Blueprint('authentication', __name__, url_prefix='/')
@@ -21,6 +20,126 @@ bp = Blueprint('authentication', __name__, url_prefix='/')
 #: reach nothing and no page explains why. Anything writing `user.role` validates
 #: against this first. See issue #95.
 KNOWN_ROLES = ('pending', 'visitor', 'contributor', 'admin')
+
+#: One message for both halves of a failed login. Saying which half was wrong tells an
+#: unauthenticated caller whether an account exists, one request at a time. See #101.
+LOGIN_FAILED = 'Incorrect username or password.'
+
+#: One message for a registration that did not produce an account. "That username is
+#: taken" is the same disclosure /login was just stopped from making, from a route that
+#: is just as anonymous. Nothing is lost by staying quiet: a new account is created
+#: `pending` and cannot be used until an admin approves it, so the honest instruction
+#: is the same either way.
+REGISTRATION_SUBMITTED = ('Registration submitted. An administrator has to approve the account before you can '
+                          'log in - if you cannot log in shortly, please contact one.')
+
+#: What a throttled caller is told. Deliberately the same shape as LOGIN_FAILED - it
+#: names no account and confirms nothing, so the throttle does not become the oracle
+#: that collapsing the two login errors was meant to close.
+TOO_MANY_ATTEMPTS = ('Too many failed attempts from this address. Please wait a few minutes '
+                     'and try again.')
+
+
+def _throttled(username=None):
+    """True if this caller has spent their attempts, having logged the fact.
+
+    The log line is the operator's view of an attempt in progress, which is the second
+    thing issue #101 asks to decide. It names the account only when the attempts are
+    aimed at one - a spray across many names and a run against `admin` want different
+    responses, and the count is what tells them apart.
+    """
+    remote_addr = request.remote_addr
+    if not db.login_is_throttled(remote_addr):
+        return False
+    if username:
+        against = db.count_recent_login_failures(remote_addr, username)
+        current_app.logger.warning(
+            "throttled %s after %d recent failures, %d of them against %r",
+            remote_addr, db.count_recent_login_failures(remote_addr), against, username)
+    else:
+        current_app.logger.warning(
+            "throttled %s after %d recent failures", remote_addr,
+            db.count_recent_login_failures(remote_addr))
+    return True
+
+
+#: A real hash to check a password against when the username does not exist, so that
+#: "no such user" costs what "wrong password" costs. The message alone does not close
+#: the hole: password hashing is deliberately slow, so skipping it is measurable.
+#:
+#: The method matters as much as the fact of hashing. check_password_hash costs whatever
+#: the *stored* hash asks for, and werkzeug's default has moved across the versions this
+#: app has been pinned to - measured here on werkzeug 3.1.8, one check costs 66 ms for
+#: pbkdf2:sha256:260000 (its 2.2 default, which is what this repo pinned until #27),
+#: 150 ms for pbkdf2:sha256:600000, and 93 ms for scrypt:32768:8:1. A dummy built with
+#: today's default therefore equalises nothing on a database whose rows predate the
+#: upgrade - it just moves the tell. So the dummy is built with the method the user
+#: table actually uses, and rebuilt if that answer changes.
+#:
+#: Built on first use rather than at import, because every app start - and every test
+#: that builds one - would otherwise pay for a hash nobody needs.
+_ABSENT_USER_PASSWORD_HASH = None
+_ABSENT_USER_HASH_METHOD = None
+
+
+def _spend_a_password_check(password):
+    """Do the work a real password check would, and throw the answer away."""
+    global _ABSENT_USER_PASSWORD_HASH, _ABSENT_USER_HASH_METHOD
+    method = db.get_stored_password_hash_method()
+    if _ABSENT_USER_PASSWORD_HASH is None or _ABSENT_USER_HASH_METHOD != method:
+        secret = secrets.token_urlsafe(32)
+        # an empty table has no method to match; the default is as good an answer as
+        # any, and there is no account to be told apart from in the first place
+        try:
+            _ABSENT_USER_PASSWORD_HASH = (generate_password_hash(secret, method=method) if method
+                                          else generate_password_hash(secret))
+        except ValueError:
+            # the stored hashes name something werkzeug can verify but not generate - a
+            # legacy md5$/sha1$ hash, or a column written by something other than this
+            # app. Falling back costs the timing match for those rows; raising would
+            # make /login 500 for absent usernames *only*, which is both a denial of
+            # service and a perfect existence oracle - strictly worse than the leak
+            # this whole change is closing.
+            current_app.logger.warning("Cannot generate a %r hash for the absent-user check; using the default", method)
+            _ABSENT_USER_PASSWORD_HASH = generate_password_hash(secret)
+        _ABSENT_USER_HASH_METHOD = method
+    check_password_hash(_ABSENT_USER_PASSWORD_HASH, password)
+
+
+def _rehash_if_stale(user_info, password):
+    """Move a verified password onto the current hashing method.
+
+    Only reachable with a password that has just been checked, so the plaintext is in
+    hand and the rewrite is safe. This is what lets the table converge on one cost:
+    without it, a database carrying a mix of old and new hashes keeps a timing
+    difference between accounts that _spend_a_password_check cannot match with one dummy.
+    """
+    global _ABSENT_USER_PASSWORD_HASH, _ABSENT_USER_HASH_METHOD
+    stored_method = user_info.password.split("$", 1)[0]
+    if stored_method == _current_hash_method():
+        return False
+    user_info.password = generate_password_hash(password)
+    # the dummy was built to match the old method, so it is now the odd one out
+    _ABSENT_USER_PASSWORD_HASH = None
+    _ABSENT_USER_HASH_METHOD = None
+    return True
+
+
+_CURRENT_HASH_METHOD = None
+
+
+def _current_hash_method():
+    """The method a hash generated right now would carry. One hash per process."""
+    global _CURRENT_HASH_METHOD
+    if _CURRENT_HASH_METHOD is None:
+        _CURRENT_HASH_METHOD = generate_password_hash(secrets.token_urlsafe(8)).split("$", 1)[0]
+    return _CURRENT_HASH_METHOD
+
+#: The roles whose API token is worth anything. `token_required` is the authority; the
+#: settings page reads it too, so the page cannot show a token to someone whose token
+#: does not work, or - the way it went wrong - hide one that does. `pending` gets
+#: nothing, as in the web UI.
+API_ROLES = ('visitor', 'contributor', 'admin')
 
 
 @bp.before_app_request
@@ -64,7 +183,13 @@ def register():
         if 'registrationToken' in request.form:
             provided_registration_token = request.form['registrationToken']
         error = None
-        if not username:
+        # the guessable secret on this route is the registration token, so it is metered
+        # by the same counter as /login. Ordinary validation slips - a short username, a
+        # password typed twice differently - deliberately do NOT record an attempt: they
+        # are not guesses, and counting them would lock people out of their own signup.
+        if _throttled(username):
+            error = TOO_MANY_ATTEMPTS
+        elif not username:
             error = 'Username is required.'
         elif re.match(r"^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$", username) is None:
             error = "Username has wrong format. Must be 3-20 characters, alphanumeric with dots and underscores allowed, but cannot start or end with dots/underscores, nor contain two of them in a row."
@@ -76,6 +201,7 @@ def register():
             error = 'The passwords do not match. No new user was created.'
         elif is_registration_token_required and server_info.registration_token != provided_registration_token:
             error = 'Invalid registration token provided. No new user was created.'
+            db.record_failed_login(request.remote_addr, username)
         if error is None:
             user_info = UserInfo()
             user_info.username = username
@@ -99,15 +225,22 @@ def register():
                     current_app.logger.exception("Failed to persist server settings during first-user registration")
                     error = "Server values invalid. Please check the server settings and try again."
             if error is None:
-                user_info.registered = datetime.utcnow()
+                user_info.registered = utc_now()
                 user_info.last_login = 'no login'
-                user_info.apitoken = hashlib.md5(uuid.uuid4().bytes).hexdigest()
+                user_info.apitoken = generate_apitoken()
                 try:
                     user_info.saveToDb()
                 except sqlite3.IntegrityError:
-                    error = f"User {username} is already registered."
+                    # the username is taken. Saying so here would hand back exactly the
+                    # answer /login was just stopped from giving, from a route that is
+                    # equally anonymous and equally unthrottled. Both outcomes leave by
+                    # the same door with the same message. See #101.
+                    current_app.logger.info("Registration rejected: requested username is already in use")
+                if g.first_user:
+                    flash('Registration complete - you can log in now.', category='success')
                 else:
-                    return redirect(url_for("authentication.login"))
+                    flash(REGISTRATION_SUBMITTED, category='info')
+                return redirect(url_for("authentication.login"))
         flash(error, category='error')
     proposed_registration_token = ""
     if g.first_user:
@@ -130,18 +263,29 @@ def login():
         username = request.form['username']
         password = request.form['inputPassword']
 
+        if _throttled(username):
+            # before the password check, so a throttled caller costs no hashing either -
+            # the dummy check below is deliberately expensive and would otherwise make
+            # this route the cheapest way to spend the server's CPU
+            flash(TOO_MANY_ATTEMPTS, category='error')
+            return render_template('login.html')
+
         user_info = UserInfo.fromDb(username=username)
         error = None
         if user_info is None:
-            error = 'Incorrect username.'
+            _spend_a_password_check(password)
+            error = LOGIN_FAILED
         elif not check_password_hash(user_info.password, password):
-            error = 'Incorrect password.'
+            error = LOGIN_FAILED
         if error is None:
             session.clear()
             session['user_id'] = user_info.user_id
-            user_info.last_login = datetime.utcnow()
-            user_info.saveToDb()
+            user_info.last_login = utc_now()
+            rehashed = _rehash_if_stale(user_info, password)
+            user_info.saveToDb(withPassword=rehashed)
+            db.clear_login_failures(request.remote_addr)
             return redirect(url_for('index'))
+        db.record_failed_login(request.remote_addr, username)
         flash(error, category='error')
     return render_template('login.html')
 
@@ -181,7 +325,7 @@ def settings():
     if user_column_settings is None:
         user_column_settings = UserColumnSettings.fromDict(user_id, {})
         user_column_settings.saveToDb()
-    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings())
+    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info is not None and user_info.role in API_ROLES)
 
 def admin_required(view):
     @functools.wraps(view)
@@ -233,7 +377,7 @@ def token_required(view):
         if user_id is None:
             abort(403)
         g.api_user = UserInfo.fromDb(user_id=user_id)
-        if g.api_user is None or g.api_user.role not in ('visitor', 'contributor', 'admin'):
+        if g.api_user is None or g.api_user.role not in API_ROLES:
             abort(403)
         return view(**kwargs)
     return wrapped_view

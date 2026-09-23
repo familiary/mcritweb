@@ -175,6 +175,9 @@
 
 
 {% macro job_header(families_by_id, samples_by_id) %}
+  {# accept but discard additional kwargs - see _table_base in table.html, which
+     forwards the caller's kwargs to the header as well as to the row macro #}
+  {% if False %}{{ kwargs }}{% endif %}
   <tr>
     <th scope="col">#</th>
     <th scope="col">Type</th>
@@ -206,7 +209,7 @@
     {% else %}
       <td class="job-cell" align="right" valign="middle">{{ "%5.2f"|format(0) }}%</td>
     {% endif %}
-    <td align="right">
+    <td align="right" class="buttons">
       {% if not job.started_at or job.finished_at %}
       <button type="button" id="job_id_{{ job.job_id }}" class="confirm-delete btn btn-outline-dark btn-sm"><i class="fa-solid fa-trash"></i></button>
       {% endif %}
@@ -219,6 +222,9 @@
 
 
 {% macro minijob_header(families_by_id, samples_by_id) %}
+  {# accept but discard additional kwargs - see _table_base in table.html, which
+     forwards the caller's kwargs to the header as well as to the row macro #}
+  {% if False %}{{ kwargs }}{% endif %}
   <tr>
     <th style="min-width: 150px; text-align: right;" scope="col">Finished</th>
     <th style="width: 99%" scope="col">Type</th>
@@ -230,7 +236,7 @@
   <tr class="job-row parent_{{ kwargs['parent'] }}" >
     <td job_id="{{ job.job_id }}" class="job-cell" align="right" valign="middle">{{ job.finished_at|date_time }}</td>
     <td job_id="{{ job.job_id }}" class="job-cell" valign="middle">{{ job_description(job, kwargs['families_by_id'], kwargs['samples_by_id']) }}</td>
-    <td align="right">
+    <td align="right" class="buttons">
       <a class="btn btn-outline-dark btn-sm" href="{{ url_for('data.result', job_id=job.job_id) }}"  role="button" target="_self"><i class="fa-solid fa-square-poll-vertical"></i></a>
     </td>
   </tr>

@@ -4,10 +4,24 @@
 {% block title%}
 {% if family_entry is not none %}
 Unique Blocks for Family: {{ family_entry.family_id }}
-{% else %}
+{% elif sample_ids|length == 1 %}
 Unique Blocks for Sample: {{ sample_id }}
+{% else %}
+Unique Blocks for {{ sample_ids|length }} Samples
 {% endif %}
 {% endblock %}
+
+{# the block filter and the rule parameters are two GET forms on one page; each has to
+   carry the other's state or tuning one silently resets the other #}
+{% macro carry_block_filter_params() %}
+{% for name in ["min_score", "min_block_length", "max_block_length", "blkl"] %}{% if request.args.get(name) %}
+      <input type="hidden" name="{{ name }}" value="{{ request.args.get(name) }}">{% endif %}{% endfor %}
+{% endmacro %}
+
+{% macro carry_yara_rule_params() %}
+{% for name, value in yara_query.items() %}
+      <input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+{% endmacro %}
 
 {% block style %}
 {{ pagination_js() }}
@@ -39,6 +53,11 @@ Unique Blocks for Sample: {{ sample_id }}
       <td valign="middle">Family</td>
       <td valign="middle">{{ format_family_name(family_entry.family_name, family_entry.family_id) }}</td>
     </tr>
+    {% else %}
+    <tr>
+      <td valign="middle">Requested Samples</td>
+      <td valign="middle">{% for id in sample_ids %}{{ format_sample_id(id) }} {% endfor %}</td>
+    </tr>
     {% endif %}
     <tr>
       <td valign="middle">Samples</td>
@@ -48,13 +67,15 @@ Unique Blocks for Sample: {{ sample_id }}
       <td valign="middle">Unique Blocks</td>
       <td valign="middle">{{ statistics["unique_blocks_overall"] }}</td>
     </tr>
+    {# the cover is recomputed here from the current rule parameters, so these describe
+       the rule shown below rather than the one the backend built with its defaults #}
     <tr>
       <td valign="middle">Has a YARA rule?</td>
-      <td valign="middle">{{ statistics["has_yara_rule"] }}, covers: {{ statistics["num_samples_covered"] }} samples</td>
+      <td valign="middle">{{ yara_cover["has_rule"] }}, covers: {{ yara_cover["num_samples_covered"] }} samples</td>
     </tr>
     <tr>
       <td valign="middle">YARA rule covers all?</td>
-      <td valign="middle">{{ statistics["has_complete_yara_rule"] }}</td>
+      <td valign="middle">{{ yara_cover["is_complete_cover"] }}</td>
     </tr>
 </tbody>
 </table>
@@ -67,6 +88,10 @@ Unique Blocks for Sample: {{ sample_id }}
     <button class="nav-link {% if active_tab=='blocks' %}show active{%endif%}" id="pills-blocks-tab" data-bs-toggle="pill" data-bs-target="#pills-blocks" type="button" role="tab" aria-controls="pills-blocks" aria-selected="false">Unique Blocks</button>
   </li>
   <li class="nav-item" role="presentation">
+    {# deliberately still keyed on the stored statistics: this says whether the report
+       can yield a rule at all. Keying it on the current cover would disable the tab as
+       soon as a parameter selected no blocks - locking the reader out of the very form
+       that would undo it. What the current parameters produced is reported inside. #}
     <button class="nav-link {% if active_tab=='yara' %}show active{%endif%} {% if not statistics['has_yara_rule'] %}disabled{%endif%}" id="pills-yara-tab" data-bs-toggle="pill" data-bs-target="#pills-yara" type="button" role="tab" aria-controls="pills-yara" aria-selected="false">YARA Rule</button>
   </li>
 </ul>
@@ -103,10 +128,12 @@ Unique Blocks for Sample: {{ sample_id }}
     <form class="form-inline" action ="{{ url_for('data.result', job_id=job_info.job_id) }}" method='GET'>
         <div class="form-group row">
           <label class="col-3" for="block_count">Filter blocks to</label>
-          <input class="col-3" type="text" name='min_score' id="min_score" aria-describedby="min_score" placeholder="min score (0-100)">
-          <input class="col-3" type="text" name='min_block_length' id="min_block_length" aria-describedby="min_block_length" placeholder="min block length">
-          <input class="col-3" type="text" name='max_block_length' id="max_block_length" aria-describedby="max_block_length" placeholder="max block length">
-          <input type="hidden" name="tab" value="blocks">
+          {# prefilled, so that the filter is not silently reset by using it twice - the
+             rule form below carries these across for the same reason #}
+          <input class="col-3" type="text" name='min_score' id="min_score" aria-describedby="min_score" placeholder="min score (0-100)" value="{{ request.args.get('min_score', '') }}">
+          <input class="col-3" type="text" name='min_block_length' id="min_block_length" aria-describedby="min_block_length" placeholder="min block length" value="{{ request.args.get('min_block_length', '') }}">
+          <input class="col-3" type="text" name='max_block_length' id="max_block_length" aria-describedby="max_block_length" placeholder="max block length" value="{{ request.args.get('max_block_length', '') }}">
+          <input type="hidden" name="tab" value="blocks">{{ carry_yara_rule_params() }}
           <button type="submit" class="btn btn-primary">filter</button>
         </div>
     </form>
@@ -142,10 +169,36 @@ Unique Blocks for Sample: {{ sample_id }}
   </div>
   <div class="tab-pane fade {% if active_tab=='yara' %}show active{%endif%}" id="pills-yara" role="tabpanel" aria-labelledby="pills-yara-tab">
     <h3 id="yara">Proposed YARA rule</h3>
+    <p>
+      The rule is composed from this report every time the page is rendered, so these parameters
+      change it without running the analysis again. Instruction and byte bounds decide which blocks
+      may be used at all, blocks per sample how many of them each sample has to contribute, and
+      strings required how many of the rule's strings a file must match.
+    </p>
+    <form class="form-inline" action="{{ url_for('data.result', job_id=job_info.job_id) }}" method='GET'>
+        <div class="form-group row">
+          <input class="col-2" type="text" name='min_ins' id="min_ins" aria-describedby="min_ins" placeholder="min instructions" value="{{ yara_params['min_ins'] if yara_params['min_ins'] is not none }}">
+          <input class="col-2" type="text" name='max_ins' id="max_ins" aria-describedby="max_ins" placeholder="max instructions" value="{{ yara_params['max_ins'] if yara_params['max_ins'] is not none }}">
+          <input class="col-2" type="text" name='min_bytes' id="min_bytes" aria-describedby="min_bytes" placeholder="min bytes" value="{{ yara_params['min_bytes'] if yara_params['min_bytes'] is not none }}">
+          <input class="col-2" type="text" name='max_bytes' id="max_bytes" aria-describedby="max_bytes" placeholder="max bytes" value="{{ yara_params['max_bytes'] if yara_params['max_bytes'] is not none }}">
+          <input class="col-2" type="text" name='required_per_sample' id="required_per_sample" aria-describedby="required_per_sample" placeholder="blocks per sample" value="{{ yara_params['required_per_sample'] }}">
+          <input class="col-2" type="text" name='condition_required' id="condition_required" aria-describedby="condition_required" placeholder="strings required" value="{{ yara_params['condition_required'] }}">
+          <input type="hidden" name="tab" value="yara">{{ carry_block_filter_params() }}
+          <button type="submit" class="btn btn-primary">regenerate rule</button>
+        </div>
+    </form>
+    {# keyed on the rule rather than on the cover's has_rule flag, so the warning appears
+       exactly when there is nothing to show. A cover with no blocks in it has no rule
+       that compiles - an empty strings section is a YARA syntax error and the condition
+       reads "0 of them" - so the page says so instead of offering it for copying. #}
+    {% if yara_rule is none %}
+    <p class="alert alert-warning">These parameters selected no blocks at all, so there is no rule to show. Widen the bounds and regenerate.</p>
+    {% else %}
     <p>Copy rule to clipboard!&nbsp;<i class="fa-regular fa-copy" onclick="copyElementToClipboard('#yara_text')"></i>
     </p>
     <textarea style="font-family:monospace; min-width: 100%" id="yara_text" name="yara_text" 
         rows="50">{{yara_rule}}</textarea>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

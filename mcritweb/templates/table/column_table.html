@@ -1,6 +1,17 @@
 {% from 'table/links.html' import format_pichash, format_function_id, format_family_name, format_family_id, format_sample_id, format_sha_short_clipboard, clipboard_btn %}
 
 {% macro sample_column_table()%}
+  {# A query is matched without being stored, so it has no family, version, component
+     or library flag - the backend sends those back empty and rendering them anyway
+     presented the queried binary as a member of family 0, captioned "Unnamed" (#40).
+     The rows survive as long as *some* sample here is stored - a query filtered to one
+     matched sample shows both, and that one does have them - but each cell is gated on
+     its own sample, so the query's column stays blank rather than inheriting them. #}
+  {% macro is_stored_sample(sample) %}{{ "yes" if sample.sample_id is not none and sample.sample_id >= 0 else "" }}{% endmacro %}
+  {% set identity = namespace(is_stored=false) %}
+  {% for name_and_sample in varargs %}
+    {% if name_and_sample[1].sample_id is not none and name_and_sample[1].sample_id >= 0 %}{% set identity.is_stored = true %}{% endif %}
+  {% endfor %}
   <table class="table table-hover">
     <thead class="thead-light">
       <tr>
@@ -12,23 +23,31 @@
     </thead>
     <tbody>
       <tr>
-        <td valign="middle">Sample ID | Family: </td>
+        <td valign="middle">Sample ID{% if identity.is_stored %} | Family{% endif %}: </td>
         {% for name_and_sample in varargs %}
-          <td valign="middle">{% if name_and_sample[1].sample_id < 0 %}*{{ name_and_sample[1].sample_id|abs }}{% else%}<a href="{{ url_for('explore.sample_by_id', sample_id=name_and_sample[1].sample_id) }}">{{ name_and_sample[1].sample_id }}</a>{% endif %} | 
-            {{ format_family_name(name_and_sample[1].family, name_and_sample[1].family_id) }}
+          <td valign="middle">{% if name_and_sample[1].sample_id < 0 %}*{{ name_and_sample[1].sample_id|abs }}{% else%}<a href="{{ url_for('explore.sample_by_id', sample_id=name_and_sample[1].sample_id) }}">{{ name_and_sample[1].sample_id }}</a>{% endif %}{% if identity.is_stored %} | {% if is_stored_sample(name_and_sample[1]) %}
+            {{ format_family_name(name_and_sample[1].family, name_and_sample[1].family_id) }}{% else %}-{% endif %}{% endif %}
           </td>
         {% endfor %}
       </tr>
 
+      {% if identity.is_stored %}
       <tr>
         <td valign="middle">Version | Component | Library: </td>
         {% for name_and_sample in varargs %}
+          {% if is_stored_sample(name_and_sample[1]) %}
           <td valign="middle">
             {{ name_and_sample[1].version or "-" }} | 
             {{ name_and_sample[1].component or "-" }} | 
             <i {% if name_and_sample[1].is_library %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+          {% else %}
+          {# a query has none of these; an empty cell keeps the row aligned without
+             claiming the queried binary is not a library, which we do not know #}
+          <td valign="middle">-</td>
+          {% endif %}
         {% endfor %}
       </tr>
+      {% endif %}
       <tr>
         <td valign="middle">SHA256 | Filename: </td>
         {% for name_and_sample in varargs %}
@@ -160,6 +179,21 @@
           </td>
         {% endfor %}
       </tr>
+      <tr>
+        <td valign="middle">MinHash: </td>
+        {% for name_fe_se_ph in varargs %}
+          <td valign="middle">
+            {% if name_fe_se_ph[1].minhash|length > 0 %}
+              <i style="color:green;" class="fa-solid fa-square-check" title="MinHash available"></i>
+              <span class="font-monospace">{{ name_fe_se_ph[1].minhash.hex()[:16] }}&hellip;</span> {{ clipboard_btn(name_fe_se_ph[1].minhash.hex()) }}
+              ({{ name_fe_se_ph[1].minhash|length // 4 }} x 32 bit)
+            {% else %}
+              <i style="color:darkred;" class="fa-solid fa-times-circle" title="No MinHash"></i> not calculated
+              <span style="font-size: 0.8em; color: grey;">(too small to be minhashed, or the MinHash job has not run yet)</span>
+            {% endif %}
+          </td>
+        {% endfor %}
+      </tr>
     </tbody>
   </table>
 {% endmacro %}
@@ -174,6 +208,16 @@
         <td valign="middle">Task:</td>
         <td valign="middle">{{ job_info.parameters }}</td>
       </tr>
+      {# the band setting is already in the Task row above, but only as an unlabelled
+         trailing number - getMatchesForSample(0, 2) reads like a second sample id.
+         Omitted entirely for jobs that did not record one, see get_minhash_matching_label. #}
+      {% set minhash_matching = minhash_matching_label(job_info) %}
+      {% if minhash_matching %}
+        <tr>
+          <td valign="middle">MinHash Matching: </td>
+          <td valign="middle">{{ minhash_matching }}</td>
+        </tr>
+      {% endif %}
       <tr>
         <td valign="middle">Job ID:</td>
         <td valign="middle">{{ job_info.job_id }}</td>
@@ -243,6 +287,14 @@
                 {{ "%5.2f"|format(0) }}% 
               {% endif %}
             {% endif %}
+          </td>
+        </tr>
+      {% endif %}
+      {% if job_info.finished_at %}
+        <tr>
+          <td valign="middle">Raw Result: </td>
+          <td valign="middle">
+            <a href="{{ url_for('data.download_result', job_id=job_info.job_id) }}">Download as JSON</a>
           </td>
         </tr>
       {% endif %}

@@ -1,0 +1,179 @@
+{% from 'table/compare_nav.html' import compare_nav %}
+{% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
+{% from 'table/sample_row.html' import sample_header %}
+
+{% extends 'base.html' %}
+{% block title%}
+Unique Blocks
+{% endblock %}
+
+{% block style %}
+<script>
+  // ids clicked on this page, on top of what the URL already carries
+  var selected = [];
+
+  $(document).ready(function(){
+    $("tr.parent").click(function(){
+      var id = $(this).children("th.id").text().trim();
+      // a row the URL already selected is removed with the x in the table above, not by
+      // clicking it again - toggling here would only ever add a duplicate
+      if ({{ selected_ids|tojson }}.map(String).indexOf(id) != -1) {
+        return;
+      }
+      var position = selected.indexOf(id);
+      if (position == -1) {
+        this.style.backgroundColor = "rgb(240, 240, 240)";
+        selected.push(id);
+      } else {
+        this.style.backgroundColor = "white";
+        selected.splice(position, 1);
+      }
+    });
+
+    $('#unique_blocks_search_form').submit(function(eventObj) {
+      eventObj.preventDefault();
+      eventObj.stopPropagation();
+      var args = fetchState();
+      args["query"] = $("#Search").val();
+      args["_anchor"] = "Search";
+      var null_keys = {{ pagination.params_list|tojson }};
+      for (var i = 0, size = null_keys.length; i < size; i++) {
+        args[null_keys[i]] = null;
+      }
+      // overwrites base_link with args and forwards to the resulting url
+      pagination_js_helper(window.location.href, args);
+      return true;
+    });
+  });
+
+  // The full selection is what the URL carried plus what has been clicked here. Either
+  // half can be empty, and joining them with a bare comma then leaves a leading or
+  // trailing one - which parse_integer_list_query_param refuses outright. See #94.
+  function joinSampleIds() {
+    return [].concat({{ selected_ids|tojson }}, selected)
+      .map(function(id) { return String(id).trim(); })
+      .filter(function(id) { return id.length > 0; })
+      .join(",");
+  }
+  function setSelected() {
+    var params = fetchState();
+    params.samples = joinSampleIds();
+    pagination_js_helper(window.location.href, params);
+  }
+  function deleteSample(element) {
+    var removed = $(element).parent().parent().children("th.id").text().trim();
+    var params = fetchState();
+    params.samples = {{ selected_ids|tojson }}.filter(function(id) { return id.toString() !== removed; }).join(",");
+    pagination_js_helper(window.location.href, params);
+  }
+  function createJob() {
+    // url_for, not a root-relative literal: mounted under a SCRIPT_NAME or a reverse
+    // proxy prefix, "/analyze/..." leaves the application entirely. cross_compare.html
+    // hardcodes its own submit URL the same way, which is where this was copied from -
+    // that one is untouched here, but it has the same bug.
+    window.location.href = {{ url_for('analyze.start_unique_blocks')|tojson }} + "?samples=" + encodeURIComponent(joinSampleIds());
+  }
+  // nothing on this page is a job parameter - the sample set is the whole request - but
+  // the pagination widgets expect a provider, and the search box has to survive paging
+  function fetchState() {
+    return {};
+  }
+</script>
+
+{{ pagination_js() }}
+
+{% endblock %}
+{% block content %}
+
+{{ compare_nav("blocks") }}
+<h1>Unique Blocks</h1>
+<p>
+  Isolate the basic blocks that only occur in the selected samples, and build a YARA rule from them.
+  The rule's own parameters are applied when the report is rendered, so they can be changed on the
+  result page without running the analysis again. At most {{ max_selected }} samples per request.
+</p>
+<div>
+  <table class="table table-hover">
+    <thead class="thead-light">
+      <tr>
+        <th scope="col"><i class="fa-solid fa-virus" title="Sample ID"></th>
+        <th scope="col">SHA256</th>
+        <th scope="col">Family</th>
+        <th scope="col">Version</th>
+        <th scope="col">Filename</th>
+        <th scope="col">Bitness</th>
+        <th scope="col">Functions</th>
+        <th scope="col"></th>
+      </tr>
+    </thead>
+    {% if selected_samples %}
+    <tbody>
+      {# id -> entry, and the entry is none for a selected id the backend would not
+         resolve. Such a row is still drawn, greyed out: it is part of the selection, so
+         hiding it would leave a sample set nobody can see or edit, and the x below is
+         the only way to take it back out. #}
+      {% for sample_id, sample in selected_samples.items() %}
+      <tr {% if sample is none %}class="text-muted"{% endif %}>
+        <th align="right" valign="middle" scope="row" class="id">{{ "%d"|format(sample_id) }}</th>
+        {% if sample is none %}
+        <td colspan="6" valign="middle">not confirmed by MCRIT - deleted, or the backend was unavailable</td>
+        {% else %}
+        <td align="right" valign="middle" class="font-monospace">{{ sample.getShortSha256() }}</td>
+        <td valign="middle">{{ sample.family }}</td>
+        <td valign="middle">{{ sample.version }}</td>
+        <td valign="middle">{{ sample.getShortFilename() }}</td>
+        <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
+        <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
+        {% endif %}
+        <td valign="middle"><a style="color: black;" onclick="deleteSample(this)"><i class="fa-solid fa-xmark"></i></a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% endif %}
+  </table>
+  {% if not selected_ids %}
+  <center>
+  <h4>Selected samples will show here</h4>
+  </center>
+  {% else %}
+  {{ pagination_widget(pagination_selected, _js_argument_provider="fetchState") }}
+  {% endif %}
+  <br>
+  <form style="width:100%" id="unique_blocks_search_form">
+      <input type="text" class="form-control shadow-none" name="query" value="{{ query }}" id="Search" placeholder="Search" autofocus autocomplete="on">
+      <input type='submit' hidden>
+  </form>
+
+  {% if samples %}
+  {{ set_pagination_params(pagination, _anchor="Search", _js_argument_provider="fetchState") }}
+  <table class="table table-hover">
+      <thead class="thead-light">
+        {{ sample_header(show_analyze=False, sort_pagination=pagination) }}
+      </thead>
+      <tbody>
+        {% for sample in samples %}
+        <tr {% if sample.sample_id in selected_ids %} style="background-color: yellowgreen;"{% endif %}class="parent">
+          <th align="right" valign="middle" scope="row" class="id">{{ "%d"|format(sample.sample_id) }}</th>
+          <td align="right" valign="middle" class="font-monospace">{{ sample.getShortSha256() }}</td>
+          <td valign="middle">{{ sample.family }}</td>
+          <td valign="middle">{{ sample.version }}</td>
+          <td valign="middle">{{ sample.getShortFilename() }}</td>
+          <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
+          <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
+          <td align="center" valign="middle"><i {% if sample.is_library %} class="fa-solid fa-square-check" {% else %} class="fa-solid fa-times-circle"> {% endif %}</i></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {{ pagination_widget(pagination) }}
+    <center>
+      <button type="button" onclick="setSelected()" class="btn btn-outline-primary">Add</button>
+      {% if selected_ids %}
+      <button type="button" onclick="createJob()" class="btn btn-primary">Find Unique Blocks</button>
+      {% endif %}
+    </center>
+  {% else %}
+  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+{% endif %}
+</div>
+{% endblock %}

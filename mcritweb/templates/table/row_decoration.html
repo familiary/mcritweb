@@ -1,0 +1,50 @@
+{#- Row-specific rendering for table rows - issue #53.
+
+    A view hands a table macro `row_decorations`: a mapping of row id to a decoration
+    dict. `_table_base` forwards it to the row *and* the header macro, so both sides of
+    a table stay in step without the caller repeating itself. A row macro looks itself
+    up by the id it already renders - sample_id, family_id, function_id.
+
+        row_decorations = {23: {"tint": "selected",
+                                "badges": [{"text": "ID match", "variant": "success"}]}}
+
+    Both keys are optional. `tint` colours the whole row, `badges` puts Bootstrap
+    badges in an extra leading column that only exists while some row has one.
+
+    Tints and badge variants are *names looked up here*, never interpolated: rows carry
+    values chosen by whoever submitted the sample, and a decoration able to carry raw
+    CSS or a raw class name would be a way to restyle the page from a corpus entry. An
+    unknown name renders nothing. Badge text is ordinary autoescaped output.
+-#}
+
+{#- "selected" and "pending" are the two shades cross_compare.html has always used for
+    its selection; keeping the exact values keeps that page looking as it did. -#}
+{%- set ROW_TINTS = {"selected": "yellowgreen", "pending": "rgb(240, 240, 240)"} -%}
+{%- set BADGE_VARIANTS = ["primary", "secondary", "success", "danger", "warning", "info", "light", "dark"] -%}
+
+
+{#- an attribute for the enclosing <tr>, so it stays empty when nothing is decorated -#}
+{%- macro row_tint(row_decorations, row_id) -%}
+  {%- set tint = ROW_TINTS.get((row_decorations or {}).get(row_id, {}).get("tint")) -%}
+  {%- if tint %} style="background-color: {{ tint }};"{% endif -%}
+{%- endmacro -%}
+
+
+{%- macro row_badges(row_decorations, row_id) -%}
+  {%- for badge in (row_decorations or {}).get(row_id, {}).get("badges", []) -%}
+    <span class="badge bg-{{ badge.get("variant") if badge.get("variant") in BADGE_VARIANTS else "secondary" }}">{{ badge["text"] }}</span>
+  {% endfor -%}
+{%- endmacro -%}
+
+
+{#- The badge column appears only once some row actually has a badge, otherwise every
+    table that passes tints alone would grow an empty column. Header and row ask the
+    same question of the same mapping, so they cannot disagree on the column count. -#}
+{%- macro badge_column_header(row_decorations) -%}
+  {%- if (row_decorations or {}).values()|selectattr("badges")|list %}<th scope="col"></th>{% endif -%}
+{%- endmacro -%}
+
+
+{%- macro badge_column_cell(row_decorations, row_id) -%}
+  {%- if (row_decorations or {}).values()|selectattr("badges")|list %}<td valign="middle">{{ row_badges(row_decorations, row_id) }}</td>{% endif -%}
+{%- endmacro -%}

@@ -1,8 +1,9 @@
-{% from 'table/links.html' import format_pichash, format_offset, format_family_name_tuple, format_family_id, format_sample_id, format_function_id, format_sha_short_clipboard %}
+{% from 'table/links.html' import format_pichash, format_offset, format_family_name_tuple, format_family_id, format_sample_id, format_function_id, format_sha_short_clipboard, clipboard_btn %}
 {% from 'table/column_table.html' import function_column_table %}
+{% from 'table/function_details.html' import api_usage_modal, api_usage_button, minhash_shingles, picblock_table %}
 {% extends 'base.html' %}
 {% block style %}
-<!-- 
+<!--
 <script src="{{ url_for('static', filename='trace_CFG/lib/jquery-3.1.1.min.js') }}"></script>
 <script src="{{ url_for('static', filename='trace_CFG/lib/split.js') }}"></script>
 -->
@@ -23,50 +24,179 @@ Function: {{ function_id }}
 {% endblock %}
 {% block content %}
 
+{# "Compare with function": asks for the other function_id and opens data.match_functions #}
+<div class="modal fade" id="compareFunctionModal" tabindex="-1" aria-labelledby="compareFunctionModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="compareFunctionModalLabel">Compare function {{ function_id }} with another function</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="compare_function_form">
+        <div class="modal-body">
+          <label for="other_function_id" class="col-form-label">Function ID to compare against</label>
+          <input type="number" class="form-control" id="other_function_id" name="other_function_id" placeholder="e.g. 4711" required autofocus>
+          <div class="form-text">Any stored function can be compared, it does not have to be a match.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">Compare</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{{ api_usage_modal("apiUsageModal", "API usage for function %d" % function_id, [
+    ("This function", "/functions/%d" % function_id),
+    ("With its control flow graph", "/functions/%d?with_xcfg=true" % function_id),
+    ("PicHash occurrences (summary)", "/query/pichash/%016x/summary" % entry.pichash),
+    ("PicHash occurrences (all)", "/query/pichash/%016x" % entry.pichash),
+    ("Its sample", "/samples/%d" % entry.sample_id),
+  ], "function_entry = client.getFunctionById(%d, with_xcfg=True)\nprint(client.getMatchesForPicHash(function_entry.pichash, summary=True))" % function_id) }}
+<script>
+  $(document).ready(function(){
+    $("#compare_function_form").submit(function(eventObj) {
+      eventObj.preventDefault();
+      // the placeholder id 0 is what url_for needs to build the path; the real id replaces it
+      var url_template = {{ url_for('data.match_functions', function_id_a=function_id, function_id_b=0)|tojson }};
+      var other_function_id = parseInt($("#other_function_id").val(), 10);
+      if (isNaN(other_function_id)) {
+        return false;
+      }
+      window.location.href = url_template.replace(/0$/, String(other_function_id));
+      return false;
+    });
+  });
+</script>
+
 <div class="container">
-<span><h1>Function: {{ function_id }}</h1></span>
-<span style="float:right"><a href="#function_xcfg">go to cfg</a></span>
-    {% if entry is not none %}
-      {{ function_column_table(("Function Info", entry, sample_entry, pichash_match_summary)) }}
-
-      <script type="text/javascript">
-      window.onload = function() {
-          var js_function_id = {{ function_id }};
-          loadWithDotGraphAndFunctionId(js_function_id)
-      };
-      </script>
-    {% endif %}
-
-    <div id="xcfg_top" style="height: 90px;">
-        <span><h3 id="function_xcfg">Function CFG</h3></span>
-        <span style="float:right"><a href="#top">go to top</a></span>
-        <input style=" margin: 3px;" type="button" id="showCycles" value="Show Cycles"/>
-        <input style=" margin: 3px;" type="button" id="showLoops" value="Show Loops"/>
-        <label style=" margin:3px; background-color:#fdd0a2; padding:1px"><input style=" margin: 3px;" type="checkbox" id="loopBgFill" value="loopBgFill" checked>Show Loop Boundaries</label>
-        <!-- <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableNodeDrag" value="enableNodeDrag">Enable Node Dragging</label> -->
-        <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableTooltip" value="enableTooltip">Enable Tooltip</label>
+  <div class="row">
+    <div class="col">
+      <h1>Function: {{ function_id }}</h1>
     </div>
-    <div id="xcfg_container">
-        <div id="xcfg_left">
-            <div id="tooltip" class="hidden">
-            <p><span id="value"></span></p>
-            </div>
-            <div id="loading" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:#3f51b5 ; ">
-            Loading. Please Wait!
-            </div>
-            <svg id="graphContainer">
-            <g/>
-            </svg>
-        </div>
-        <div id="xcfg_text_right">
-            <pre id="text_code"></pre>
-        </div>
+    <div align="right" class="col">
+      <div class="btn-group dropdown">
+        <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="button_function_analyze" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Analyze">
+          <i class="fa-solid fa-flask"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><h6 class="dropdown-header">This function</h6></li>
+          <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#compareFunctionModal">Compare with function&hellip;</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('explore.search', query='pichash:0x' + ('%016x'|format(entry.pichash)), type='function') }}">Find functions with this PicHash</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><h6 class="dropdown-header">Sample {{ entry.sample_id }}</h6></li>
+          {# a query sample's functions are numbered negatively and have no sample in the
+             database to match against, so analyze.compare_function does not accept them (#35) #}
+          {% if function_id >= 0 %}
+          <li><a class="dropdown-item" href="{{ url_for('analyze.compare_function', function_id=function_id) }}">New: 1 vs N for this function</a></li>
+          {% endif %}
+          <li><a class="dropdown-item" href="{{ url_for('analyze.compare', query='sha256:'+sample_entry.sha256) }}">New: 1 vs N for the sample</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('analyze.compare_versus', selected_a=entry.sample_id, query_a='sha256:'+sample_entry.sha256) }}">New: 1 vs 1</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('analyze.cross_compare', samples=entry.sample_id) }}">New: Cross Compare</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id, _anchor='jobs') }}">Previous Jobs</a></li>
+        </ul>
+      </div>
+      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_sample" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id) }}" role="button" title="Go to sample {{ entry.sample_id }}"><i class="fa-solid fa-virus"></i></a>
+      {% if sample_entry.family_id is not none %}
+      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_family" href="{{ url_for('explore.family_by_id', family_id=sample_entry.family_id) }}" role="button" title="Go to family {{ sample_entry.family }}"><i class="fa-solid fa-bug"></i></a>
+      {% endif %}
+      {{ api_usage_button("apiUsageModal") }}
+      <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" role="button" title="Go to the control flow graph"><i class="fa-solid fa-diagram-project"></i></a>
     </div>
+  </div>
+</div>
+
+<div class="container">
+  {% if entry is not none %}
+  <div class="accordion accordion-flush mb-3" id="functionAccordion">
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="heading-info" style="margin:0">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-info" aria-expanded="true" aria-controls="collapse-info">
+          Function Info
+        </button>
+      </h2>
+      <div id="collapse-info" class="accordion-collapse collapse show" aria-labelledby="heading-info">
+        <div class="accordion-body">
+          {{ function_column_table(("Function Info", entry, sample_entry, pichash_match_summary)) }}
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="heading-minhash" style="margin:0">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-minhash" aria-expanded="false" aria-controls="collapse-minhash">
+          MinHash &amp; Shingles
+        </button>
+      </h2>
+      <div id="collapse-minhash" class="accordion-collapse collapse" aria-labelledby="heading-minhash">
+        <div class="accordion-body">
+          {{ minhash_shingles(entry) }}
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="heading-blocks" style="margin:0">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-blocks" aria-expanded="false" aria-controls="collapse-blocks">
+          Basic Blocks &amp; PicBlockHashes ({{ entry.picblockhashes|length }} of {{ entry.num_blocks }} blocks hashed)
+        </button>
+      </h2>
+      <div id="collapse-blocks" class="accordion-collapse collapse" aria-labelledby="heading-blocks">
+        <div class="accordion-body">
+          {{ picblock_table(entry) }}
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="heading-cfg" style="margin:0">
+        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-cfg" aria-expanded="true" aria-controls="collapse-cfg">
+          Control Flow Graph
+        </button>
+      </h2>
+      <div id="collapse-cfg" class="accordion-collapse collapse show" aria-labelledby="heading-cfg">
+        <div class="accordion-body">
+          <script type="text/javascript">
+          window.onload = function() {
+              var js_function_id = {{ function_id }};
+              loadWithDotGraphAndFunctionId(js_function_id)
+          };
+          </script>
+          <div id="xcfg_top" style="height: 60px;">
+              <span id="function_xcfg"></span>
+              <span style="float:right"><a href="#top">go to top</a></span>
+              <input style=" margin: 3px;" type="button" id="showCycles" value="Show Cycles"/>
+              <input style=" margin: 3px;" type="button" id="showLoops" value="Show Loops"/>
+              <label style=" margin:3px; background-color:#fdd0a2; padding:1px"><input style=" margin: 3px;" type="checkbox" id="loopBgFill" value="loopBgFill" checked>Show Loop Boundaries</label>
+              <!-- <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableNodeDrag" value="enableNodeDrag">Enable Node Dragging</label> -->
+              <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableTooltip" value="enableTooltip">Enable Tooltip</label>
+          </div>
+          <div id="xcfg_container">
+              <div id="xcfg_left">
+                  <div id="tooltip" class="hidden">
+                  <p><span id="value"></span></p>
+                  </div>
+                  <div id="loading" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:#3f51b5 ; ">
+                  Loading. Please Wait!
+                  </div>
+                  <svg id="graphContainer">
+                  <g/>
+                  </svg>
+              </div>
+              <div id="xcfg_text_right">
+                  <pre id="text_code"></pre>
+              </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
     <script src="{{ url_for('static', filename='trace_CFG/main.js') }}"></script>
     <script src="{{ url_for('static', filename='trace_CFG/fnManip.js') }}"></script>
     <script src="{{ url_for('static', filename='trace_CFG/loopCollapser.js') }}"></script>
     <script src="{{ url_for('static', filename='trace_CFG/loopify_dagre.js') }}"></script>
-    <!-- 
+    <!--
     -->
 </div>
 {% endblock %}

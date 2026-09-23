@@ -24,7 +24,7 @@ Functions
     </div>
 </div>
 
-{{ function_table(functions, sort_pagination=pagination, column_setup=user_column_setup) }}
+{{ function_table(functions, sort_pagination=pagination, column_setup=user_column_setup, row_decorations=row_decorations) }}
 {% if functions %}
 {{ pagination_widget(pagination) }}
 {% endif %}

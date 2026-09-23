@@ -129,7 +129,7 @@ Results for Job: {{ job_info.job_id }}
 <img src="{{ url_for('data.diagram_file', filename=job_info.job_id + '-famid_%d' % famid + '.png') }}" class="img-fluid" />
 
 <h3 id="function-matches">Function Matches in Family: {{ matching_result.getFamilyNameByFamilyId(famid) }} ({{ famid }})</h3>
-<p>selection: {{ funp.max_value }}, showing: {{ 1 + funp.start_index }} - {{ funp.end_index }} (filtered: {{ matching_result.num_original_function_matches - funp.max_value}})</p>
+<p>selection: {{ funp.max_value }}, showing: {{ 1 + funp.start_index }} - {{ funp.end_index }} (filtered: {{ num_original_aggregated_functions - funp.max_value}})</p>
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#function-matches" method='GET'>
   <div class="form-group row">
     <input type="hidden" id="famid" name="famid" value="{{ famid }}">

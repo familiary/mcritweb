@@ -81,7 +81,7 @@ Server settings
 <script>
     function copyRegistrationUrl() {
       var js_token = "{{ server_info.registration_token }}";
-      var_register_url = "{{ url_for('authentication.register', _external=True) }}";
+      const var_register_url = "{{ url_for('authentication.register', _external=True) }}";
       // Copy the text inside the text field
       navigator.clipboard.writeText(var_register_url + "?token=" + js_token);
       // Alert the copied text

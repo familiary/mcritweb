@@ -30,37 +30,68 @@ MCRIT provides a search interface, with which you can search various data points
 The search syntax either allows to simply use plain search terms or to prefix your search terms in order to limit the search to specific fields.
 
 For example, when only looking for samples of a certain `family_name`, you could use:
+
 * `family_name:my_malware`
 
 The currently supported fields per category are:
+
 * families:
-  * family_id
-  * family_name
+    * family_id
+    * family_name
 * samples:
-  * family_id
-  * sample_id
-  * sha256
-  * filename
-  * family
-  * version
-  * component
+    * family_id
+    * sample_id
+    * sha256
+    * filename
+    * family
+    * version
+    * component
 * functions:
-  * family_id
-  * sample_id
-  * function_id
-  * offset
-  * pichash
-  * function_name
-  * num_instructions
+    * family_id
+    * sample_id
+    * function_id
+    * offset
+    * pichash
+    * function_name
+    * num_instructions
 
 Additionally, you can also use operands to further limit the term:
+
 * `<`, `<=`, `>`, `>=` -> limit the range
 * `!=` -> not equal
 * `!` -> logical not
-* `?` -> interpret as regular expression
+* `?` -> match anywhere in the field, as a literal substring rather than a pattern
 
 Furthermore, search terms can be combined using the `AND` and `OR` directives, e.g. like so:
+
 * `family_id:1 AND offset:<=0x2399fff AND offset:>=0x2398fff`
+
+A term that is exactly a family, sample or function id - or a sample's `sha256` - also
+matches that record directly, on top of every record whose text contains the term.
+Those exact hits are flagged with an `ID match` or `SHA256 match` badge at the start of
+their row, so they can be told apart from an incidental substring hit. This works the same way
+on the search page and on the family, sample and function listings. An exact hit is
+listed once, at the top of the first page of results; paging onwards shows the text hits
+alone.
+
+The result tables can be sorted by clicking a column header.
+The sort order you last chose is remembered separately for families, samples, and functions, and stays in effect for the rest of your browser session - a new search or a return to one of the lists keeps it, while logging out clears it.
+A link that already carries sort parameters always wins over the remembered order, so a shared URL shows everyone the same table.
+
+##### Plain terms and prefixed terms are not the same search
+
+A term with no field prefix is matched as a case-insensitive **substring** of every field
+listed above for that category. A term *with* a prefix and no operand is matched
+**exactly**: `function_name:memcpy` finds the function called `memcpy`, not the ones
+called `memcpy_s`. Use `?` when you want a substring of one named field
+(`function_name:?memcpy`).
+
+The difference is worth knowing for functions. A plain term has to be compared against
+the name of every function in the database, and when nothing matches there is no partial
+result to stop at, so the search reads all of them — on a large instance that takes tens
+of seconds. An exact `function_name:` term is answered from an index instead and does not
+have that cost. This is also why *Functions* starts unticked on the combined search page:
+tick it when you want them, and prefix the term if you already know the whole name.
 
 #### Families
 
@@ -71,6 +102,7 @@ The search bar allows using the syntax described above to filter the list.
 ![An example row of the family table](images/family_table.png "An example row of the family table")
 
 On the far right, there are four operations available to interact with the families:
+
 * Matching: create a new matching job, and preselect this family
 * Blocks: Run a Blocks analysis over the family, isolating all basic blocks unique to this family and trying to derive a YARA rule for the family
 * Export: export all samples and their functions
@@ -84,6 +116,7 @@ The search bar allows using the syntax described above to filter the list.
 ![An example row of the sample table](images/sample_table.png "An example row of the sample table")
 
 The same operations as for families are available here as well:
+
 * Matching: create a new matching job, and preselect this sample
 * Blocks: Run a Blocks analysis over this sample, isolating all basic blocks unique to this sample and trying to derive a YARA rule for it
 * Edit: allows to change the family name and version, decide whether the sample is a library or not, or delete the sample
@@ -101,6 +134,24 @@ When selecting a function shown in the table, you can open the function details.
 This sub view provides more information about the function, including a rendering of its control flow graph and occurrency of its basic blocks across the database:
 
 ![An example row for function details](images/function_details.png "An example row for function details")
+
+The page is organized in collapsible sections:
+
+* **Function Info**: sample and family, offset, name and labels, size, PicHash with how many families/samples/functions share it, and whether a MinHash has been calculated for the function.
+* **MinHash & Shingles**: the MinHash signature itself and, if the backend tracks it (`MINHASH_TRACK_SHINGLES`), which shingler produced how many of its slots.
+* **Basic Blocks & PicBlockHashes**: the basic blocks the backend indexed with their PicBlockHash.
+* **Control Flow Graph**: the CFG, with the occurrence of every basic block across the database listed next to it.
+
+![The MinHash and basic block sections](images/function_sections.png "The MinHash and basic block sections")
+
+The buttons in the top right corner open the analyze menu, lead to the function's sample and family, show the API usage and jump to the CFG.
+The analyze menu starts a 1vsN, 1vs1 or cross compare job for the sample, searches for all functions sharing the PicHash, or compares this function with any other stored function by its function_id:
+
+![The analyze menu of a function](images/function_analyze_menu.png "The analyze menu of a function")
+
+The API usage lists the requests that fetch the same data through the API passthrough, ready to paste with your own API token (see [User Settings](#user-settings)):
+
+![The API usage of a function](images/function_api_usage.png "The API usage of a function")
 
 
 #### Statistics
@@ -121,12 +172,13 @@ Naturally, only one input sample can be selected and the search syntax described
 
 
 For further options, you can
+
 * choose if you want to force a new run with `Force Rematch` (e.g. in case families/samples were added/removed) or if you want to access a previous result, if existing.
 * adjust the fuzziness for MinHash matching. 
-  * Off: Only do PicHash matching, i.e. quasi-exact function matches.
-  * Fast: requires 3 matching bads, tightens the results but drops many matches in the lower range.
-  * Standard: requires 2 matching bands, which considerably filters the function candidates while not cutting off too many potential true positives.
-  * Complete: requires just 1 matching band, which yields the maximum number of function candidates but also likely incurs many false positives.
+    * Off: Only do PicHash matching, i.e. quasi-exact function matches.
+    * Fast: requires 3 matching bads, tightens the results but drops many matches in the lower range.
+    * Standard: requires 2 matching bands, which considerably filters the function candidates while not cutting off too many potential true positives.
+    * Complete: requires just 1 matching band, which yields the maximum number of function candidates but also likely incurs many false positives.
 
 #### Compare 1vs1
 
@@ -154,13 +206,23 @@ This allows you to upload a single sample, have it disassembled, and performed a
 
 ![An example for creating a query](images/query.png "An example for creating a query")
 
+If the sample turns out to be interesting after all, the result page of a query offers to promote it to a full sample, so you can give it a family and a version without uploading the file a second time.
+
+Promotion works from the copy of the upload that MCRITweb keeps under `instance/temp/uploads/`, because MCRIT itself does not hand a query's input back out again.
+That copy only exists on the machine that received the upload through the web interface, so a query submitted through the API or the IDA plugin, or one made against a different host of the same deployment, cannot be promoted - the result page says so instead of offering the form.
+Promoting a sample that is already in the collection simply takes you to it.
+
 
 #### Unique Blocks
 
 Unique Block Isolation generates a code-based YARA rule for a family or a chosen set of samples.
 It is essentially the approach of [YARA-Signator](https://github.com/fxb-cocacoding/yara-signator), applied to basic blocks instead of instruction n-grams: find the code that occurs inside the target set and in no other family, then build a rule from it.
 
-You start it from the cubes button on a family row or on a sample row, which queues the job immediately and takes you to its job page.
+There are two ways in.
+The cubes button on a family row or a sample row queues the job immediately for that one family or sample and takes you to its job page.
+**Analyze → Unique Blocks** opens a selection page instead, where you search the corpus and build up a set of samples before submitting: the backend has always accepted a list, and this is the way to give it one.
+The selection is held in the URL, so it survives a reload and can be shared or bookmarked, and it is capped at 250 samples.
+A sample the backend will not confirm stays in the selection and is shown as unresolved rather than being dropped — a failure to look it up is not evidence that it is gone, and silently editing the set would mean the next submit analysed something other than what you chose.
 
 The job works in two steps.
 First, elimination: MCRIT takes every basic block in the selected samples and discards any block that also occurs in a sample outside the selection.
@@ -182,12 +244,20 @@ The table below breaks the same numbers down per sample, which is where you see 
 **Unique Blocks** lists the surviving blocks themselves, each with its score, picblockhash, the number of input samples it appears in, its length in instructions, the function it came from, and its disassembly alongside the byte sequence a rule would use.
 Three filters narrow the list — a minimum score, and a minimum and maximum block length — which together are the lever for trading coverage against confidence.
 
-**YARA Rule** holds the generated rule, ready to copy.
+**YARA Rule** holds the generated rule, ready to copy — when there is one.
 Blocks are chosen greedily from the scored candidates: MCRIT repeatedly takes the block covering the most samples not yet covered, until either every sample is covered or no remaining block adds anything.
 That keeps the rule as short as it can be while still reaching every sample.
 The rule is named `mcrit_` plus a short hash of the blocks it selected, so the same selection always produces the same rule name.
 Each string is the block's byte sequence with position-dependent operands wildcarded (i.e. the same normalisation PicHash uses) with the corresponding disassembly kept above it as a comment.
 The condition requires 7 of the strings to match by default, or fewer if the rule has fewer strings.
+
+That default, and the block lengths the rule is built from, can be changed on this tab.
+The bounds — a minimum and maximum length in instructions, and the same in bytes — narrow the candidates *before* the greedy selection runs, so they change which blocks the rule is made of rather than merely hiding rows.
+Tightening them trades coverage for confidence: a longer minimum gives strings that are less likely to appear by chance, and a smaller set of samples covered.
+These are applied to the cached result when the page is rendered, so changing them costs nothing and does not re-run the job — which is also why they are here and not on the submit page.
+
+A bound tight enough to exclude every block leaves a rule with no strings.
+The page says so rather than offering an empty rule to copy.
 
 
 #### Result View
@@ -198,6 +268,11 @@ When not filtered, it is usually divided into these sections:
 ##### Job / Input Sample
 
 Some meta data describing the matching job and reference sample
+
+Once a job has finished, this table also offers "Download as JSON", which hands you the
+raw result report exactly as the MCRIT server produced it - the same data the page above
+is rendered from, unfiltered. This works for every job type, including from the job
+overview page, and is meant for further processing outside of MCRITweb.
 
 ##### Best Family Matches
 
@@ -226,6 +301,7 @@ Similar to the family view but limited to families and samples that have the lib
 The MCRIT diagram visualizes the aggregated matching information for the whole sample.
 Each bar corresponds to one function (with 10 or more instructions) from the binary, sorted by virtual addresses from left to right and its size being proportional to the number of instructions.
 The three major rows show the following aspects:
+
 * frequency
 * library matches
 * best match into another family
@@ -250,6 +326,14 @@ This also allows to select a match, for which a BinDiff-like function comparison
 ![An example for function CFG comparison](images/function_match_cfg.png "An example for function CFG comparison")
 
 Here, blue indicates PIC matches (solid blue is indexed, light blue ad-hoc matched), green indicates a full match, yellow orange a partial match and red diversion that was too strong to be matched.
+
+The two graphs are panned and zoomed together while *Sync graphs* is ticked, so that corresponding regions stay next to each other.
+Hovering a basic block outlines the blocks it was matched to on the other side, and clicking it centers the other graph on its first match.
+
+*Combined* switches to a single graph in the manner of BinDiff, in which matched blocks are drawn once with the code of function A (the code of function B is shown while hovering a block where it differs), blocks that exist only in A are red and blocks that exist only in B are purple.
+Edges are black where both functions have them, and dashed red or purple where only A or only B has them.
+
+![The combined view of a function comparison](images/function_match_combined.png "The combined view of a function comparison")
 
 #### LinkHunt
 
@@ -310,6 +394,7 @@ The last menu point allows you to access settings.
 
 When using a multi-user instance of MCRIT Web, this section allows management of all user accounts.
 At this time, there are 4 user roles with different access rights implemented.
+
 * `Pending`: A user that has just registered and was not assigned a role yet
 * `Visitor`: A limited "read-only" role that can not add content to the MCRIT dataase but is allowed to create matching jobs and queries with a filesize up to 1MB
 * `Contributor`: An account with full access rights

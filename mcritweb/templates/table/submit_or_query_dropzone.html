@@ -77,7 +77,7 @@
 
 
   function mcritInitDropzone(){
-    myDropzone = Dropzone.forElement("#myDropzone");
+    const myDropzone = Dropzone.forElement("#myDropzone");
 
     myDropzone.on("removedfile", function(file) {
       if (this.files.length == 0) {
@@ -95,7 +95,7 @@
       $("#submit-dropzone").prop("disabled", false);
 
       // fill form with data derived from file name
-      filename = file.name
+      const filename = file.name
 
       let xhr = new XMLHttpRequest();
       xhr.open("POST", "{{ url_for('data.request_filename_info') }}" );
@@ -272,15 +272,14 @@ function handleSliderChange_dropzone(val) {
 </form>
 </center>
 <script>
-    // |tojson emits a real array, so the repr-parsing this used to do - strip the
-    // brackets, split on ", ", shave a quote off each end - is gone with it. A family
-    // name is chosen by whoever submits or renames a family, and one containing a quote
-    // used to escape the string literal entirely.
-    var families = {{ families|tojson }};
-    families_ac = [];
-    for (let i in families) {
-        families_ac.push({label:families[i], value:families[i]})
-    }
+    // Escaped by |autocomplete_items (see mcritweb/__init__.py) before |tojson turns it
+    // into a JS literal. autocomplete.js renders each suggestion through innerHTML and
+    // into a data-label attribute, so a family name is markup there, not text - and a
+    // family name is chosen by whoever submits or renames a family. |tojson only gets
+    // the value safely into the script; the escaping is what keeps it from executing
+    // once the widget renders it. Known cost, since it is not free: the widget slices
+    // the escaped label, so a lookup landing inside an entity renders it literally.
+    var families_ac = {{ families|autocomplete_items|tojson }};
     // Autocomplete builds a Bootstrap dropdown, and Bootstrap is deferred (issue #63):
     // construct it once the deferred scripts have run, not while the page parses
     document.addEventListener("DOMContentLoaded", function () {

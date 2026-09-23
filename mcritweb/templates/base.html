@@ -10,6 +10,21 @@
      render-blocking CSS less than the unminified full builds. See issue #63. #}
   <link href="{{ url_for('static', filename='bootstrap-5.0.2-dist/css/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/fontawesome-subset.css') }}" rel="stylesheet">
+  {# the icon font is discovered only after the Font Awesome stylesheet is parsed and laid out, so it arrives
+     a render-blocking round after everything else and every fa- icon - the navbar's Explore
+     entries among them - is a blank box until then. Solid only: the regular and brands faces
+     are page-specific, and preloading a face a page never draws with is pure waste.
+
+     Signed-in only, and that is not about authorisation. The one solid glyph an anonymous
+     page draws is the navbar help icon, which sits inside .navbar-collapse - below 992px
+     Bootstrap gives that display:none, so the glyph has no box and the font is fetched and
+     discarded. Measured: /login at 390x844 requests fa-solid-900.woff2 (150KB) and
+     document.fonts reports nothing loaded. Signed-in pages draw icons in the content
+     itself, at every width, so there the preload is paid for.
+     See issue #62 and tests/testIconPreload.py #}
+  {% if g.user %}
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ url_for('static', filename='webfonts/fa-solid-900.woff2') }}">
+  {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="icon" type="image/png" href=" {{ url_for('static',filename='d20_mcrit_cabaret_small.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='navbar.css') }}">
@@ -36,6 +51,9 @@
      both while parsing. See issue #63. #}
   <script defer src="{{ url_for('static', filename='bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js') }}"></script>
   <script defer src="{{ url_for('static', filename='post_action.js') }}"></script>
+  {# page_loading.js stays a plain script, as it was: nothing calls it, it only
+     registers its navigation listeners as it runs. See issue #60. #}
+  <script src="{{ url_for('static', filename='page_loading.js') }}"></script>
 
   {% if not suppress_dropzone_overlay %}
     {{ submit_or_query_dropzone_js(select_form_type=True, lazy=True) }}
@@ -46,7 +64,7 @@
       }
       function clearDropzone(e) {
         if (!window.Dropzone) { return; }
-        myDropzone = Dropzone.forElement("#myDropzone");
+        const myDropzone = Dropzone.forElement("#myDropzone");
         myDropzone.removeAllFiles();
       }
 
@@ -109,6 +127,7 @@
         <a class="dropdown-item" href="{{ url_for('analyze.compare') }}" >Compare 1vsN</a>
         <a class="dropdown-item" href="{{ url_for('analyze.compare_versus') }}" >Compare 1vs1</a>
         <a class="dropdown-item" href="{{ url_for('analyze.cross_compare') }}">Cross-Compare</a>
+        <a class="dropdown-item" href="{{ url_for('analyze.unique_blocks') }}">Unique Blocks</a>
         <div class="dropdown-divider"></div>
         <a class="dropdown-item" href="{{ url_for('analyze.query') }}">Query</a>
       </div>

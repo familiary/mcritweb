@@ -18,6 +18,9 @@ import json
 import pathlib
 import re
 
+import mcrit.matchers.MatcherFlags as MatcherFlags
+from mcrit.config.MinHashConfig import MinHashConfig
+from mcrit.minhash.MinHash import MinHash
 from mcrit.queue.LocalQueue import Job
 from mcrit.storage.FamilyEntry import FamilyEntry
 from mcrit.storage.FunctionEntry import FunctionEntry
@@ -33,6 +36,10 @@ REPORTS = (
     "matches_for_query",
     "cross_compare",
     "unique_blocks",
+    # the three maintenance jobs result_maintenance.html knows, one per branch of the template
+    "maintenance_rebuild_index",
+    "maintenance_recalculate_pichashes",
+    "maintenance_recalculate_minhashes",
 )
 
 
@@ -43,6 +50,11 @@ def load(name):
 def job_id_of(report):
     """The job id a report fixture was captured under."""
     return load(f"{report}.job")["_id"]["$oid"]
+
+
+#: The sample the captured 1-vs-N report (`matches_for_sample`) was produced for, and
+#: the sample the reference functions belong to.
+MATCHED_SAMPLE_ID = 0
 
 
 # --- the search/cursor protocol ------------------------------------------------
@@ -132,11 +144,48 @@ def _page(entries, search_term, fields, default_sort, sort_by, is_ascending, cur
     }
 
 
+class RawResponse:
+    """Enough of a requests.Response for a caller reading a raw-mode answer.
+
+    `McritClient(raw_responses=True)` returns the response untouched instead of running
+    it through `handle_response`, which is the only way a caller can tell "404, not in
+    the collection" from "the call failed" - handle_response maps both to None. Only the
+    methods that a view actually asks for in raw mode model this; see the note on
+    CorpusMcritClient.raw.
+    """
+
+    def __init__(self, status_code, payload=None):
+        self.status_code = status_code
+        self._payload = payload
+
+    def json(self):
+        return {"status": "successful", "data": self._payload}
+
+def _job_state(document):
+    """mongoqueue._identifyJobState, transcribed - `state=` is filtered on it."""
+    if document["started_at"] and document["locked_by"] and not (document["finished_at"] or document["terminated"]):
+        return "in_progress"
+    if document["attempts_left"] == 0 and not document["finished_at"] and not document["terminated"]:
+        return "failed"
+    if not document["finished_at"] and not document["locked_by"] and not document["terminated"]:
+        return "queued"
+    if document["finished_at"] and not document["terminated"]:
+        return "finished"
+    if document["terminated"]:
+        return "terminated"
+    return "unknown"
+
+
 class CorpusMcritClient:
     """Serves the captured corpus in the types the real client returns."""
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
+        #: raw_responses is modelled for getSampleBySha256 only, because that is the one
+        #: place a view needs the status code rather than the parsed value. Every other
+        #: method ignores it and answers parsed, so a new raw-mode caller has to teach
+        #: this fake about its method rather than getting a wrong shape quietly.
+        self.raw = bool(kwargs.get("raw_responses"))
         self.calls = []
         self._samples = {int(k): SampleEntry.fromDict(v) for k, v in load("samples").items()}
         self._families = {int(k): FamilyEntry.fromDict(v) for k, v in load("families").items()}
@@ -152,18 +201,31 @@ class CorpusMcritClient:
         self._jobs = {job_id_of(report): (load(f"{report}.job"), load(f"{report}.result")) for report in REPORTS}
         self._queue = load("queue")
 
+    def raw_variant(self):
+        """The same backend answering in raw mode - see FakeMcritClient.raw_variant."""
+        clone = object.__new__(type(self))
+        clone.__dict__.update(self.__dict__)
+        clone.raw = True
+        return clone
+
     def _record(self, name, *args, **kwargs):
         self.calls.append((name, args, kwargs))
 
     # --- server ------------------------------------------------------------------
 
+    # Both of these answer with the wrapped dict, because that is what the real client
+    # answers with: MinHashIndex.getStatus returns {"status": {...}} and getVersion
+    # returns {"version": "..."}, StatusResource puts each under "data", and
+    # handle_response hands "data" back untouched. Unwrapping here once more used to
+    # make /explore/statistics render an empty table under test while working in
+    # production - and hid that the admin page renders getVersion()'s dict verbatim.
     def getStatus(self, *args, **kwargs):
         self._record("getStatus", *args, **kwargs)
-        return load("status")["status"]
+        return load("status")
 
     def getVersion(self, *args, **kwargs):
         self._record("getVersion", *args, **kwargs)
-        return load("version")["version"]
+        return load("version")
 
     # --- families ----------------------------------------------------------------
 
@@ -197,8 +259,8 @@ class CorpusMcritClient:
         self._record("getSampleBySha256", sha256, *args, **kwargs)
         for sample in self._samples.values():
             if sample.sha256 == sha256:
-                return sample
-        return None
+                return RawResponse(200, sample.toDict()) if self.raw else sample
+        return RawResponse(404) if self.raw else None
 
     # --- functions ---------------------------------------------------------------
 
@@ -220,6 +282,95 @@ class CorpusMcritClient:
         self._record("isFunctionId", function_id, *args, **kwargs)
         return int(function_id) in self._functions
 
+    # --- direct matching ---------------------------------------------------------
+
+    def getMatchesForPicHash(self, pichash, summary=False, *args, **kwargs):
+        """(family, sample, function) for every function sharing this pichash.
+
+        Mirrors QueryResource.on_get_query_pichash[_summary]: the summary is three
+        cardinalities, not the tuples, and it is what the function tables render.
+        """
+        self._record("getMatchesForPicHash", pichash, summary=summary)
+        matches = {
+            (entry.family_id, entry.sample_id, entry.function_id)
+            for entry in self._functions.values()
+            if entry.pichash == pichash
+        }
+        if summary:
+            return {
+                "families": len({match[0] for match in matches}),
+                "samples": len({match[1] for match in matches}),
+                "functions": len({match[2] for match in matches}),
+            }
+        return [list(match) for match in sorted(matches)]
+
+    def getMatchFunctionVs(self, function_id_a, function_id_b, *args, **kwargs):
+        """The four entries and the match tuple the function-vs page is built from.
+
+        Scored the way MinHashIndex.getMatchesFunctionVs does it - the minhashes are
+        in the captured entries, so the score is computed here rather than invented,
+        and the flags follow the same three rules.
+        """
+        self._record("getMatchFunctionVs", function_id_a, function_id_b)
+        entry_a = self._functions.get(int(function_id_a))
+        entry_b = self._functions.get(int(function_id_b))
+        if entry_a is None or entry_b is None:
+            return None
+        sample_a = self._samples[entry_a.sample_id]
+        sample_b = self._samples[entry_b.sample_id]
+        bits = MinHashConfig().MINHASH_SIGNATURE_BITS
+        minhash_a = entry_a.getMinHash(minhash_bits=bits).minhash
+        minhash_b = entry_b.getMinHash(minhash_bits=bits).minhash
+        score = None
+        if minhash_a and minhash_b:
+            score = MinHash.calculateMinHashScore(minhash_a, minhash_b, minhash_bits=bits)
+        flags = 0
+        flags += MatcherFlags.IS_MINHASH_FLAG if score is not None and score >= MinHashConfig().MINHASH_MATCHING_THRESHOLD else 0
+        flags += MatcherFlags.IS_PICHASH_FLAG if entry_a.pichash == entry_b.pichash else 0
+        flags += MatcherFlags.IS_LIBRARY_FLAG if sample_b.is_library else 0
+        match_tuple = [entry_b.family_id, entry_b.sample_id, entry_b.function_id, score, flags]
+        return {
+            "function_entry_a": entry_a.toDict(),
+            "function_entry_b": entry_b.toDict(),
+            "sample_entry_a": sample_a.toDict(),
+            "sample_entry_b": sample_b.toDict(),
+            # serialised by hand: MatchedFunctionEntry.toDict() of mcrit <= 1.8.1 re-encodes
+            # the flag booleans with their bit values (danielplohmann/mcrit#155), which
+            # turns a pichash match into a library one on the way out
+            "match_entry": {
+                "fid": int(function_id_a),
+                "num_bytes": entry_a.binweight,
+                "offset": entry_a.offset,
+                "matches": match_tuple,
+            },
+        }
+
+    def getMatchesForPicBlockHash(self, picblockhash, summary=False, *args, **kwargs):
+        self._record("getMatchesForPicBlockHash", picblockhash, summary=summary, *args, **kwargs)
+        hits = [entry for entry in self._functions.values() if any(block["hash"] == picblockhash for block in entry.picblockhashes)]
+        return {
+            "families": len({entry.family_id for entry in hits}),
+            "samples": len({entry.sample_id for entry in hits}),
+            "functions": len(hits),
+        }
+
+    # --- job submission ----------------------------------------------------------
+
+    def requestMatchesForSample(self, sample_id, *args, **kwargs):
+        """mcrit deduplicates by descriptor and answers the job it already has.
+
+        The corpus holds exactly one captured 1-vs-N job, for the sample its reference
+        functions belong to, so that is the only submission this can answer. Anything
+        else is a gap in the fixtures rather than a job, and says so.
+        """
+        self._record("requestMatchesForSample", sample_id, *args, **kwargs)
+        if int(sample_id) != MATCHED_SAMPLE_ID:
+            raise NotImplementedError(
+                f"The corpus has no captured 1-vs-N job for sample {sample_id}, only for "
+                f"sample {MATCHED_SAMPLE_ID}. Capture one with tests/fixtures/regenerate.py."
+            )
+        return job_id_of("matches_for_sample")
+
     # --- jobs and results --------------------------------------------------------
 
     def getJobData(self, job_id, *args, **kwargs):
@@ -232,9 +383,33 @@ class CorpusMcritClient:
         entry = self._jobs.get(job_id)
         return entry[1] if entry else None
 
-    def getQueueData(self, *args, **kwargs):
-        self._record("getQueueData", *args, **kwargs)
-        return [Job(entry, None) for entry in self._queue]
+    def getQueueData(self, start=0, limit=0, method=None, filter=None, state=None, ascending=False):
+        """The queue, narrowed the way mcrit narrows it - including where it does so
+        badly, because callers have to cope with that.
+
+        `queue.json` is captured newest-first, which is what `ascending=False` means.
+        `method` is a mongo query on `payload.method` and so applies *before* start and
+        limit; `state` is filtered in python over the whole collection and then sliced,
+        which is only a performance difference. `filter` is the odd one out: mcrit
+        applies it as a substring test over `Job.parameters` *after* start and limit
+        (`QueueRemoteCalls.getQueueData`), so it drops non-matches out of an already
+        paged slice rather than paging the matches. Reproduced deliberately - a caller
+        that combines `filter` with `limit` must not look correct here."""
+        # every parameter recorded by name, as data.jobs actually passes them: a call
+        # assertion should not depend on which ones this line happened to forward
+        # positionally.
+        self._record("getQueueData", start=start, limit=limit, method=method, filter=filter, state=state, ascending=ascending)
+        documents = self._queue if not ascending else list(reversed(self._queue))
+        if method is not None:
+            documents = [entry for entry in documents if entry["payload"]["method"] == method]
+        if state is not None:
+            documents = [entry for entry in documents if _job_state(entry) == state]
+        start = start if isinstance(start, int) and start > 0 else 0
+        documents = documents[start:start + limit] if isinstance(limit, int) and limit > 0 else documents[start:]
+        jobs = [Job(entry, None) for entry in documents]
+        if isinstance(filter, str):
+            jobs = [job for job in jobs if filter in job.parameters]
+        return jobs
 
     def getQueueStatistics(self, *args, **kwargs):
         self._record("getQueueStatistics", *args, **kwargs)

@@ -584,6 +584,10 @@
   content: "\f101"; }
 
 
+.fa-arrows-rotate::before {
+  content: "\f021"; }
+
+
 .fa-virus::before {
   content: "\e074"; }
 
@@ -594,6 +598,10 @@
 
 .fa-filter::before {
   content: "\f0b0"; }
+
+
+.fa-code::before {
+  content: "\f121"; }
 
 
 .fa-cubes-stacked::before {
@@ -650,6 +658,10 @@
 
 .fa-code-compare::before {
   content: "\e13a"; }
+
+
+.fa-diagram-project::before {
+  content: "\f542"; }
 
 
 .fa-project-diagram::before {

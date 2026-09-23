@@ -1,4 +1,5 @@
 import json
+import logging
 import math
 import os
 import sys
@@ -8,6 +9,8 @@ from mcrit.storage.MatchingResult import MatchingResult
 from PIL import Image
 
 from mcritweb.views.client import get_client
+
+LOG = logging.getLogger(__name__)
 
 
 def load_cached_result(result_filepath):
@@ -117,7 +120,12 @@ class MatchReportRenderer:
         # output stats
         num_matchable_functions = sum([1 for _, function_info in self.function_infos.items() if function_info.num_instructions >= 10])
         num_matched_functions = len(set([match.function_id for match in self.match_report.function_matches]))
-        print(f"Sample has {len(self.function_infos)} functions, {num_matchable_functions} matchable and {num_matched_functions} with matches.")
+        # `processReport` is on the request path - data.py calls it to draw the match
+        # diagram - so this cannot be a print. It stays as a debug record because it is
+        # genuinely useful when a diagram comes out wrong, and it is the only place the
+        # matchable/matched counts are computed together.
+        LOG.debug("Sample has %d functions, %d matchable and %d with matches.",
+                  len(self.function_infos), num_matchable_functions, num_matched_functions)
 
     def __init__(self):
         self._function_visualization_width = 1
@@ -337,13 +345,14 @@ class MatchReportRenderer:
         stack_interval = 1
         stack_size = (math.ceil(int(num_blocks / (diagram_width / (block_size + 1))) / stack_interval) + 1) * stack_interval
         num_columns = int(num_blocks / stack_size) if num_blocks % stack_size == 0 else int(num_blocks / stack_size) + 1
-        print(f"stack size: {stack_size}, num columns: {num_columns}")
+        LOG.debug("stack size: %s, num columns: %s", stack_size, num_columns)
         window_size_x = 40 + diagram_width
         window_size_y = 40 + num_diagrams * stack_size * block_size + 20 * (num_diagrams - 1)
 
         image = Image.new("RGB", (window_size_x, window_size_y), background_color_tuple)
         pixels = image.load()
-        print(f"drawing diagram for {num_blocks} blocks, with stack size {stack_size} in {window_size_x}x{window_size_y} pixels.")
+        LOG.debug("drawing diagram for %s blocks, with stack size %s in %sx%s pixels.",
+                  num_blocks, stack_size, window_size_x, window_size_y)
         diagram_x = 20
         diagram_y = 20
         diagram_2_y = 20 + stack_size * block_size + 20

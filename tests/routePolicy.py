@@ -75,7 +75,9 @@ MUTATING_CLIENT_CALLS = {
     "requestMatchesForSmdaReport",
     "requestMatchesForUnmappedBinary",
     "requestUniqueBlocksForFamily",
-    "requestUniqueBlocksForSample",
+    # the method is plural - the singular spelling matched nothing on McritClient, so
+    # the detector was blind to every unique-blocks submission
+    "requestUniqueBlocksForSamples",
     "respawn",
     "updateFamily",
     "updateSample",
@@ -120,15 +122,20 @@ ROUTE_POLICY = {
     "admin.change_default_filter": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_column_settings": (LOGGED_IN, WRITES_ON_POST),
     "admin.reset_column_settings": (LOGGED_IN, WRITES_ON_POST),
+    "admin.regenerate_apitoken": (LOGGED_IN, WRITES_ON_POST),   # only ever the caller's own row
 
     # --- visitor and above -------------------------------------------------------
     "explore.families": (VISITOR, READ_ONLY),
+    # the family type-ahead behind the edit modals (#77). Visitors already read every
+    # family name off explore.families, so this exposes nothing the listing does not.
+    "explore.family_names": (VISITOR, READ_ONLY),
     "explore.family_by_id": (VISITOR, READ_ONLY),
     "explore.samples": (VISITOR, READ_ONLY),
     "explore.sample_by_id": (VISITOR, READ_ONLY),
     "explore.functions": (VISITOR, READ_ONLY),
     "explore.function_by_id": (VISITOR, READ_ONLY),
     "explore.fetchDotGraph": (VISITOR, READ_ONLY),
+    "explore.fetchCombinedDotGraph": (VISITOR, READ_ONLY),
     "explore.findLoops": (VISITOR, READ_ONLY),
     "explore.getPicBlockMatches": (VISITOR, READ_ONLY),
     "explore.search": (VISITOR, READ_ONLY),
@@ -138,19 +145,42 @@ ROUTE_POLICY = {
     "analyze.compare_submit_query": (VISITOR, READ_ONLY),
     "analyze.cross_compare": (VISITOR, READ_ONLY),
     "analyze.cross_compare_from_hash_list": (VISITOR, READ_ONLY),
+    # the configuration page for unique blocks - it selects samples and looks them up,
+    # the submission is the separate route below. See issue #93.
+    "analyze.unique_blocks": (VISITOR, READ_ONLY),
     # Job submission by GET, deliberately: the URL names a comparison, so it is worth
     # bookmarking and sharing. Not destructive, and idempotent since issue #97 - the
     # backend returns the existing job for identical parameters unless the caller asks
     # for a recalculation, so a repeat, a prefetch or a double-click costs nothing.
     "analyze.compare_all": (VISITOR, WRITES_ON_GET),
     "analyze.compare_vs": (VISITOR, WRITES_ON_GET),
+    # same shape one level down: it queues the *parent sample's* 1-vs-N and lands on
+    # that report filtered to the function, because the backend has no per-function
+    # job. Reuses an existing job unless asked to rematch, so it is idempotent too.
+    #
+    # It does widen the surface, and the docstring above is why that is worth writing
+    # down: this row takes a *function* id where its siblings take a sample id, so
+    # many more URLs reach it - `<img src="/analyze/compare_function/12345">` on any
+    # page a logged-in visitor loads queues a match. The set of *jobs* reachable that
+    # way does not grow, because every function resolves to its parent sample and
+    # `analyze.compare_all` already queues those from a bare GET. So this is more
+    # spellings of an existing capability, not a new one.
+    "analyze.compare_function": (VISITOR, WRITES_ON_GET),
     "analyze.blocks_family": (VISITOR, WRITES_ON_GET),
     "analyze.blocks_sample": (VISITOR, WRITES_ON_GET),
+    # the same shape as the two above and as start_cross_compare, and unconditionally
+    # idempotent rather than idempotent-unless-asked: neither unique-blocks method takes
+    # a force_recalculation, so mcrit answers a repeat from its descriptor cache. The
+    # route sorts and deduplicates the selection so that a repeat hashes the same.
+    "analyze.start_unique_blocks": (VISITOR, WRITES_ON_GET),
     "analyze.start_cross_compare": (VISITOR, WRITES_ON_GET),
     "analyze.query": (VISITOR, WRITES_ON_POST),
     "data.jobs": (VISITOR, READ_ONLY),
     "data.job_by_id": (VISITOR, READ_ONLY),
     "data.result": (VISITOR, READ_ONLY),
+    # writes the report to instance/cache/results on a cache miss, exactly as
+    # data.result does, which is local caching rather than a state change
+    "data.download_result": (VISITOR, READ_ONLY),
     "data.linkhunt": (VISITOR, READ_ONLY),
     "data.match_functions": (VISITOR, READ_ONLY),
     # serves instance/cache/diagrams; the <img> tags on the result pages carry the
@@ -161,6 +191,9 @@ ROUTE_POLICY = {
     # --- contributor and above ---------------------------------------------------
     "data.submit": (CONTRIBUTOR, WRITES_ON_POST),
     "data.submit_or_query": (CONTRIBUTOR, WRITES_ON_POST),
+    # adds the file a query was run for to the corpus - the same write data.submit
+    # performs, from a copy already on disk instead of a fresh upload. See issue #9.
+    "data.promote_query": (CONTRIBUTOR, WRITES_ON_POST),
     "data.import_view": (CONTRIBUTOR, WRITES_ON_POST),
     "data.import_complete": (CONTRIBUTOR, READ_ONLY),
     "data.export_view": (CONTRIBUTOR, READ_ONLY),

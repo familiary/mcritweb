@@ -1,6 +1,7 @@
 {% from 'table/compare_nav.html' import compare_nav %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% from 'table/sample_row.html' import sample_header %}
+{% from 'table/row_decoration.html' import row_tint %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -23,7 +24,7 @@ Compare
         }
         else{
           this.style.backgroundColor = "white";
-          pos = selected.indexOf($(this).children("th.id").text());
+          const pos = selected.indexOf($(this).children("th.id").text());
           console.log(pos);
           if(pos == 0){
             selected.shift();
@@ -39,12 +40,12 @@ Compare
     $('#cross_search_form').submit(function(eventObj) {
       eventObj.preventDefault();
       eventObj.stopPropagation();
-      base_url = window.location.href;
-      args = fetchState();
+      const base_url = window.location.href;
+      const args = fetchState();
       args.cache = null;
       args["query"] = $("#Search").val();
       args["_anchor"] = "Search"
-      null_keys = {{ pagination.params_list|tojson }};
+      const null_keys = {{ pagination.params_list|tojson }};
       for(var i = 0, size = null_keys.length; i < size ; i++){
         args[null_keys[i]] = null;
       }
@@ -171,7 +172,7 @@ function handleSliderChange(val) {
       </thead>
       <tbody>
         {% for sample in samples %}
-        <tr {% if sample.sample_id in selected_ids %} style="background-color: yellowgreen;"{% endif %}{% if sample.sample_id in cached %} style="background-color: rgb(240, 240, 240);"{% endif %}class="parent">
+        <tr{{ row_tint(row_decorations, sample.sample_id) }} class="parent">
           <th align="right" valign="middle" scope="row" class="id">{{ "%d"|format(sample.sample_id) }}</th>
           <td align="right" valign="middle" class="font-monospace">{{ sample.getShortSha256() }}</td>
           <td valign="middle">{{ sample.family }}</td>

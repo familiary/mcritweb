@@ -27,7 +27,10 @@ GLYPH_RULE = re.compile(r"\.fa-([a-z0-9-]+)::before")
 #: fa-* classes that are sizing, style or layout utilities rather than glyphs; their
 #: rules are kept by the "not a glyph rule" test below, they are listed here so the
 #: staleness test does not expect a glyph for them
-NOT_GLYPHS = {"solid", "regular", "brands", "light", "thin", "duotone", "sharp", "classic", "xs", "sm", "lg", "xl", "2xl", "1x", "2x", "3x", "4x", "5x", "6x", "7x", "8x", "9x", "10x", "fw", "ul", "li", "border", "pull-left", "pull-right", "spin", "pulse", "beat", "fade", "beat-fade", "bounce", "flip", "shake", "spin-pulse", "spin-reverse", "rotate-90", "rotate-180", "rotate-270", "flip-horizontal", "flip-vertical", "flip-both", "rotate-by", "stack", "stack-1x", "stack-2x", "inverse", "sr-only", "sr-only-focusable"}
+NOT_GLYPHS = {"solid", "regular", "brands", "light", "thin", "duotone", "sharp", "classic", "xs", "sm", "lg", "xl", "2xl", "1x", "2x", "3x", "4x", "5x", "6x", "7x", "8x", "9x", "10x", "fw", "ul", "li", "border", "pull-left", "pull-right", "spin", "pulse", "beat", "fade", "beat-fade", "bounce", "flip", "shake", "spin-pulse", "spin-reverse", "rotate-90", "rotate-180", "rotate-270", "flip-horizontal", "flip-vertical", "flip-both", "rotate-by", "stack", "stack-1x", "stack-2x", "inverse", "sr-only", "sr-only-focusable",
+              # the webfont files themselves: base.html preloads fa-solid-900.woff2 and
+              # explains why in a comment (issue #62) - a file name, not a glyph
+              "solid-900", "regular-400", "brands-400"}
 
 
 def used_icons(paths=SCANNED):

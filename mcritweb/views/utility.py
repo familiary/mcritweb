@@ -99,6 +99,49 @@ def get_user_column_setup(table_type:str):
     ucs_dict = user_column_settings.toUserColumnSettings()
     return ucs_dict[table_type]["active"]
 
+#: A backend-issued job id, as it is allowed to appear in a path: the two shapes the
+#: two queue implementations actually answer, and nothing else. MongoQueue hands back
+#: `str(ObjectId)` and LocalQueue `str(uuid.uuid4())`.
+#:
+#: Matching the shape rather than merely excluding separators is what keeps three
+#: things out. A path cannot walk out of the folder. `MongoQueue.put` returns None on
+#: an unacknowledged insert and `QueueRemoteCalls.submitPayloadQueue` wraps its answer
+#: in `str()`, so a backend failing that way hands out the literal string "None" - one
+#: name, shared by every such failure, which is the collision this whole change exists
+#: to remove. And a Windows device name - NUL, CON, AUX, COM1 - is a valid filename
+#: that opens the device instead of a file, so `open(".../uploads/NUL", "wb")` stores
+#: nothing at all and says nothing about it.
+#:
+#: `\Z` and not `$`, which would also match before a trailing newline.
+QUERY_UPLOAD_JOB_ID = re.compile(
+    r"^(?:[0-9a-fA-F]{24}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})\Z")
+
+
+def query_upload_path(app, job_id):
+    """Where `analyze.query` keeps the file one query job was run for, or None.
+
+    The single definition of that name, because two sides depend on it agreeing: the
+    query route writes the file, and promoting a query to a sample (issue #9) reads it
+    back to resubmit the same bytes. It is keyed by job id because that is what both
+    of them have and neither of them can choose - the id is issued by the backend when
+    the job is queued, after the upload has been accepted.
+
+    It used to be keyed by a sha256 instead, and that is the bug this replaces: for an
+    .smda upload the hash was read out of the uploaded report's own `sha256` field, so
+    any visitor could name the file after another user's query and overwrite it. A
+    digest of the uploaded bytes fixes that half, but leaves the read side unable to
+    find anything - a query report records the sample's declared hash, not a hash of
+    the bytes that were posted, so there is no path from a job to that name.
+
+    Returns None for anything that is not a usable job id, so the caller decides what
+    an unpromotable job should say rather than this raising. An id that does not look
+    like one means a backend that is not answering properly, not a name to repair.
+    """
+    if not isinstance(job_id, str) or not QUERY_UPLOAD_JOB_ID.match(job_id):
+        return None
+    return os.sep.join([app.instance_path, "temp", "uploads", job_id])
+
+
 def ensure_local_data_paths(app, clear_data=False):
     # nuke both cache and temp folders
     nuke_paths = [

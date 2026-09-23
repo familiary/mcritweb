@@ -55,8 +55,8 @@ Sample: {{ entry.sample_id }}
     else if(button_clicked) {
       e.stopPropagation();
       button_clicked = false;
-      own_menu = $('#dropdown-menu');
-      was_visible = own_menu.is(":visible");
+      const own_menu = $('#dropdown-menu');
+      const was_visible = own_menu.is(":visible");
       $("#dropdown-menu").hide();
       if (!was_visible){
         $("#dropdown-menu").toggle();

@@ -25,7 +25,7 @@ Samples
   </div>
 
 
-{{ sample_table(samples, job_collection=job_collection, show_export=True, show_edit=True, sort_pagination=pagination, column_setup=user_column_setup) }}
+{{ sample_table(samples, job_collection=job_collection, show_export=True, show_edit=True, sort_pagination=pagination, column_setup=user_column_setup, row_decorations=row_decorations) }}
 {% if samples %}
 {{ pagination_widget(pagination) }}
 {% endif %}
