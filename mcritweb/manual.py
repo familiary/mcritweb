@@ -19,6 +19,7 @@ same reason: MCRITweb is deployed from a checkout, never from a built wheel.
 """
 
 import pathlib
+import re
 
 import markdown
 from markupsafe import Markup
@@ -39,7 +40,33 @@ MISSING_MANUAL = Markup(
     "this usually means the checkout is incomplete.</p>"
 )
 
+#: A screenshot's source as the markdown writes it, `src="images/x.png"`.
+SCREENSHOT_SOURCE = re.compile(r'src="images/([^"/]+)"')
+
 _cache = {}
+
+
+def _png_size(path):
+    """(width, height) from a PNG's header, or None if the file is missing or not a PNG."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(24)
+    except OSError:
+        return None
+    if len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
+        return None
+    return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+
+
+def _with_size(match):
+    # A lazy screenshot is a 2px placeholder until it arrives. Without its size, the
+    # ones loading next to a /help#section target push the section away after the
+    # browser has scrolled to it. With width and height, and `height: auto` in
+    # style.css, the space is reserved before the image loads.
+    size = _png_size(IMAGE_DIRECTORY / match.group(1))
+    if size is None:
+        return match.group(0)
+    return f'{match.group(0)} width="{size[0]}" height="{size[1]}"'
 
 
 def render(image_url_prefix):
@@ -60,6 +87,7 @@ def render(image_url_prefix):
         # which is what makes marking the output safe defensible here
         html = markdown.markdown(MANUAL_PATH.read_text(encoding="utf-8"), extensions=list(EXTENSIONS))
         _cache.clear()
+        html = SCREENSHOT_SOURCE.sub(_with_size, html)
         html = html.replace(MARKDOWN_IMAGE_PREFIX, f'src="{image_url_prefix}')
         # the first screenshot is the page's largest paint; the rest download as they are scrolled to
         first, _, rest = html.partition("<img ")
