@@ -144,9 +144,9 @@ Sample: {{ entry.sample_id }}
             {% endif %}
           </div>
         </div>
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_family_blocks" href="{{ url_for('analyze.blocks_sample', sample_id=entry.sample_id) }}" role="button" target="_self"><i class="fa-solid fa-cubes-stacked"></i></a>
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=entry.sample_id) }}" role="button" target="_self"><i class="fa-solid fa-file-export"></i></a>
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ entry.is_library }}"  data-bs-version="{{ entry.version }}"  data-bs-sampleid="{{ entry.sample_id }}" data-bs-familyname="{{ entry.family }}"><i class="fa-solid fa-pen-to-square"></i></a>
+          <a aria-label="Unique blocks" title="Unique blocks" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_family_blocks" href="{{ url_for('analyze.blocks_sample', sample_id=entry.sample_id) }}" role="button" target="_self"><i class="fa-solid fa-cubes-stacked"></i></a>
+          <a aria-label="Export" title="Export" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=entry.sample_id) }}" role="button" target="_self"><i class="fa-solid fa-file-export"></i></a>
+          <a aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ entry.is_library }}"  data-bs-version="{{ entry.version }}"  data-bs-sampleid="{{ entry.sample_id }}" data-bs-familyname="{{ entry.family }}"><i class="fa-solid fa-pen-to-square"></i></a>
       </div>
     </div>
 </div>
@@ -159,18 +159,18 @@ Sample: {{ entry.sample_id }}
       </p>
   {% endif %}
 </div>
-<h3>Search</h3>
+<h2 class="h3">Search</h2>
   <form style="width:100%" method="GET" required action="#">
     <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" autofocus autocomplete="on">
     <input type='submit' hidden>
   </form>
-  <h3>Functions</h3>
+  <h2 class="h3">Functions</h2>
 {{ function_table(functions, for_sample_view=True, sort_pagination=pagination, column_setup=user_column_setup) }}
 {% if functions %}
 {{ pagination_widget(pagination) }}
 {% endif %}
 {% if job_collection.count %}
-<h3 id="jobs">Jobs</h3>
+<h2 class="h3" id="jobs">Jobs</h2>
 {{ job_table(job_collection.getJobs(), samples_by_id=samples) }}
 {% endif %}
 {% include 'js/ac_family_names.html' %}

@@ -26,15 +26,15 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
 <div class="container">
 <span><h1>Function Comparison: {{ format_function_id(function_id_a) }} vs. {{ format_function_id(function_id_b) }}</h1></span>
     <div id="match_score">
-        <h3>Match Score: <span id="match_score_value"></span>{% if match_result.matched_score is not none %}{{ "%d"|format(match_result.matched_score) }}{% else %}n/a{% endif %}
+        <h2 class="h3">Match Score: <span id="match_score_value"></span>{% if match_result.matched_score is not none %}{{ "%d"|format(match_result.matched_score) }}{% else %}n/a{% endif %}
           {% if match_result.match_is_pichash %}<span class="badge bg-primary" title="Both functions have the same PicHash">PicHash</span>{% endif %}
           {% if match_result.match_is_minhash %}<span class="badge bg-secondary" title="MinHash score above the matching threshold">MinHash</span>{% endif %}
           {% if match_result.match_is_library %}<span class="badge bg-success" title="Function B belongs to a library sample">Library</span>{% endif %}
-        </h3>
+        </h2>
     </div>
 <div style="float:right">
   {{ api_usage_button("apiUsageModal") }}
-  <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" role="button" title="Go to the control flow graphs"><i class="fa-solid fa-diagram-project"></i></a>
+  <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" role="button" aria-label="Go to the control flow graphs" title="Go to the control flow graphs"><i class="fa-solid fa-diagram-project"></i></a>
 </div>
 {% if entry_a is not none and entry_b is not none %}
     {{ function_column_table(
@@ -67,7 +67,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
 
 
     <div id="xcfg_top" style="min-height: 90px;">
-        <span><h3 id="function_xcfg">Function CFGs</h3></span>
+        <span><h2 class="h3" id="function_xcfg">Function CFGs</h2></span>
         <span style="float:right"><a href="#top">go to top</a></span>
         <div class="d-flex flex-wrap align-items-center" style="gap: 4px 12px;">
           <span>

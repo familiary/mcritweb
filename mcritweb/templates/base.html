@@ -1,8 +1,10 @@
 {% from 'table/submit_or_query_dropzone.html' import submit_or_query_dropzone, submit_or_query_dropzone_js with context%}
 {% from 'table/links.html' import clipboard_btn, clipboard_js %}
 <!doctype html>
+<html lang="en">
 <head>
   <title>{% block title %}{% endblock %} - MCRIT Web</title>
+  <meta name="description" content="{% block description %}MCRIT Web: explore, match and compare malware families, samples and functions by code similarity.{% endblock %}">
   {# how scripts reach the CSRF token - forms carry it as a hidden input instead #}
   <meta name="csrf-token" content="{{ csrf_token() }}">
   {# the icon font is discovered only after all.css is parsed and laid out, so it arrives
@@ -70,16 +72,16 @@
     <noscript>Please enable JavaScript to use all features of this site. </noscript>
 <nav class="navbar navbar-expand-lg navbar-light">
   <a class="navbar-brand d-none d-md-block" href="{{ url_for('index') }}">
-    <img src="{{ url_for('static', filename='d20_mcrit_cabaret.png') }}" class="img-fluid">
+    <img src="{{ url_for('static', filename='d20_mcrit_cabaret.png') }}" class="img-fluid" alt="MCRIT home" width="459" height="150">
   </a>
   <a class="navbar-brand d-md-none" href="{{ url_for('index') }}">
-    <img src="{{ url_for('static', filename='d20_mcrit_cabaret.png') }}" class="img-fluid">
+    <img src="{{ url_for('static', filename='d20_mcrit_cabaret.png') }}" class="img-fluid" alt="MCRIT home" width="459" height="150">
   </a>
   <button class="navbar-toggler navbar-toggler-end float-end" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
     <span class="navbar-toggler-icon"></span>
   </button>
   <a class="right-logo d-none d-lg-block ms-lg-auto mb-lg-auto" href="https://www.fkie.fraunhofer.de/">
-    <img src="{{ url_for('static', filename='fkie_190x52.gif') }}">
+    <img src="{{ url_for('static', filename='fkie_190x52.gif') }}" alt="Fraunhofer FKIE" width="187" height="52">
   </a>
 
 
@@ -146,13 +148,13 @@
       {% endif %}
     </li>
     <li class="nav-item">
-      <a class="nav-link" href="{{ url_for('help') }}" title="Documentation"><i class="fas fa-question-circle"></i></a>
+      <a class="nav-link" href="{{ url_for('help') }}" aria-label="Documentation" title="Documentation"><i class="fas fa-question-circle"></i></a>
     </li>
   </ul>
 </nav>
 
   </header>
-  <section class="content">
+  <main class="content">
       {% for category, message in get_flashed_messages(with_categories=true) %}
         {% if category == 'error' %}
           <div class="alert alert-danger mt-3" role="alert">{{ message }}</div>
@@ -185,7 +187,7 @@
           </div>
         </div>
       {% endif %}
-  </section>
+  </main>
 
 
 </body>
