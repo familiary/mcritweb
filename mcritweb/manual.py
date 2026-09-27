@@ -60,5 +60,10 @@ def render(image_url_prefix):
         # which is what makes marking the output safe defensible here
         html = markdown.markdown(MANUAL_PATH.read_text(encoding="utf-8"), extensions=list(EXTENSIONS))
         _cache.clear()
-        _cache[key] = Markup(html.replace(MARKDOWN_IMAGE_PREFIX, f'src="{image_url_prefix}'))
+        html = html.replace(MARKDOWN_IMAGE_PREFIX, f'src="{image_url_prefix}')
+        # the first screenshot is the page's largest paint; the rest download as they are scrolled to
+        first, _, rest = html.partition("<img ")
+        if rest:
+            html = first + "<img " + rest.replace("<img ", '<img loading="lazy" ')
+        _cache[key] = Markup(html)
     return _cache[key]

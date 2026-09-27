@@ -188,3 +188,12 @@ def test_the_manual_names_the_menu_entry_that_reaches_the_selection_page():
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_only_the_first_screenshot_loads_eagerly():
+    """The first screenshot is the largest paint of /help; the other twenty would
+    otherwise share the connection with it on every visit."""
+    images = re.findall(r"<img [^>]*>", str(render("/help/images/")))
+    assert len(images) > 1
+    assert "loading=" not in images[0]
+    assert all('loading="lazy"' in image for image in images[1:])
