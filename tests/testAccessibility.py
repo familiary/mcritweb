@@ -12,10 +12,13 @@ hidden when the page loads, which is when the audit reads the page.
 """
 
 import logging
+import re
 from html.parser import HTMLParser
+from pathlib import Path
 
 import pytest
 from fixtureData import job_id_of
+from PIL import Image
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -197,3 +200,16 @@ def test_the_checker_catches_what_it_claims_to():
     for expected in ("no lang", "0 <main>", "no meta description", "has no alt", "no width/height",
                      "<a ", "<input ", "<h1> is followed by <h3>"):
         assert expected in problems, expected
+
+
+def test_the_static_images_declare_their_own_size():
+    """The width/height attributes reserve the image's box before it arrives, so they must
+    be the file's pixel size: the CSS fixes the height and derives the width from them."""
+    mcritweb = Path(__file__).resolve().parent.parent / "mcritweb"
+    base = (mcritweb / "templates" / "base.html").read_text()
+    for name in ("d20_mcrit_cabaret.png", "fkie_190x52.gif"):
+        tags = re.findall(r"<img[^>]*filename='" + re.escape(name) + r"'[^>]*>", base)
+        assert tags, f"base.html no longer shows {name}"
+        width, height = Image.open(mcritweb / "static" / name).size
+        for tag in tags:
+            assert f'width="{width}"' in tag and f'height="{height}"' in tag, tag
