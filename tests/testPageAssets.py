@@ -257,3 +257,15 @@ class TestTheCrossComparePage:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@pytest.mark.parametrize("name", ["single_function.html", "result_compare_function_vs.html"])
+def test_the_graph_libraries_stay_out_of_the_head(name):
+    """d3, dagre-d3 and graphlib are only used by the CFG scripts at the end of the page
+    and by window.onload; loaded from the style block they blocked the first paint."""
+    code = code_of(TEMPLATE_ROOT / name)
+    style = re.search(r"{%\s*block style\s*%}(.*?){%\s*endblock\s*%}", code, re.S).group(1)
+    assert "trace_CFG/lib/" not in style
+    first_graph_script = code.index("trace_CFG/main")
+    for lib in ("d3.min.js", "graphlib.min.js", "graphlib-dot.min.js", "dagre-d3.min.js", "convexhull.js"):
+        assert -1 < code.find("trace_CFG/lib/" + lib) < first_graph_script, lib
