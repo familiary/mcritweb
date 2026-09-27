@@ -42,18 +42,16 @@
      its jQuery plugins on DOMContentLoaded, so it wins `$.fn.tooltip` over jQuery UI as
      long as jQuery UI is a plain `<script>`. Load a library from here *lazily* and that
      flips. See ADR-0015. #}
-  <script src="{{ url_for('static', filename='autocomplete.js') }}"></script>
-  {# `defer`: neither library is called while the page parses. Bootstrap's declarative
+  {# `defer`: nothing below is called while the page parses. Bootstrap's declarative
      behaviour and its jQuery plugins register when it executes, which with defer is
      after every plain script (so still after jQuery UI on the cross compare page) and
      before DOMContentLoaded (so before every $(document).ready block); post_action.js
-     only listens for clicks. jQuery and autocomplete.js stay plain: inline blocks call
-     both while parsing. See issue #63. #}
+     and page_loading.js only listen for events, and every `new Autocomplete` waits for
+     DOMContentLoaded. jQuery stays plain: inline blocks call `$` while parsing. See issue #63. #}
   <script defer src="{{ url_for('static', filename='bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js') }}"></script>
   <script defer src="{{ url_for('static', filename='post_action.js') }}"></script>
-  {# page_loading.js stays a plain script, as it was: nothing calls it, it only
-     registers its navigation listeners as it runs. See issue #60. #}
-  <script src="{{ url_for('static', filename='page_loading.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='page_loading.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='autocomplete.js') }}"></script>
 
   {% if not suppress_dropzone_overlay %}
     {{ submit_or_query_dropzone_js(select_form_type=True, lazy=True) }}
