@@ -8,7 +8,7 @@
   
   $(document).ready(function(){
     var editSampleModal = document.getElementById('editSampleModal');
-    editSampleModal.addEventListener('show.bs.modal', function (event) {
+    editSampleModal?.addEventListener('show.bs.modal', function (event) {
     // Button that triggered the modal
     var button = event.relatedTarget;
     // Extract info from data-bs-* attributes
@@ -148,9 +148,9 @@
     {% if (show_export or show_analyze) %}
       <td align="right" class="buttons">
         {% if show_analyze %}
-          <button type="button" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_analyze" aria-label="Analyze" title="Analyze" onclick=set_analyze_sample_button_clicked() bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <button type="button" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_analyze" title="Analyze" onclick=set_analyze_sample_button_clicked() bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             {% if job_collection and job_collection.getJobsForSample(sample.sample_id, matching_only=True) %}
-            <i style="color:green;" class="fa-solid fa-flask"></i>&nbsp;{{ job_collection.getJobsForSample(sample.sample_id, matching_only=True) | length}}
+            <i style="color:green;" class="fa-solid fa-flask"></i><span class="visually-hidden">Analyze, matching jobs:</span>&nbsp;{{ job_collection.getJobsForSample(sample.sample_id, matching_only=True) | length}}
             {% else %}
             <i class="fa-solid fa-flask"></i>
             {% endif %}

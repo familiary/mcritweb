@@ -20,6 +20,21 @@ html {
   a {
     color: #377ba8;
   }
+
+  /* rows tinted inline by score or selection: #377ba8 falls below 4.5:1 on the palest of
+     the 40% score tints (#99b4e3), this stays above it on every one of them */
+  tr[style*="background-color"] a {
+    color: #17466b;
+  }
+
+  /* a table link is often one digit or one icon; 24x24 is the WCAG 2.5.8 minimum target */
+  td > a:not(.btn) {
+    display: inline-block;
+    min-width: 24px;
+    min-height: 24px;
+    line-height: 24px;
+    text-align: center;
+  }
   
   hr {
     border: none;

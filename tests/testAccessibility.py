@@ -36,10 +36,24 @@ VISITOR_PAGES = [
     "/explore/functions",
     "/explore/search?query=a",
     "/data/jobs",
+    "/explore/families/0",
+    "/explore/samples/0",
+    "/explore/functions/0",
+    "/explore/statistics",
+    "/data/matches/function/0/1",
+    "/analyze/query",
+    "/analyze/compare",
+    "/analyze/compare_versus",
+    "/analyze/cross_compare",
+    "/analyze/unique_blocks",
     "/settings",
+    "/help",
+    f"/data/jobs/{job_id_of('matches_for_sample')}",
+    f"/data/linkhunt/{job_id_of('matches_for_sample')}",
 ] + [f"/data/result/{job_id_of(report)}" for report in
      ["matches_for_sample", "matches_for_sample_vs", "matches_for_query", "cross_compare", "unique_blocks"]]
-ADMIN_PAGES = ["/admin/server"]
+CONTRIBUTOR_PAGES = ["/data/submit"]
+ADMIN_PAGES = ["/admin/server", "/admin/users/", "/data/import", f"/data/result/{job_id_of('maintenance_rebuild_index')}"]
 
 
 @pytest.fixture
@@ -134,6 +148,11 @@ def problems_of(html):
             problems.append(f"<img src={img.attrs.get('src')}> has no width/height")
     for element in page.all("a", "button"):
         if element.tag == "a" and "href" not in element.attrs:
+            # without href an <a> has no role, and a name on a roleless element is prohibited
+            if "onclick" in element.attrs:
+                problems.append(f"<a {element.attrs}> navigates by onclick alone, not crawlable")
+            if "aria-label" in element.attrs and "role" not in element.attrs:
+                problems.append(f"<a {element.attrs}> has aria-label but no href or role")
             continue
         if not element.accessible_name():
             problems.append(f"<{element.tag} {element.attrs}> has no accessible name")
@@ -185,6 +204,12 @@ def test_visitor_pages(client, as_role, path):
     assert_accessible(client.get(path))
 
 
+@pytest.mark.parametrize("path", CONTRIBUTOR_PAGES)
+def test_contributor_pages(client, as_role, path):
+    as_role("contributor")
+    assert_accessible(client.get(path))
+
+
 @pytest.mark.parametrize("path", ADMIN_PAGES)
 def test_admin_pages(client, as_role, path):
     as_role("admin")
@@ -195,10 +220,12 @@ def test_the_checker_catches_what_it_claims_to():
     """Without this, a parser that saw nothing would pass every page above."""
     bad = ('<!doctype html><html><head></head><body><img src="/static/x.png">'
            '<a href="/r"><i class="fa-solid fa-trash"></i></a><input name="q">'
+           '<a onclick="go()">x</a><a aria-label="Last page"></a>'
            '<h1>a</h1><h3>b</h3></body></html>')
     problems = "\n".join(problems_of(bad))
     for expected in ("no lang", "0 <main>", "no meta description", "has no alt", "no width/height",
-                     "<a ", "<input ", "<h1> is followed by <h3>"):
+                     "<a ", "<input ", "<h1> is followed by <h3>",
+                     "not crawlable", "aria-label but no href or role"):
         assert expected in problems, expected
 
 
