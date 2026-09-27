@@ -310,3 +310,15 @@ def test_main_duo_keeps_the_hook_function_compare_needs():
     assert "graph_zooms[graph_id] = {zoom: zoom, svg: svg, inner: inner, initialScale: initialScale};" in main_duo
     assert 'if (typeof onGraphShown === "function") {' in main_duo
     assert "function onGraphShown(graph_id) {" in function_compare
+
+
+@pytest.mark.parametrize("script", ["main.js", "main_duo.js"])
+def test_the_cfg_scripts_make_no_synchronous_request(script):
+    """A synchronous XMLHttpRequest on the main thread is deprecated and freezes the page
+    for every block lookup; `getCodefromGraph` fetches the block matches asynchronously."""
+    import os
+    path = os.path.join(os.path.dirname(__file__), "..", "mcritweb", "static", "trace_CFG", script)
+    with open(path) as f:
+        source = f.read()
+    assert not re.search(r"\.open\s*\([^;]*,\s*false\s*\)", source)
+    assert 'fetch("../getPicBlockMatches/" + hash_only)' in source
