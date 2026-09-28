@@ -8,6 +8,6 @@ numpy
 scipy
 fastcluster
 networkx
-mcrit>=1.5.3
+mcrit>=1.10.0
 levenshtein
 markdown

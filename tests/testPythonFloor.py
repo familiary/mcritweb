@@ -4,12 +4,12 @@
 `README.md` told readers "Python 3.8+" while CI tested 3.11 upwards, `ruff.toml` linted
 against py311, and no installable `mcrit` supports anything older.
 
-The floor is **inherited, not intrinsic**. Nothing in mcritweb's own source needs 3.11 -
+The floor is **inherited, not intrinsic**. Nothing in mcritweb's own source needs 3.12 -
 there is no `match`, no `except*`, no `tomllib`, no `datetime.UTC`, and `ruff.toml`
 deliberately ignores UP006/UP007/UP045 so the annotation style stays pre-3.9. What makes
-3.8 unusable is the dependency: `mcrit` has declared `>=3.11` since v1.5.0, and the pin
-here is `mcrit>=1.5.3`, so pip finds no satisfiable release below 3.11 and fails at
-resolution.
+3.8 unusable is the dependency: `mcrit` declared `>=3.11` from v1.5.0 and `>=3.12` from
+v1.10.0, and the pin here is `mcrit>=1.10.0`, so pip finds no satisfiable release below
+3.12 and fails at resolution.
 
 Without a `python_requires`, what the reader gets for following the README is that
 resolver error - which names neither Python nor the version they need. Declaring the
@@ -27,7 +27,7 @@ from importlib import metadata
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-FLOOR = (3, 11)
+FLOOR = (3, 12)
 
 
 def _version(text):
@@ -117,13 +117,13 @@ def test_the_installed_mcrit_is_what_imposes_the_floor():
 
 
 def test_the_mcrit_pin_stays_above_the_first_release_that_declared_the_floor():
-    """v1.5.0 is the first mcrit release to declare `>=3.11` (v1.4.3 and earlier declare
-    nothing). A pin below that would allow a release with no floor at all, and the
-    reasoning in this file's docstring would stop being true."""
+    """v1.10.0 is the first mcrit release to declare `>=3.12` (v1.5.0 to v1.9.x declare
+    `>=3.11`, v1.4.3 and earlier nothing). A pin below that would allow a release with a
+    lower floor, and the reasoning in this file's docstring would stop being true."""
     pin = re.search(r"['\"]mcrit>=([\d.]+)['\"]", _read("setup.py"))
 
     assert pin, "the mcrit pin moved; re-check what Python the oldest allowed release needs"
-    assert _version(pin.group(1)) >= (1, 5, 0)
+    assert _version(pin.group(1)) >= (1, 10, 0)
 
 
 if __name__ == "__main__":

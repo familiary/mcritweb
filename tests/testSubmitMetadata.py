@@ -145,7 +145,7 @@ def test_the_client_still_leaves_the_query_string_to_us(wire):
     concatenates its query string by hand. If a future mcrit hands requests `params=`
     instead - the durable fix, and one this repository cannot ship - requests would
     encode the already-encoded values a second time and every family would be stored
-    as "R%26D". `setup.py` pins `mcrit>=1.5.3` with no ceiling, so a deployment that
+    as "R%26D". `setup.py` pins `mcrit>=1.10.0` with no ceiling, so a deployment that
     merely pip-upgrades would corrupt metadata quietly. This fails first, and loudly.
 
     Measured against mcrit 1.8.1: a raw '&' reaches the URL untouched, which is only
