@@ -18,7 +18,9 @@ lists five dependencies and the capture did not include them - which is why
 testResultPages.py now renders the job page for every report rather than only one.
 """
 
+import json
 import logging
+import re
 import unittest
 
 import pytest
@@ -113,6 +115,138 @@ def test_a_job_without_dependencies_is_unaffected(overview):
 
     assert response.status_code == 200
     assert b"no longer" not in response.data
+
+
+# --- polling a running job, issue #183 --------------------------------------------
+#
+# A running job's overview used to meta-refresh itself, and every tick re-ran the whole
+# page: getJobData for the job and each of its sub-jobs, and a getSampleById per sample
+# they name - 28 backend calls a tick for a cross compare over 13 samples, measured,
+# nearly all of them for things the previous tick already had. The page now polls
+# data.job_status, which reads the job alone, and reloads when the answer differs from
+# what it rendered.
+
+
+def running(job):
+    """The same job, not finished yet and with all of its sub-jobs still unfinished."""
+    job = dict(job, finished_at=None, progress=0.25, result=None)
+    job["unfinished_dependencies"] = list(job["all_dependencies"])
+    return job
+
+
+class CountingJobs(JobsWithHoles):
+    """JobsWithHoles, recording every call a view makes."""
+
+    def __init__(self, parent, children):
+        super().__init__(parent, children)
+        self.calls = []
+
+    def getJobData(self, job_id, *args, **kwargs):
+        self.calls.append(("getJobData", job_id))
+        return super().getJobData(job_id)
+
+    def getSampleById(self, sample_id, *args, **kwargs):
+        self.calls.append(("getSampleById", sample_id))
+        return None
+
+    def getFamily(self, family_id, *args, **kwargs):
+        self.calls.append(("getFamily", family_id))
+        return None
+
+
+@pytest.fixture
+def cross_compare_backend(app):
+    """A running cross compare over three samples, one of its sub-jobs finished."""
+    children = [job_data(f"child-{sample_id}", sample_id, params=f'{{"0": {sample_id}}}') for sample_id in (7, 8, 9)]
+    children[1] = running(children[1])
+    children[2] = running(children[2])
+    parent = running(job_data("parent", 10, "combineMatchesToCross", [child["_id"] for child in children]))
+    parent["unfinished_dependencies"] = ["child-8", "child-9"]
+    parent["started_at"] = None
+    backend = CountingJobs(parent, children)
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend
+    return backend
+
+
+def test_the_status_of_a_running_job_is_read_off_the_job_alone(client, as_role, cross_compare_backend):
+    as_role("visitor")
+    response = client.get("/data/jobs/parent/status")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "started": False,
+        "finished": False,
+        "failed": False,
+        "progress": 0.25,
+        "unfinished_sub_jobs": 2,
+    }
+    assert cross_compare_backend.calls == [("getJobData", "parent")], "a tick fetched more than the job it polls"
+
+
+def test_the_status_of_an_unknown_job_is_a_404(client, as_role, cross_compare_backend):
+    as_role("visitor")
+    response = client.get("/data/jobs/no-such-job/status")
+
+    assert response.status_code == 404
+    assert response.is_json
+
+
+def test_a_running_job_polls_rather_than_reloading_on_every_tick(client, as_role, cross_compare_backend):
+    as_role("visitor")
+    body = client.get("/data/jobs/parent?refresh=3").get_data(as_text=True)
+
+    assert '"/data/jobs/parent/status"' in body, "the page does not poll the status endpoint"
+    # without scripting, the meta refresh is still what brings the page up to date
+    assert re.search(r'<noscript>\s*<meta http-equiv="refresh" content="3">\s*</noscript>', body)
+    assert body.count('http-equiv="refresh"') == 1, "a meta refresh outside <noscript> would still reload every tick"
+
+
+def test_the_page_compares_against_what_the_endpoint_answers(client, as_role, cross_compare_backend):
+    """The page reloads when the endpoint's answer differs from the state it rendered,
+    so the two have to agree on an unchanged job - or every tick reloads after all."""
+    as_role("visitor")
+    body = client.get("/data/jobs/parent?refresh=3").get_data(as_text=True)
+    rendered = json.loads(re.search(r"const shown = (\{.*?\});", body).group(1))
+
+    assert rendered == client.get("/data/jobs/parent/status").get_json()
+
+
+def test_a_finished_job_neither_polls_nor_refreshes(client, as_role, app):
+    backend = CountingJobs(job_data("done", 3, "getMatchesForSample", [], params='{"0": 7}'), [])
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend
+    as_role("visitor")
+    body = client.get("/data/jobs/done?refresh=3").get_data(as_text=True)
+
+    assert "/data/jobs/done/status" not in body
+    assert 'http-equiv="refresh"' not in body
+
+
+def test_a_page_that_will_not_poll_does_not_build_the_poll_state(client, as_role, app, monkeypatch):
+    """The state reads a private part of mcrit's Job, so only a page that emits the
+    polling script may take that risk - not every finished job's page."""
+    import mcritweb.views.data as data_views
+
+    def unexpected(job_info):
+        raise AssertionError("built the poll state for a page that does not poll")
+
+    monkeypatch.setattr(data_views, "job_overview_state", unexpected)
+    backend = CountingJobs(job_data("done", 3, "getMatchesForSample", [], params='{"0": 7}'), [])
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend
+    as_role("visitor")
+
+    assert client.get("/data/jobs/done?refresh=3").status_code == 200
+    assert client.get("/data/jobs/done").status_code == 200
+
+
+def test_the_poll_state_survives_a_job_without_its_raw_document():
+    """`unfinished_dependencies` has no property on mcrit's Job, so it is read from the
+    raw document; a Job that stops exposing that must cost the count, not the page."""
+    from types import SimpleNamespace
+
+    from mcritweb.views.data import job_overview_state
+
+    job = SimpleNamespace(started_at="2026-01-01", finished_at=None, is_failed=False, progress=0.5)
+    assert job_overview_state(job)["unfinished_sub_jobs"] == 0
 
 
 if __name__ == "__main__":

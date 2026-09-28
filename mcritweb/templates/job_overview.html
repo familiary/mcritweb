@@ -8,7 +8,49 @@ Overview for Job: {{ job_info.job_id }}
 {% endblock %}
 {% block style %}
 {% if (auto_refresh > 0) and (not job_info.finished_at) %}
-<meta http-equiv="refresh" content="{{ auto_refresh }}">
+{# reloading re-fetches every sub-job and every sample they name, so with scripting the
+   page asks data.job_status instead and reloads only once there is something new to
+   show. Without it, this is the whole mechanism. See issue #183. #}
+<noscript><meta http-equiv="refresh" content="{{ auto_refresh }}"></noscript>
+<script>
+  (function () {
+    const statusUrl = {{ url_for('data.job_status', job_id=job_info.job_id)|tojson }};
+    const shown = {{ job_state|tojson }};
+    // setTimeout reads a delay past 2^31-1 ms as no delay at all, which would turn an
+    // oversized refresh parameter into polling as fast as the backend answers
+    const interval = Math.min({{ (auto_refresh * 1000)|tojson }}, 2147483647);
+
+    function poll() {
+      fetch(statusUrl)
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("job status answered " + response.status);
+          }
+          return response.json();
+        })
+        .then(function (state) {
+          // progress alone is updated in place, anything else changes what the page lists
+          const changed = ["started", "finished", "failed", "unfinished_sub_jobs"].some(function (key) {
+            return state[key] !== shown[key];
+          });
+          if (changed) {
+            window.location.reload();
+            return;
+          }
+          const progress = document.getElementById("job-progress");
+          if (progress && state.started) {
+            progress.textContent = (100 * state.progress).toFixed(2) + "%";
+          }
+          window.setTimeout(poll, interval);
+        })
+        // an unknown job, an expired session answering with the login page, an
+        // unreachable backend: the reload renders whichever it is, as a tick used to
+        .catch(function () { window.location.reload(); });
+    }
+
+    window.setTimeout(poll, interval);
+  })();
+</script>
 {% endif %}
 
 {{ job_row_std_js() }}
@@ -17,7 +59,7 @@ Overview for Job: {{ job_info.job_id }}
 {% block content %}
 <h1>Job overview: {{ job_info.parameters }}</h1>
 
-{{ job_column_table(job_info, show_progress=True) }}
+{{ job_column_table(job_info, show_progress=True, progress_id="job-progress") }}
 
 
 {# a shorter list on its own would misreport the job - a cross compare would look like

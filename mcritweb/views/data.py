@@ -1193,7 +1193,43 @@ def job_by_id(job_id):
         for job in child_jobs:
             if job.family_id is not None:
                 families_by_id[job.family_id] = client.getFamily(job.family_id)
-    return render_template('job_overview.html', families=families_by_id, samples=samples_by_id, job_info=job_info, auto_refresh=auto_refresh, child_jobs=child_jobs, missing_children=missing_children)
+    # only a page that will poll needs it, so a finished job's page never reads it
+    job_state = job_overview_state(job_info) if auto_refresh > 0 and not job_info.finished_at else None
+    return render_template('job_overview.html', families=families_by_id, samples=samples_by_id, job_info=job_info, job_state=job_state, auto_refresh=auto_refresh, child_jobs=child_jobs, missing_children=missing_children)
+
+
+def job_overview_state(job_info):
+    """What the overview of a running job shows that can still change, read off the job
+    alone - without its sub-jobs or the samples and families they name.
+
+    The overview polls `job_status` for this and reloads once the answer differs from
+    what it rendered. A reload fetches every sub-job and every sample they name, so it
+    should happen when there is something new to show, not on every tick. See #183.
+    """
+    return {
+        "started": job_info.started_at is not None,
+        "finished": job_info.finished_at is not None,
+        "failed": job_info.is_failed,
+        "progress": job_info.progress,
+        # the queue drops a sub-job from this list when it finishes, and also when it
+        # fails for good (out of attempts, whether by its own error or by a dead worker),
+        # so this counts the sub-jobs still to settle without asking for any of them. It
+        # is in the job document the backend sends, but mcrit's Job has no property for
+        # it, so it is read defensively: a Job without it costs this one reload trigger,
+        # not the page.
+        "unfinished_sub_jobs": len(getattr(job_info, "_data", {}).get("unfinished_dependencies") or []),
+    }
+
+
+@bp.route('/jobs/<job_id>/status')
+@visitor_required
+@mcrit_server_required
+def job_status(job_id):
+    """The job overview's polling endpoint: one getJobData, as JSON."""
+    job_info = get_client().getJobData(job_id)
+    if job_info is None:
+        return {"error": "unknown job"}, 404
+    return job_overview_state(job_info)
 
 
 @bp.route('/jobs/<job_id>/delete', methods=('POST',))

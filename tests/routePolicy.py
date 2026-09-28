@@ -177,6 +177,7 @@ ROUTE_POLICY = {
     "analyze.query": (VISITOR, WRITES_ON_POST),
     "data.jobs": (VISITOR, READ_ONLY),
     "data.job_by_id": (VISITOR, READ_ONLY),
+    "data.job_status": (VISITOR, READ_ONLY),
     "data.result": (VISITOR, READ_ONLY),
     # writes the report to instance/cache/results on a cache miss, exactly as
     # data.result does, which is local caching rather than a state change

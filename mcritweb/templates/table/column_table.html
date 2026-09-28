@@ -201,7 +201,7 @@
 
 
 
-{% macro job_column_table(job_info, show_created=True, show_started=True, show_finished=True, show_progress=False, show_duration=True) %}
+{% macro job_column_table(job_info, show_created=True, show_started=True, show_finished=True, show_progress=False, show_duration=True, progress_id=None) %}
   <table class="table table-hover">
     <tbody>
       <tr>
@@ -277,7 +277,7 @@
       {% if show_progress %}
         <tr>
           <td valign="middle">Progress: </td>
-          <td valign="middle">
+          <td valign="middle"{% if progress_id %} id="{{ progress_id }}"{% endif %}>
             {% if job_info.finished_at %}
               <a href="{{ url_for('data.result', job_id=job_info.job_id ) }}">Results available</a>
             {% else %}
