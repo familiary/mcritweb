@@ -96,6 +96,13 @@ def create_app(test_config=None, instance_path=None):
         # X-Forwarded-For. 0 means "served directly": nothing about the request is
         # taken from a header. See the block below create_app's config load.
         TRUSTED_PROXY_COUNT=0,
+        # (connect, read) seconds every MCRIT client call may take. requests waits forever
+        # by default, so a backend that is down or hung held a gunicorn thread for good:
+        # under the gthread worker docker-mcrit runs, gunicorn's -t does not reclaim it.
+        # 280 s stays under the 300 s docker-mcrit's NGINX waits, so a slow backend ends in
+        # MCRITweb's own error page rather than a 504 from the proxy. None waits forever.
+        # Honoured by mcrit releases whose McritClient has a `timeout`; older ones ignore it.
+        MCRIT_CLIENT_TIMEOUT=(10, 280),
     )
 
     if test_config is None:
