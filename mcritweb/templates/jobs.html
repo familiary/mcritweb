@@ -11,21 +11,12 @@ Jobs
 
 {{ job_row_std_js() }}
 {{ pagination_js() }}
-<script>$(document).ready(function () {
-  $('#job-table').DataTable({
-    autoWidth: false,
-    deferRender: false,
-    processing: false,
-    scrollX: false,
-    scrollY: false,
-    searching: false,
-    serverSide: false,
-    stateSave: false,
-    paging: false,
-    info: false
-  }
-  );
-});</script>
+{# There used to be a DataTable here. It never ran - the table below is rendered with
+   id=<the active category>, so the '#job-table' selector matched nothing - and reviving it
+   would have made things worse rather than better: it would sort the 25 rows of the
+   current page and leave the rest of the queue where it was, which is the "sort should
+   be done in mcrit and not only consider displayed elements" half of issue #51. The
+   order the whole queue is sorted in is the '#' column link, handled by data.jobs(). #}
 
 <style>
   .black {
@@ -136,16 +127,20 @@ Jobs
       </ul>
     </div>
   </nav>
-  {#
-  {% if query %}
-  <p>Results for "{{ query }}"</p>
-  {% endif %}
-  <form style="width:100%" method="POST" required>
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="text" class="form-control shadow-none" name="Search"id="Search" placeholder="Search" autofocus autocomplete="on">
+  <form style="width:100%" method="GET">
+    {# carried so searching does not silently drop the category/state you were looking at #}
+    {% if active %}<input type="hidden" name="active" value="{{ active }}">{% endif %}
+    {% if state %}<input type="hidden" name="state" value="{{ state }}">{% endif %}
+    {% if ascending %}<input type="hidden" name="ascending" value="true">{% endif %}
+    <input type="text" class="form-control shadow-none" name="Search" id="Search" placeholder="Search jobs" value="{{ query or '' }}" autocomplete="on">
     <input type='submit' hidden>
   </form>
-  #}
+  {% if query %}
+  <p>
+    {{ match_count }} job{{ '' if match_count == 1 else 's' }} matching "{{ query }}"
+    &mdash; <a href="{{ url_for('data.jobs', active=active, state=state) }}">clear</a>
+  </p>
+  {% endif %}
 
   {% if active %}
 <p>
@@ -158,9 +153,15 @@ Jobs
 </p>
 {% endif %}
 
-  {{ job_table(jobs, table_id=active, families_by_id=families, samples_by_id=samples) }}
-  {% if p %}
-    {{ pagination_widget(p) }}
+  {% if query and not jobs %}
+    {# the table's empty state invites you to create your first job, which is the wrong
+       thing to say to someone whose search simply matched nothing on a full queue #}
+    <center class="mt-3">No job's parameters contain "{{ query }}".</center>
+  {% else %}
+    {{ job_table(jobs, table_id=active, families_by_id=families, samples_by_id=samples, order_toggle=order_toggle, order_ascending=ascending) }}
+    {% if p %}
+      {{ pagination_widget(p) }}
+    {% endif %}
   {% endif %}
 
   <!-- based on https://stackoverflow.com/a/8983053 -->

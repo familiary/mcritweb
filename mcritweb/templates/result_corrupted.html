@@ -8,6 +8,11 @@ Results for Job: {{ job_info.job_id }} - corrupted!
 
 <p>{{reason}}</p>
 <p>back to <a href="{{ url_for('data.jobs') }}">Jobs and Results</a></p>
+{# same gate as job_corrupted.html: data.result is visitor_required and
+   delete_job_by_id is contributor_required, so an ungated button answers 403 for the
+   visitors who can reach this page #}
+{% if g.user.role == 'admin' or g.user.role == 'contributor' %}
 <p><button type="button" class="btn btn-link p-0 align-baseline" data-post="{{ url_for('data.delete_job_by_id', job_id=job_info.job_id) }}">Delete job data</button> and return back to Jobs and Results</p>
+{% endif %}
 
 {% endblock %}

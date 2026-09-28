@@ -408,7 +408,13 @@ class CorpusMcritClient:
         documents = documents[start:start + limit] if isinstance(limit, int) and limit > 0 else documents[start:]
         jobs = [Job(entry, None) for entry in documents]
         if isinstance(filter, str):
-            jobs = [job for job in jobs if filter in job.parameters]
+            # the backend tests `filter` against every job's rendered parameters, so a job
+            # whose payload cannot be read fails the whole request - a 500, which the real
+            # client hands back as None. Reproduced for the same reason as the paging above.
+            try:
+                jobs = [job for job in jobs if filter in job.parameters]
+            except Exception:
+                return None
         return jobs
 
     def getQueueStatistics(self, *args, **kwargs):

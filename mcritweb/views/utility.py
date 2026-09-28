@@ -10,10 +10,112 @@ import re
 import shutil
 
 import requests
-from flask import current_app, flash, g, redirect, session, url_for
+from flask import current_app, flash, g, has_app_context, redirect, session, url_for
 
 from mcritweb import db
 from mcritweb.db import ServerInfo, UserColumnSettings
+
+#: What rebuilding `Job.parameters` can raise: it is `json.loads` (ValueError, since
+#: json.JSONDecodeError subclasses it, or TypeError for a params that is not a string)
+#: followed by `.items()` (AttributeError for a null or an array). Nothing else, which
+#: is the point of listing them rather than writing `except Exception` - that would turn
+#: a future bug in `Job` into every job page quietly reporting an unreadable payload,
+#: which is both wrong and unreportable.
+PARAMETERS_ERRORS = (ValueError, TypeError, AttributeError)
+
+#: What rebuilding any of the fields below can raise. Wider by exactly LookupError,
+#: because these go on to index what json.loads returned - `int(self.arguments[0])`
+#: raises IndexError for a params of "{}", and the descriptor reads raise KeyError -
+#: so a payload that parses cleanly can still fail to yield a sample id.
+PAYLOAD_ERRORS = PARAMETERS_ERRORS + (LookupError,)
+
+#: Every field a job listing reads off a job, in the row macro (`table/job_row.html`),
+#: in the sample and family lookups the views do around it, and in
+#: `JobCollection.filterToSampleIds`. Not one of them is stored: `Job` rebuilds each
+#: from `payload["params"]` or `payload["descriptor"]` on every access, so any of them
+#: can raise for a payload that cannot be parsed - and they do not all fail together.
+#: `params = "{}"` gives a perfectly good `parameters` of "getMatchesForSample()" and
+#: an IndexError from `sample_ids`, because that goes through `int(arguments[0])`.
+#: `job.method` is the exception and is not listed: it is a plain dictionary read.
+JOB_DESCRIPTION_FIELDS = (
+    "parameters", "arguments", "sample_ids", "family_id", "sample_id",
+    "other_sample_id", "sha256", "family", "filename",
+)
+
+
+def job_parameters_or_none(job):
+    """`job.parameters`, or None for a job whose payload cannot be read.
+
+    None means "could not be read", which is distinct from the "" that Job.parameters
+    legitimately answers for a record carrying no params at all - `parameters or ""`
+    cannot tell a corrupt job from an empty one.
+
+    This asks about `parameters` alone, which is what a job's *own* page needs: it
+    prints the task name, the id and the timestamps and nothing else off the payload.
+    A listing needs the broader question - see `job_is_describable`.
+    """
+    try:
+        return job.parameters
+    except PARAMETERS_ERRORS:
+        current_app.logger.exception("Could not read parameters for job %s", getattr(job, "job_id", "?"))
+        return None
+
+
+def job_parameters_or_blank(job):
+    """`job.parameters`, or "" for a job whose payload cannot be read.
+
+    One such job used to break the single page of the browse view that showed it;
+    filtering the whole category for a search would let it break every page of the
+    search instead. A job whose parameters cannot be read cannot contain the search
+    term either, so leaving it out is also the right answer.
+    """
+    return job_parameters_or_none(job) or ""
+
+
+def job_is_describable(job):
+    """Whether every field a job listing reads off `job` can actually be read.
+
+    The question a listing has to ask, and it is not "does `parameters` work": that one
+    passes `params = "{}"` and `params = '{"0": "abc"}'` straight through to the
+    `int(arguments[0])` in `sample_ids` that raises IndexError and ValueError on them.
+    Asking about each field the listing touches is the only predicate that matches what
+    the listing then does.
+
+    Memoised for the request, because both the view's lookups and the row macro ask
+    about the same jobs, and each answer costs a `json.loads` per field. Outside an
+    application context - a helper driven directly, as sample_row_job_collection is by
+    its own tests - there is no request to memoise for, so the answer is just computed.
+    """
+    job_id = getattr(job, "job_id", None)
+    cache = None
+    if has_app_context():
+        cache = getattr(g, "_describable_jobs", None)
+        if cache is None:
+            cache = g._describable_jobs = {}
+        elif job_id is not None and job_id in cache:
+            return cache[job_id]
+    describable = True
+    for field in JOB_DESCRIPTION_FIELDS:
+        try:
+            getattr(job, field)
+        except PAYLOAD_ERRORS:
+            if has_app_context():
+                current_app.logger.exception("Could not read %s for job %s", field, job_id or "?")
+            describable = False
+            break
+    if cache is not None and job_id is not None:
+        cache[job_id] = describable
+    return describable
+
+
+def describable_jobs(jobs):
+    """The jobs in `jobs` a listing can describe.
+
+    A page that lists jobs looks up the samples and families they name before it renders
+    them, and those lookups raise for a job whose payload cannot supply them. Skip those
+    here; `job_description` renders what is left of them, so the job keeps its row.
+    """
+    return [job for job in jobs or [] if job_is_describable(job)]
 
 
 def get_server_url():
