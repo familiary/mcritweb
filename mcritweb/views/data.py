@@ -18,12 +18,13 @@ from mcritweb.db import UserColumnSettings, UserFilters, get_query_filename, utc
 from mcritweb.views.analyze import query as analyze_query
 from mcritweb.views.authentication import contributor_required, visitor_required
 from mcritweb.views.client import get_client
-from mcritweb.views.cross_compare import get_sample_to_job_id, score_to_color
+from mcritweb.views.cross_compare import CROSS_ORDERINGS, get_sample_to_job_id, order_sample_ids, score_to_color
 from mcritweb.views.functiondiff import get_function_diff
 from mcritweb.views.MatchReportRenderer import MatchReportRenderer
 from mcritweb.views.pagination import Pagination
 from mcritweb.views.params import (
     parse_checkbox_query_param,
+    parse_choice_query_param,
     parse_integer_list_query_param,
     parse_integer_query_param,
     parse_str_query_param,
@@ -824,15 +825,15 @@ def result_matches_for_cross(job_info, result_json):
             reason = "MCRIT was not able to retrieve information for all samples specified in the original job task. This might be a result of having deleted samples from the database since it was processed. Please consider starting a new job."
             return render_template("result_corrupted.html", reason=reason, job_info=job_info)
     custom_order = request.args.get('custom','')
+    # a drag-and-drop order is the more specific request, so it wins over a named one
+    ordering = parse_choice_query_param(request, 'order', CROSS_ORDERINGS, default="clustered")
     samples_by_method = {}
     sample_indices = {}
     for method, method_results in result_json.items():
         if custom_order:
             order = custom_order.split(',')
-        elif "clustered_sequence" in method_results:
-            order = method_results["clustered_sequence"]
         else:
-            order = None
+            order = order_sample_ids(samples, ordering, method_results.get("clustered_sequence"))
         ordered_samples = []
         if order:
             for order_sample_id in order:
@@ -853,6 +854,7 @@ def result_matches_for_cross(job_info, result_json):
         sample_indices[method] = [x for index, x in enumerate([sample.sample_id for sample in samples_by_method[method]]) if (index+1) % 5 == 0]
     return render_template('result_cross.html',
         is_corrupted=False,
+        active_order="custom" if custom_order else ordering,
         samples=samples_by_method,
         sample_indices = sample_indices,
         job_info=job_info,

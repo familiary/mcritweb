@@ -176,7 +176,7 @@ Results for Job: {{ job_info.job_id }}
 <h1>Results for Job: {{ job_info.method }}</h1>
 {{ job_column_table(job_info, show_created=False, show_started=False, show_finished=False) }}
 
-<p>Cross Comparison of {{ samples["unweighted"]|length }} samples in the data set. You can order the samples in this list per drag and drop to change the order in the matrices.</p>
+<p>Cross Comparison of {{ samples["unweighted"]|length }} samples in the data set. You can order the samples in this list per drag and drop to change the order in the matrices, or use the ordering buttons to switch between the clustered order, ascending sample ID and family name. Whichever order is chosen applies to all matrices, not just the one on screen.</p>
 <div class="container">
     <div class="row">
       <div class="col-sm-auto">
@@ -189,6 +189,16 @@ Results for Job: {{ job_info.job_id }}
       <div class="col-sm-auto align-self-center mb-3">
         <button onclick="changeorder()"type="button" class="btn btn-primary ">Change order</button> 
         <button onclick="window.location.href='{{ url_for('data.result', job_id=job_info.job_id) }}'" type="button" class="btn btn-primary ">Reset order</button> 
+      </div>
+      <div class="col-sm-auto align-self-center mb-3">
+        <div class="btn-group" role="group" aria-label="Order the samples by">
+          {% for ordering, label, hint in [
+              ("clustered", "clustered", "The order MCRIT's hierarchical clustering produced"),
+              ("sample_id", "sample ID", "Ascending sample ID"),
+              ("family", "family", "Family name, then version")] %}
+          <button onclick="window.location.href='{{ url_for('data.result', job_id=job_info.job_id, order=ordering) }}'" type="button" aria-pressed="{{ 'true' if active_order == ordering else 'false' }}" class="btn {{ 'btn-primary' if active_order == ordering else 'btn-outline-primary' }} hint--top" data-hint="{{ hint }}">{{ label }}</button>
+          {% endfor %}
+        </div>
       </div>
     </div>
   </div>

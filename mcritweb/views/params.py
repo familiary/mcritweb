@@ -130,6 +130,18 @@ def parse_str_query_param(request, query_param:str):
     return param
 
 
+def parse_choice_query_param(request, query_param:str, choices, default=None):
+    """ Try to find query_param in the request and accept it only if it is one of choices """
+    param = default
+    try:
+        value = request.args.get(query_param)
+        if value in choices:
+            param = value
+    except Exception:
+        pass
+    return param
+
+
 def parse_checkbox_query_param(request, query_param:str):
     """ Try to find query_param in the request and parse it as checkbox """
     param = False

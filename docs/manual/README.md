@@ -190,6 +190,7 @@ This usually delivers immediate results as the matching candidate are limited to
 When wanting to compare a group of samples among each others, use Cross-Compare.
 Technically, this will trigger 1vsN matching jobs for all selected samples but will also generate a comparison matrix for all samples.
 This matrix is automatically ordered using hierarchical clustering and its individual fields can be clicked to get to the respective 1vs1 comparison.
+The ordering buttons switch between that clustered order, ascending sample ID and family name, and the sample list can also be rearranged per drag and drop; whichever order is chosen applies to all six matrices.
 The view looks like this:
 
 ![An example for a cross matching matrix](images/cross_matrix.png "An example for a cross matching matrix")
