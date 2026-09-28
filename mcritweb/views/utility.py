@@ -152,6 +152,10 @@ def ensure_local_data_paths(app, clear_data=False):
     ensure_paths = [
         app.instance_path + os.sep + "cache" + os.sep + "diagrams",
         app.instance_path + os.sep + "cache" + os.sep + "results",
+        # write_atomically parks a cache file here until it is complete - deliberately
+        # beside the two cache directories rather than inside either, because
+        # data.diagram_file serves every name under cache/diagrams
+        app.instance_path + os.sep + "cache" + os.sep + "incomplete",
         app.instance_path + os.sep + "temp" + os.sep + "reports",
         app.instance_path + os.sep + "temp" + os.sep + "diagrams",
         app.instance_path + os.sep + "temp" + os.sep + "uploads",

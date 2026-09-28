@@ -12,6 +12,43 @@ from mcritweb.views.client import get_client
 
 LOG = logging.getLogger(__name__)
 
+#: Geometry of the stacked diagram. renderStackedDiagram draws one block per
+#: `instruction_block_size` instructions of every matchable function, in three stacked
+#: bands, and derives everything else - including the image size - from that count.
+DIAGRAM_WIDTH = 2400
+NUM_DIAGRAMS = 3
+BLOCK_SIZE = 9
+STACK_INTERVAL = 1
+#: Below this many instructions a function is not matched at all, so it contributes no
+#: blocks. Same threshold _calculateOutputMap sets "is_matchable" by.
+MIN_MATCHABLE_INSTRUCTIONS = 10
+
+
+def count_diagram_blocks(num_instructions_per_function, instruction_block_size=10):
+    """How many blocks renderStackedDiagram lays out for functions of these sizes.
+
+    One block per `instruction_block_size` instructions of every matchable function,
+    plus a separator block between consecutive functions.
+    """
+    blocks_per_function = [round(num_instructions / instruction_block_size) for num_instructions in num_instructions_per_function if num_instructions >= MIN_MATCHABLE_INSTRUCTIONS]
+    return sum(blocks_per_function) + len(blocks_per_function) - 1
+
+
+def stacked_diagram_stack_size(num_blocks):
+    """How many blocks tall each of the three bands is."""
+    return (math.ceil(int(num_blocks / (DIAGRAM_WIDTH / (BLOCK_SIZE + 1))) / STACK_INTERVAL) + 1) * STACK_INTERVAL
+
+
+def stacked_diagram_size(num_blocks):
+    """The (width, height) in pixels renderStackedDiagram produces for `num_blocks`.
+
+    Split out from the renderer so that a page can reserve the box its diagram will
+    land in without rendering it first - the image is fetched separately now, see
+    data.match_diagram_size and issue #68.
+    """
+    stack_size = stacked_diagram_stack_size(num_blocks)
+    return (40 + DIAGRAM_WIDTH, 40 + NUM_DIAGRAMS * stack_size * BLOCK_SIZE + 20 * (NUM_DIAGRAMS - 1))
+
 
 def load_cached_result(result_filepath):
     result_json = {}
@@ -183,7 +220,7 @@ class MatchReportRenderer:
             best_target_family_score = 0
             best_target_sample_score = 0
             best_score = 0
-            is_matchable = function_info.num_instructions >= 10
+            is_matchable = function_info.num_instructions >= MIN_MATCHABLE_INSTRUCTIONS
             library_match_class = " "
             num_library_families_matched = 0
             # sample match info
@@ -336,18 +373,13 @@ class MatchReportRenderer:
         border_color_tuple = (0x22, 0x22, 0x22)
         # additional line where top X families or family clusters are highlighted in flavors of the same color?
         output_map = self._calculateOutputMap(filtered_family_id=filtered_family_id, filtered_sample_id=filtered_sample_id, filtered_function_id=filtered_function_id)
-        num_matchable = sum([1 for fid, item in output_map.items() if item["is_matchable"]])
-        num_blocks = sum([item["num_instruction_blocks"] for fid, item in output_map.items() if item["is_matchable"]]) + num_matchable - 1
+        num_blocks = count_diagram_blocks([item["num_instructions"] for item in output_map.values()])
         # determine best fitting multiple of a selected number for stack size.
-        diagram_width = 2400
-        num_diagrams = 3
-        block_size = 9
-        stack_interval = 1
-        stack_size = (math.ceil(int(num_blocks / (diagram_width / (block_size + 1))) / stack_interval) + 1) * stack_interval
+        block_size = BLOCK_SIZE
+        stack_size = stacked_diagram_stack_size(num_blocks)
         num_columns = int(num_blocks / stack_size) if num_blocks % stack_size == 0 else int(num_blocks / stack_size) + 1
         LOG.debug("stack size: %s, num columns: %s", stack_size, num_columns)
-        window_size_x = 40 + diagram_width
-        window_size_y = 40 + num_diagrams * stack_size * block_size + 20 * (num_diagrams - 1)
+        window_size_x, window_size_y = stacked_diagram_size(num_blocks)
 
         image = Image.new("RGB", (window_size_x, window_size_y), background_color_tuple)
         pixels = image.load()

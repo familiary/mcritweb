@@ -1,0 +1,12 @@
+{# The MCRIT diagram is no longer drawn while the result page is being built: it is
+   rendered on demand by data.diagram_file, so the browser fetches it once the HTML has
+   arrived (issue #68). `size` is the size it will come out as - data.match_diagram_size
+   works it out from the report - and goes on the <img> as width/height, which is what
+   makes the browser reserve the right box instead of shoving the tables below it down
+   when the image lands. A size that turns out wrong costs nothing: the image's own
+   dimensions win once it has loaded. #}
+{% macro match_diagram(filename, size=none) %}
+  <div class="mcrit-diagram">
+    <img src="{{ url_for('data.diagram_file', filename=filename) }}" class="img-fluid" alt="MCRIT diagram"{% if size %} width="{{ size[0] }}" height="{{ size[1] }}"{% endif %} />
+  </div>
+{% endmacro %}

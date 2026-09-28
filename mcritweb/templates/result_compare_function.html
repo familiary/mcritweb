@@ -1,3 +1,4 @@
+{% from 'table/match_diagram.html' import match_diagram %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% from 'table/column_table.html' import sample_column_table, matching_result_job_column_table %}
 {% from 'table/matching_statistics_table.html' import matching_statistics_table %}
@@ -26,7 +27,7 @@ Results for Job: {{ job_info.job_id }}
 {% if not matching_result.is_query %}
 <h3>MCRIT Diagram</h3>
 <p>Showing: foreign family match frequency, library matches, best foreign family match scores.</p>
-<img src="{{ url_for('data.diagram_file', filename=job_info.job_id + '-funid_%d' % funid + '.png') }}" class="img-fluid" />
+{{ match_diagram(job_info.job_id + '-funid_%d' % funid + '.png', diagram_size) }}
 {% endif %}
 
 <h3 id="function-matches">Matches for Function: {{ funid }}</h3>

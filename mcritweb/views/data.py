@@ -1,6 +1,7 @@
 import hashlib
 import os
 import re
+import uuid
 from urllib.parse import quote
 
 from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
@@ -20,7 +21,7 @@ from mcritweb.views.authentication import contributor_required, visitor_required
 from mcritweb.views.client import get_client
 from mcritweb.views.cross_compare import get_sample_to_job_id, score_to_color
 from mcritweb.views.functiondiff import get_function_diff
-from mcritweb.views.MatchReportRenderer import MatchReportRenderer
+from mcritweb.views.MatchReportRenderer import MatchReportRenderer, count_diagram_blocks, stacked_diagram_size
 from mcritweb.views.pagination import Pagination
 from mcritweb.views.params import (
     parse_checkbox_query_param,
@@ -38,6 +39,47 @@ bp = Blueprint('data', __name__, url_prefix='/data')
 ################################################################
 # Helper functions
 ################################################################
+
+#: A job id as the backend hands it out: a mongo ObjectId (24 hex) or, on a local
+#: queue, a uuid4. A cached report is named after its job id, and the id arrives
+#: straight from the URL - so keep it to characters that cannot leave the cache
+#: directory (no os.sep, no ".."), and to a length a filename can hold. `\Z`, not `$`,
+#: which also matches before a trailing newline - the convention master's own
+#: JOB_ID_PATTERN states for the download route.
+JOB_ID_RE = re.compile(r"^[0-9A-Za-z_-]{1,64}\Z")
+
+
+def is_cacheable_job_id(job_id):
+    """Whether `job_id` may be pasted into a cache filename.
+
+    Anything else is simply not cached and not looked up - the report is then
+    fetched from the backend, which is slower but always correct.
+    """
+    return isinstance(job_id, str) and JOB_ID_RE.match(job_id) is not None
+
+
+#: The diagram filenames create_match_diagram writes and the four result templates
+#: ask for: "<job_id>.png", or "<job_id>-famid_7.png" / "-samid_7" / "-funid_7".
+#: The job id is lazy so that the optional filter suffix is preferred over letting
+#: the id swallow it - a uuid4 job id contains dashes, so a greedy id would read
+#: "<uuid>-famid_7.png" as one long unfiltered id. Query reports number their
+#: functions negatively, hence the optional sign.
+#: The filter id is exactly how str(int) spells it, because the whole point of
+#: recognising the name is to render the file that was asked for: "0001" and "-0"
+#: would be rendered as "-famid_1" and "-funid_0", leaving the requested name still
+#: missing and the report re-parsed on every hit for as long as anyone asked. Off
+#: this grammar they are simply part of a job id nobody has, which is a backend miss
+#: and no report parse - the same as any other name the app never wrote.
+DIAGRAM_FILENAME_RE = re.compile(
+    r"^(?P<job_id>[0-9A-Za-z_-]{1,64}?)"
+    r"(?:-(?P<filter_kind>famid|samid|funid)_(?P<filter_id>0|-?[1-9][0-9]{0,17}))?"
+    r"\.png\Z"
+)
+
+
+#: The width of the strftime prefix cache_result puts in front of the job id.
+CACHE_TIMESTAMP_LENGTH = len("20260806-104636")
+
 
 def quote_backend_query_value(value):
     """Percent-encode one value for a query string `McritClient` builds by hand.
@@ -59,36 +101,151 @@ def quote_backend_query_value(value):
 
 
 def load_cached_result(app, job_id):
-    matching_result = {}
+    """The most recently cached report for `job_id`, or {} if there is none.
+
+    Cache files are named "<utc timestamp>-<job id>.json", which the old code looked
+    for with `job_id in filename`. That answered for any id occurring anywhere in a
+    name - inside a longer id, or inside the timestamp, where "2026" matches every
+    file ever written - and, having no reason to stop, it json.load()ed every match
+    and kept the last. A job re-fetched a handful of times therefore cost a full
+    parse of its report per cached copy. Matching the id against exactly the part of
+    the name it occupies, and reading only the newest hit, fixes both. See issue #68.
+    """
+    if not is_cacheable_job_id(job_id):
+        return {}
     cache_path = os.sep.join([app.instance_path, "cache", "results"])
-    for filename in os.listdir(cache_path):
-        if job_id in filename and filename.endswith("json"):
-            with open(cache_path + os.sep + filename) as fin:
-                matching_result = json.load(fin)
-    return matching_result
+    suffix = f"-{job_id}.json"
+    # the length test is what keeps a *partial* id from matching on a dash boundary,
+    # which "endswith" alone would allow for the uuid4 ids a local queue hands out
+    expected_length = CACHE_TIMESTAMP_LENGTH + len(suffix)
+    cached = [name for name in os.listdir(cache_path) if len(name) == expected_length and name.endswith(suffix)]
+    # the timestamp prefix is fixed-width, so lexical order is chronological order
+    for name in sorted(cached, reverse=True):
+        path = os.sep.join([cache_path, name])
+        try:
+            with open(path) as fin:
+                return json.load(fin)
+        except (OSError, ValueError):
+            # a cache file we cannot read is not a reason to fail the page - fall
+            # through to the next one, and ultimately to fetching from the backend
+            app.logger.exception("Ignoring unreadable cached result %s", path)
+    return {}
 
 
 def find_cached_result_filename(app, job_id):
     """Name of the newest cached report for a job, or None if none is cached.
 
-    Matches the whole `<timestamp>-<job_id>.json` name that cache_result writes,
-    rather than a substring of it as load_cached_result does: this file is handed to
-    the caller as-is, so a short or crafted job_id must not be able to select a
-    report that merely contains it. The timestamp prefix sorts chronologically, so
-    the newest capture wins for a job that has been fetched more than once.
+    Matches the whole `<timestamp>-<job_id>.json` name that cache_result writes, as
+    load_cached_result does: this file is handed to the caller as-is, so a short or
+    crafted job_id must not be able to select a report that merely contains it. The
+    timestamp prefix sorts chronologically, so the newest capture wins for a job that
+    has been fetched more than once.
     """
     cache_path = os.sep.join([app.instance_path, "cache", "results"])
-    candidates = [filename for filename in os.listdir(cache_path) if filename.endswith(f"-{job_id}.json")]
+    suffix = f"-{job_id}.json"
+    # the length test too, as in load_cached_result: `endswith` alone lets the tail of
+    # a uuid4 job id - which has dashes of its own - select another job's report
+    expected_length = CACHE_TIMESTAMP_LENGTH + len(suffix)
+    candidates = [filename for filename in os.listdir(cache_path) if len(filename) == expected_length and filename.endswith(suffix)]
     return max(candidates) if candidates else None
 
 
 def cache_result(app, job_info, matching_result):
     # TODO potentially implement a cache control that manages maximum allowed cache size?
-    if job_info.result is not None:
+    if job_info.result is not None and is_cacheable_job_id(job_info.job_id):
         cache_path = os.sep.join([app.instance_path, "cache", "results"])
         timestamped_filename = utc_now().strftime(f"%Y%m%d-%H%M%S-{job_info.job_id}.json")
-        with open(cache_path + os.sep + timestamped_filename, "w") as fout:
-            json.dump(matching_result, fout, indent=1)
+        # the filename is only second-resolution, so two requests for the same job can
+        # pick the same one - write elsewhere and rename, or a reader gets half a file
+        write_atomically(app, cache_path, timestamped_filename, lambda fout: json.dump(matching_result, fout, indent=1), "w")
+
+
+#: The permissions a cached file is asked for with, before the process umask is
+#: applied to them. The same 0666 a plain `open(path, "w")` asks for, so a cached
+#: report or diagram keeps the mode the in-place writes left it with - 0644 under a
+#: default umask, and whatever the operator chose otherwise. `tempfile.mkstemp`
+#: cannot do this job: it hard-codes 0600 because it is built for files that are
+#: secrets, and neither of these is one - both are derived from a report the app
+#: serves. The umask cannot be read back either, only temporarily set to zero, which
+#: is process-wide and would hand a concurrent request a world-writable file.
+CACHE_FILE_MODE = 0o666
+
+
+def incomplete_cache_path(app):
+    """Where a cache file lives until it is complete.
+
+    A sibling of the two cache directories rather than a subdirectory of either,
+    because `diagram_file` serves every name under cache/diagrams: a temporary file
+    there is fetchable under its own name for the whole render window, and after a
+    SIGKILL forever - the partial file this is all here to prevent, in a new shape.
+    Being under the same instance/cache is also what keeps os.replace a rename
+    rather than a copy, so the two must stay on one filesystem.
+    """
+    return os.sep.join([app.instance_path, "cache", "incomplete"])
+
+
+def write_atomically(app, directory, filename, write, mode="wb"):
+    """Hand `write` a handle on a temporary file, then rename it into place.
+
+    Both caches are written while other requests are reading them, and a diagram in
+    particular takes long enough to render that a reader can easily catch a partial
+    file - which would then be served, and browser-cached, as a truncated image.
+    os.replace is atomic, so a reader sees either no file or a complete one.
+    """
+    temp_directory = incomplete_cache_path(app)
+    os.makedirs(temp_directory, exist_ok=True)
+    temp_path = os.sep.join([temp_directory, uuid.uuid4().hex + ".part"])
+    try:
+        # opened through `open` rather than tempfile, so that the permissions come out
+        # the way the in-place writes left them; the opener adds O_EXCL, so a name
+        # that somehow already exists is an error rather than a silent clobber
+        # newline="" for the text modes. The cached report is served back verbatim as
+        # the raw result, so it has to be byte-for-byte what json.dump wrote - and text
+        # mode rewrites the newline on the way out, which on Windows makes every one a
+        # CRLF and the served file stop matching the bytes it claims to be. Harmless on
+        # Linux, where text mode translates nothing, so CI cannot see this either way.
+        # `newline` is not a valid argument in binary mode, hence the conditional.
+        text_kwargs = {} if "b" in mode else {"newline": ""}
+        with open(temp_path, mode, opener=lambda path, flags: os.open(path, flags | os.O_EXCL, CACHE_FILE_MODE), **text_kwargs) as fout:
+            write(fout)
+        os.replace(temp_path, os.sep.join([directory, filename]))
+    finally:
+        # os.replace consumed it on the success path; this is the failure path
+        if os.path.isfile(temp_path):
+            os.remove(temp_path)
+
+
+def match_diagram_size(result_json):
+    """The pixel size the diagram of `result_json` renders to, or None if unknown.
+
+    The diagram is no longer drawn during the page request - the browser fetches it
+    from data.diagram_file afterwards - so the page has to reserve the box it will
+    land in, or the tables below it jump down when it arrives. That box is decided
+    entirely by how many instruction blocks the reference sample's matchable
+    functions add up to, and the report already carries the instruction count of
+    every one of them: mcrit's `_summarizeMatches` writes an entry per function of
+    the reference sample, matched or not. So the size is known without asking the
+    backend anything.
+
+    MatchReportRenderer reads those instruction counts from
+    `getFunctionsBySampleId(reference sample)` instead, which is the same list - it
+    is what the matcher summarised the report from (mcrit MatcherSample/MatcherVs).
+    The two can only disagree if the sample was deleted after the job ran, and then
+    the reservation is merely the wrong size: the browser takes the image's own
+    dimensions once it has loaded.
+
+    None for a query report, whose reference sample is not stored: the renderer then
+    has no function entries at all and draws an empty diagram, and pinning a size to
+    that is not worth the guess.
+    """
+    function_summaries = result_json.get("matches", {}).get("functions") if isinstance(result_json, dict) else None
+    if not function_summaries:
+        return None
+    # same test MatchingResult.fromDict decides is_query by - a query's functions are
+    # numbered negatively, and its reference sample is not one the backend stores
+    if any(function_summary["fid"] < 0 for function_summary in function_summaries):
+        return None
+    return stacked_diagram_size(count_diagram_blocks([function_summary["num_instructions"] for function_summary in function_summaries]))
 
 
 def create_match_diagram(app, job_id, matching_result, filtered_family_id=None, filtered_sample_id=None, filtered_function_id=None):
@@ -100,15 +257,63 @@ def create_match_diagram(app, job_id, matching_result, filtered_family_id=None, 
         filter_suffix = f"-samid_{filtered_sample_id}"
     elif filtered_function_id is not None:
         filter_suffix = f"-funid_{filtered_function_id}"
-    output_path = cache_path + os.sep + job_id + filter_suffix + ".png"
+    output_filename = job_id + filter_suffix + ".png"
+    output_path = cache_path + os.sep + output_filename
     if not os.path.isfile(output_path):
         renderer = MatchReportRenderer()
         renderer.processReport(matching_result)
         image = renderer.renderStackedDiagram(filtered_family_id=filtered_family_id, filtered_sample_id=filtered_sample_id, filtered_function_id=filtered_function_id)
-        image.save(output_path)
+        write_atomically(app, cache_path, output_filename, lambda fout: image.save(fout, format="PNG"))
         # `app`, not `current_app`: this function takes an app precisely so it does
         # not depend on a request context, and uses app.instance_path fifteen lines up.
         app.logger.debug("stored new MCRIT diagram: %s", output_path)
+
+
+def render_missing_match_diagram(app, filename_match):
+    """Render the diagram `filename_match` names, so that diagram_file can serve it.
+
+    Rendering used to happen inline in result_matches_for_sample_or_query, before
+    render_template, which put the whole PIL render plus a getFunctionsBySampleId
+    round trip in front of the HTML of the first view of every result page - by far
+    the largest part of it (issue #68). The image already had its own route and its
+    own <img> request, so the work belongs here: the page now returns immediately
+    and the browser fetches the diagram alongside it.
+
+    The report is re-read rather than passed along, which is sound because the
+    renderer only ever looks at the unfiltered `function_matches`, `library_matches`
+    and `reference_sample_entry` - the filtering the view applies before rendering
+    today does not reach any of them. tests/testMatchDiagrams.py pins that down.
+    """
+    job_id = filename_match.group("job_id")
+    filter_kind = filename_match.group("filter_kind")
+    filter_id = int(filename_match.group("filter_id")) if filter_kind else None
+    client = get_client()
+    # the result page only ever linked to a diagram for a filter it had checked -
+    # keep that, so a hand-written URL cannot fill the cache with diagrams of
+    # families and samples that do not exist
+    if filter_kind == "famid" and not client.isFamilyId(filter_id):
+        return
+    if filter_kind == "samid" and not client.isSampleId(filter_id):
+        return
+    result_json = load_cached_result(app, job_id)
+    if not result_json:
+        result_json = client.getResultForJob(job_id)
+    if not isinstance(result_json, dict) or not result_json:
+        return
+    matching_result = MatchingResult.fromDict(result_json)
+    # the same for a function id, which the report can answer by itself. A query
+    # report additionally has no stored functions to lay a diagram out over, so the
+    # function-filtered variant was never generated for one and still is not
+    if filter_kind == "funid" and (matching_result.is_query or filter_id not in matching_result.function_id_to_family_ids_matched):
+        return
+    create_match_diagram(
+        app,
+        job_id,
+        matching_result,
+        filtered_family_id=filter_id if filter_kind == "famid" else None,
+        filtered_sample_id=filter_id if filter_kind == "samid" else None,
+        filtered_function_id=filter_id if filter_kind == "funid" else None,
+    )
 
 # https://stackoverflow.com/a/39842765
 # https://stackoverflow.com/a/26972238
@@ -117,6 +322,19 @@ def create_match_diagram(app, job_id, matching_result, filtered_family_id=None, 
 @visitor_required
 def diagram_file(filename):
     cache_path = os.sep.join([current_app.instance_path, "cache", "diagrams"])
+    filename_match = DIAGRAM_FILENAME_RE.match(filename)
+    # only a name this route itself could have produced is worth rendering; anything
+    # else - including a diagram cached under a name we no longer generate - is left
+    # to send_from_directory, which serves it if it is there and 404s if it is not
+    if filename_match is not None and not os.path.isfile(os.sep.join([cache_path, filename])):
+        try:
+            render_missing_match_diagram(current_app, filename_match)
+        except Exception:
+            # a diagram is decoration on a page that has already been served, and
+            # every reason it can fail (a job id naming a report of some other kind,
+            # a backend that went away, a report referring to a deleted sample) ends
+            # in a broken image rather than the 500 on the whole page it used to be
+            current_app.logger.exception("Could not render match diagram %s", filename)
     return send_from_directory(cache_path, filename)
 
 
@@ -413,21 +631,24 @@ def result(job_id):
         # re-format result report for visualization and choose respective template
         if job_info is None:
             return render_template("result_invalid.html", job_id=job_id)
+        # the diagram's size, while the raw report is still in hand - MatchingResult
+        # drops the per-function instruction counts it is worked out from
+        diagram_size = match_diagram_size(result_json)
         if job_info.parameters.startswith("getMatchesForSampleVs"):
             matching_result = MatchingResult.fromDict(result_json)
-            return result_matches_for_sample_or_query(job_info, matching_result)
+            return result_matches_for_sample_or_query(job_info, matching_result, diagram_size)
         elif job_info.parameters.startswith("getMatchesForSample"):
             matching_result = MatchingResult.fromDict(result_json)
-            return result_matches_for_sample_or_query(job_info, matching_result)
+            return result_matches_for_sample_or_query(job_info, matching_result, diagram_size)
         elif job_info.parameters.startswith("getMatchesForSmdaReport"):
             matching_result = MatchingResult.fromDict(result_json)
-            return result_matches_for_sample_or_query(job_info, matching_result)
+            return result_matches_for_sample_or_query(job_info, matching_result, diagram_size)
         elif job_info.parameters.startswith("getMatchesForMappedBinary"):
             matching_result = MatchingResult.fromDict(result_json)
-            return result_matches_for_sample_or_query(job_info, matching_result)
+            return result_matches_for_sample_or_query(job_info, matching_result, diagram_size)
         elif job_info.parameters.startswith("getMatchesForUnmappedBinary"):
             matching_result = MatchingResult.fromDict(result_json)
-            return result_matches_for_sample_or_query(job_info, matching_result)
+            return result_matches_for_sample_or_query(job_info, matching_result, diagram_size)
         elif job_info.parameters.startswith("combineMatchesToCross"):
             return result_matches_for_cross(job_info, result_json)
         # NOTE: 'updateMinHashes' is the start of 'updateMinHashesForSample'.
@@ -596,6 +817,24 @@ def result_unique_blocks(job_info, blocks_result: dict):
 MISSING_ENTRIES_REASON = "MCRIT was not able to retrieve information for all functions referenced by this result. This might be a result of having deleted samples from the database since it was processed. Please consider starting a new job."
 
 
+def count_aggregated_function_matches(matching_result, unfiltered=False):
+    """How many rows the aggregated function table has.
+
+    The pagination needs the row count and nothing else, but asking
+    getAggregatedFunctionMatches() for it aggregated every function match in the
+    report - a dict and several set unions per match - and threw the result away,
+    only for the template to build it a second time for the page slice. It groups by
+    function_id and does not drop any group, so the row count is the number of
+    distinct function_ids. tests/testResultPages.py asserts the two agree.
+
+    `unfiltered` counts the whole report, as getAggregatedFunctionMatches(unfiltered=True)
+    does - the total a filtered page prints its "filtered" figure against, which
+    would otherwise aggregate the entire report a second time just to be counted.
+    """
+    function_matches = matching_result.function_matches if unfiltered else matching_result.filtered_function_matches
+    return len({function_match.function_id for function_match in function_matches})
+
+
 def assign_matched_offsets(client, function_matches):
     """Attach the offset of each matched function, in place.
 
@@ -640,7 +879,7 @@ def name_query_sample(job_info, matching_result: MatchingResult):
         sample_entry.filename = get_query_filename(job_info.job_id) or ""
 
 
-def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult):
+def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult, diagram_size=None):
     name_query_sample(job_info, matching_result)
     score_color_provider = ScoreColorProvider()
     filtered_family_id = parse_integer_query_param(request, "famid")
@@ -749,20 +988,18 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
     # filtered for family
     if filtered_family_id is not None and client.isFamilyId(filtered_family_id):
         matching_result.filterToFamilyId(filtered_family_id)
-        create_match_diagram(current_app, job_info.job_id, matching_result, filtered_family_id=filtered_family_id)
         sample_pagination = Pagination(request, matching_result.num_sample_matches, limit=10, query_param="samp", limit_param="sampl")
-        function_pagination = Pagination(request, len(matching_result.getAggregatedFunctionMatches()), limit=100, query_param="funp", limit_param="funl")
+        function_pagination = Pagination(request, count_aggregated_function_matches(matching_result), limit=100, query_param="funp", limit_param="funl")
         # result_compare_family.html and result_compare_all.html draw one row per matched
         # function of the reference sample, aggregated over the samples it matched, and print
         # "filtered" as the rest of the report beside it. That subtraction only means anything
         # if both sides count the same thing, so the total goes in aggregated too - taken off
         # the raw match count, it read as a four-figure "filtered" with no filter applied.
-        num_original_aggregated_functions = len(matching_result.getAggregatedFunctionMatches(unfiltered=True))
-        return render_template("result_compare_family.html", famid=filtered_family_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all) 
+        num_original_aggregated_functions = count_aggregated_function_matches(matching_result, unfiltered=True)
+        return render_template("result_compare_family.html", diagram_size=diagram_size, famid=filtered_family_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all) 
     # filtered for sample
     elif filtered_sample_id is not None and client.isSampleId(filtered_sample_id):
         matching_result.filterToSampleId(filtered_sample_id)
-        create_match_diagram(current_app, job_info.job_id, matching_result, filtered_sample_id=filtered_sample_id)
         filtered_sample_entry = client.getSampleById(filtered_sample_id)
         matching_result.other_sample_entry = filtered_sample_entry
         # get offsets for matched functions
@@ -775,11 +1012,9 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         # this sample that one query function can match, and paginating over that count left the
         # tail of the table on no page at all.
         function_pagination = Pagination(request, matching_result.num_function_matches, limit=100, query_param="funp", limit_param="funl")
-        return render_template("result_compare_sample.html", samid=filtered_sample_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_sample) 
+        return render_template("result_compare_sample.html", diagram_size=diagram_size, samid=filtered_sample_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_sample) 
     # filter for function - treat family/sample part as if there was no filter
     elif filtered_function_id is not None and filtered_function_id in matching_result.function_id_to_family_ids_matched:
-        if not matching_result.is_query:
-            create_match_diagram(current_app, job_info.job_id, matching_result, filtered_function_id=filtered_function_id)
         matching_result.filterToFunctionId(filtered_function_id)
         matching_result.filtered_function_matches = sorted(matching_result.filtered_function_matches, key=lambda x: (x.matched_score, x.match_is_pichash, x.matched_family_id, x.matched_sample_id, x.matched_function_id), reverse=True)
         # pull all function_entries, as we want to have their offsets
@@ -788,7 +1023,7 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         # set up pagination
         family_pagination = Pagination(request, matching_result.num_family_matches, limit=10, query_param="famp", limit_param="fampl")
         function_pagination = Pagination(request, matching_result.num_function_matches, limit=100, query_param="funp", limit_param="funl")
-        return render_template("result_compare_function.html", funid=filtered_function_id, job_info=job_info, famp=family_pagination, funp=function_pagination, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_function) 
+        return render_template("result_compare_function.html", diagram_size=diagram_size, funid=filtered_function_id, job_info=job_info, famp=family_pagination, funp=function_pagination, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_function) 
     # 1 vs 1 result
     elif job_info.parameters.startswith("getMatchesForSampleVs("):
         # get offsets for matched functions
@@ -799,17 +1034,35 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         return render_template("result_compare_vs.html", job_info=job_info, matching_result=matching_result, funp=function_pagination, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_sample)
     # unfiltered / default -> also 1 vs group
     else:
-        create_match_diagram(current_app, job_info.job_id, matching_result)
         family_pagination = Pagination(request, matching_result.num_family_matches, limit=10, query_param="famp", limit_param="fampl")
         library_pagination = Pagination(request, matching_result.num_library_matches, limit=10, query_param="libp", limit_param="libl")
-        function_pagination = Pagination(request, len(matching_result.getAggregatedFunctionMatches()), limit=100, query_param="funp", limit_param="funl")
+        function_pagination = Pagination(request, count_aggregated_function_matches(matching_result), limit=100, query_param="funp", limit_param="funl")
         # the total behind the "filtered" figure, aggregated to match the rows - see above
-        num_original_aggregated_functions = len(matching_result.getAggregatedFunctionMatches(unfiltered=True))
+        num_original_aggregated_functions = count_aggregated_function_matches(matching_result, unfiltered=True)
         # a query can be promoted to a sample (issue #9), but only while the file it
         # was run for is still on this host - the page has to say which it is. The file
         # is filed under the job's own id, so this costs no round trip either
         is_query_result = job_info.method in QUERY_UPLOAD_KINDS
-        return render_template("result_compare_all.html", job_info=job_info, famp=family_pagination, libp=library_pagination, funp=function_pagination, num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all, is_query_result=is_query_result, can_promote_query=is_query_result and query_upload_exists(current_app, job_info.job_id))
+        return render_template("result_compare_all.html", diagram_size=diagram_size, job_info=job_info, famp=family_pagination, libp=library_pagination, funp=function_pagination, num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all, is_query_result=is_query_result, can_promote_query=is_query_result and query_upload_exists(current_app, job_info.job_id))
+
+
+def order_samples(samples, order):
+    """`samples` in the order `order` names them, or None if it names one that is not there.
+
+    The ordering used to scan `samples` for every id in `order`, which made laying
+    out n samples cost O(n^2) - and the cross-compare page does it once per matching
+    method, so six times over. Both sides are compared as strings because `order` is
+    either the report's clustered sequence or the `custom` query parameter, neither
+    of which is guaranteed to arrive as an int. See issue #68.
+    """
+    samples_by_id = {str(sample.sample_id): sample for sample in samples}
+    ordered_samples = []
+    for order_sample_id in order:
+        sample = samples_by_id.get(str(order_sample_id))
+        if sample is None:
+            return None
+        ordered_samples.append(sample)
+    return ordered_samples
 
 
 def result_matches_for_cross(job_info, result_json):
@@ -835,17 +1088,13 @@ def result_matches_for_cross(job_info, result_json):
             order = None
         ordered_samples = []
         if order:
-            for order_sample_id in order:
-                for sample in samples:
-                    if str(sample.sample_id) == str(order_sample_id):
-                        ordered_samples.append(sample)
-                        break
-                else:
-                    reason = "MCRIT was not able to produce the chosen custom ordering, as some sample_ids are not part of the cross compare originally specified."
-                    # job_info, not result_json: the template reads job_info.job_id for
-                    # its heading and for the delete link, and a result dict has neither.
-                    # The sibling corrupted branch above already passes the Job.
-                    return render_template("result_corrupted.html", reason=reason, job_info=job_info)
+            ordered_samples = order_samples(samples, order)
+            if ordered_samples is None:
+                reason = "MCRIT was not able to produce the chosen custom ordering, as some sample_ids are not part of the cross compare originally specified."
+                # job_info, not result_json: the template reads job_info.job_id for
+                # its heading and for the delete link, and a result dict has neither.
+                # The sibling corrupted branch above already passes the Job.
+                return render_template("result_corrupted.html", reason=reason, job_info=job_info)
         if ordered_samples != []:
             samples_by_method[method] = ordered_samples
         else:
@@ -1130,7 +1379,7 @@ def jobs():
                 for sample_id in [sid for sid in job.sample_ids if sid not in samples_by_id]:
                     samples_by_id[sample_id] = client.getSampleById(sample_id)
         for job in jobs:
-            if job.family_id is not None:
+            if job.family_id is not None and job.family_id not in families_by_id:
                 families_by_id[job.family_id] = client.getFamily(job.family_id)
     return render_template('jobs.html', families=families_by_id, samples=samples_by_id, active=active_category, state=state_category, jobs=jobs, menu_configuration=menu_configuration, p=pagination, query=query)
 
@@ -1191,7 +1440,7 @@ def job_by_id(job_id):
                 for sample_id in [sid for sid in job.sample_ids if sid not in samples_by_id]:
                     samples_by_id[sample_id] = client.getSampleById(sample_id)
         for job in child_jobs:
-            if job.family_id is not None:
+            if job.family_id is not None and job.family_id not in families_by_id:
                 families_by_id[job.family_id] = client.getFamily(job.family_id)
     return render_template('job_overview.html', families=families_by_id, samples=samples_by_id, job_info=job_info, auto_refresh=auto_refresh, child_jobs=child_jobs, missing_children=missing_children)
 

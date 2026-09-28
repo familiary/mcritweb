@@ -222,6 +222,30 @@ html {
     margin-top: 1.25rem;
   }
 
+  /* The MCRIT diagram is fetched separately from the result page that shows it, so
+     this fills the box the <img> has reserved (see templates/match_diagram.html)
+     until the pixels get there. The diagram is opaque, so it covers the caption once
+     it has loaded. */
+  .mcrit-diagram {
+    position: relative;
+    background-color: rgb(240, 240, 240);
+  }
+
+  .mcrit-diagram::before {
+    content: "rendering diagram\2026";
+    position: absolute;
+    top: 45%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: slategray;
+  }
+
+  .mcrit-diagram img {
+    position: relative;
+    display: block;
+  }
+
 /* Issue #52. Both of these are sized by their content, so a narrow viewport wraps
    them and the row grows a second line for no information:
 
