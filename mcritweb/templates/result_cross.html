@@ -40,6 +40,7 @@
         <td class="id clickable" style="padding: 0 5px; font-size: 13px;color: black">{{ sample.sample_id }}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.bitness}}</td>
         <td class="" style="padding: 0 5px; font-size: 13px;color: black">{{sample.statistics['num_functions']}}</td>
+      {# a pane filled in the browser rewrites the first line of data-hint, see the script at the end #}
       {% for sample2 in samples %}
         <td><span onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}'";" class="hint--top" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) &#10;
             {{ sample.sample_id }}: {{sample.sha256[:8]}} -- {{ sample.family }} {{ sample.version }} -- ({{sample.statistics['num_functions']}} func)
@@ -64,7 +65,8 @@ Results for Job: {{ job_info.job_id }}
 
 <script>
   $(document).ready(function(){
-    $("td.clickable").click(function(){
+    // delegated, so that it also reaches the rows of a pane filled after load
+    $(document).on("click", "td.clickable", function(){
       var result = $(this).parent().children("td.result").text();
       window.location.href="/data/result/"+result;
     });
@@ -176,12 +178,12 @@ Results for Job: {{ job_info.job_id }}
 <h1>Results for Job: {{ job_info.method }}</h1>
 {{ job_column_table(job_info, show_created=False, show_started=False, show_finished=False) }}
 
-<p>Cross Comparison of {{ samples["unweighted"]|length }} samples in the data set. You can order the samples in this list per drag and drop to change the order in the matrices.</p>
+<p>Cross Comparison of {{ samples[rendered_method]|length }} samples in the data set. You can order the samples in this list per drag and drop to change the order in the matrices.</p>
 <div class="container">
     <div class="row">
       <div class="col-sm-auto">
         <ul style="list-style: none" id="sortable">
-            {% for sample in samples["unweighted"] %}
+            {% for sample in samples[rendered_method] %}
             <li>{{ sample.sample_id ~' '~ sample.family ~ ' ' ~ sample.version}}</li>
             {% endfor %}
           </ul>
@@ -194,38 +196,99 @@ Results for Job: {{ job_info.job_id }}
   </div>
 
 <ul class="nav nav-pills mb-3 justify-content-center" id="pills-tab" role="tablist">
+    {% for method in ["unweighted", "score_weighted", "frequency_weighted", "nonlib_unweighted", "nonlib_score_weighted", "nonlib_frequency_weighted"] %}
     <li class="nav-item" role="presentation">
-      <button class="nav-link show active" id="pills-unweighted-tab" data-bs-toggle="pill" data-bs-target="#pills-unweighted" type="button" role="tab" aria-controls="pills-unweighted" aria-selected="true">unweighted</button>
+      <button class="nav-link{% if method == rendered_method %} show active{% endif %}" id="pills-{{ method }}-tab" data-bs-toggle="pill" data-bs-target="#pills-{{ method }}" type="button" role="tab" aria-controls="pills-{{ method }}" aria-selected="{{ 'true' if method == rendered_method else 'false' }}">{{ method }}</button>
     </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="pills-score_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-score_weighted" type="button" role="tab" aria-controls="pills-score_weighted" aria-selected="false">score_weighted</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="pills-frequency_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-frequency_weighted" type="button" role="tab" aria-controls="pills-frequency_weighted" aria-selected="false">frequency_weighted</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="pills-nonlib_unweighted-tab" data-bs-toggle="pill" data-bs-target="#pills-nonlib_unweighted" type="button" role="tab" aria-controls="pills-nonlib_unweighted" aria-selected="false">nonlib_unweighted</button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="pills-nonlib_score_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-nonlib_score_weighted" type="button" role="tab" aria-controls="pills-nonlib_score_weighted" aria-selected="false">nonlib_score_weighted</button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="pills-nonlib_frequency_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-nonlib_frequency_weighted" type="button" role="tab" aria-controls="pills-nonlib_frequency_weighted" aria-selected="false">nonlib_frequency_weighted</button>
-      </li>
+    {% endfor %}
   </ul>
 
 
 <div class="tab-content" id="pills-tabContent">
 
     {% for method in matching_percent.keys() %}
-      <div class="tab-pane fade {% if method=='unweighted' %}show active{%endif%}" id="pills-{{ method }}" role="tabpanel" aria-labelledby="pills-{{ method }}-tab">
+      {% if method == rendered_method %}
+      <div class="tab-pane fade show active" id="pills-{{ method }}" role="tabpanel" aria-labelledby="pills-{{ method }}-tab">
           <center> 
             {{ cross_table(method, samples[method], matching_percent[method], matching_matches[method], sample_indices[method], job_info) }}
           </center>
       </div>
+      {% else %}
+      <div class="tab-pane fade" id="pills-{{ method }}" role="tabpanel" aria-labelledby="pills-{{ method }}-tab" data-lazy-method="{{ method }}">
+          <center></center>
+      </div>
+      {% endif %}
     {% endfor %}
 
   </div>
+
+<script type="application/json" id="cross-lazy-panes">{{ lazy_panes|tojson }}</script>
+<script>
+  // Only the pane shown on load is rendered (issue #182). Any other is built the first time
+  // its tab is shown, by cloning the rows and cells of the rendered one - they already carry
+  // everything a pair of samples has in common across the methods: links, edit buttons and
+  // the samples' part of each tooltip - and patching in what differs per method: the order,
+  // each cell's colour and the score line of its tooltip.
+  $(document).ready(function(){
+    var lazy = null;
+    var renderedPane = document.getElementById("pills-" + {{ rendered_method|tojson }});
+    var rendered = renderedPane ? renderedPane.querySelector("table") : null;
+    if (!rendered) {
+      return;
+    }
+
+    function fillPane(pane, method) {
+      if (lazy === null) {
+        lazy = JSON.parse(document.getElementById("cross-lazy-panes").textContent);
+      }
+      var data = lazy.panes[method];
+      var sourceRows = rendered.querySelectorAll("tr.sample-row");
+      var sourceIndex = {};
+      sourceRows.forEach(function(row, index){
+        sourceIndex[row.querySelector("td.id").textContent.trim()] = index;
+      });
+      var table = rendered.cloneNode(false);
+      var body = table.appendChild(rendered.tBodies[0].cloneNode(false));
+      body.appendChild(rendered.rows[0].cloneNode(true));
+      var indices = body.appendChild(rendered.rows[1].cloneNode(true));
+      indices.querySelectorAll("td[align]").forEach(function(cell, k){
+        cell.textContent = data.order[(k + 1) * 5 - 1];
+      });
+      data.order.forEach(function(sampleId, i){
+        var sourceRow = sourceRows[sourceIndex[sampleId]];
+        var sourceCells = sourceRow.cells;
+        var numLeading = sourceCells.length - sourceRows.length;
+        var row = body.appendChild(sourceRow.cloneNode(false));
+        for (var k = 0; k < numLeading; k++) {
+          row.appendChild(sourceCells[k].cloneNode(true));
+        }
+        data.order.forEach(function(otherId, j){
+          var cell = row.appendChild(sourceCells[numLeading + sourceIndex[otherId]].cloneNode(true));
+          var span = cell.querySelector("span[data-hint]");
+          var hint = span.getAttribute("data-hint");
+          // the first line of the hint, as cross_table writes it
+          span.setAttribute("data-hint", "MCRIT: " + data.percent[i][j].toFixed(2) + "% (" + data.matches[i][j] + " matches) " + hint.slice(hint.indexOf("\n")));
+          span.style.backgroundColor = "#" + lazy.palette[data.color[i][j]];
+        });
+        row.querySelector("a[data-bs-target='#editSampleModal']").id = method + "_sample_" + sampleId + "_edit";
+      });
+      // the tooltips of the clipboard buttons are set up once, on load - see clipboard_js
+      $(table).find('[data-toggle="tooltip"]').removeAttr("aria-describedby").tooltip();
+      pane.querySelector("center").appendChild(table);
+    }
+
+    document.querySelectorAll("#pills-tab button").forEach(function(button){
+      button.addEventListener("show.bs.tab", function(){
+        var pane = document.querySelector(button.getAttribute("data-bs-target"));
+        // a result can lack a method its tab is offered for, which leaves no pane to fill
+        if (pane && pane.hasAttribute("data-lazy-method")) {
+          fillPane(pane, pane.getAttribute("data-lazy-method"));
+          pane.removeAttribute("data-lazy-method");
+        }
+      });
+    });
+  });
+</script>
 {% endblock %}
 
 
