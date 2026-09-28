@@ -146,7 +146,7 @@ CI (`.github/workflows/test.yml`) runs `ruff check .` plus the suite on Python 3
 - A release adds a dated entry at the top of the README "Version History" (` * YYYY-MM-DD vX.Y.Z: <summary>`) and bumps `setup.py`. Historic commit message for this: `bump X.Y.Z`.
 - **Do not bump the version unless explicitly asked.**
 - MCRITweb is **deployed from a checkout** — a container image or a local clone — and no wheel or sdist is ever built or published. `setup.py` exists for the runtime version string and for `pip install -e .`; its `packages` list is not a distribution concern.
-- `mcrit>=1.10.0` is pinned in both `setup.py` and `requirements.txt` — the two must stay in sync. MCRITweb consumes backend data classes (`MatchingResult`, `SampleEntry`, `FunctionEntry`, `UniqueBlocksResult`, …) directly, so a backend release can break rendering; when a fix depends on new backend behavior, raise the floor in both files and say so in the changelog entry.
+- `mcrit>=1.12.0` is pinned in both `setup.py` and `requirements.txt` — the two must stay in sync. MCRITweb consumes backend data classes (`MatchingResult`, `SampleEntry`, `FunctionEntry`, `UniqueBlocksResult`, …) directly, so a backend release can break rendering; when a fix depends on new backend behavior, raise the floor in both files and say so in the changelog entry.
 - `flask>=3.0` and `werkzeug>=3.0`. The old hard pins at 2.2.5 / 2.3.3 were lifted in issue #27; the lower bounds are there to stop a resolver sliding back to a 2.x that cannot run on Python 3.12+. See ADR-0001 for what was checked.
 
 ## Agent guardrails

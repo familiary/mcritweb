@@ -8,7 +8,7 @@ The floor is **inherited, not intrinsic**. Nothing in mcritweb's own source need
 there is no `match`, no `except*`, no `tomllib`, no `datetime.UTC`, and `ruff.toml`
 deliberately ignores UP006/UP007/UP045 so the annotation style stays pre-3.9. What makes
 3.8 unusable is the dependency: `mcrit` declared `>=3.11` from v1.5.0 and `>=3.12` from
-v1.10.0, and the pin here is `mcrit>=1.10.0`, so pip finds no satisfiable release below
+v1.10.0, and the pin here is `mcrit>=1.12.0`, so pip finds no satisfiable release below
 3.12 and fails at resolution.
 
 Without a `python_requires`, what the reader gets for following the README is that
