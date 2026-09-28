@@ -112,6 +112,23 @@ def test_the_sample_listing_says_a_sha256_matched_by_sha256(client, as_role, fak
     assert marks_of(response, "sample-table") == {6: "SHA256 match"}
 
 
+def test_an_exact_hit_with_no_text_hits_is_still_marked(client, as_role, fake_mcrit):
+    """The page that found nothing but the exact id is the one the mark is most for. The
+    views read the search as a `SearchPage` (#64), which is as long as its text hits, so
+    this page is falsy - whether to mark has to turn on whether the search answered at
+    all, not on whether it found rows."""
+    as_role("visitor")
+    known = fake_mcrit._samples[6]
+    fake_mcrit.search_samples = lambda *args, **kwargs: {
+        "search_results": {}, "cursor": {"forward": None, "backward": None},
+        "id_match": known.toDict(), "sha_match": None,
+    }
+
+    response = client.get("/explore/samples?query=6")
+
+    assert rows_of(response, "sample-table") == [(6, "ID match")]
+
+
 def test_a_text_search_grows_no_match_column(client, as_role):
     """The column is not part of the table's normal shape - a search that hit nothing
     exactly must render as it always did."""

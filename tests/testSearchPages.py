@@ -361,6 +361,7 @@ ANALYZE_PAGES = [
     ("/analyze/compare", "query"),
     ("/analyze/cross_compare", "query"),
     ("/analyze/compare_versus", "query_a"),
+    ("/analyze/unique_blocks", "query"),
 ]
 
 
@@ -410,9 +411,10 @@ def test_a_backward_cursor_returns_the_previous_slice(corpus_mcrit):
 
 
 def test_search_results_are_dicts_not_entries(corpus_mcrit):
-    """The views call `.fromDict` on every value. Handing back entry objects here
-    would let code that forgot to do that pass, which is exactly the bug this
-    module's search-page tests exist to catch."""
+    """The search_* methods answer the wire format, and `mcritweb.views.search.search_page`
+    calls `.fromDict` on every value. Handing back entry objects here would let code that
+    read the dict as if it were entries pass, which is exactly the bug this module's
+    search-page tests exist to catch."""
     results = corpus_mcrit.search_samples("", limit=1)["search_results"]
 
     assert all(isinstance(value, dict) for value in results.values())

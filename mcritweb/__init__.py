@@ -54,7 +54,6 @@ def create_app(test_config=None, instance_path=None):
     # drag the entire application stack (mcrit, smda, numpy, PIL, networkx) into every
     # import - including a test that only wants a pure-python helper. See issue #88.
     from flask_dropzone import Dropzone
-    from mcrit.storage.SampleEntry import SampleEntry
 
     from . import db, manual
     from .csrf import CsrfProtect
@@ -62,6 +61,7 @@ def create_app(test_config=None, instance_path=None):
     from .views import administration, analyze, api, authentication, data, explore
     from .views.client import get_client
     from .views.params import get_minhash_matching_label
+    from .views.search import search_page
     from .views.utility import ensure_local_data_paths, get_mcritweb_version_from_setup
 
     # create and configure the app
@@ -298,10 +298,9 @@ def create_app(test_config=None, instance_path=None):
                     if job.family_id is not None:
                         families_by_id[job.family_id] = client.getFamily(job.family_id)
             
-            sample_results = client.search_samples("", is_ascending=False, cursor=None, sort_by="sample_id", limit=5)
+            sample_results = search_page(client, "samples", "", is_ascending=False, cursor=None, sort_by="sample_id", limit=5)
             if sample_results:
-                for sample_dict in sample_results['search_results'].values():
-                    latest_samples.append(SampleEntry.fromDict(sample_dict))
+                latest_samples = sample_results.entries
             return render_template("index.html", samples=samples_by_id, families=families_by_id, latest_samples=latest_samples, jobs=jobs)
 
     return app
