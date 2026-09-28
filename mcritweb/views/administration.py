@@ -6,7 +6,7 @@ from flask import Blueprint, current_app, flash, g, redirect, render_template, r
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken
+from mcritweb.db import KNOWN_THEMES, ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken
 from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
 from mcritweb.views.client import get_client
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
@@ -110,6 +110,24 @@ def change_default_filter():
     user_filters.saveToDb()
     flash('Default filters successfully changed', category='success')
     return redirect(url_for('authentication.settings'))
+
+@bp.route('/change_theme' , methods=('POST',))
+@login_required
+def change_theme():
+    user_id = get_session_user_id()
+    if user_id is None:
+        flash('User ID was not recognized', category='error')
+        return redirect(url_for('index'))
+    theme = request.form.get('theme')
+    if theme not in KNOWN_THEMES:
+        flash('Unknown theme requested', category='error')
+        return redirect(url_for('authentication.settings'))
+    user_info = UserInfo.fromDb(user_id=user_id)
+    user_info.theme = theme
+    user_info.saveToDb()
+    flash(f'Theme successfully changed to {theme}', category='success')
+    return redirect(url_for('authentication.settings'))
+
 
 @bp.route('/change_column_settings' , methods=('GET', 'POST'))
 @login_required

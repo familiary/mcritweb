@@ -74,7 +74,7 @@ Results for Job: {{ job_info.job_id }}
           <!-- WIP: render stuff here, we need better accessors for this though -->
           <a href="{{ url_for('explore.function_by_id', function_id=link_entry.function_id) }}">
             {% if link_entry.matched_unique %}
-            <b style="color: black;">0x{{ "%x"|format(link_entry.offset) }}</b></a>
+            <b style="color: var(--control-text);">0x{{ "%x"|format(link_entry.offset) }}</b></a>
             {% else %}
             0x{{ "%x"|format(link_entry.offset) }}</a>
             {% endif %}
@@ -120,7 +120,7 @@ Results for Job: {{ job_info.job_id }}
         <td style="text-align: right;" valign="middle">
           <a href="{{ url_for('explore.function_by_id', function_id=link_entry.matched_function_id) }}">
           {% if link_entry.matched_unique %}
-          <b style="color: black;">{{ link_entry.matched_function_id }}</b>
+          <b style="color: var(--control-text);">{{ link_entry.matched_function_id }}</b>
           {% else %}
           {{ link_entry.matched_function_id }}
           {% endif %}

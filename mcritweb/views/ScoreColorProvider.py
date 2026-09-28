@@ -1,3 +1,25 @@
+#: The colour a tint is mixed into, per theme, matching `--page-bg` in style.css.
+#: The maps below are drawn for a white page: every score is a hue laid over the
+#: ground at 40% and "no score" is the ground itself, so on a dark page the same
+#: arithmetic paints the whole table in near-white blocks and every cell that
+#: matched nothing brightest of all - the heat map reads inverted. Only the ground
+#: changes; the hues, the thresholds and the scores behind them do not. Score to
+#: colour is presentation and may change here, per AGENTS.md; scores may not.
+THEME_GROUNDS = {
+    "light": (0xff, 0xff, 0xff),
+    "dark": (0x1a, 0x1d, 0x20),
+}
+
+#: How much of the requested opacity a theme actually spends. A tint that is legible
+#: on white at 40% is a mid-grey on black, and the text on it - white, on a dark page
+#: - then sits at 3.6:1. Spending 70% of it keeps the worst step of the map (yellow)
+#: above 6:1 while leaving the ordering of the scale untouched.
+THEME_TINT_STRENGTHS = {
+    "light": 1.0,
+    "dark": 0.7,
+}
+
+
 class ScoreColorProvider:
     
     frequency_color_map = {
@@ -70,7 +92,12 @@ class ScoreColorProvider:
     }
 
     def _tupleToHex(self, tup, opacity=1):
-        return "".join([f"{int(255 - opacity * (255 - e)):02x}" for e in tup])
+        opacity = opacity * self.tint_strength
+        return "".join([f"{int(g + opacity * (e - g)):02x}" for e, g in zip(tup, self.ground)])
+
+    def _groundHex(self):
+        """What a cell with nothing to report is painted: the page it sits on."""
+        return "".join([f"{g:02x}" for g in self.ground])
 
     def getMatchHexColorByScore100(self, score, opacity=1):
         if score >= 90:
@@ -93,7 +120,7 @@ class ScoreColorProvider:
             return self._tupleToHex(self.matching_color_map_100[9], opacity)
         elif score > 0:
             return self._tupleToHex(self.matching_color_map_100[10], opacity)
-        return self._tupleToHex(self.frequency_color_map[0])
+        return self._groundHex()
 
     def getMatchHexColorByScore50(self, score, opacity=1):
         if score > 100:
@@ -110,7 +137,7 @@ class ScoreColorProvider:
             return self._tupleToHex(self.matching_color_map_50[6], opacity)
         elif score >= 50:
             return self._tupleToHex(self.matching_color_map_50[7], opacity)
-        return self._tupleToHex(self.frequency_color_map[0])
+        return self._groundHex()
 
     def getFrequencyHexColorByScore(self, score, opacity=1):
         if score > 100:
@@ -129,7 +156,7 @@ class ScoreColorProvider:
             return self._tupleToHex(self.frequency_color_map[7], opacity)
         elif score >= 40:
             return self._tupleToHex(self.frequency_color_map[8], opacity)
-        return self._tupleToHex(self.frequency_color_map[0])
+        return self._groundHex()
 
     def getMatchHexColorFromResult(self, match_result, score_type, scale=100, opacity=0.4):
         if score_type not in ["matched_percent_score_weighted", "matched_percent_frequency_weighted", "matched_percent_nonlib_score_weighted", "matched_percent_nonlib_frequency_weighted", "matched_score"]:
@@ -144,7 +171,8 @@ class ScoreColorProvider:
     def getUniqueColorScore(self, score, opacity=0.4):
         if score is not None and score > 0:
             return self.getMatchHexColorByScore100(60, opacity=opacity)
-        return "FFFFFF"
+        return self._groundHex()
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, theme="light") -> None:
+        self.ground = THEME_GROUNDS.get(theme, THEME_GROUNDS["light"])
+        self.tint_strength = THEME_TINT_STRENGTHS.get(theme, THEME_TINT_STRENGTHS["light"])

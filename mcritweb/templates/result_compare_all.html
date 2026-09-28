@@ -234,7 +234,7 @@ Results for Job: {{ job_info.job_id }}
 
 <h3>MCRIT Diagram</h3>
 <p>Showing: foreign family match frequency, library matches, best foreign family match scores.</p>
-<img src="{{ url_for('data.diagram_file', filename=job_info.job_id + '.png') }}" class="img-fluid" />
+<img src="{{ url_for('data.diagram_file', filename=diagram_filename(job_info.job_id)) }}" class="img-fluid" />
 
 <h3 id="function-matches">Function Matches</h3>
 <p>selection: {{ funp.max_value }}, showing: {{ 1 + funp.start_index }} - {{ funp.end_index }} (filtered: {{ num_original_aggregated_functions - funp.max_value}})</p>
@@ -322,9 +322,9 @@ Results for Job: {{ job_info.job_id }}
           {% elif column_type == "num_pichash" %}
             <td style="text-align: right;" valign="middle">{{ aggregate["pichash_matches"] }}</td>
           {% elif column_type == "is_library_match" %}
-            <td style="text-align: right;" valign="middle"><i {% if aggregate["library_matches"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+            <td style="text-align: right;" valign="middle"><i {% if aggregate["library_matches"] %} style="color:var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color:var(--status-no);" class="fa-solid fa-times-circle"> {% endif %}</i></td>
           {% elif column_type == "is_unique_match" %}
-            <td style="text-align: right;" valign="middle"><i {% if aggregate["is_family_unique"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+            <td style="text-align: right;" valign="middle"><i {% if aggregate["is_family_unique"] %} style="color:var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color:var(--status-no);" class="fa-solid fa-times-circle"> {% endif %}</i></td>
           {% endif %}
         {% endfor %}
       </tr>

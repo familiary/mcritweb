@@ -18,8 +18,13 @@
 -#}
 
 {#- "selected" and "pending" are the two shades cross_compare.html has always used for
-    its selection; keeping the exact values keeps that page looking as it did. -#}
-{%- set ROW_TINTS = {"selected": "yellowgreen", "pending": "rgb(240, 240, 240)"} -%}
+    its selection. They are palette names from static/style.css, so a theme reaches them
+    (#70); the light palette keeps the values this page always had. -#}
+{%- set ROW_TINTS = {"selected": "var(--row-selected-bg)", "pending": "var(--surface-muted)"} -%}
+{#- The same two tints as classes, for a row a script toggles. The script has to read the
+    state back, and it can read a class where it could only compare a colour - which is
+    what pinned these shades to one palette. See tr.row-selected in static/style.css. -#}
+{%- set ROW_TINT_CLASSES = {"selected": "row-selected", "pending": "row-pending"} -%}
 {%- set BADGE_VARIANTS = ["primary", "secondary", "success", "danger", "warning", "info", "light", "dark"] -%}
 
 
@@ -27,6 +32,14 @@
 {%- macro row_tint(row_decorations, row_id) -%}
   {%- set tint = ROW_TINTS.get((row_decorations or {}).get(row_id, {}).get("tint")) -%}
   {%- if tint %} style="background-color: {{ tint }};"{% endif -%}
+{%- endmacro -%}
+
+
+{#- the tint as a class name, with its leading space, for a <tr class="..."> the caller
+    writes itself - so the row carries one class attribute, not two -#}
+{%- macro row_tint_class(row_decorations, row_id) -%}
+  {%- set tint_class = ROW_TINT_CLASSES.get((row_decorations or {}).get(row_id, {}).get("tint")) -%}
+  {%- if tint_class %} {{ tint_class }}{% endif -%}
 {%- endmacro -%}
 
 

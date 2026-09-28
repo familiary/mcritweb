@@ -1,0 +1,330 @@
+/* Dark-theme overrides for the vendored front-end.
+
+   `style.css` owns the palette and is already written against it, so almost every
+   declaration below just points a widget we did not write at a name declared there.
+   The exceptions are the alert and contextual-table tints: those are Bootstrap's own
+   semantic set rather than ours, and their light originals live in Bootstrap too, so
+   the dark counterparts are stated here beside the rules they replace.
+
+   It exists because the deployed Bootstrap is 5.0.2, two minor versions before
+   `data-bs-theme` and its `--bs-body-*` variables. 5.0.2 paints `.table`, `.modal`,
+   `.dropdown-menu` and the rest with literals, and it is vendored under `static/`
+   where AGENTS.md forbids editing it. So the components are pulled onto the palette
+   from outside, in a project-owned file that loads after every vendored stylesheet.
+   The same applies to jQuery-UI, DataTables and Dropzone.
+
+   Every rule is scoped to `:root[data-theme="dark"]`, which `base.html` writes from
+   the user's stored preference. The file is therefore inert under the light theme,
+   and the attribute also buys the specificity needed to beat the vendored rule. */
+
+:root[data-theme="dark"] body {
+  color: var(--body-text);
+  background-color: var(--page-bg);
+}
+
+/* --- tables ------------------------------------------------------------------ */
+
+:root[data-theme="dark"] .table {
+  --bs-table-striped-color: var(--body-text);
+  --bs-table-striped-bg: rgba(255, 255, 255, 0.05);
+  --bs-table-active-color: var(--body-text);
+  --bs-table-active-bg: rgba(255, 255, 255, 0.1);
+  --bs-table-hover-color: var(--body-text);
+  --bs-table-hover-bg: rgba(255, 255, 255, 0.075);
+  color: var(--body-text);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .table-bordered > :not(caption) > *,
+:root[data-theme="dark"] .table > :not(:first-child) {
+  border-color: var(--border-subtle);
+}
+
+/* the contextual cell colours, on the job statistics table */
+
+:root[data-theme="dark"] .table-secondary {
+  --bs-table-bg: #2b3035;
+  color: var(--body-text);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .table-primary {
+  --bs-table-bg: #1b2b45;
+  color: var(--body-text);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .table-success {
+  --bs-table-bg: #17301f;
+  color: var(--body-text);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .table-warning {
+  --bs-table-bg: #3a3115;
+  color: var(--body-text);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .table-danger {
+  --bs-table-bg: #3a1c1f;
+  color: var(--body-text);
+  border-color: var(--border-subtle);
+}
+
+/* --- form controls ----------------------------------------------------------- */
+
+:root[data-theme="dark"] .form-control,
+:root[data-theme="dark"] .form-select,
+:root[data-theme="dark"] .input-group-text {
+  color: var(--body-text);
+  background-color: var(--surface-muted);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .form-control:focus,
+:root[data-theme="dark"] .form-select:focus {
+  color: var(--body-text);
+  background-color: var(--surface-muted);
+}
+
+:root[data-theme="dark"] .form-control::placeholder {
+  color: var(--muted-text);
+}
+
+:root[data-theme="dark"] .form-control:disabled,
+:root[data-theme="dark"] .form-control[readonly] {
+  background-color: var(--page-bg);
+}
+
+/* a radio or a checkbox: Bootstrap sets appearance:none, so `color-scheme: dark`
+   does not reach these and the box has to be painted here */
+:root[data-theme="dark"] .form-check-input {
+  background-color: var(--surface-muted);
+  border-color: var(--border-subtle);
+}
+
+/* the chevron is a data URI with the stroke colour baked into it */
+:root[data-theme="dark"] .form-select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23dee2e6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+}
+
+/* --- buttons ----------------------------------------------------------------- */
+
+:root[data-theme="dark"] .btn-outline-dark {
+  color: var(--body-text);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .btn-outline-dark:hover,
+:root[data-theme="dark"] .btn-outline-dark:active {
+  color: var(--page-bg);
+  background-color: var(--body-text);
+  border-color: var(--body-text);
+}
+
+:root[data-theme="dark"] .btn-light {
+  color: var(--body-text);
+  background-color: var(--surface-muted);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .btn-light:hover,
+:root[data-theme="dark"] .btn-light:active {
+  color: var(--control-text);
+  background-color: var(--page-bg);
+  border-color: var(--border-subtle);
+}
+
+/* the close glyph is a black data URI; inverting the box inverts only the glyph */
+:root[data-theme="dark"] .btn-close {
+  filter: invert(1);
+}
+
+/* --- menus, modals, lists ---------------------------------------------------- */
+
+:root[data-theme="dark"] .dropdown-menu,
+:root[data-theme="dark"] .modal-content,
+:root[data-theme="dark"] .card,
+:root[data-theme="dark"] .list-group-item {
+  color: var(--body-text);
+  background-color: var(--surface-muted);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .dropdown-item {
+  color: var(--body-text);
+}
+
+:root[data-theme="dark"] .dropdown-item:hover,
+:root[data-theme="dark"] .dropdown-item:focus {
+  color: var(--control-text);
+  background-color: var(--page-bg);
+}
+
+:root[data-theme="dark"] .dropdown-divider,
+:root[data-theme="dark"] .modal-header,
+:root[data-theme="dark"] .modal-footer,
+:root[data-theme="dark"] .card-header,
+:root[data-theme="dark"] .card-footer {
+  border-color: var(--border-subtle);
+}
+
+/* --- navigation -------------------------------------------------------------- */
+
+:root[data-theme="dark"] .navbar-light .navbar-nav .nav-link {
+  color: var(--body-text);
+}
+
+:root[data-theme="dark"] .navbar-light .navbar-nav .nav-link.disabled {
+  color: var(--muted-text);
+}
+
+:root[data-theme="dark"] .navbar-light .navbar-toggler {
+  color: var(--body-text);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .navbar-light .navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28222, 226, 230, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+:root[data-theme="dark"] .nav-tabs {
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .nav-tabs .nav-link.active,
+:root[data-theme="dark"] .nav-tabs .nav-item.show .nav-link {
+  color: var(--control-text);
+  background-color: var(--surface-muted);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .nav-tabs .nav-link:hover,
+:root[data-theme="dark"] .nav-tabs .nav-link:focus {
+  border-color: var(--border-subtle);
+}
+
+/* --- pagination -------------------------------------------------------------- */
+
+:root[data-theme="dark"] .page-link {
+  background-color: var(--surface-muted);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .page-item.disabled .page-link {
+  color: var(--muted-text);
+  background-color: var(--page-bg);
+  border-color: var(--border-subtle);
+}
+
+/* --- accordions -------------------------------------------------------------- */
+
+:root[data-theme="dark"] .accordion-item,
+:root[data-theme="dark"] .accordion-body,
+:root[data-theme="dark"] .accordion-collapse {
+  color: var(--body-text);
+  background-color: var(--page-bg);
+  border-color: var(--border-subtle);
+}
+
+/* the chevron is a data URI, as on .form-select, but here it is a pseudo-element
+   whose only content is the icon - so the box can simply be inverted */
+:root[data-theme="dark"] .accordion-button::after {
+  filter: invert(1);
+}
+
+/* --- alerts ------------------------------------------------------------------ */
+
+:root[data-theme="dark"] .alert-danger {
+  color: #f8b6b6;
+  background-color: #3d1f22;
+  border-color: #5c2b2f;
+}
+
+:root[data-theme="dark"] .alert-warning {
+  color: #ffd97d;
+  background-color: #3d3320;
+  border-color: #5c4c2b;
+}
+
+:root[data-theme="dark"] .alert-success {
+  color: #9fdfb4;
+  background-color: #1d3326;
+  border-color: #2b4c37;
+}
+
+:root[data-theme="dark"] .alert-info {
+  color: #9adcea;
+  background-color: #16323a;
+  border-color: #224a55;
+}
+
+/* --- utilities the templates use --------------------------------------------- */
+
+:root[data-theme="dark"] .text-muted {
+  color: var(--muted-text) !important;
+}
+
+:root[data-theme="dark"] .bg-light {
+  background-color: var(--surface-muted) !important;
+}
+
+:root[data-theme="dark"] .border {
+  border-color: var(--border-subtle) !important;
+}
+
+/* --- the two logos in the navbar --------------------------------------------- */
+
+/* the MCRIT wordmark is pure black on a transparent ground, so inverting it is
+   exact: it comes out pure white and there is no hue to distort */
+:root[data-theme="dark"] .navbar-brand img {
+  filter: invert(1);
+}
+
+/* the Fraunhofer mark is not ours to recolour - the green is part of it - so it
+   keeps the light ground it was drawn for rather than being filtered */
+:root[data-theme="dark"] .navbar .right-logo {
+  padding: 4px 8px;
+  background: #fff;
+  border-radius: 4px;
+}
+
+/* --- jQuery-UI: the search autocomplete -------------------------------------- */
+
+:root[data-theme="dark"] .ui-widget-content,
+:root[data-theme="dark"] .ui-widget.ui-widget-content {
+  color: var(--body-text);
+  background: var(--surface-muted);
+  border-color: var(--border-subtle);
+}
+
+:root[data-theme="dark"] .ui-menu .ui-menu-item-wrapper.ui-state-active,
+:root[data-theme="dark"] .ui-state-active,
+:root[data-theme="dark"] .ui-widget-content .ui-state-active {
+  color: var(--control-text);
+  background: var(--page-bg);
+  border-color: var(--accent);
+}
+
+/* --- DataTables -------------------------------------------------------------- */
+
+:root[data-theme="dark"] .dataTables_wrapper .dataTables_length,
+:root[data-theme="dark"] .dataTables_wrapper .dataTables_filter,
+:root[data-theme="dark"] .dataTables_wrapper .dataTables_info,
+:root[data-theme="dark"] .dataTables_wrapper .dataTables_processing,
+:root[data-theme="dark"] .dataTables_wrapper .dataTables_paginate {
+  color: var(--body-text);
+}
+
+/* --- Dropzone ---------------------------------------------------------------- */
+
+:root[data-theme="dark"] .dropzone .dz-message,
+:root[data-theme="dark"] .dropzone .dz-preview .dz-details {
+  color: var(--body-text);
+}
+
+:root[data-theme="dark"] .dropzone .dz-preview .dz-image,
+:root[data-theme="dark"] .dropzone .dz-preview .dz-details {
+  background: var(--surface-muted);
+}

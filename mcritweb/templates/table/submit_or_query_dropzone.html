@@ -3,7 +3,7 @@
 
 {% macro submit_or_query_dropzone_js(select_form_type=False) %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
-{{ dropzone.style('border: 2px dashed black; margin: 30%; min-height: 200px;border-radius: 25px; background: rgb(240, 240, 240);') }}
+{{ dropzone.style('border: 2px dashed var(--dropzone-border); margin: 30%; min-height: 200px;border-radius: 25px; background: var(--surface-muted);') }}
 <script>
   function show_extended(x) {
     if (x.checked) {      

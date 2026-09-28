@@ -3,7 +3,7 @@ import os
 import re
 from urllib.parse import quote
 
-from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Blueprint, Response, current_app, flash, g, json, redirect, render_template, request, send_from_directory, session, url_for
 from mcrit.libs.utility import decode_two_complement
 from mcrit.queue.LocalQueue import Job
 from mcrit.queue.QueueRemoteCalls import to_binary as canonicalise_queue_json
@@ -91,18 +91,32 @@ def cache_result(app, job_info, matching_result):
             json.dump(matching_result, fout, indent=1)
 
 
+@bp.app_template_global()
+def diagram_filename(job_id, famid=None, samid=None, funid=None):
+    """The cached diagram for this job, filter and theme.
+
+    The templates used to build this name themselves, in four places; a diagram is
+    drawn on the ground of the theme that asked for it (#70), so the name now carries
+    that too and there is one place that knows how it is spelled. Diagrams are cached
+    and never invalidated, so a theme that did not reach the name would serve whoever
+    loaded the page first their palette, permanently.
+    """
+    filter_suffix = ""
+    if famid is not None:
+        filter_suffix = f"-famid_{famid}"
+    elif samid is not None:
+        filter_suffix = f"-samid_{samid}"
+    elif funid is not None:
+        filter_suffix = f"-funid_{funid}"
+    theme_suffix = "-dark" if g.theme == "dark" else ""
+    return job_id + filter_suffix + theme_suffix + ".png"
+
+
 def create_match_diagram(app, job_id, matching_result, filtered_family_id=None, filtered_sample_id=None, filtered_function_id=None):
     cache_path = os.sep.join([app.instance_path, "cache", "diagrams"])
-    filter_suffix = ""
-    if filtered_family_id is not None:
-        filter_suffix = f"-famid_{filtered_family_id}"
-    elif filtered_sample_id is not None:
-        filter_suffix = f"-samid_{filtered_sample_id}"
-    elif filtered_function_id is not None:
-        filter_suffix = f"-funid_{filtered_function_id}"
-    output_path = cache_path + os.sep + job_id + filter_suffix + ".png"
+    output_path = cache_path + os.sep + diagram_filename(job_id, famid=filtered_family_id, samid=filtered_sample_id, funid=filtered_function_id)
     if not os.path.isfile(output_path):
-        renderer = MatchReportRenderer()
+        renderer = MatchReportRenderer(g.theme)
         renderer.processReport(matching_result)
         image = renderer.renderStackedDiagram(filtered_family_id=filtered_family_id, filtered_sample_id=filtered_sample_id, filtered_function_id=filtered_function_id)
         image.save(output_path)
@@ -642,7 +656,7 @@ def name_query_sample(job_info, matching_result: MatchingResult):
 
 def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult):
     name_query_sample(job_info, matching_result)
-    score_color_provider = ScoreColorProvider()
+    score_color_provider = ScoreColorProvider(g.theme)
     filtered_family_id = parse_integer_query_param(request, "famid")
     filtered_sample_id = parse_integer_query_param(request, "samid")
     filtered_function_id = parse_integer_query_param(request, "funid")
@@ -928,7 +942,7 @@ def linkhunt(job_id):
 def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
     name_query_sample(job_info, matching_result)
     client = get_client()
-    score_color_provider = ScoreColorProvider()
+    score_color_provider = ScoreColorProvider(g.theme)
     # generic filtering of function results
     filter_action = parse_str_query_param(request, "filter_button_action")
     filter_min_score = parse_integer_query_param(request, "filter_min_score")

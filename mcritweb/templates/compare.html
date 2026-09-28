@@ -19,7 +19,7 @@ $(document).ready(function(){
   for (var i = 0; i < table.length; i++) {
     if ($(table.item(i)).children("th.sample-id").text()==selected){
       selected_column = table.item(i);
-      table.item(i).style.backgroundColor = "rgb(240, 240, 240)";
+      table.item(i).classList.add("row-pending");
     }
   }
 
@@ -27,19 +27,22 @@ $(document).ready(function(){
   if (selected_column === null && table.length > 0) {
     selected_column = table.item(0);
     selected = $(selected_column).children("th.sample-id").text();
-    selected_column.style.backgroundColor = "rgb(240, 240, 240)";
+    selected_column.classList.add("row-pending");
     document.getElementById("button_match").style.display = "initial";
   }
 
+  // The tint is `tr.row-pending` in style.css, not a colour written here: a literal
+  // renders the same on a dark page as on a light one, and "white" is not what an
+  // unselected row is - it is whatever the theme paints behind it. See #70.
   $("tr.parent_table_sample").click(function(){
     if (selected_column === null) {
       document.getElementById("button_match").style.display = "initial";
     } else {
-      selected_column.style.backgroundColor = "white";
+      selected_column.classList.remove("row-pending");
     }
     selected_column = this;
     selected = $(selected_column).children("th.sample-id").text();
-    this.style.backgroundColor = "rgb(240, 240, 240)";
+    this.classList.add("row-pending");
   });
 
   $('#compare_search_form').submit(function(eventObj) {

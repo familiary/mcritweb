@@ -1,6 +1,70 @@
+/* The palette. Every colour this stylesheet paints is declared here once and
+   referenced by role below, so the whole scheme is readable in one place.
+
+   `:root` carries the light palette; the block at the bottom of this file
+   redefines the same names for `data-theme="dark"`, which `base.html` writes onto
+   <html> from the user's stored preference (#70). Vendored Bootstrap 5.0.2 predates
+   `data-bs-theme` and paints its components with literals, so the rules that push
+   those onto this palette live in `theme-dark.css`, which loads last. */
+:root {
+    /* the ground the page is painted on */
+    --page-bg: white;
+    /* the project accent: headings, links, rules, the flash outline */
+    --accent: #377ba8;
+    /* the grey chrome behind nav, table heads, accordions and active controls.
+       Their borders take it too, so the border matches the fill. */
+    --surface-muted: rgb(240, 240, 240);
+    /* text pinned to full contrast on top of that chrome and on top of a
+       score-tinted table cell, over Bootstrap's own */
+    --control-text: black;
+    /* the ring the accordion paints in place of Bootstrap's focus ring */
+    --focus-ring: #FFF;
+    /* the rule under a section header */
+    --header-rule: lightgray;
+    /* the flash notice; its border is the accent */
+    --flash-bg: #cae6f6;
+    /* de-emphasised body text */
+    --muted-text: slategray;
+    /* a destructive input */
+    --danger-text: #cc2f2e;
+    /* the sortable-column indicators */
+    --sort-indicator-idle: rgba(0, 0, 0, 0.3);
+    --sort-indicator-active: rgba(0, 0, 0, 1);
+    /* boxes in the rendered user manual, and the rule under a code block or a
+       panel inset into the page */
+    --border-subtle: rgb(222, 226, 230);
+    /* a panel a shade off the page: manual code blocks, the settings drag columns */
+    --surface-subtle: rgb(248, 249, 250);
+
+    /* --- named for the templates, which used to spell these out inline --------- */
+    /* Bootstrap's body colour, for anything that has to state it rather than
+       inherit it */
+    --body-text: #212529;
+    /* a plain hyperlink that is not the project accent - the empty-table prompts
+       carry Bootstrap's link blue */
+    --link-color: #0d6efd;
+    /* the tick / cross pair marking a boolean column */
+    --status-yes: green;
+    --status-no: darkred;
+    /* a sample picker row already in the comparison; the already-computed and the
+       just-clicked ones take --surface-muted. Both are applied by class, never
+       written into a style attribute - see `tr.row-selected` below. */
+    --row-selected-bg: yellowgreen;
+    /* the dashed drop target */
+    --dropzone-border: black;
+    /* the "rendering..." notice a CFG pane shows while its graph loads */
+    --spinner-text: #3f51b5;
+    /* a table that draws its own grid rather than Bootstrap's */
+    --rule-strong: #333;
+    /* the CFG loop-boundary legend keeps the graph's own fill, which is baked into
+       the renderer - only the text on it has to follow the theme */
+    --legend-loop-bg: #fdd0a2;
+    --legend-loop-text: inherit;
+}
+
 html {
     font-family: 'Roboto', sans-serif;
-    background: white;
+    background: var(--page-bg);
     padding: 1rem;
   }
   
@@ -9,27 +73,27 @@ html {
     max-width: 1824px;
     font-size: 0.9em;
     margin: 0 auto;
-    background: white;
+    background: var(--page-bg);
   }
   
   h1, h2, h3, h4, h5, h6 {
-    color: #377ba8;
+    color: var(--accent);
     margin: 1rem 0;
   }
   
   a {
-    color: #377ba8;
+    color: var(--accent);
   }
   
   hr {
     border: none;
-    border-top: 1px solid #377ba8;
+    border-top: 1px solid var(--accent);
   }
   
 
 
   nav {
-    background: rgb(240, 240, 240);
+    background: var(--surface-muted);
     display: flex;
     align-items: center;
     padding: 0 0.5rem;
@@ -62,7 +126,7 @@ html {
   }
   
   .content > header {
-    border-bottom: 1px solid lightgray;
+    border-bottom: 1px solid var(--header-rule);
     display: flex;
     align-items: flex-end;
   }
@@ -75,8 +139,8 @@ html {
   .flash {
     margin: 1em 0;
     padding: 1em;
-    background: #cae6f6;
-    border: 1px solid #377ba8;
+    background: var(--flash-bg);
+    border: 1px solid var(--accent);
   }
   
   .post > header {
@@ -95,7 +159,7 @@ html {
   }
   
   .post .about {
-    color: slategray;
+    color: var(--muted-text);
     font-style: italic;
   }
   
@@ -129,54 +193,65 @@ html {
   }
   
   input.danger {
-    color: #cc2f2e;
+    color: var(--danger-text);
   }
   
   input[type=submit] {
     align-self: start;
     min-width: 10em;
   }
-  .nav-pills .nav-link.active { background-color: rgb(240, 240, 240); color:black}
-  .nav-pills .nav-link{color:black}
-  .thead-light { background-color: rgb(240, 240, 240); color:black}
+  .nav-pills .nav-link.active { background-color: var(--surface-muted); color:var(--control-text)}
+  .nav-pills .nav-link{color:var(--control-text)}
+  .thead-light { background-color: var(--surface-muted); color:var(--control-text)}
+
+  /* The three sample pickers under /analyze (compare, 1 vs 1, cross compare) mark
+     each row's state here rather than by writing a colour into its style attribute.
+     The scripts on those pages have to read the state back to toggle it, and a
+     colour they can compare against is a colour the theme cannot change: cross
+     compare's handler tested `style.backgroundColor != "yellowgreen"` and so pinned
+     both tints to the light palette. They toggle the class instead - #70.
+     Bootstrap leaves `--bs-table-bg` transparent, so a background on the row shows
+     through its cells; `.table-hover`'s tint is painted over this, not instead. */
+  tr.row-selected { background-color: var(--row-selected-bg); }
+  tr.row-pending  { background-color: var(--surface-muted); }
  a > * {
     pointer-events: none;
   }
 
   .accordion-button:link, .accordion-button:visited, .accordion-button:hover, .accordion-button:active  {
-    background-color: rgb(240, 240, 240)!important;
-      color:black !important;
+    background-color: var(--surface-muted)!important;
+      color:var(--control-text) !important;
       text-decoration: none !important;
-         border-color: rgb(240, 240, 240) !important;
+         border-color: var(--surface-muted) !important;
       box-shadow: 0px !important;   
   }
 
   .accordion-button:focus {
     z-index: 3;
-    border-color: rgb(240, 240, 240)!important;
+    border-color: var(--surface-muted)!important;
     outline: 0;
-    box-shadow: 0 0 0 .25rem #FFF !important;
+    box-shadow: 0 0 0 .25rem var(--focus-ring) !important;
   }
   .accordion-button:not(.collapsed) {
-    color:black  !important;
-    background-color: rgb(240, 240, 240)!important;
-    border-color: rgb(240, 240, 240)!important;
+    color:var(--control-text)  !important;
+    background-color: var(--surface-muted)!important;
+    border-color: var(--surface-muted)!important;
   }
 
   .page-link {
-    color: black;
+    color: var(--control-text);
   }
   .page-item.active .page-link{ 
-    color:black;
-    background-color:rgb(240, 240, 240);
-    border-color:rgb(240, 240, 240)}
+    color:var(--control-text);
+    background-color:var(--surface-muted);
+    border-color:var(--surface-muted)}
 
   .fa-sort {
-    color: rgba(0, 0, 0, 0.3);
+    color: var(--sort-indicator-idle);
   }
 
   .fa-sort-up, .fa-sort-down {
-    color: rgba(0, 0, 0, 1);
+    color: var(--sort-indicator-active);
   }
 
   .pointer {
@@ -190,7 +265,7 @@ html {
     height: auto;
     display: block;
     margin: 1rem auto;
-    border: 1px solid rgb(222, 226, 230);
+    border: 1px solid var(--border-subtle);
     border-radius: 4px;
   }
 
@@ -202,12 +277,12 @@ html {
 
   .manual th, .manual td {
     padding: 0.5rem;
-    border: 1px solid rgb(222, 226, 230);
+    border: 1px solid var(--border-subtle);
   }
 
   .manual pre {
     padding: 0.75rem;
-    background-color: rgb(248, 249, 250);
+    background-color: var(--surface-subtle);
     border-radius: 4px;
     overflow-x: auto;
   }
@@ -215,12 +290,45 @@ html {
   .manual h1, .manual h2 {
     margin-top: 1.5rem;
     padding-bottom: 0.25rem;
-    border-bottom: 1px solid rgb(222, 226, 230);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .manual h3, .manual h4, .manual h5 {
     margin-top: 1.25rem;
   }
+
+/* The dark palette. Only the names above are redefined - not one rule below `:root`
+   knows which theme it is painting. Selected on <html> server-side from the user's
+   profile, so there is no first paint in the wrong colours to hide. */
+:root[data-theme="dark"] {
+    /* tells the engine to paint the form widgets, scrollbars and caret it owns in
+       their dark variants - the one part of the page CSS cannot reach */
+    color-scheme: dark;
+
+    --page-bg: #1a1d20;
+    --accent: #7db8e0;
+    --surface-muted: #2b3035;
+    --control-text: #f1f3f5;
+    --focus-ring: #495057;
+    --header-rule: #3a4046;
+    --flash-bg: #12313f;
+    --muted-text: #9aa5b1;
+    --danger-text: #ff7b7a;
+    --sort-indicator-idle: rgba(255, 255, 255, 0.35);
+    --sort-indicator-active: rgba(255, 255, 255, 1);
+    --border-subtle: #3a4046;
+    --surface-subtle: #24282c;
+
+    --body-text: #dee2e6;
+    --link-color: #6ea8fe;
+    --status-yes: #5dd47f;
+    --status-no: #ff7b7a;
+    --row-selected-bg: #4a6b1f;
+    --dropzone-border: #6c757d;
+    --spinner-text: #8c9eff;
+    --rule-strong: #495057;
+    --legend-loop-text: #000;
+}
 
 /* Issue #52. Both of these are sized by their content, so a narrow viewport wraps
    them and the row grows a second line for no information:

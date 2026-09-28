@@ -46,6 +46,22 @@ EDGE_COLOR_BOTH = "#000000"
 EDGE_COLOR_ONLY_A = "#d62728"
 EDGE_COLOR_ONLY_B = "#7b2cbf"
 
+#: What the legend under a CFG draws its swatches with: the constants above, so the
+#: legend and the graph it explains cannot disagree. These are data colours - the same
+#: in every theme - so they are handed to the template (mcritweb/__init__.py) rather
+#: than named a second time in static/style.css, where a copy could drift.
+CFG_LEGEND_COLORS = {
+    "full_picblock": COLOR_FULL_PICBLOCK_MATCH,
+    "adhoc_picblock": COLOR_ADHOC_PICBLOCK_MATCH,
+    "escaped": COLOR_ESCAPED_MATCH,
+    "levenshtein": [LEVENSHTEIN_COLORS[distance] for distance in sorted(LEVENSHTEIN_COLORS)],
+    "unmatched": COLOR_UNMATCHED,
+    "only_in_b": COLOR_ONLY_IN_B,
+    "edge_both": EDGE_COLOR_BOTH,
+    "edge_only_a": EDGE_COLOR_ONLY_A,
+    "edge_only_b": EDGE_COLOR_ONLY_B,
+}
+
 
 def node_id(offset):
     return f"Node0x{offset:x}"

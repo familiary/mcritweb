@@ -414,3 +414,7 @@ Additionally, users with level contributor and above can also change their usern
 All users with level visitor or above can also set a number of filter preferences, that are automatically applied to all matching results.
 
 ![An example for the user filter preferences](images/pref_filter.png "An example for the user filter preferences")
+
+The "Change theme" tab switches between the light and the dark colour scheme.
+The choice is stored with the account and applied while a page is rendered, so it takes effect on the next page you open and follows you to any browser you log in from.
+Pages you see before logging in, such as the login form itself, are always shown in the light scheme.

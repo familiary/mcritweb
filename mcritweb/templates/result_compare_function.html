@@ -26,7 +26,7 @@ Results for Job: {{ job_info.job_id }}
 {% if not matching_result.is_query %}
 <h3>MCRIT Diagram</h3>
 <p>Showing: foreign family match frequency, library matches, best foreign family match scores.</p>
-<img src="{{ url_for('data.diagram_file', filename=job_info.job_id + '-funid_%d' % funid + '.png') }}" class="img-fluid" />
+<img src="{{ url_for('data.diagram_file', filename=diagram_filename(job_info.job_id, funid=funid)) }}" class="img-fluid" />
 {% endif %}
 
 <h3 id="function-matches">Matches for Function: {{ funid }}</h3>
@@ -95,13 +95,13 @@ Results for Job: {{ job_info.job_id }}
       {% elif column_type == "best_score" %}
       <td style="text-align: right;" valign="middle">{{ "%d"|format(matched_function.matched_score) }}</td>
       {% elif column_type == "is_minhash_match" %}
-      <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_minhash %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+      <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_minhash %} style="color:var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color:var(--status-no);" class="fa-solid fa-times-circle"> {% endif %}</i></td>
       {% elif column_type == "is_pichash_match" %}
-      <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_pichash %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+      <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_pichash %} style="color:var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color:var(--status-no);" class="fa-solid fa-times-circle"> {% endif %}</i></td>
       {% elif column_type == "is_library_match" %}
-      <td style="text-align: center;" valign="middle"><i {% if matching_result.hasLibraryMatch(matched_function.function_id) %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+      <td style="text-align: center;" valign="middle"><i {% if matching_result.hasLibraryMatch(matched_function.function_id) %} style="color:var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color:var(--status-no);" class="fa-solid fa-times-circle"> {% endif %}</i></td>
       {% elif column_type == "is_unique_match" %}
-      <td style="text-align: center;" valign="middle"><i {% if matching_result.getFamilyIdsMatchedByFunctionId(matched_function.function_id)|length == 1 %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+      <td style="text-align: center;" valign="middle"><i {% if matching_result.getFamilyIdsMatchedByFunctionId(matched_function.function_id)|length == 1 %} style="color:var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color:var(--status-no);" class="fa-solid fa-times-circle"> {% endif %}</i></td>
       {% endif %}
       {% endfor %}
    </tr>

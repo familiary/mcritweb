@@ -9,7 +9,7 @@ from flask import Blueprint, abort, current_app, flash, g, redirect, render_temp
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, utc_now
+from mcritweb.db import DEFAULT_THEME, ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, utc_now
 from mcritweb.views.utility import get_session_user_id
 
 bp = Blueprint('authentication', __name__, url_prefix='/')
@@ -298,6 +298,10 @@ def load_logged_in_user():
     else:
         user_info = UserInfo.fromDb(user_id=user_id)
         g.user = user_info
+    # the palette every template renders against. Resolved once here rather than read
+    # off g.user in base.html, because the pages a logged-out caller sees - login,
+    # register, the index - still have to name a theme (#70).
+    g.theme = g.user.theme if g.user is not None else DEFAULT_THEME
 
 
 def login_required(view):

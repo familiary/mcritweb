@@ -65,16 +65,16 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
 {# the colour key of the block matching in views/functiondiff.py #}
 {% macro cfg_legend(combined=False) %}
   <span class="cfg-legend" style="font-size: 0.85em;">
-    <span class="swatch" style="background:#00DDFF"></span>PicBlockHash (indexed)
-    <span class="swatch" style="background:#C0F4FF"></span>PicBlockHash (ad-hoc)
-    <span class="swatch" style="background:#00ff00"></span>escaped instructions
-    <span class="swatch" style="background:#40ff40"></span><span class="swatch" style="background:#c0ff80; margin-left:0"></span><span class="swatch" style="background:#FFFF40; margin-left:0"></span><span class="swatch" style="background:#FFCC40; margin-left:0"></span>edit distance 0-3
-    <span class="swatch" style="background:#FFA0A0"></span>{% if combined %}only in A{% else %}unmatched{% endif %}
+    <span class="swatch" style="background:{{ cfg_colors.full_picblock }}"></span>PicBlockHash (indexed)
+    <span class="swatch" style="background:{{ cfg_colors.adhoc_picblock }}"></span>PicBlockHash (ad-hoc)
+    <span class="swatch" style="background:{{ cfg_colors.escaped }}"></span>escaped instructions
+    <span class="swatch" style="background:{{ cfg_colors.levenshtein[0] }}"></span><span class="swatch" style="background:{{ cfg_colors.levenshtein[1] }}; margin-left:0"></span><span class="swatch" style="background:{{ cfg_colors.levenshtein[2] }}; margin-left:0"></span><span class="swatch" style="background:{{ cfg_colors.levenshtein[3] }}; margin-left:0"></span>edit distance 0-3
+    <span class="swatch" style="background:{{ cfg_colors.unmatched }}"></span>{% if combined %}only in A{% else %}unmatched{% endif %}
     {% if combined %}
-    <span class="swatch" style="background:#D0B0FF"></span>only in B
-    <span class="edge-swatch" style="border-color:#000"></span>edge in both
-    <span class="edge-swatch" style="border-color:#d62728; border-top-style: dashed;"></span>edge only in A
-    <span class="edge-swatch" style="border-color:#7b2cbf; border-top-style: dashed;"></span>edge only in B
+    <span class="swatch" style="background:{{ cfg_colors.only_in_b }}"></span>only in B
+    <span class="edge-swatch" style="border-color:{{ cfg_colors.edge_both }}"></span>edge in both
+    <span class="edge-swatch" style="border-color:{{ cfg_colors.edge_only_a }}; border-top-style: dashed;"></span>edge only in A
+    <span class="edge-swatch" style="border-color:{{ cfg_colors.edge_only_b }}; border-top-style: dashed;"></span>edge only in B
     {% endif %}
   </span>
 {% endmacro %}
@@ -90,7 +90,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
   {% if function_entry.minhash|length > 0 %}
     {% set num_slots = function_entry.minhash|length // 4 %}
     <p class="mb-1">
-      <i style="color:green;" class="fa-solid fa-square-check"></i>
+      <i style="color:var(--status-yes);" class="fa-solid fa-square-check"></i>
       MinHash available, {{ num_slots }} x 32 bit:
     </p>
     <div class="font-monospace" style="word-break: break-all; font-size: 0.85em;">{{ function_entry.minhash.hex() }} {{ clipboard_btn(function_entry.minhash.hex()) }}</div>
@@ -117,11 +117,11 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
         </tbody>
       </table>
     {% else %}
-      <p class="mt-2 mb-0" style="color: grey; font-size: 0.9em;">No shingle composition recorded (the backend tracks it only with <code>MINHASH_TRACK_SHINGLES</code>).</p>
+      <p class="mt-2 mb-0" style="color:var(--muted-text); font-size: 0.9em;">No shingle composition recorded (the backend tracks it only with <code>MINHASH_TRACK_SHINGLES</code>).</p>
     {% endif %}
   {% else %}
     <p class="mb-0">
-      <i style="color:darkred;" class="fa-solid fa-times-circle"></i>
+      <i style="color:var(--status-no);" class="fa-solid fa-times-circle"></i>
       No MinHash - the function is below the size threshold for minhashing, or the MinHash job has not run yet. Only PicHash matching applies.
     </p>
   {% endif %}

@@ -1,6 +1,9 @@
 {% from 'table/submit_or_query_dropzone.html' import submit_or_query_dropzone, submit_or_query_dropzone_js with context%}
 {% from 'table/links.html' import clipboard_btn, clipboard_js %}
 <!doctype html>
+{# the theme is a stored profile setting, so it is decided here rather than by a
+   script after load - nothing flashes in the wrong palette. See issue #70. #}
+<html data-theme="{{ g.theme }}">
 <head>
   <title>{% block title %}{% endblock %} - MCRIT Web</title>
   {# how scripts reach the CSRF token - forms carry it as a hidden input instead #}
@@ -28,6 +31,9 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='hint.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='jquery-ui.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='dataTables.bootstrap5.min.css') }}">
+  {# last, so its rules outrank every vendored stylesheet above; inert unless
+     data-theme is "dark" #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='theme-dark.css') }}">
   <script src="{{ url_for('static', filename='jquery.js') }}"></script>
   <script src="{{ url_for('static', filename='jquery.dataTables.min.js') }}"></script>
   <script src="{{ url_for('static', filename='dataTables.bootstrap5.min.js') }}"></script>

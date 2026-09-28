@@ -129,7 +129,7 @@ Sample: {{ entry.sample_id }}
         <div class="btn-group dropdown">
           <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="button_sample_analyze" onclick=set_analyze_sample_button_clicked() bs-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
             {% if job_collection.getJobsForSample(entry.sample_id, matching_only=True) %}
-            <i style="color:green;" class="fa-solid fa-flask"></i>&nbsp;{{ job_collection.getJobsForSample(entry.sample_id, matching_only=True) | length}}
+            <i style="color:var(--status-yes);" class="fa-solid fa-flask"></i>&nbsp;{{ job_collection.getJobsForSample(entry.sample_id, matching_only=True) | length}}
             {% else %}
             <i class="fa-solid fa-flask"></i>
             {% endif %}

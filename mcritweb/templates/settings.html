@@ -10,7 +10,7 @@ Settings
     .list-group.col {
         min-height: 50px;
         padding: 5px;
-        background-color: #f8f9fa;
+        background-color: var(--surface-subtle);
         border-radius: 5px;
     }
 </style>
@@ -35,6 +35,9 @@ Settings
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="pills-column-settings-tab" data-bs-toggle="pill" data-bs-target="#pills-column-settings" type="button" role="tab" aria-controls="pills-column-settings" aria-selected="false">Change table column settings</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="pills-theme-tab" data-bs-toggle="pill" data-bs-target="#pills-theme" type="button" role="tab" aria-controls="pills-theme" aria-selected="false">Change theme</button>
   </li>
 </ul>
 <div class="tab-content" id="pills-tabContent">
@@ -131,6 +134,23 @@ Settings
           <input class="col-4" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" aria-describedby="filter_exclude_library" {% if user_filters.filter_exclude_library %}checked{% endif %}>
           <label class="col-8" for="block_count">exclude PIC hits</label>
           <input class="col-4" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" aria-describedby="filter_exclude_pic" {% if user_filters.filter_exclude_pic %}checked{% endif %}>
+        </div>
+        <button type="submit" class="btn btn-primary">Confirm change</button>
+    </form>
+  </div>
+  <div class="tab-pane fade" id="pills-theme" role="tabpanel" aria-labelledby="pills-theme-tab">
+    <form action="{{ url_for('admin.change_theme') }}" method='post'>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group row text-start">
+          <p>The theme is applied when a page is rendered, so it takes effect on the next page you open.</p>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="theme" id="theme_light" value="light" {% if user_info.theme != 'dark' %}checked{% endif %}>
+            <label class="form-check-label" for="theme_light">Light</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="theme" id="theme_dark" value="dark" {% if user_info.theme == 'dark' %}checked{% endif %}>
+            <label class="form-check-label" for="theme_dark">Dark</label>
+          </div>
         </div>
         <button type="submit" class="btn btn-primary">Confirm change</button>
     </form>

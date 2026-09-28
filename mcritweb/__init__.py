@@ -61,6 +61,7 @@ def create_app(test_config=None, instance_path=None):
     from .secret_key import INSECURE_DEFAULT, load_or_create_secret_key
     from .views import administration, analyze, api, authentication, data, explore
     from .views.client import get_client
+    from .views.functiondiff import CFG_LEGEND_COLORS
     from .views.params import get_minhash_matching_label
     from .views.utility import ensure_local_data_paths, get_mcritweb_version_from_setup
 
@@ -258,6 +259,10 @@ def create_app(test_config=None, instance_path=None):
     @app.template_global()
     def minhash_matching_label(job_info):
         return get_minhash_matching_label(job_info)
+
+    # the colours the CFG legend explains, taken from the constants the graph is painted
+    # with (views/functiondiff.py) so the two cannot drift apart
+    app.add_template_global(CFG_LEGEND_COLORS, "cfg_colors")
 
     # the user manual. Public, and deliberately not under /admin: it was the only
     # route in that blueprint without an admin gate, which made the prefix a lie.

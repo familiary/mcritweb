@@ -101,7 +101,7 @@
     {% elif column_type == "num_functions" %}
       <td align="right" valign="middle">{{ "%d"|format(family.num_functions) }}</td>
     {% elif column_type == "is_library" %}
-      <td align="center" valign="middle"><i {% if family.is_library %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+      <td align="center" valign="middle"><i {% if family.is_library %} style="color:var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color:var(--status-no);" class="fa-solid fa-times-circle"> {% endif %}</i></td>
     {% endif %}
   {% endfor %}
     <td align="center" valign="middle" class="buttons">

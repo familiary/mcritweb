@@ -34,7 +34,7 @@
   {% if jobs %}
   {{ _table_base(jobs, job_header, job_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("analyze.compare") }}' style="color: #0d6efd; text-decoration: underline;" >No jobs available. Click here to create your first job</a></center>
+  <center><a href='{{ url_for("analyze.compare") }}' style="color: var(--link-color); text-decoration: underline;" >No jobs available. Click here to create your first job</a></center>
   {% endif %}
 {% endmacro %}
 
@@ -42,7 +42,7 @@
   {% if jobs %}
   {{ _half_table_base(jobs, minijob_header, minijob_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("analyze.compare") }}' style="color: #0d6efd; text-decoration: underline;" >No jobs available. Click here to create your first job</a></center>
+  <center><a href='{{ url_for("analyze.compare") }}' style="color: var(--link-color); text-decoration: underline;" >No jobs available. Click here to create your first job</a></center>
   {% endif %}
 {% endmacro %}
 
@@ -104,7 +104,7 @@
   </script>
   {{ _table_base(families, family_header, family_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No families available. Click here to upload your first sample</a></center>
+  <center><a href='{{ url_for("data.submit") }}' style="color: var(--link-color); text-decoration: underline;" >No families available. Click here to upload your first sample</a></center>
   {% endif %}
 {% endmacro %}
 
@@ -112,7 +112,7 @@
   {% if functions %}
   {{ _table_base(functions, function_header, function_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No functions available. Click here to upload your first sample</a></center>
+  <center><a href='{{ url_for("data.submit") }}' style="color: var(--link-color); text-decoration: underline;" >No functions available. Click here to upload your first sample</a></center>
   {% endif %}
 {% endmacro %}
 
@@ -169,7 +169,7 @@
   </script>
   {{ _table_base(samples, sample_header, sample_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  <center><a href='{{ url_for("data.submit") }}' style="color: var(--link-color); text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
   {% endif %}
 {% endmacro %}
 
@@ -177,6 +177,6 @@
   {% if samples %}
   {{ _half_table_base(samples, minisample_header, minisample_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  <center><a href='{{ url_for("data.submit") }}' style="color: var(--link-color); text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
   {% endif %}
 {% endmacro %}

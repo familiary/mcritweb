@@ -22,10 +22,10 @@ Unique Blocks
       }
       var position = selected.indexOf(id);
       if (position == -1) {
-        this.style.backgroundColor = "rgb(240, 240, 240)";
+        this.classList.add("row-pending");
         selected.push(id);
       } else {
-        this.style.backgroundColor = "white";
+        this.classList.remove("row-pending");
         selected.splice(position, 1);
       }
     });
@@ -125,7 +125,7 @@ Unique Blocks
         <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
         <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
         {% endif %}
-        <td valign="middle"><a style="color: black;" onclick="deleteSample(this)"><i class="fa-solid fa-xmark"></i></a></td>
+        <td valign="middle"><a style="color:var(--control-text);" onclick="deleteSample(this)"><i class="fa-solid fa-xmark"></i></a></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -152,7 +152,7 @@ Unique Blocks
       </thead>
       <tbody>
         {% for sample in samples %}
-        <tr {% if sample.sample_id in selected_ids %} style="background-color: yellowgreen;"{% endif %}class="parent">
+        <tr class="parent{% if sample.sample_id in selected_ids %} row-selected{% endif %}">
           <th align="right" valign="middle" scope="row" class="id">{{ "%d"|format(sample.sample_id) }}</th>
           <td align="right" valign="middle" class="font-monospace">{{ sample.getShortSha256() }}</td>
           <td valign="middle">{{ sample.family }}</td>
@@ -173,7 +173,7 @@ Unique Blocks
       {% endif %}
     </center>
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  <center><a href='{{ url_for("data.submit") }}' style="color:var(--link-color); text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
 {% endif %}
 </div>
 {% endblock %}

@@ -1,7 +1,7 @@
 {% from 'table/compare_nav.html' import compare_nav %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% from 'table/sample_row.html' import sample_header %}
-{% from 'table/row_decoration.html' import row_tint %}
+{% from 'table/row_decoration.html' import row_tint_class %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -15,15 +15,19 @@ Compare
   var selected = {{ cached|tojson }};
   console.log(selected)
   $(document).ready(function(){
+    // A row already in the comparison is not toggled here - it is dropped with the
+    // "x" beside it instead. That used to be recognised by comparing the row's
+    // background against the literal "yellowgreen", which is why neither tint could
+    // follow the theme; the state is a class now, and the class is what is read.
     $("tr.parent").click(function(){
-      if(this.style.backgroundColor != "yellowgreen")
+      if(!this.classList.contains("row-selected"))
       {
         if(selected.indexOf($(this).children("th.id").text()) == -1){
-        this.style.backgroundColor = "rgb(240, 240, 240)";
+        this.classList.add("row-pending");
         selected.push($(this).children("th.id").text());
         }
         else{
-          this.style.backgroundColor = "white";
+          this.classList.remove("row-pending");
           const pos = selected.indexOf($(this).children("th.id").text());
           console.log(pos);
           if(pos == 0){
@@ -144,7 +148,7 @@ function handleSliderChange(val) {
         <td valign="middle">{{ sample.getShortFilename() }}</td>
         <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
         <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
-        <td valign="middle"><a style="color: black;" onclick="deleteSample(this)"><i class="fa-solid fa-xmark"></i></a></td>
+        <td valign="middle"><a style="color: var(--control-text);" onclick="deleteSample(this)"><i class="fa-solid fa-xmark"></i></a></td>
 
       </tr>
       {% endfor %}
@@ -172,7 +176,9 @@ function handleSliderChange(val) {
       </thead>
       <tbody>
         {% for sample in samples %}
-        <tr{{ row_tint(row_decorations, sample.sample_id) }} class="parent">
+        {# the view decides a row's state (selected wins over already computed) and
+           the class carries it, which is also what the click handler reads #}
+        <tr class="parent{{ row_tint_class(row_decorations, sample.sample_id) }}">
           <th align="right" valign="middle" scope="row" class="id">{{ "%d"|format(sample.sample_id) }}</th>
           <td align="right" valign="middle" class="font-monospace">{{ sample.getShortSha256() }}</td>
           <td valign="middle">{{ sample.family }}</td>
@@ -222,7 +228,7 @@ function handleSliderChange(val) {
       {% endif %}
   </center>
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  <center><a href='{{ url_for("data.submit") }}' style="color: var(--link-color); text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
 {% endif %}
 </div>
 {% endblock %}

@@ -53,6 +53,31 @@ def test_linkhunt_renders_for_every_matching_report(client, as_role, report):
     assert response.status_code == 200
 
 
+def test_the_match_diagram_is_cached_per_theme(app, client, as_role):
+    """Diagrams are rendered once into instance/cache/diagrams and never invalidated,
+    so the theme has to be part of the name (#70) - otherwise whichever palette
+    reached a job first is the palette everyone gets for it, permanently."""
+    from mcritweb.db import UserInfo
+
+    user_id = as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+
+    light = client.get(f"/data/result/{job_id}").get_data(as_text=True)
+    assert f"{job_id}.png" in light
+    assert "-dark.png" not in light
+
+    with app.app_context():
+        user_info = UserInfo.fromDb(user_id=user_id)
+        user_info.theme = "dark"
+        user_info.saveToDb()
+
+    dark = client.get(f"/data/result/{job_id}").get_data(as_text=True)
+    assert f"{job_id}-dark.png" in dark
+    # both are on disk, so switching back does not re-render or serve the other one
+    assert client.get(f"/data/diagrams/{job_id}-dark.png").status_code == 200
+    assert client.get(f"/data/diagrams/{job_id}.png").status_code == 200
+
+
 @pytest.mark.parametrize("report", ["cross_compare", "unique_blocks"])
 def test_linkhunt_reports_a_report_it_cannot_read_instead_of_500ing(client, as_role, report):
     """A job id is part of the URL, so any of them can be asked for a link hunt.

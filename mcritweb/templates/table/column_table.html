@@ -39,7 +39,7 @@
           <td valign="middle">
             {{ name_and_sample[1].version or "-" }} | 
             {{ name_and_sample[1].component or "-" }} | 
-            <i {% if name_and_sample[1].is_library %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+            <i {% if name_and_sample[1].is_library %} style="color:var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color:var(--status-no);" class="fa-solid fa-times-circle"> {% endif %}</i></td>
           {% else %}
           {# a query has none of these; an empty cell keeps the row aligned without
              claiming the queried binary is not a library, which we do not know #}
@@ -139,7 +139,7 @@
           {% for label_entry in name_fe_se_ph[1].function_labels|sort(attribute='timestamp', reverse=True) %}
             <p>
               {{ label_entry.function_label }}<br />
-              <span style="font-size: 0.7em; color: grey;">
+              <span style="font-size: 0.7em; color: var(--muted-text);">
                 {{ label_entry.username }} | {{ label_entry.timestamp }}
               </span>
             </p>
@@ -184,12 +184,12 @@
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">
             {% if name_fe_se_ph[1].minhash|length > 0 %}
-              <i style="color:green;" class="fa-solid fa-square-check" title="MinHash available"></i>
+              <i style="color:var(--status-yes);" class="fa-solid fa-square-check" title="MinHash available"></i>
               <span class="font-monospace">{{ name_fe_se_ph[1].minhash.hex()[:16] }}&hellip;</span> {{ clipboard_btn(name_fe_se_ph[1].minhash.hex()) }}
               ({{ name_fe_se_ph[1].minhash|length // 4 }} x 32 bit)
             {% else %}
-              <i style="color:darkred;" class="fa-solid fa-times-circle" title="No MinHash"></i> not calculated
-              <span style="font-size: 0.8em; color: grey;">(too small to be minhashed, or the MinHash job has not run yet)</span>
+              <i style="color:var(--status-no);" class="fa-solid fa-times-circle" title="No MinHash"></i> not calculated
+              <span style="font-size: 0.8em; color:var(--muted-text);">(too small to be minhashed, or the MinHash job has not run yet)</span>
             {% endif %}
           </td>
         {% endfor %}

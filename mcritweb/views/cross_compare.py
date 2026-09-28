@@ -6,6 +6,13 @@ def get_sample_to_job_id(job_info):
 
 
 def score_to_color(score):
+    """The cross-compare matrix cell for a score, as six hex digits.
+
+    Unlike ScoreColorProvider this needs no per-theme variant: the hues are used at
+    full saturation rather than mixed into the page, so they carry the same weight on
+    either ground, and the two lowest steps are already near-black - which reads as
+    "nothing here" against a white page and against a dark one alike.
+    """
     if score >= 90:
         return "0080ff"  # dark blue
     elif score >= 80:

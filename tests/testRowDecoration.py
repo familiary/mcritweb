@@ -135,7 +135,8 @@ def test_a_tint_reaches_the_row_it_names(app, fake_mcrit, macro):
 
     rendered = render_table(app, macro, rows, row_decorations=decorations)
 
-    assert rendered.count('style="background-color: yellowgreen;"') == 1
+    # a palette name rather than a colour, so a theme reaches it (#70)
+    assert rendered.count('style="background-color: var(--row-selected-bg);"') == 1
 
 
 @pytest.mark.parametrize("macro", sorted(DECORATED_TABLES))
@@ -227,7 +228,9 @@ def test_cross_compare_tints_a_selected_row(client, as_role, fake_mcrit):
 
     page = client.get(f"/analyze/cross_compare?samples={sample.sample_id}").get_data(as_text=True)
 
-    assert '<tr style="background-color: yellowgreen;" class="parent">' in page
+    # as a class: the page's click handler reads the state back, and a class is
+    # something it can read in any theme (#70)
+    assert '<tr class="parent row-selected">' in page
 
 
 def test_cross_compare_tints_a_row_clicked_but_not_yet_added(client, as_role, fake_mcrit):
@@ -236,7 +239,7 @@ def test_cross_compare_tints_a_row_clicked_but_not_yet_added(client, as_role, fa
 
     page = client.get(f"/analyze/cross_compare?cache={sample.sample_id}").get_data(as_text=True)
 
-    assert '<tr style="background-color: rgb(240, 240, 240);" class="parent">' in page
+    assert '<tr class="parent row-pending">' in page
 
 
 def test_a_selected_row_that_is_also_cached_stays_green(client, as_role, fake_mcrit):
@@ -248,8 +251,8 @@ def test_a_selected_row_that_is_also_cached_stays_green(client, as_role, fake_mc
     page = client.get(
         f"/analyze/cross_compare?samples={sample.sample_id}&cache={sample.sample_id}").get_data(as_text=True)
 
-    assert '<tr style="background-color: yellowgreen;" class="parent">' in page
-    assert not any("rgb(240, 240, 240)" in tag for tag in row_tags(page))
+    assert '<tr class="parent row-selected">' in page
+    assert not any("row-pending" in tag for tag in row_tags(page))
 
 
 if __name__ == "__main__":
