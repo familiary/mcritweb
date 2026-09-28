@@ -61,6 +61,7 @@ def create_app(test_config=None, instance_path=None):
     from .secret_key import INSECURE_DEFAULT, load_or_create_secret_key
     from .views import administration, analyze, api, authentication, data, explore
     from .views.client import get_client
+    from .views.matching_statistics import matching_statistics
     from .views.params import get_minhash_matching_label
     from .views.utility import ensure_local_data_paths, get_mcritweb_version_from_setup
 
@@ -253,6 +254,10 @@ def create_app(test_config=None, instance_path=None):
     def join_hint_strings(list_of_strings):
         return "\n".join(sorted(list_of_strings))
 
+    # the backend's match_aggregation describes the whole job and is never revised by
+    # filtering, so a result page narrowed to one family or sample has to recompute it
+    # over the matches it is showing - see the module docstring and issue #38
+    app.add_template_global(matching_statistics, "matching_statistics")
     # a global rather than a template variable: the job table macro is reached from a
     # dozen templates, all of which would otherwise have to pass this through
     @app.template_global()

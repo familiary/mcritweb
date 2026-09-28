@@ -175,6 +175,6 @@ Results for Job: {{ job_info.job_id }}
 
 
 <h3>Matching Method Statistics </h3>
-{{ matching_statistics_table(matching_result.match_aggregation) }}
+{{ matching_statistics_table(matching_statistics(matching_result)) }}
 
 {% endblock %}
