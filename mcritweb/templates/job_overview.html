@@ -19,6 +19,20 @@ Overview for Job: {{ job_info.job_id }}
 
 {{ job_column_table(job_info, show_progress=True) }}
 
+{% if can_rerun %}
+  {# a write, so it posts rather than links - see static/post_action.js and issue #84 #}
+  <button type="button" class="btn btn-outline-dark btn-sm" data-post="{{ url_for('data.rerun_job_by_id', job_id=job_info.job_id) }}">
+    <i class="fa-solid fa-rotate-right"></i> Rerun job
+  </button>
+{% endif %}
+{% if configuration_url %}
+  {# unlike the rerun this queues nothing - it only reopens the form the job came from,
+     with the same samples and matching selected - so a plain link is right #}
+  <a class="btn btn-outline-dark btn-sm" href="{{ configuration_url }}">
+    <i class="fa-solid fa-sliders"></i> Modify configuration
+  </a>
+{% endif %}
+
 
 {# a shorter list on its own would misreport the job - a cross compare would look like
    it combined nothing - so say how many are gone rather than quietly leaving them out #}

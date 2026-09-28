@@ -385,6 +385,15 @@ In this section, you can view all of these jobs, categorized by their type.
 
 ![An example for the job queue](images/jobs.png "An example for the job queue")
 
+Selecting a job opens its own page, with its parameters, its progress and, once it has finished or failed, a link to its result.
+A matching job - 1vsN, 1vs1 or Cross-Compare - also offers a **Rerun job** button there, which submits the same comparison again with the same parameters and takes you to the new job.
+A rerun always recomputes: unlike following a comparison link a second time, it does not return the finished job you started from.
+Jobs that cannot be repeated from what they recorded do not offer the button - a Query, because the uploaded binary is no longer available to resend, and Unique Blocks, because repeating it would only hand back the same result.
+
+Next to it, **Modify configuration** reopens the comparison page the job was started from, with the job's own samples already selected and the Minhash Matching slider on the setting it ran with - so a comparison can be widened, narrowed or re-matched without picking the samples again.
+Nothing is submitted until you press *Compare* there, and the *Force rematch* box is not preselected, because a job does not record whether it was originally forced.
+It is offered for the same kinds of job as the rerun - and, unlike the rerun, also while one is still running, since opening a form starts nothing - but only where the comparison page can actually show the settings the job used.
+
 
 ### User / Settings
 

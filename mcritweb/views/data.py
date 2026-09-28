@@ -29,6 +29,7 @@ from mcritweb.views.params import (
     parse_str_query_param,
     parseBaseAddrFromFilename,
     parseBitnessFromFilename,
+    slider_position_for_band_range,
 )
 from mcritweb.views.ScoreColorProvider import ScoreColorProvider
 from mcritweb.views.utility import get_session_user_id, mcrit_server_required, query_upload_path
@@ -1193,7 +1194,7 @@ def job_by_id(job_id):
         for job in child_jobs:
             if job.family_id is not None:
                 families_by_id[job.family_id] = client.getFamily(job.family_id)
-    return render_template('job_overview.html', families=families_by_id, samples=samples_by_id, job_info=job_info, auto_refresh=auto_refresh, child_jobs=child_jobs, missing_children=missing_children)
+    return render_template('job_overview.html', families=families_by_id, samples=samples_by_id, job_info=job_info, auto_refresh=auto_refresh, child_jobs=child_jobs, missing_children=missing_children, can_rerun=is_rerunnable(job_info, child_jobs), configuration_url=configuration_url(job_info, child_jobs))
 
 
 @bp.route('/jobs/<job_id>/delete', methods=('POST',))
@@ -1224,6 +1225,306 @@ def delete_job_by_id(job_id):
         client.deleteJob(job_id)
     return redirect(url_for("data.jobs"))
     
+
+
+################################################################
+# Rerunning a job
+################################################################
+#
+# A job records the call that produced it: payload["params"] is a JSON object of the
+# arguments the backend method was called with, keyed by position ("0", "1", ...) for
+# the positional ones and by name for the rest - see mcrit's QueueRemoteCalls. That is
+# enough to submit the same request again, but only where "the same request" is still
+# a well-defined thing to ask for, so the mapping below is deliberately short:
+#
+#   * the query methods (getMatchesForSmdaReport and the two binary ones) are left out
+#     because the binary they matched lives in the backend's GridFS. The job holds a
+#     reference to it, not the bytes, and McritClient cannot resubmit from a reference.
+#   * getUniqueBlocks is left out because neither of its request methods takes
+#     force_recalculation, so repeating one is answered from the cache with the very
+#     job being looked at.
+#   * the collection and minhashing methods are left out because they are not analyses
+#     to repeat - deleteSample and deleteFamily destroy, addBinarySample has no binary
+#     to resend, and the maintenance jobs have their own buttons on the admin page.
+#
+# Reconstructing the wrong request would be worse than offering no button: the user
+# would believe they had rerun what is on screen. So every step below refuses rather
+# than guesses, and a parameter that cannot be read disqualifies the whole rerun
+# instead of being dropped from it.
+
+#: job method -> the McritClient method that submits it again.
+RERUNNABLE_METHODS = {
+    "getMatchesForSample": "requestMatchesForSample",
+    "getMatchesForSampleVs": "requestMatchesForSampleVs",
+    "combineMatchesToCross": "requestMatchesCross",
+}
+
+#: The matching parameters mcrit stores on a job under their own name; McritClient
+#: takes them back as keywords of the same name. force_recalculation is deliberately
+#: not among them - QueueRemoteCalls consumes it before the payload is written, so no
+#: job records whether it was forced.
+RERUN_MATCHING_PARAMS = ("minhash_threshold", "pichash_size", "band_matches_required")
+
+#: The two child methods a cross compare is built from, and what each one means for
+#: `sample_group_only` - the only place that choice survives.
+CROSS_CHILD_METHODS = {"getMatchesForSample": False, "getMatchesForSampleVsGroup": True}
+
+#: How many positional arguments each of those backend methods takes, so that a
+#: payload carrying one this does not know about can be recognised as such. Together
+#: with RERUN_MATCHING_PARAMS this is the complete parameter list of each method as of
+#: mcrit 1.5 - a version that records a further one has to be handled here, and until
+#: it is, the rerun is withheld rather than submitted without it.
+METHOD_ARITY = {
+    "getMatchesForSample": 1,
+    "getMatchesForSampleVs": 2,
+    "getMatchesForSampleVsGroup": 2,
+    "combineMatchesToCross": 1,
+}
+
+
+def job_params(job_info):
+    """A job's own parameters as {index_or_name: value}, or None if unreadable.
+
+    `Job.arguments` parses the same payload but raises on anything that is not the
+    JSON object it expects, and deciding whether to offer a rerun must not be able to
+    take the job page down.
+    """
+    try:
+        payload = job_info.payload
+    except (AttributeError, KeyError, TypeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    try:
+        params = json.loads(payload.get("params", ""))
+    except (TypeError, ValueError):
+        return None
+    return params if isinstance(params, dict) else None
+
+
+def as_job_int(value):
+    """An integer parameter, or None. A bool is an int in Python and never one of these."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def matching_kwargs(params, method):
+    """The named matching parameters of a job, or None if they cannot all be honoured.
+
+    Unreadable is one way to get None; the other is a parameter this does not know
+    about, positional or named. Both would otherwise be quietly left out of the
+    resubmitted call, which is how a rerun ends up being a *different* comparison than
+    the one on screen - so either disqualifies the job instead.
+    """
+    known = set(RERUN_MATCHING_PARAMS) | {str(position) for position in range(METHOD_ARITY[method])}
+    if set(params) - known:
+        return None
+    kwargs = {}
+    for name in RERUN_MATCHING_PARAMS:
+        if name in params:
+            value = as_job_int(params[name])
+            if value is None:
+                return None
+            kwargs[name] = value
+    return kwargs
+
+
+def cross_rerun_request(params, child_jobs):
+    """The requestMatchesCross call behind a combineMatchesToCross job, or None.
+
+    That job records only {sample_id: child_job_id}. Which comparison ran is the
+    choice between the two child methods, and the matching parameters exist only on
+    the children - so a rerun is offered exactly when every child named in the mapping
+    is still there and they all agree.
+    """
+    # this method takes the mapping and nothing else, so anything further in the
+    # payload is a parameter that would be lost on the way back out
+    if set(params) != {"0"}:
+        return None
+    sample_to_job_id = params["0"]
+    if not isinstance(sample_to_job_id, dict) or not sample_to_job_id:
+        return None
+    children_by_id = {}
+    for child in child_jobs or []:
+        try:
+            children_by_id[child.job_id] = child
+        except (AttributeError, KeyError, TypeError):
+            continue
+    sample_ids = []
+    methods = set()
+    child_kwargs = []
+    for sample_key, child_job_id in sample_to_job_id.items():
+        try:
+            sample_ids.append(int(sample_key))
+        except (TypeError, ValueError):
+            return None
+        child = children_by_id.get(child_job_id)
+        child_params = job_params(child) if child is not None else None
+        if child_params is None or child.method not in CROSS_CHILD_METHODS:
+            return None
+        methods.add(child.method)
+        kwargs = matching_kwargs(child_params, child.method)
+        if kwargs is None:
+            return None
+        child_kwargs.append(kwargs)
+    if len(methods) != 1 or any(kwargs != child_kwargs[0] for kwargs in child_kwargs):
+        return None
+    sample_group_only = CROSS_CHILD_METHODS[methods.pop()]
+    return RERUNNABLE_METHODS["combineMatchesToCross"], (sample_ids,), dict(child_kwargs[0], sample_group_only=sample_group_only)
+
+
+def rerun_request(job_info, child_jobs=None):
+    """The McritClient call that reproduces `job_info`, as (method_name, args, kwargs).
+
+    None means this job has no rerun: either its method is not one of the three above,
+    or its stored parameters do not describe the original request completely.
+    """
+    if job_info is None:
+        return None
+    params = job_params(job_info)
+    if params is None or job_info.method not in RERUNNABLE_METHODS:
+        return None
+    if job_info.method == "combineMatchesToCross":
+        return cross_rerun_request(params, child_jobs)
+    kwargs = matching_kwargs(params, job_info.method)
+    if kwargs is None:
+        return None
+    sample_ids = [as_job_int(params.get(str(position))) for position in range(METHOD_ARITY[job_info.method])]
+    if any(sample_id is None for sample_id in sample_ids):
+        return None
+    return RERUNNABLE_METHODS[job_info.method], tuple(sample_ids), kwargs
+
+
+def has_run_its_course(job_info):
+    """Whether a job is finished or failed, as opposed to queued or in progress.
+
+    Forcing a recalculation of a job that is still running queues the same work a
+    second time, so this gates both the button and the route that button posts to.
+    Withholding the button alone would only hide the door - the POST is reachable
+    without it.
+    """
+    if job_info is None:
+        return False
+    try:
+        return job_info.finished_at is not None or bool(job_info.is_failed)
+    except (AttributeError, KeyError, TypeError):
+        # a record that does not carry the fields is not one to rerun either
+        return False
+
+
+def is_rerunnable(job_info, child_jobs=None):
+    """Whether to offer a rerun of this job on its page."""
+    if not has_run_its_course(job_info):
+        return False
+    return rerun_request(job_info, child_jobs) is not None
+
+
+def configuration_url(job_info, child_jobs=None):
+    """The analyze page this job was submitted from, with its inputs filled in.
+
+    Issue #55's other half: from a finished job back to the form behind it, so the
+    parameters can be changed and the job resubmitted rather than retyped. Built on
+    `rerun_request` so there is one recovery of a job's arguments and not two - a job
+    whose request cannot be rebuilt faithfully gets no link here either.
+
+    Preselecting is not the same as passing the ids along. `analyze.compare` and
+    `analyze.compare_versus` highlight a row only when the sample is on the search
+    page in front of them, and compare.html falls back to selecting the *first* row
+    when it is not - so a bare `selected=` would quietly point the form at a
+    different sample. Each link therefore also carries the search that puts the
+    sample on the page: searching a sample id makes mcrit answer with that sample
+    (`id_match`), regardless of where it would otherwise fall in the paging.
+
+    None means no link at all, which is the honest answer whenever the form cannot
+    represent the job it claims to be showing.
+
+    Not gated on the job having finished, unlike the rerun: following a link queues
+    nothing, and reopening the form of a job still in the queue to submit a variation
+    of it is a reasonable thing to want.
+    """
+    request_to_repeat = rerun_request(job_info, child_jobs)
+    if request_to_repeat is None:
+        return None
+    method_name, args, kwargs = request_to_repeat
+    kwargs = dict(kwargs)
+    sample_group_only = kwargs.pop("sample_group_only", False)
+    # `band_matches_required` is the only matching parameter these forms have a
+    # control for. A job carrying another one cannot be shown on them, and one
+    # carrying none took the backend's own default rather than a slider position,
+    # which the slider - which always submits one - cannot reproduce either.
+    if set(kwargs) != {"band_matches_required"}:
+        return None
+    slider_position = slider_position_for_band_range(kwargs["band_matches_required"])
+    if slider_position is None:
+        return None
+    # `rematch` is left at each page's default: force_recalculation is consumed by
+    # QueueRemoteCalls before the payload is written, so no job records whether it
+    # was forced and preselecting either way would be an invention.
+    if method_name == "requestMatchesCross":
+        return url_for('analyze.cross_compare', samples=",".join(str(sample_id) for sample_id in args[0]),
+                       onlySelected="true" if sample_group_only else "false", minhashBandRange=slider_position)
+    if method_name == "requestMatchesForSample":
+        return url_for('analyze.compare', query=args[0], selected=args[0], minhashBandRange=slider_position)
+    if method_name == "requestMatchesForSampleVs":
+        return url_for('analyze.compare_versus', query_a=args[0], selected_a=args[0],
+                       query_b=args[1], selected_b=args[1], minhashBandRange=slider_position)
+    # a method added to RERUNNABLE_METHODS has to say which form preselects it, and
+    # how, before it can be linked to one
+    return None
+
+
+@bp.route('/jobs/<job_id>/rerun', methods=('POST',))
+@visitor_required
+@mcrit_server_required
+def rerun_job_by_id(job_id):
+    """Submit the request a job was created from once more.
+
+    POST only, like every other route that changes something: this queues backend work
+    and an <img> tag or a prefetch must not be able to start it (issue #84).
+
+    Visitor, because it grants nothing a visitor does not already have - the same three
+    requests are reachable from /analyze/compare/<id>, /analyze/compare/<a>/<b> and
+    /analyze/start_cross_compare, `rematch` included.
+
+    Nothing from the request is forwarded to the backend except `job_id` itself, which
+    goes to the same getJobData that `job_by_id` already calls for any visitor. What is
+    submitted is rebuilt here from the stored job, not from anything the caller sent.
+    """
+    client = get_client()
+    job_info = client.getJobData(job_id)
+    if job_info is None:
+        flash('There is no job with that id.', category='error')
+        return redirect(url_for('data.jobs'))
+    if not has_run_its_course(job_info):
+        # the button is withheld for a job that is still running, but withholding it
+        # only hides the door: this POST is reachable without it, and forcing a
+        # recalculation here would queue the same work alongside the run in progress
+        flash('This job has not finished yet - wait for it rather than running it twice.', category='error')
+        return redirect(url_for('data.job_by_id', job_id=job_id))
+    child_jobs = None
+    if job_info.method == "combineMatchesToCross":
+        # only this one method needs them, so the round trips are not spent on the
+        # other two. `all_dependencies` is a bare lookup in mcrit's Job and raises for
+        # a record that does not carry the field.
+        try:
+            dependencies = job_info.all_dependencies
+        except (KeyError, TypeError):
+            dependencies = None
+        child_jobs = [client.getJobData(child_id) for child_id in dependencies] if isinstance(dependencies, list) else []
+    request_to_repeat = rerun_request(job_info, child_jobs)
+    if request_to_repeat is None:
+        flash('This job cannot be rerun: its original request is not fully recorded.', category='error')
+        return redirect(url_for('data.job_by_id', job_id=job_id))
+    method_name, args, kwargs = request_to_repeat
+    # Forced, or mcrit answers from its descriptor cache with the job we started from
+    # and the rerun is indistinguishable from a reload. This is the deliberate opposite
+    # of the analyze routes, which must stay cacheable because they write on GET (#97).
+    new_job_id = getattr(client, method_name)(*args, force_recalculation=True, **kwargs)
+    if not new_job_id:
+        flash('The backend did not accept the rerun; the samples it needs may be gone.', category='error')
+        return redirect(url_for('data.job_by_id', job_id=job_id))
+    return redirect(url_for('data.job_by_id', job_id=new_job_id, refresh=3))
 
 
 ################################################################

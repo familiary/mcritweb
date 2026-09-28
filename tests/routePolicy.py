@@ -177,6 +177,12 @@ ROUTE_POLICY = {
     "analyze.query": (VISITOR, WRITES_ON_POST),
     "data.jobs": (VISITOR, READ_ONLY),
     "data.job_by_id": (VISITOR, READ_ONLY),
+    # Queues the matching request a job was created from once more, forced past the
+    # backend's descriptor cache. Visitor, because the same three requests are already
+    # reachable at visitor level from analyze.compare_all / compare_vs /
+    # start_cross_compare, `rematch` included - so this grants no new capability, it
+    # only saves retyping the parameters. POST because it writes: issue #84.
+    "data.rerun_job_by_id": (VISITOR, WRITES_ON_POST),
     "data.result": (VISITOR, READ_ONLY),
     # writes the report to instance/cache/results on a cache miss, exactly as
     # data.result does, which is local caching rather than a state change
