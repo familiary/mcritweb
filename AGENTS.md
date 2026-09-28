@@ -35,7 +35,7 @@ This repository owns **no analysis data of its own**. Families, samples, functio
 
 ## Development setup
 
-The README states Python 3.11+ - inherited from mcrit, which has declared it since v1.5.0; the reference deployment (`docker-mcrit`) runs **Python 3.12**. Target 3.11/3.12 for anything new.
+The README states Python 3.12+ - inherited from mcrit, which has declared it since v1.10.0 (v1.5.0 to v1.9.x declared 3.11); the reference deployment (`docker-mcrit`) runs **Python 3.12**. Target 3.12 for anything new.
 
 ```bash
 make init   # requirements.txt, plus pytest/pytest-cov/ruff at the versions CI pins
@@ -138,7 +138,7 @@ Three backends are available to tests, all offline. `fake_mcrit` is strict — a
 
 Coverage is thin and nothing exercises a real backend, so for anything touching views or templates still **verify by exercising the app**: `flask run` against a reachable MCRIT backend and walk the affected pages. When changing shared template macros (`table/*.html`), check every page that imports them — a macro is typically used by 3–5 templates. Results are cached under `instance/cache/` and never invalidated, so clear it when validating result rendering.
 
-CI (`.github/workflows/test.yml`) runs `ruff check .` plus the suite on Python 3.11, 3.12, 3.13 and 3.14 — the last two became reachable only once the Flask 2.2.5 pin was lifted in #27, since it calls `pkgutil.get_loader`, removed in 3.14. There is deliberately **no `ruff format` check** — this codebase has never been formatted and reflowing it would bury the history of every file. Keep `ruff check .` clean; the rule set in `ruff.toml` mirrors mcrit's.
+CI (`.github/workflows/test.yml`) runs `ruff check .` plus the suite on Python 3.12, 3.13 and 3.14 — the last two became reachable only once the Flask 2.2.5 pin was lifted in #27, since it calls `pkgutil.get_loader`, removed in 3.14. There is deliberately **no `ruff format` check** — this codebase has never been formatted and reflowing it would bury the history of every file. Keep `ruff check .` clean; the rule set in `ruff.toml` mirrors mcrit's.
 
 ## Versioning & releases
 
@@ -146,7 +146,7 @@ CI (`.github/workflows/test.yml`) runs `ruff check .` plus the suite on Python 3
 - A release adds a dated entry at the top of the README "Version History" (` * YYYY-MM-DD vX.Y.Z: <summary>`) and bumps `setup.py`. Historic commit message for this: `bump X.Y.Z`.
 - **Do not bump the version unless explicitly asked.**
 - MCRITweb is **deployed from a checkout** — a container image or a local clone — and no wheel or sdist is ever built or published. `setup.py` exists for the runtime version string and for `pip install -e .`; its `packages` list is not a distribution concern.
-- `mcrit>=1.5.3` is pinned in both `setup.py` and `requirements.txt` — the two must stay in sync. MCRITweb consumes backend data classes (`MatchingResult`, `SampleEntry`, `FunctionEntry`, `UniqueBlocksResult`, …) directly, so a backend release can break rendering; when a fix depends on new backend behavior, raise the floor in both files and say so in the changelog entry.
+- `mcrit>=1.10.0` is pinned in both `setup.py` and `requirements.txt` — the two must stay in sync. MCRITweb consumes backend data classes (`MatchingResult`, `SampleEntry`, `FunctionEntry`, `UniqueBlocksResult`, …) directly, so a backend release can break rendering; when a fix depends on new backend behavior, raise the floor in both files and say so in the changelog entry.
 - `flask>=3.0` and `werkzeug>=3.0`. The old hard pins at 2.2.5 / 2.3.3 were lifted in issue #27; the lower bounds are there to stop a resolver sliding back to a 2.x that cannot run on Python 3.12+. See ADR-0001 for what was checked.
 
 ## Agent guardrails

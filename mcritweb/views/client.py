@@ -16,12 +16,16 @@ from mcritweb.views.utility import get_server_token, get_server_url, get_usernam
 
 def default_client_factory(username=None, **kwargs):
     """Build a client from the server settings stored in the local database."""
-    return McritClient(
+    client = McritClient(
         mcrit_server=get_server_url(),
         apitoken=get_server_token(),
         username=get_username() if username is None else username,
         **kwargs
     )
+    # set as an attribute rather than passed to the constructor, so an mcrit that predates
+    # the timeout keeps working and simply goes on without one
+    client.timeout = current_app.config.get("MCRIT_CLIENT_TIMEOUT", (10, 280))
+    return client
 
 
 def get_client(**kwargs):
