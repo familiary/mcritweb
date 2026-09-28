@@ -201,7 +201,7 @@
 
 
 
-{% macro job_column_table(job_info, show_created=True, show_started=True, show_finished=True, show_progress=False, show_duration=True) %}
+{% macro job_column_table(job_info, show_created=True, show_started=True, show_finished=True, show_progress=False, show_duration=True, child_progress=None) %}
   <table class="table table-hover">
     <tbody>
       <tr>
@@ -274,6 +274,18 @@
           </td>
         </tr>
       {% endif %}
+      {# a job waiting on dependencies only starts once they are done, so its own
+         duration says nothing about them - see data.total_duration. Deliberately
+         outside show_duration: the pages that switch the duration row off do so
+         because an unfinished job has none, which is exactly when this row is the
+         only elapsed time there is. #}
+      {% set job_total_duration = job_info|total_duration %}
+      {% if job_total_duration is not none %}
+        <tr>
+          <td valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued, and against the current time while it is still running. A job that fans out is queued just after the children it waits on, so this is a lower bound by that enqueue interval - 10ms for five children.">Total (since queued): </span></td>
+          <td valign="middle">{{ job_total_duration }}{% if not job_info.finished_at %} and counting{% endif %}</td>
+        </tr>
+      {% endif %}
       {% if show_progress %}
         <tr>
           <td valign="middle">Progress: </td>
@@ -281,7 +293,13 @@
             {% if job_info.finished_at %}
               <a href="{{ url_for('data.result', job_id=job_info.job_id ) }}">Results available</a>
             {% else %}
-              {% if job_info.started_at %}
+              {%- if child_progress is not none %}
+                {# a job waiting on dependencies has not started, so its own counter reads
+                   0 for the entire time the work is running - which is the half of issue
+                   #46 about progress. The children carry the real number and this page
+                   has already fetched them. #}
+                {{ "%5.2f"|format(100 * child_progress) }}% <span class="text-muted">(across {{ job_info.all_dependencies|length }} dependencies)</span>
+              {% elif job_info.started_at %}
                 {{ "%5.2f"|format(100 * job_info.progress) }}% 
               {% else %}
                 {{ "%5.2f"|format(0) }}% 

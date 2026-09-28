@@ -17,7 +17,7 @@ Overview for Job: {{ job_info.job_id }}
 {% block content %}
 <h1>Job overview: {{ job_info.parameters }}</h1>
 
-{{ job_column_table(job_info, show_progress=True) }}
+{{ job_column_table(job_info, show_progress=True, child_progress=child_progress) }}
 
 
 {# a shorter list on its own would misreport the job - a cross compare would look like
