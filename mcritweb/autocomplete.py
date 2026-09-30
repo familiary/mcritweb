@@ -6,12 +6,11 @@ suggestion through `innerHTML` and interpolates the same value into a double-quo
 and a family name is chosen by whoever submits or renames a family. The escaping
 therefore happens on the way in, and the widget only ever sees escaped names (#168).
 
-This lives in its own module because there are now two ways in, and they must not
-drift: the `autocomplete_items` template filter, for names rendered into a page, and
-`explore.family_names`, which answers the same names as JSON for the type-ahead that
-fetches them as they are typed (#146). `|tojson` protects the transport in the first
-case and `jsonify` in the second; neither is escaping, and the sink is one `innerHTML`
-further on in both.
+Its one caller is `explore.family_names`, which answers the names as JSON for the
+type-ahead that fetches them as they are typed (#146). That is the only way names reach
+the widget: no page embeds them since #192, which also removed the template filter
+that used to wrap this for the pages that did. `jsonify` protects the transport, not
+the sink one `innerHTML` further on.
 
 Known cost, since it is not free: the widget slices the escaped label, so a lookup
 landing inside an entity renders it literally - "R&amp;D" for a family named "R&D" -

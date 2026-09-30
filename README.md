@@ -9,7 +9,7 @@ MCRITweb has been developed by Daniel Enders, Manuel Blatt, and Daniel Plohmann.
 We highly recommend using the dockerized deployment available at [docker-mcrit](https://github.com/danielplohmann/docker-mcrit).
 
 If you instead want to go for a direct installation, a few dependencies have to be installed.  
-First, ensure that Python 3.11+ is available, then simply use pip to cover the requirements:
+First, ensure that Python 3.12+ is available, then simply use pip to cover the requirements:
 ```bash
 # install python and MCRIT dependencies
 $ sudo apt install python3 python3-pip
