@@ -100,6 +100,14 @@ class FakeMcritClient:
         self._record("getFamily", *args, **kwargs)
         return None
 
+    def getSamplesByIds(self, *args, **kwargs):
+        self._record("getSamplesByIds", *args, **kwargs)
+        return {}
+
+    def getFamiliesByIds(self, *args, **kwargs):
+        self._record("getFamiliesByIds", *args, **kwargs)
+        return {}
+
     def getStatus(self, *args, **kwargs):
         self._record("getStatus", *args, **kwargs)
         return {}

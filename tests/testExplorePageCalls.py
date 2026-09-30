@@ -150,6 +150,22 @@ def test_a_listing_asks_the_queue_only_for_the_methods_its_rows_can_show(client,
     )
 
 
+@pytest.mark.parametrize("path", ["/explore/samples", "/explore/samples?query=citadel"])
+def test_a_listing_asks_each_method_only_for_the_samples_on_its_page(client, as_role, fake_mcrit, path):
+    """Named by method alone, mcrit answers every job of that method the installation
+    ever ran, and the listing kept the few whose sample is on the page. With the page's
+    sample ids it selects those in its own query instead."""
+    as_role("visitor")
+    fake_mcrit.calls.clear()
+
+    response = client.get(path)
+
+    page = sorted(rows_on(response))
+    assert page, f"{path} rendered no rows - nothing is being asserted"
+    asked = [sorted(kwargs.get("sample_ids") or []) for _args, kwargs in calls_to(fake_mcrit, "getQueueData")]
+    assert asked == [page, page], f"{path} asked for {asked}, its rows are {page}"
+
+
 def test_the_named_methods_are_the_ones_a_row_can_show():
     """`SAMPLE_ROW_JOB_METHODS` is a hand-copy of an intersection that lives in mcrit,
     and the two are tied together by nothing but this. Today the queue's
@@ -415,6 +431,44 @@ def test_the_type_ahead_survives_a_backend_that_cannot_answer(client, as_role, f
 
     assert response.status_code == 200
     assert response.json == {"suggestions": []}
+
+
+@pytest.mark.parametrize("path", ["/data/submit", "/analyze/query"])
+def test_the_submit_form_asks_for_family_names_as_they_are_typed(client, as_role, fake_mcrit, path):
+    """The same cost as above, on the submit form (#192): its GET used to call
+    `getFamilies()` to embed every name for the family field's type-ahead. The field
+    now fetches `explore.family_names` like the edit modals do - on `/data/submit`, and
+    on the query form that carries the same hidden field."""
+    as_role("contributor")
+    fake_mcrit.calls.clear()
+
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert calls_to(fake_mcrit, "getFamilies") == [], f"{path} still downloads every family"
+    markup = response.get_data(as_text=True)
+    assert 'name=\'family\' class="form-control" id="family"' in markup
+    assert "attachFamilyAutocomplete(document.getElementById('family'))" in markup
+    assert json.dumps("/explore/familyNames") in markup
+
+
+def test_the_drop_overlay_brings_its_own_family_type_ahead(client, as_role, fake_mcrit):
+    """The drop overlay's family field used to be built with no names at all. Since
+    #192 the dropzone macro includes `js/ac_family_names.html` itself, so a listing
+    page - which includes the partial for its edit modals too - runs it twice, and the
+    guard that stops the second run attaching a second widget to the modal fields is
+    what keeps that harmless. The browser test in testAutocompleteEscaping.py shows the
+    effect; this pins both includes and the guard offline."""
+    as_role("contributor")
+
+    markup = client.get("/explore/samples").get_data(as_text=True)
+
+    assert markup.count("attachFamilyAutocomplete(document.getElementById('family'))") == 2, (
+        "the listing and its drop overlay should each include the family type-ahead"
+    )
+    assert markup.count("field.dataset.familyAutocomplete") == 4, (
+        "the guard against attaching a second widget to a field is gone"
+    )
 
 
 # --- the unified search does not run the slow collection unasked ------------------
