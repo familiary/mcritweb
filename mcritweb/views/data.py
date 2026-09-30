@@ -454,9 +454,14 @@ def result(job_id):
     # check if we have the respective report already locally cached
     result_json = load_cached_result(current_app, job_id)
     job_info = client.getJobData(job_id)
+    # kept separate from result_json because the tail of this view needs to tell an
+    # empty report ({}) from one that could not be fetched (None), and truthiness
+    # cannot. load_cached_result answers {} on a miss, and cache_result only ever
+    # writes a truthy report, so a falsy result_json always means we got here.
+    fetched = None
     if not result_json:
         # otherwise obtain result report from remote
-        result_json = client.getResultForJob(job_id)
+        result_json = fetched = client.getResultForJob(job_id)
         if result_json:
             cache_result(current_app, job_info, result_json)
     if result_json:
@@ -502,12 +507,45 @@ def result(job_id):
             return redirect(url_for('explore.families'))
         elif job_info.parameters in ["rebuildIndex()", "recalculatePicHashes()", "recalculateMinHashes()"]:
             return render_template("result_maintenance.html", result=result_json, job_info=job_info)
-    elif job_info and not (job_info.is_finished or job_info.is_failed or job_info.is_terminated):
-        # if we are not done processing, list job data
-        return render_template("job_in_progress.html", job_info=job_info)
-    else:
-        # if we can't find job or result, we have to assume the job_id was invalid
+        else:
+            # a job type this dispatch has never been taught. Falling off the end of the
+            # chain returned None, which Flask answers with a 500 rather than a page.
+            return render_template("result_incompatible.html", job_id=job_id)
+    # no report to show. Which of the reasons for that it is decides what to say, and
+    # `if result_json:` above cannot tell an empty report from an absent one - {} is
+    # falsy - so a finished job with an empty result used to land in the unknown-job-id
+    # page below. See issue #73.
+    if job_info is None:
+        # nothing knows this job id, so there is no missing result to explain
         return render_template("result_invalid.html", job_id=job_id)
+    if job_info.is_failed or job_info.is_terminated:
+        # not result_invalid.html: that page says the job "was not found in the system",
+        # which is false for a job we are holding the record of. This one is the whole
+        # point of the issue - stop reporting one reason as another.
+        reason = ("This job was terminated before it could finish."
+                  if job_info.is_terminated else
+                  "This job ran out of attempts and failed. The backend's log will say why.")
+        return render_template("job_failed.html", job_info=job_info, reason=reason)
+    if job_info.is_finished:
+        # Three ways to finish without a report, and they are not the same answer.
+        # getResultForJob returns None both when the job recorded no result id and when
+        # the document behind that id can no longer be fetched, so job_info.result is
+        # what separates them.
+        if job_info.result is None:
+            # the job never produced one. For a matching job that is an empty report;
+            # for a minhashing job or a collection change there was never going to be one
+            return render_template("result_empty.html", job_id=job_id)
+        if fetched is None:
+            # it recorded a result and the backend could not hand it back - a purged
+            # GridFS document, a re-provisioned backend that kept the job metadata.
+            # Telling the analyst "this run found nothing" would be a wrong analytical
+            # answer, not just wrong wording. result_invalid.html already says exactly
+            # this: the result referenced by this job was not found.
+            return render_template("result_invalid.html", job_id=job_id)
+        # it ran to completion and the report it produced is empty. That is a result
+        return render_template("result_empty.html", job_id=job_id)
+    # if we are not done processing, list job data
+    return render_template("job_in_progress.html", job_info=job_info)
 
 #: `UniqueBlocksResult.generateYaraRule`'s own defaults, restated so the page can offer
 #: them as a form. These are not job parameters - the backend stores blocks and
