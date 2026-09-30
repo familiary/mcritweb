@@ -1,7 +1,7 @@
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% from 'table/column_table.html' import sample_column_table, matching_result_job_column_table %}
 {% from 'table/matching_statistics_table.html' import matching_statistics_table %}
-{% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
+{% from 'table/match_row.html' import famlib_header, famlib_row, aggregated_function_header, aggregated_function_row %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -46,76 +46,13 @@ Results for Job: {{ job_info.job_id }}
 <table class="table table-hover">
   <thead class="thead-light">
     <tr>
-      {% if ucs_famlib is none %}
-        {% set ucs_famlib = ["family_name", "version", "sample_id", "sha256", "filename", "bitness", "num_functions", "num_minhash", "num_pichash", "num_library", "direct_score", "direct_nonlib_score", "frequency_score", "frequency_nonlib_score", "uniq_score"] %}
-      {% endif %}
-      {% for column_type in ucs_famlib %}
-        {% if column_type == "family_name" %}
-        <th scope="col"><i class="fa-solid fa-bug " title="Family ID"></th>
-        {% elif column_type == "version" %}
-          <th scope="col">Version</th>
-        {% elif column_type == "sample_id" %}
-        <th style="text-align: right;" scope="col"><i class="fa-solid fa-virus" title="Sample ID"></th>
-        {% elif column_type == "sha256" %}
-          <th style="text-align: right;" scope="col">SHA256</th>
-        {% elif column_type == "filename" %}
-          <th scope="col">Filename</th>
-        {% elif column_type == "bitness" %}
-          <th style="text-align: right;" scope="col">Bitness</th>
-        {% elif column_type == "num_functions" %}
-        <th style="text-align: right;" scope="col">FNs</th>
-        {% elif column_type == "num_minhash" %}
-        <th style="text-align: right;" scope="col">Min#</th>
-        {% elif column_type == "num_pichash" %}
-        <th style="text-align: right;" scope="col">Pic#</th>
-        {% elif column_type == "num_library" %}
-        <th style="text-align: right;" scope="col">Lib</th>
-        {% elif column_type == "direct_score" %}
-        <th style="text-align: center;" colspan="2" scope="col">Direct</th>
-        {% elif column_type == "frequency_score" %}
-        <th style="text-align: center;" colspan="2" scope="col">Frequency</th>
-        {% elif column_type == "uniq_score" %}
-        <th style="text-align: center;" scope="col">Uniq</th>
-        {% endif %}
-      {% endfor %}
+      {{ famlib_header(ucs_famlib, sort_pagination=samp) }}
     </tr>
   </thead>
   <tbody>
-    {% for matched_sample in matching_result.getSampleMatches(samp.start_index, samp.limit) %}
+    {% for matched_sample in sample_rows %}
       <tr style="background-color:#{{ scp.getMatchHexColorFromResult(matched_sample, 'matched_percent_score_weighted') }}">
-        {% for column_type in ucs_famlib %}
-          {% if column_type == "family_name" %}
-            <td valign="middle">{{ format_family_name(matched_sample.family, matched_sample.family_id) }}&nbsp;<a href="{{ url_for(request.endpoint, famid=matched_sample.family_id, samp=1, funp=1, **request.view_args) }}#sample-matches"><i class="fa-solid fa-filter"></i></a></td>
-          {% elif column_type == "version" %}
-            <td valign="middle">{{ matched_sample.version }}</td>
-          {% elif column_type == "sample_id" %}
-            <td style="text-align: right;" valign="middle" scope="row" class="id"><a href="{{ url_for('explore.sample_by_id', sample_id=matched_sample.sample_id) }}">{{ matched_sample.sample_id }}</a>&nbsp;<a href="{{ url_for(request.endpoint, samid=matched_sample.sample_id, funp=funp.page, **request.view_args) }}"><i class="fa-solid fa-filter"></i></a></td>
-          {% elif column_type == "sha256" %}
-            <td style="text-align: right;" valign="middle" class="font-monospace">{{ matched_sample.getShortSha256() }}</td>
-          {% elif column_type == "filename" %}
-            <td valign="middle">{{ matched_sample.getShortFilename(10) }}</td>
-          {% elif column_type == "bitness" %}
-            <td style="text-align: right;" valign="middle">{{ matched_sample.bitness }}</td>
-          {% elif column_type == "num_functions" %}
-            <td style="text-align: right;" valign="middle">{{ matched_sample.num_functions }}</td>
-          {% elif column_type == "num_minhash" %}
-            <td style="text-align: right;" valign="middle">{{ matched_sample.matched_functions_minhash }}</td>
-          {% elif column_type == "num_pichash" %}
-            <td style="text-align: right;" valign="middle">{{ matched_sample.matched_functions_pichash }}</td>
-          {% elif column_type == "num_library" %}
-            <td style="text-align: right;" valign="middle">{{ matched_sample.matched_functions_library }}</td>
-          {% elif column_type == "direct_score" %}
-            <td style="text-align: right;" valign="middle"><span class="hint--left" data-hint="Weighted Direct Score: &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_score_weighted) }} / {{ matching_result.reference_sample_entry.binweight }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_score_weighted) }}%">{{ "%3d"|format(matched_sample.matched_percent_score_weighted) }}</span></td>
-          {% elif column_type == "direct_nonlib_score" %}
-            <td style="text-align: right;" valign="middle"><span class="hint--left" data-hint="Weighted Direct Score (Library Excluded): &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_nonlib_score_weighted) }} / {{ matching_result.reference_sample_entry.binweight }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_nonlib_score_weighted) }}%">{{ "%3d"|format(matched_sample.matched_percent_nonlib_score_weighted) }} </span></td>
-          {% elif column_type == "frequency_score" %}
-            <td style="text-align: right; background-color:#{{ scp.getMatchHexColorFromResult(matched_sample, 'matched_percent_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="Frequency Weighted Score: &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_frequency_weighted) }} / {{ matching_result.reference_sample_entry.binweight }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_frequency_weighted) }}%">{{ "%3d"|format(matched_sample.matched_percent_frequency_weighted) }}</span></td>
-          {% elif column_type == "frequency_nonlib_score" %}
-            <td style="text-align: right; background-color:#{{ scp.getMatchHexColorFromResult(matched_sample, 'matched_percent_nonlib_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="Frequency Weighted Score (Library Excluded): &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_nonlib_frequency_weighted) }} / {{ matching_result.reference_sample_entry.binweight }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}%">{{ "%3d"|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}</span></td>
-          {% elif column_type == "uniq_score" %}
-            <td style="text-align: right; background-color:#{{ scp.getUniqueColorScore(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}" valign="middle"><span class="hint--left" data-hint="Unique Matching Score: &#10;Functions: {{ '%4d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['functions_matched']) }} &#10;Bytes: {{ '%2d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['bytes_matched']) }} &#10;Percent: {{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%">{{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%</span></td>
-          {% endif %}
-        {% endfor %}
+        {{ famlib_row(matched_sample, matching_result, scp, funp, ucs_famlib) }}
       </tr>
     {% endfor %}
   </tbody>
@@ -156,72 +93,13 @@ Results for Job: {{ job_info.job_id }}
 <table class="table table-hover">
   <thead class="thead-light">
     <tr>
-    {% if ucs_functions is none %}
-      {% set ucs_functions = ["matched_function_id", "offset", "num_bytes", "num_matched_families", "num_matched_samples", "num_matched_functions", "best_score", "num_minhash", "num_pichash", "is_library_match", "is_unique_match"] %}
-    {% endif %}
-    {% for column_type in ucs_functions %}
-    {% if column_type == "matched_function_id" %}
-    <th scope="col">Function ID</th>
-    {% elif column_type == "offset" %}
-    <th style="text-align: right;" scope="col">offset</th>
-    {% elif column_type == "num_bytes" %}
-    <th style="text-align: right;" scope="col">num_bytes</th>
-    {% elif column_type == "num_matched_families" %}
-    <th style="text-align: right;" scope="col">Matched Families</th>
-    {% elif column_type == "num_matched_samples" %}
-    <th style="text-align: right;" scope="col">Matched Samples</th>
-    {% elif column_type == "num_matched_functions" %}
-    <th style="text-align: right;" scope="col">Matched Functions</th>
-    {% elif column_type == "best_score" %}
-    <th style="text-align: right;" scope="col">Best Score</th>
-    {% elif column_type == "num_minhash" %}
-    <th style="text-align: right;" scope="col">Min</th>
-    {% elif column_type == "num_pichash" %}
-    <th style="text-align: right;" scope="col">Pic</th>
-    {% elif column_type == "is_library_match" %}
-    <th style="text-align: right;" scope="col">Lib</th>
-    {% elif column_type == "is_unique_match" %}
-    <th style="text-align: right;" scope="col">Uniq</th>
-    {% endif %}
-    {% endfor %}
+    {{ aggregated_function_header(ucs_functions, sort_pagination=funp) }}
     </tr>
   </thead>
   <tbody>
-    {% for aggregate in matching_result.getAggregatedFunctionMatches(funp.start_index, funp.limit) %}
+    {% for aggregate in function_rows %}
       <tr style="background-color:#{{ scp.getMatchHexColorByScore50(aggregate['best_score'] + aggregate['pichash_matches'], 0.4) }}">
-        {% for column_type in ucs_functions %}
-          {% if column_type == "matched_function_id" %}
-            <td valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=aggregate['function_id'] * -1 if matching_result.is_query else aggregate['function_id']) }}">{% if matching_result.is_query %}*{% endif %}{{ aggregate["function_id"] }}</a>&nbsp;<a href="{{ url_for(request.endpoint, funid=aggregate['function_id'], samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
-          {% elif column_type == "offset" %}
-            <td style="text-align: right;" valign="middle">0x{{ "%x"|format(aggregate["offset"]) }}</td>
-          {% elif column_type == "num_bytes" %}
-            <td style="text-align: right;" valign="middle">{{ "%d"|format(aggregate["num_bytes"]) }}</td>
-          {% elif column_type == "num_matched_families" %}
-            <td style="text-align: right;" valign="middle">
-              {% if aggregate["num_families_matched"] == 1 %}
-               <span><i class="fa-solid fa-bug" title="Family ID"></i>&nbsp; {{ join_hint_strings(aggregate['families_matched']) }}</span>
-              {% elif aggregate["num_families_matched"] in [2, 3, 4, 5] %}
-               <span class="hint--right" data-hint="{{ join_hint_strings(aggregate['families_matched']) }}">{{ aggregate["num_families_matched"] }}&nbsp;<i class="fa-solid fa-bug " title="Family ID"></i></span>
-              {% else %}
-                {{ aggregate["num_families_matched"] }}
-              {% endif %}
-            </td>
-          {% elif column_type == "num_matched_samples" %}
-            <td style="text-align: right;" valign="middle">{{ aggregate["num_samples_matched"] }}</td>
-          {% elif column_type == "num_matched_functions" %}
-            <td style="text-align: right;" valign="middle">{{ aggregate["num_functions_matched"] }}</td>
-          {% elif column_type == "best_score" %}
-            <td style="text-align: right;" valign="middle">{{ "%d"|format(aggregate["best_score"]) }}</td>
-          {% elif column_type == "num_minhash" %}
-            <td style="text-align: right;" valign="middle">{{ aggregate["minhash_matches"] }}</td>
-          {% elif column_type == "num_pichash" %}
-            <td style="text-align: right;" valign="middle">{{ aggregate["pichash_matches"] }}</td>
-          {% elif column_type == "is_library_match" %}
-            <td style="text-align: right;" valign="middle"><i {% if aggregate["library_matches"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
-          {% elif column_type == "is_unique_match" %}
-            <td style="text-align: right;" valign="middle"><i {% if aggregate["is_family_unique"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
-          {% endif %}
-        {% endfor %}
+        {{ aggregated_function_row(aggregate, matching_result, ucs_functions) }}
       </tr>
     {% endfor %}
   </tbody>

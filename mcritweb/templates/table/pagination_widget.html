@@ -190,7 +190,10 @@
   {% endif %}
 {%- endmacro -%}
 
-{%- macro sortable_header_col(pagination, sort_by, align='left', caller='') -%}
+{# `colspan` is for the result pages, where one header covers a score column and its
+   library-excluded twin. Only the named column is sortable; the twin has no header
+   cell of its own to click. #}
+{%- macro sortable_header_col(pagination, sort_by, align='left', colspan=None, caller='') -%}
 
   {%- macro _get_onclick(_js_argument_provider=none) -%}
     {% if _js_argument_provider is not none %}
@@ -202,7 +205,9 @@
 
   {% set params = {} %}
   {{ params.update(pagination|getattr("_extra_pagination_params", {}))|silent }}
-  <th style="text-align:{{align}};" scope="col" {% if pagination is not none %}class="pointer"{% endif %} onclick="{{ _get_onclick(**params).strip() }}">
+  {# without a pagination there is nothing to sort by, and the onclick would be
+     `window.location.href=''` - a click that reloads the page for no reason. #}
+  <th style="text-align:{{align}};" scope="col" {% if colspan is not none %}colspan="{{ colspan }}" {% endif %}{% if pagination is not none %}class="pointer" onclick="{{ _get_onclick(**params).strip() }}"{% endif %}>
     <span>
       {{ caller() }}
     </span>

@@ -81,7 +81,7 @@ Optional: set `PROFILER=True` in `instance/config.py` while `FLASK_DEBUG=1` to e
   def settings():
   ```
 - **Where the settings live** — operation mode, both server-side tokens and the backend URL are columns on the single-row `server` table; per-user tokens are `user.apitoken`. `multi_user` blocks registration in single-user mode.
-- **Two paginations** — `CursorPagination` (cursor-based, for backend `search_*` endpoints; supports prefixes so several tables can paginate on one page) and `Pagination` (offset-based, for slicing in-memory result lists). Use `CursorPagination` for anything backed by a backend search.
+- **Two paginations** — `CursorPagination` (cursor-based, for backend `search_*` endpoints; supports prefixes so several tables can paginate on one page) and `Pagination` (offset-based, for slicing in-memory result lists). Use `CursorPagination` for anything backed by a backend search. Both answer `sort_by` / `is_ascending` / `get_sort_link`, which is all the `sortable_header_col` widget in `table/pagination_widget.html` needs, so a sortable header works the same either way. A `CursorPagination` sends its order to the backend; a `Pagination` sorts the list in the view **before** slicing the page out of it (`views/result_sorting.py`) — sorting after the slice orders one page and leaves the list unsorted.
 - **User column settings** — `UserColumnSettings` lets each user pick and order the columns of seven tables. Positions are integers, `-1` meaning "not active".
 - **User filters** — `UserFilters` stores the defaults; `MatchingResult.setFilterValues()` / `.applyFilterValues()` apply them.
 

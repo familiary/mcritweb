@@ -65,6 +65,14 @@ class Pagination:
         self.original_args = request_args_for_link_building(request)
         self.query_param = query_param
         self.limit_param = limit_param
+        # Sorting, named the way CursorPagination names it, so that the
+        # sortable_header_col widget works against either pagination model. The
+        # parameters are derived from query_param, because several of these tables
+        # share one page and each has to sort independently (famp -> fampsort).
+        self.sort_param = query_param + "sort"
+        self.ascending_param = query_param + "asc"
+        self.sort_by = request.args.get(self.sort_param)
+        self.is_ascending = request.args.get(self.ascending_param, "true").lower() != "false"
 
     def _getPageFromQueryParam(self, request, query_param):
         page = 1
@@ -126,6 +134,20 @@ class Pagination:
             args.update(self.original_args)
         args.update(kwargs_overwrites)
         args[self.query_param] = page
+        url = url_for(self.endpoint, **args)
+        return url
+
+    def get_sort_link(self, sort_by, is_ascending, **kwargs_overwrites):
+        args = {}
+        if self.original_args:
+            args.update(self.original_args)
+        args.update(kwargs_overwrites)
+        # back to page 1: the row that was at the top of page 3 is somewhere else
+        # entirely once the order changes, so keeping the page number would land the
+        # reader in the middle of a list they have not seen the start of.
+        args[self.query_param] = 1
+        args[self.sort_param] = sort_by
+        args[self.ascending_param] = str(is_ascending).lower()
         url = url_for(self.endpoint, **args)
         return url
 

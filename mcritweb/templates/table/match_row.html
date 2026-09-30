@@ -1,0 +1,243 @@
+{# Row and header widgets for the tables on the result pages (issue #50).
+
+Three kinds of match table appear across the result pages - the family/library table,
+the aggregated function table, and the function-to-function table - and before this
+file each page carried its own copy of every `column_type` dispatch chain it needed:
+nine header/body pairs in four templates, differing only in indentation and, in one
+case, in a single column (see `unique_match_known` below).
+
+`result_compare_function.html` deliberately keeps its own: its table has columns none
+of these have (family B, sample B), and its markup differs from the copy here in ways
+that are visible in the rendered page. Reconciling that is a change to what the page
+looks like, not a deduplication.
+
+The column ids are the ones stored per user in `UserColumnSettings._default_settings`,
+so they are a compatibility surface: rename one here and every user who saved that
+setting silently loses the column. They are also the sort ids: pass a table's
+`Pagination` as `sort_pagination` and each header becomes a link that sorts on its own
+column id, which `views/result_sorting.py` looks up to order the rows. That is the
+`sortable_header_col` widget the listing pages already sort through - the only new
+thing is that `Pagination` now answers `sort_by` / `is_ascending` / `get_sort_link`
+the way `CursorPagination` does.
+
+The macros emit cells only. The enclosing `<tr>` stays at the call site, because its
+background colour is per-table and because `result_compare_all.html`'s library table
+opens its row differently from every other copy.
+
+A macro does not close over the caller's scope, so everything the old inline blocks
+read straight from the render context - `matching_result`, the ScoreColorProvider
+`scp`, the function pagination `funp` - is an explicit parameter here. `url_for`,
+`request` and `join_hint_strings` are Jinja *globals* and do reach a macro, which is
+why they are not parameters.
+#}
+{% from 'table/links.html' import format_family_name %}
+{% from 'table/pagination_widget.html' import sortable_header_col %}
+
+{# Defaults for when a caller has no stored column settings. Mirrors
+   UserColumnSettings._default_settings; keep the two in step. #}
+{% set FAMLIB_COLUMNS = ["family_name", "version", "sample_id", "sha256", "filename", "bitness", "num_functions", "num_minhash", "num_pichash", "num_library", "direct_score", "direct_nonlib_score", "frequency_score", "frequency_nonlib_score", "uniq_score"] %}
+{% set AGGREGATED_FUNCTION_COLUMNS = ["matched_function_id", "offset", "num_bytes", "num_matched_families", "num_matched_samples", "num_matched_functions", "best_score", "num_minhash", "num_pichash", "is_library_match", "is_unique_match"] %}
+{% set MATCHED_FUNCTION_COLUMNS = ["function_id_a", "offset_a", "offset_b", "function_id_b", "num_bytes", "best_score", "is_minhash_match", "is_pichash_match", "is_library_match", "is_unique_match"] %}
+
+
+{# Header of the family/library match tables: best matches per family, the
+   library matches on the unfiltered page, and the sample matches of a filtered one.
+
+   `sort_pagination` is the table's own `Pagination`; pass it to make the header cells
+   sort links, or leave it out for a table there is nothing to sort (the sample-filtered
+   page shows exactly one row, the 1-vs-1 page is not paginated at all).
+
+   `direct_score` and `frequency_score` keep their `colspan="2"` header over themselves
+   and their library-excluded twin, so those two twins have no header of their own to
+   click and are not sortable. Splitting the header would make them sortable at the cost
+   of the grouping the page has always shown. #}
+{% macro famlib_header(ucs_famlib, sort_pagination=None) %}{% set columns = FAMLIB_COLUMNS if ucs_famlib is none else ucs_famlib %}
+      {% for column_type in columns %}
+        {% if column_type == "family_name" %}
+        {% call sortable_header_col(sort_pagination, "family_name") %}<i class="fa-solid fa-bug " title="Family ID"></i>{% endcall %}
+        {% elif column_type == "version" %}
+          {% call sortable_header_col(sort_pagination, "version") %}Version{% endcall %}
+        {% elif column_type == "sample_id" %}
+        {% call sortable_header_col(sort_pagination, "sample_id", align="right") %}<i class="fa-solid fa-virus" title="Sample ID"></i>{% endcall %}
+        {% elif column_type == "sha256" %}
+          {% call sortable_header_col(sort_pagination, "sha256", align="right") %}SHA256{% endcall %}
+        {% elif column_type == "filename" %}
+          {% call sortable_header_col(sort_pagination, "filename") %}Filename{% endcall %}
+        {% elif column_type == "bitness" %}
+          {% call sortable_header_col(sort_pagination, "bitness", align="right") %}Bitness{% endcall %}
+        {% elif column_type == "num_functions" %}
+        {% call sortable_header_col(sort_pagination, "num_functions", align="right") %}FNs{% endcall %}
+        {% elif column_type == "num_minhash" %}
+        {% call sortable_header_col(sort_pagination, "num_minhash", align="right") %}Min#{% endcall %}
+        {% elif column_type == "num_pichash" %}
+        {% call sortable_header_col(sort_pagination, "num_pichash", align="right") %}Pic#{% endcall %}
+        {% elif column_type == "num_library" %}
+        {% call sortable_header_col(sort_pagination, "num_library", align="right") %}Lib{% endcall %}
+        {% elif column_type == "direct_score" %}
+        {% call sortable_header_col(sort_pagination, "direct_score", align="center", colspan=2) %}Direct{% endcall %}
+        {% elif column_type == "frequency_score" %}
+        {% call sortable_header_col(sort_pagination, "frequency_score", align="center", colspan=2) %}Frequency{% endcall %}
+        {% elif column_type == "uniq_score" %}
+        {% call sortable_header_col(sort_pagination, "uniq_score", align="center") %}Uniq{% endcall %}
+        {% endif %}
+      {% endfor %}{% endmacro %}
+
+
+{# One family/library match row's cells. #}
+{% macro famlib_row(matched_sample, matching_result, scp, funp, ucs_famlib) %}{% set columns = FAMLIB_COLUMNS if ucs_famlib is none else ucs_famlib %}{% for column_type in columns %}
+          {% if column_type == "family_name" %}
+            <td valign="middle">{{ format_family_name(matched_sample.family, matched_sample.family_id) }}&nbsp;<a href="{{ url_for(request.endpoint, famid=matched_sample.family_id, samp=1, funp=1, **request.view_args) }}#sample-matches"><i class="fa-solid fa-filter"></i></a></td>
+          {% elif column_type == "version" %}
+            <td valign="middle">{{ matched_sample.version }}</td>
+          {% elif column_type == "sample_id" %}
+            <td style="text-align: right;" valign="middle" scope="row" class="id"><a href="{{ url_for('explore.sample_by_id', sample_id=matched_sample.sample_id) }}">{{ matched_sample.sample_id }}</a>&nbsp;<a href="{{ url_for(request.endpoint, samid=matched_sample.sample_id, funp=funp.page, **request.view_args) }}"><i class="fa-solid fa-filter"></i></a></td>
+          {% elif column_type == "sha256" %}
+            <td style="text-align: right;" valign="middle" class="font-monospace">{{ matched_sample.getShortSha256() }}</td>
+          {% elif column_type == "filename" %}
+            <td valign="middle">{{ matched_sample.getShortFilename(10) }}</td>
+          {% elif column_type == "bitness" %}
+            <td style="text-align: right;" valign="middle">{{ matched_sample.bitness }}</td>
+          {% elif column_type == "num_functions" %}
+            <td style="text-align: right;" valign="middle">{{ matched_sample.num_functions }}</td>
+          {% elif column_type == "num_minhash" %}
+            <td style="text-align: right;" valign="middle">{{ matched_sample.matched_functions_minhash }}</td>
+          {% elif column_type == "num_pichash" %}
+            <td style="text-align: right;" valign="middle">{{ matched_sample.matched_functions_pichash }}</td>
+          {% elif column_type == "num_library" %}
+            <td style="text-align: right;" valign="middle">{{ matched_sample.matched_functions_library }}</td>
+          {% elif column_type == "direct_score" %}
+            <td style="text-align: right;" valign="middle"><span class="hint--left" data-hint="Weighted Direct Score: &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_score_weighted) }} / {{ matching_result.reference_sample_entry.binweight }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_score_weighted) }}%">{{ "%3d"|format(matched_sample.matched_percent_score_weighted) }}</span></td>
+          {% elif column_type == "direct_nonlib_score" %}
+            <td style="text-align: right;" valign="middle"><span class="hint--left" data-hint="Weighted Direct Score (Library Excluded): &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_nonlib_score_weighted) }} / {{ matching_result.reference_sample_entry.binweight }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_nonlib_score_weighted) }}%">{{ "%3d"|format(matched_sample.matched_percent_nonlib_score_weighted) }} </span></td>
+          {% elif column_type == "frequency_score" %}
+            <td style="text-align: right; background-color:#{{ scp.getMatchHexColorFromResult(matched_sample, 'matched_percent_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="Frequency Weighted Score: &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_frequency_weighted) }} / {{ matching_result.reference_sample_entry.binweight }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_frequency_weighted) }}%">{{ "%3d"|format(matched_sample.matched_percent_frequency_weighted) }}</span></td>
+          {% elif column_type == "frequency_nonlib_score" %}
+            <td style="text-align: right; background-color:#{{ scp.getMatchHexColorFromResult(matched_sample, 'matched_percent_nonlib_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="Frequency Weighted Score (Library Excluded): &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_nonlib_frequency_weighted) }} / {{ matching_result.reference_sample_entry.binweight }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}%">{{ "%3d"|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}</span></td>
+          {% elif column_type == "uniq_score" %}
+            <td style="text-align: right; background-color:#{{ scp.getUniqueColorScore(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}" valign="middle"><span class="hint--left" data-hint="Unique Matching Score: &#10;Functions: {{ '%4d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['functions_matched']) }} &#10;Bytes: {{ '%2d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['bytes_matched']) }} &#10;Percent: {{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%">{{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%</span></td>
+          {% endif %}
+        {% endfor %}{% endmacro %}
+
+
+{# Header of the aggregated function match table (one row per reference function). #}
+{% macro aggregated_function_header(ucs_functions, sort_pagination=None) %}{% set columns = AGGREGATED_FUNCTION_COLUMNS if ucs_functions is none else ucs_functions %}
+    {% for column_type in columns %}
+    {% if column_type == "matched_function_id" %}
+    {% call sortable_header_col(sort_pagination, "matched_function_id") %}Function ID{% endcall %}
+    {% elif column_type == "offset" %}
+    {% call sortable_header_col(sort_pagination, "offset", align="right") %}offset{% endcall %}
+    {% elif column_type == "num_bytes" %}
+    {% call sortable_header_col(sort_pagination, "num_bytes", align="right") %}num_bytes{% endcall %}
+    {% elif column_type == "num_matched_families" %}
+    {% call sortable_header_col(sort_pagination, "num_matched_families", align="right") %}Matched Families{% endcall %}
+    {% elif column_type == "num_matched_samples" %}
+    {% call sortable_header_col(sort_pagination, "num_matched_samples", align="right") %}Matched Samples{% endcall %}
+    {% elif column_type == "num_matched_functions" %}
+    {% call sortable_header_col(sort_pagination, "num_matched_functions", align="right") %}Matched Functions{% endcall %}
+    {% elif column_type == "best_score" %}
+    {% call sortable_header_col(sort_pagination, "best_score", align="right") %}Best Score{% endcall %}
+    {% elif column_type == "num_minhash" %}
+    {% call sortable_header_col(sort_pagination, "num_minhash", align="right") %}Min{% endcall %}
+    {% elif column_type == "num_pichash" %}
+    {% call sortable_header_col(sort_pagination, "num_pichash", align="right") %}Pic{% endcall %}
+    {% elif column_type == "is_library_match" %}
+    {% call sortable_header_col(sort_pagination, "is_library_match", align="right") %}Lib{% endcall %}
+    {% elif column_type == "is_unique_match" %}
+    {% call sortable_header_col(sort_pagination, "is_unique_match", align="right") %}Uniq{% endcall %}
+    {% endif %}
+    {% endfor %}{% endmacro %}
+
+
+{# One aggregated function match row's cells. #}
+{% macro aggregated_function_row(aggregate, matching_result, ucs_functions) %}{% set columns = AGGREGATED_FUNCTION_COLUMNS if ucs_functions is none else ucs_functions %}{% for column_type in columns %}
+          {% if column_type == "matched_function_id" %}
+            <td valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=aggregate['function_id'] * -1 if matching_result.is_query else aggregate['function_id']) }}">{% if matching_result.is_query %}*{% endif %}{{ aggregate["function_id"] }}</a>&nbsp;<a href="{{ url_for(request.endpoint, funid=aggregate['function_id'], samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
+          {% elif column_type == "offset" %}
+            <td style="text-align: right;" valign="middle">0x{{ "%x"|format(aggregate["offset"]) }}</td>
+          {% elif column_type == "num_bytes" %}
+            <td style="text-align: right;" valign="middle">{{ "%d"|format(aggregate["num_bytes"]) }}</td>
+          {% elif column_type == "num_matched_families" %}
+            <td style="text-align: right;" valign="middle">
+              {% if aggregate["num_families_matched"] == 1 %}
+               <span><i class="fa-solid fa-bug" title="Family ID"></i>&nbsp; {{ join_hint_strings(aggregate['families_matched']) }}</span>
+              {% elif aggregate["num_families_matched"] in [2, 3, 4, 5] %}
+               <span class="hint--right" data-hint="{{ join_hint_strings(aggregate['families_matched']) }}">{{ aggregate["num_families_matched"] }}&nbsp;<i class="fa-solid fa-bug " title="Family ID"></i></span>
+              {% else %}
+                {{ aggregate["num_families_matched"] }}
+              {% endif %}
+            </td>
+          {% elif column_type == "num_matched_samples" %}
+            <td style="text-align: right;" valign="middle">{{ aggregate["num_samples_matched"] }}</td>
+          {% elif column_type == "num_matched_functions" %}
+            <td style="text-align: right;" valign="middle">{{ aggregate["num_functions_matched"] }}</td>
+          {% elif column_type == "best_score" %}
+            <td style="text-align: right;" valign="middle">{{ "%d"|format(aggregate["best_score"]) }}</td>
+          {% elif column_type == "num_minhash" %}
+            <td style="text-align: right;" valign="middle">{{ aggregate["minhash_matches"] }}</td>
+          {% elif column_type == "num_pichash" %}
+            <td style="text-align: right;" valign="middle">{{ aggregate["pichash_matches"] }}</td>
+          {% elif column_type == "is_library_match" %}
+            <td style="text-align: right;" valign="middle"><i {% if aggregate["library_matches"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+          {% elif column_type == "is_unique_match" %}
+            <td style="text-align: right;" valign="middle"><i {% if aggregate["is_family_unique"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+          {% endif %}
+        {% endfor %}{% endmacro %}
+
+
+{# Header of the function-to-function match table.
+
+   `unique_match_known` is false for the 1-vs-1 page: a match against a single other
+   sample says nothing about whether the function is unique across the corpus, so
+   `data.result()` leaves that column out. The column id stays in the caller's
+   settings, it just renders nothing - which is what result_compare_vs.html did
+   before this was shared. #}
+{% macro matched_function_header(ucs_functions, unique_match_known=True, sort_pagination=None) %}{% set columns = MATCHED_FUNCTION_COLUMNS if ucs_functions is none else ucs_functions %}
+    {% for column_type in columns %}
+      {% if column_type == "function_id_a" %}
+      {% call sortable_header_col(sort_pagination, "function_id_a") %}Function A <i class="fa-solid fa-project-diagram " title="Function ID"></i>{% endcall %}
+      {% elif column_type == "offset_a" %}
+      {% call sortable_header_col(sort_pagination, "offset_a", align="right") %}Offset A{% endcall %}
+      {% elif column_type == "offset_b" %}
+      {% call sortable_header_col(sort_pagination, "offset_b", align="right") %}Offset B{% endcall %}
+      {% elif column_type == "function_id_b" %}
+      {% call sortable_header_col(sort_pagination, "function_id_b", align="right") %}Function B <i class="fa-solid fa-project-diagram " title="Function ID"></i>{% endcall %}
+      {% elif column_type == "num_bytes" %}
+      {% call sortable_header_col(sort_pagination, "num_bytes", align="right") %}Bytes{% endcall %}
+      {% elif column_type == "best_score" %}
+      {% call sortable_header_col(sort_pagination, "best_score", align="right") %}Score{% endcall %}
+      {% elif column_type == "is_minhash_match" %}
+      {% call sortable_header_col(sort_pagination, "is_minhash_match", align="center") %}Min{% endcall %}
+      {% elif column_type == "is_pichash_match" %}
+      {% call sortable_header_col(sort_pagination, "is_pichash_match", align="center") %}Pic{% endcall %}
+      {% elif column_type == "is_library_match" %}
+      {% call sortable_header_col(sort_pagination, "is_library_match", align="center") %}Lib{% endcall %}
+      {% elif column_type == "is_unique_match" and unique_match_known %}
+      {% call sortable_header_col(sort_pagination, "is_unique_match", align="center") %}Uniq{% endcall %}
+      {% endif %}
+    {% endfor %}{% endmacro %}
+
+
+{# One function-to-function match row's cells. #}
+{% macro matched_function_row(matched_function, matching_result, ucs_functions, unique_match_known=True) %}{% set columns = MATCHED_FUNCTION_COLUMNS if ucs_functions is none else ucs_functions %}{% for column_type in columns %}
+      {% if column_type == "function_id_a" %}
+      <td valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.function_id * -1 if matching_result.is_query else matched_function.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ matched_function.function_id }}</a>&nbsp;<a href="{{ url_for(request.endpoint, funid=matched_function.function_id, samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
+      {% elif column_type == "offset_a" %}
+      <td style="text-align: right;" valign="middle">0x{{ "%x"|format(matched_function.offset) }}</td>
+      {% elif column_type == "offset_b" %}
+      <td style="text-align: right;" valign="middle">0x{{ "%x"|format(matched_function.matched_offset) }}</td>
+      {% elif column_type == "function_id_b" %}
+      <td style="text-align: right;" valign="middle"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.matched_function_id) }}">{{ matched_function.matched_function_id }}</a>{% if not matching_result.is_query %}&nbsp;<a target="_blank" href="{{ url_for('data.match_functions', function_id_a=matched_function.function_id, function_id_b=matched_function.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>{% endif %}</td>
+      {% elif column_type == "num_bytes" %}
+      <td style="text-align: right;" valign="middle">{{ "%d"|format(matched_function.num_bytes) }}</td>
+      {% elif column_type == "best_score" %}
+      <td style="text-align: right;" valign="middle">{{ "%d"|format(matched_function.matched_score) }}</td>
+      {% elif column_type == "is_minhash_match" %}
+      <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_minhash %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      {% elif column_type == "is_pichash_match" %}
+      <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_pichash %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      {% elif column_type == "is_library_match" %}
+      <td style="text-align: center;" valign="middle"><i {% if matching_result.hasLibraryMatch(matched_function.function_id) %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      {% elif column_type == "is_unique_match" and unique_match_known %}
+      <td style="text-align: center;" valign="middle"><i {% if matching_result.getFamilyIdsMatchedByFunctionId(matched_function.function_id)|length == 1 %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      {% endif %}
+    {% endfor %}{% endmacro %}
