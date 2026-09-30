@@ -1005,12 +1005,28 @@ def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
         "filter_strongest_per_family": filter_strongest_per_family,
     }
     matching_result.setFilterValues(filter_values)
-    link_hunt_result = matching_result.getLinkHuntResults(filter_min_score, filter_lib_min_score, filter_min_size, filter_min_offset, filter_max_offset, filter_unpenalized_family_count, filter_exclude_families, filter_exclude_samples, filter_strongest_per_family)
+    link_hunt_args = (filter_min_score, filter_lib_min_score, filter_min_size, filter_min_offset, filter_max_offset, filter_unpenalized_family_count, filter_exclude_families, filter_exclude_samples, filter_strongest_per_family)
+    link_hunt_result = matching_result.getLinkHuntResults(*link_hunt_args)
 
-    function_entries = client.getFunctionsBySampleId(matching_result.reference_sample_entry.sample_id)
-    # TODO: probably need to paginate them as well
-    link_clusters = matching_result.clusterLinkHuntResult(function_entries, link_hunt_result)
-    link_clusters = sorted([cluster for cluster in link_clusters if len(cluster["links"]) > 1], key=lambda x: x["score"], reverse=True)
+    # Clustering fetches every function of the reference sample and walks their call
+    # references, the bulk of this request. What it clusters is the link hunt result, so
+    # it is memoized per job and per argument of getLinkHuntResults; the link score
+    # filter below applies to the clusters afterwards and paging is over the individual
+    # links, so neither needs a new clustering. An exclusion list is only read as a set,
+    # so it is keyed as one, and an empty list as None, which excludes the same nothing -
+    # the default filters and a submitted copy of them differ by exactly that. Nothing
+    # else is normalised. The checkbox always parses to a bool, so it has no None to
+    # fold; a score, size or offset of 0 filters nothing only if the report has no
+    # negative values, which getLinkHuntResults does not itself check.
+    cluster_key = (job_info.job_id,) + tuple((tuple(sorted(set(arg))) or None) if isinstance(arg, list) else arg for arg in link_hunt_args)
+
+    def cluster_link_hunt_result():
+        function_entries = client.getFunctionsBySampleId(matching_result.reference_sample_entry.sample_id)
+        # TODO: probably need to paginate them as well
+        link_clusters = matching_result.clusterLinkHuntResult(function_entries, link_hunt_result)
+        return sorted([cluster for cluster in link_clusters if len(cluster["links"]) > 1], key=lambda x: x["score"], reverse=True)
+    # shared with every later request of the same key, so filtered below into a new list only
+    link_clusters = app_memo(current_app, "linkhunt_clusters", 32).get(cluster_key, cluster_link_hunt_result)
 
     if filter_link_score:
         link_clusters = [cluster for cluster in link_clusters if cluster["score"] > filter_link_score]
