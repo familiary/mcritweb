@@ -1,5 +1,5 @@
 {% from 'table/pagination_widget.html' import sortable_header_col %}
-{% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
+{% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id, mark %}
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro sample_row_std_js() %}
@@ -113,7 +113,7 @@
 {% endmacro %}
   
   
-{% macro sample_row(sample, no_family=False, compact_view=False, show_analyze=True, show_export=False, show_edit=False, show_hint=False, job_collection=None, column_setup=None, row_decorations=None) %}
+{% macro sample_row(sample, no_family=False, compact_view=False, show_analyze=True, show_export=False, show_edit=False, show_hint=False, job_collection=None, column_setup=None, row_decorations=None, highlight_terms=None) %}
   {% if column_setup is none %}
     {% set column_setup = ["sample_id", "sha256", "family", "version", "filename", "bitness", "num_functions", "is_library"] %}
   {% endif %}
@@ -123,15 +123,15 @@
       {% if column_type == "sample_id" %}
        <th align="left" valign="middle" scope="row" class="sample-id">{{ "%d"|format(sample.sample_id) }}</th>
       {% elif column_type == "sha256" %}
-        <td align="right" valign="middle" class="font-monospace">{{ sample.getShortSha256() }}</td>
+        <td align="right" valign="middle" class="font-monospace">{{ mark(sample.getShortSha256(), highlight_terms, "sha256") }}</td>
       {% elif column_type == "family" %}
         {% if not no_family %}
-          <td valign="middle">{{ format_family_name(sample.family, sample.family_id) }}</td>
+          <td valign="middle">{{ format_family_name(sample.family, sample.family_id, highlight_terms, "family") }}</td>
         {% endif %}
       {% elif column_type == "version" and not compact_view %}
-        <td valign="middle">{{ sample.version }}</td>
+        <td valign="middle">{{ mark(sample.version, highlight_terms, "version") }}</td>
       {% elif column_type == "filename" and not compact_view %}
-        <td valign="middle">{{ sample.getShortFilename() }}</td>
+        <td valign="middle">{{ mark(sample.getShortFilename(), highlight_terms, "filename") }}</td>
       {% elif column_type == "bitness" and not compact_view %}
         <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
       {% elif column_type == "num_functions" %}

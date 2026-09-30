@@ -3,14 +3,16 @@
 {% from 'table/function_row.html' import function_row, function_header %}
 {% from 'table/sample_row.html' import sample_row, sample_header, minisample_row, minisample_header %}
 
-{% macro _table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table") %}
+{# `highlight_terms` is named rather than left in kwargs so it reaches the row macros
+   only - a header has no search hit to mark, and half of them do not accept kwargs. #}
+{% macro _table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table", highlight_terms=None) %}
   <table class="table table-hover" id="{{table_id}}">
     <thead class="thead-light">
       {{ header_macro(**kwargs) }}
     </thead>
     <tbody>
       {% for row_data in iterable_rows %}
-        {{ row_macro(row_data, parent=table_id, **kwargs) }}
+        {{ row_macro(row_data, parent=table_id, highlight_terms=highlight_terms, **kwargs) }}
       {% endfor %}
     </tbody>
   </table>
