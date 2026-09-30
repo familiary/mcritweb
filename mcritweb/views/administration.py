@@ -2,7 +2,7 @@ import json
 import re
 
 import requests
-from flask import Blueprint, current_app, flash, g, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
@@ -15,26 +15,21 @@ from mcritweb.views.utility import forget_server_probe, get_session_user_id
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
-@bp.route('/change_username' , methods=('GET', 'POST'))
+@bp.route('/change_username' , methods=('POST',))
 @login_required
 def change_username():
-    # validate user_id:
-    try:
-        user_id = int(session['user_id'])
-        if user_id < 1:
-            raise ValueError
-    except Exception:
-        return redirect(url_for('index'))
     new_username = request.form['username']
     password = request.form['inputPassword1']
+    # g.user is the caller's row, read fresh for this request by load_logged_in_user
+    user_info = g.user
     error_msg = None
-    user_info = UserInfo.fromDb(user_id=session['user_id'])
+    # cheapest check first, and the password before the lookup, so that whether a
+    # name is taken is only ever answered to someone who proved who they are
     if re.match(r"^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$", new_username) is None:
         error_msg = "Username has invalid format."
-    if  not check_password_hash(user_info.password, password):
+    elif not check_password_hash(user_info.password, password):
         error_msg = 'Incorrect Password!'
-    user_with_name = UserInfo.fromDb(username=new_username)
-    if user_with_name is not None:
+    elif UserInfo.fromDb(username=new_username) is not None:
         error_msg = 'Username is already taken!'
     if error_msg is None:
         user_info.username = new_username
@@ -47,24 +42,17 @@ def change_username():
     return redirect(url_for('authentication.settings'))
 
 
-@bp.route('/change_password' , methods=('GET', 'POST'))
+@bp.route('/change_password' , methods=('POST',))
 @login_required
 def change_password():
-    # validate user_id:
-    try:
-        user_id = int(session['user_id'])
-        if user_id < 1:
-            raise ValueError
-    except Exception:
-        return redirect(url_for('index'))
     new_password = request.form['inputPassword3']
     old_password = request.form['inputPassword2']
+    user_info = g.user
     error_msg = None
-    user_info = UserInfo.fromDb(user_id=session['user_id'])
-    if not check_password_hash(user_info.password, old_password):
-        error_msg = 'Incorrect password!'
     if not new_password == request.form['inputPassword4']:
         error_msg = 'The entered passwords do not match!'
+    elif not check_password_hash(user_info.password, old_password):
+        error_msg = 'Incorrect password!'
     if error_msg is None:
         user_info.password = generate_password_hash(new_password)
         user_info.saveToDb(withPassword=True)
@@ -169,14 +157,7 @@ def regenerate_apitoken():
     not be replaced at all: deleting the account was the only way to retire one, which
     is not a thing you can ask of someone whose token has leaked. See issue #100.
     """
-    user_id = get_session_user_id()
-    if user_id is None:
-        flash('User ID was not recognized', category='error')
-        return redirect(url_for('index'))
-    user_info = UserInfo.fromDb(user_id=user_id)
-    if user_info is None:
-        flash('User ID was not recognized', category='error')
-        return redirect(url_for('index'))
+    user_info = g.user
     user_info.apitoken = generate_apitoken()
     user_info.saveToDb()
     flash('A new API token was generated. Anything using the old one has to be updated.', category='success')
