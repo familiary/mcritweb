@@ -222,6 +222,13 @@
         <td valign="middle">Job ID:</td>
         <td valign="middle">{{ job_info.job_id }}</td>
       </tr>
+      {% if job_info.username is defined %}
+        {# who asked for the job (fkie-cad/mcritweb#37); the row exists only when the backend records it #}
+        <tr>
+          <td valign="middle">Requested by:</td>
+          <td valign="middle">{{ job_info.username if job_info.username else "-" }}</td>
+        </tr>
+      {% endif %}
       {% if show_created %}
         <tr>
           <td valign="middle">Created: </td>
