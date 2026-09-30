@@ -178,7 +178,8 @@ Jobs
     mcrit 1.9.0 added all three and the suite failed until they were named here. MCRITweb
     offers no button for any of them - the server page starts only rebuildIndex and
     recalculateMinHashes - so they carry doDbCleanup's wording and no link, rather than
-    pointing at a page that cannot start them.
+    pointing at a page that cannot start them. mcrit 1.13.0 added three more the same way:
+    rebuildBandDfIndex, rebuildFunctionRangeIndex and deleteOrphanedQueueFiles.
   #}
   {% set job_category_empty_states = {
     "getMatchesForSample":       ("No 1 vs N matching jobs yet. Click here to start one", url_for("analyze.compare")),
@@ -197,12 +198,15 @@ Jobs
     "repairMinHashes":           ("No MinHash repairs yet. They are started on the backend, not from here.", None),
     "recomputeFamilyStats":      ("No family statistics recomputations yet. They are started on the backend, not from here.", None),
     "rebuildPicBlockHashIndex":  ("No PicBlockHash index rebuilds yet. They are started on the backend, not from here.", None),
+    "rebuildBandDfIndex":        ("No band frequency index rebuilds yet. They are started on the backend, not from here.", None),
+    "rebuildFunctionRangeIndex": ("No function range index rebuilds yet. They are started on the backend, not from here.", None),
     "addBinarySample":           ("No samples have been submitted yet. Click here to submit one", url_for("data.submit")),
     "deleteSample":              ("No samples have been deleted.", None),
     "modifySample":              ("No samples have been modified.", None),
     "deleteFamily":              ("No families have been deleted.", None),
     "modifyFamily":              ("No families have been modified.", None),
     "doDbCleanup":               ("No database cleanups yet. They are started on the backend, not from here.", None),
+    "deleteOrphanedQueueFiles":  ("No orphaned queue file cleanups yet. They are started on the backend, not from here.", None),
   } %}
   {% set empty_for_category = job_category_empty_states.get(active) %}
   {{ job_table(jobs, table_id=active, families_by_id=families, samples_by_id=samples,

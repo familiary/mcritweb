@@ -40,6 +40,8 @@ JOB_METHOD_NAMES = {
     "recalculateMinHashes": "Recalculate MinHashes and Index",
     "repairMinHashes": "Repair MinHashes",
     "recomputeFamilyStats": "Recompute Family Statistics",
+    "rebuildBandDfIndex": "Rebuild Band Frequency Index",
+    "rebuildFunctionRangeIndex": "Rebuild Function Range Index",
     # collection changes
     "addBinarySample": "Add Binary",
     "deleteSample": "Delete Sample",
@@ -48,6 +50,7 @@ JOB_METHOD_NAMES = {
     "modifyFamily": "Modify Family",
     # maintenance
     "doDbCleanup": "Database Cleanup",
+    "deleteOrphanedQueueFiles": "Delete Orphaned Queue Files",
 }
 
 
