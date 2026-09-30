@@ -157,6 +157,9 @@ class RawResponse:
     def __init__(self, status_code, payload=None):
         self.status_code = status_code
         self._payload = payload
+        # what the API passthrough reads since #228: it forwards a JSON body with its content type
+        self.headers = {"Content-Type": "application/json"}
+        self.content = b"" if payload is None else json.dumps(payload).encode()
 
     def json(self):
         return {"status": "successful", "data": self._payload}
