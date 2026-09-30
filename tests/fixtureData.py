@@ -24,6 +24,7 @@ from mcrit.minhash.MinHash import MinHash
 from mcrit.queue.LocalQueue import Job
 from mcrit.storage.FamilyEntry import FamilyEntry
 from mcrit.storage.FunctionEntry import FunctionEntry
+from mcrit.storage.FunctionLabelEntry import FunctionLabelEntry
 from mcrit.storage.SampleEntry import SampleEntry
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
@@ -303,6 +304,18 @@ class CorpusMcritClient:
     def isFunctionId(self, function_id, *args, **kwargs):
         self._record("isFunctionId", function_id, *args, **kwargs)
         return int(function_id) in self._functions
+
+    def modifyFunction(self, function_id, function_name, *args, **kwargs):
+        # McritClient.modifyFunction (mcrit > 1.8.1): the backend sets the name and records
+        # it as a label by the requesting user
+        self._record("modifyFunction", function_id, function_name, *args, **kwargs)
+        function_entry = self._functions.get(int(function_id))
+        if function_entry is None or int(function_id) < 0:
+            return None
+        function_entry.function_name = function_name
+        if function_name:
+            function_entry.function_labels.append(FunctionLabelEntry(function_name, self.kwargs.get("username") or "tester"))
+        return {"message": "Function modified."}
 
     # --- direct matching ---------------------------------------------------------
 

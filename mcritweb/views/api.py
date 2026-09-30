@@ -16,6 +16,7 @@ bp = Blueprint('api', __name__, url_prefix='/api')
 # read or a job submission, which the UI grants to visitors.
 CONTRIBUTOR_ONLY = [
     (re.compile("samples$"), "POST"),   # addReport
+    (re.compile(r"functions/\d+$"), "PUT"),   # modifyFunction (explore.modifyFunction is contributor_required)
 ]
 
 
@@ -55,7 +56,7 @@ def handle_raw_response(response):
     return Response(status=response.status_code)
 
 
-@bp.route('/<path:api_path>', methods=['GET','POST'])
+@bp.route('/<path:api_path>', methods=['GET','POST','PUT'])
 @token_required
 @mcrit_server_required
 def api_router(api_path):
@@ -102,9 +103,17 @@ def api_router(api_path):
     # getFamilies
     elif re_match := re.match(r"families$", api_path):
         return handle_raw_response(client.getFamilies())
-    # getFunctionById, isFunctionId
+    # getFunctionById, isFunctionId; modifyFunction by PUT (fkie-cad/mcritweb#72)
     elif re_match := re.match(r"functions/(?P<function_id>\d+)$", api_path):
         function_id = int(re_match.group("function_id"))
+        if request.method == "PUT":
+            if not callable(getattr(client, "modifyFunction", None)):
+                abort(501)
+            body = request.get_json(silent=True) or request.form
+            function_name = body.get("function_name") if hasattr(body, "get") else None
+            if not isinstance(function_name, str):
+                abort(400)
+            return handle_raw_response(client.modifyFunction(function_id, function_name))
         forward_with_xcfg = request.args.get("with_xcfg", "").lower() in ["1", "true"]
         return handle_raw_response(client.getFunctionById(function_id, with_xcfg=forward_with_xcfg))
     # getFunctions

@@ -569,6 +569,69 @@ def sample_by_id(sample_id):
         return redirect(url_for('explore.samples'))
 
 
+#: what the backend accepts as a function name (FunctionResource.on_put): printable ASCII, empty clears the name
+FUNCTION_NAME_PATTERN = re.compile(r"^[ -~]{0,256}$")
+
+
+#: the last mcrit release without PUT /functions/{id}; a backend reporting this version or
+#: older cannot rename, whatever the installed McritClient offers
+LAST_MCRIT_WITHOUT_FUNCTION_RENAME = (1, 8, 1)
+
+
+def _version_tuple(version):
+    try:
+        return tuple(int(part) for part in str(version).split("-")[0].split(".")[:3])
+    except (TypeError, ValueError):
+        return None
+
+
+def can_modify_functions(client):
+    """Renaming a function needs McritClient.modifyFunction and a backend that serves
+    PUT /functions/{id}; both arrived after mcrit 1.8.1, and an up-to-date client can well
+    be talking to an older server, so the server's own version decides."""
+    if not callable(getattr(client, "modifyFunction", None)):
+        return False
+    try:
+        version = _version_tuple(client.getVersion())
+    except Exception:
+        return False
+    return version is not None and version > LAST_MCRIT_WITHOUT_FUNCTION_RENAME
+
+
+@bp.route('/modifyFunction', methods=['POST'])
+@contributor_required
+@mcrit_server_required
+def modifyFunction():
+    """Set a function's name (fkie-cad/mcritweb#72). The backend records the name as a
+    label by the user MCRITweb acts for, so the function page shows who named it when."""
+    client = get_client()
+    try:
+        function_id = int(request.form.get("function_id", ""))
+        function_entry = client.getFunctionById(function_id)
+        if function_entry is None:
+            raise ValueError
+    except (TypeError, ValueError):
+        flash("No valid function_id received.", category="error")
+        return redirect(url_for('explore.functions'))
+    if not can_modify_functions(client):
+        flash("The connected MCRIT backend cannot rename functions - it needs a version newer than 1.8.1.", category="error")
+        return redirect(url_for('explore.function_by_id', function_id=function_id))
+    new_name = request.form.get("function_name", "").strip()
+    if not FUNCTION_NAME_PATTERN.match(new_name):
+        flash("A function name may be up to 256 printable ASCII characters.", category="error")
+        return redirect(url_for('explore.function_by_id', function_id=function_id))
+    if new_name == (function_entry.function_name or ""):
+        flash("The function already has that name.", category="info")
+        return redirect(url_for('explore.function_by_id', function_id=function_id))
+    if client.modifyFunction(function_id, new_name) is None:
+        flash("The backend did not accept the new function name.", category="error")
+    elif new_name:
+        flash(f"Function {function_id} is now named '{new_name}'.", category="info")
+    else:
+        flash(f"The name of function {function_id} was cleared.", category="info")
+    return redirect(url_for('explore.function_by_id', function_id=function_id))
+
+
 @bp.route('/functions/<int(signed=True):function_id>')
 @visitor_required
 @mcrit_server_required
@@ -578,7 +641,13 @@ def function_by_id(function_id):
     if function_entry:
         sample_entry = client.getSampleById(function_entry.sample_id)
         pichash_match_summary = client.getMatchesForPicHash(function_entry.pichash, summary=True)
-        return render_template("single_function.html", entry=function_entry, sample_entry=sample_entry, pichash_match_summary=pichash_match_summary)
+        return render_template(
+            "single_function.html",
+            entry=function_entry,
+            sample_entry=sample_entry,
+            pichash_match_summary=pichash_match_summary,
+            can_modify_function=can_modify_functions(client),
+        )
     else:
         flash("The given Function ID doesn't exist", category="error")
         return redirect(url_for('explore.functions'))
