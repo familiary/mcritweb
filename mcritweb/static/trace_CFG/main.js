@@ -3297,6 +3297,7 @@ function highlightUERs(UERtype){
   function getCodefromGraph(){
     var nodes = g.nodes();
     var num_nodes = nodes.length;
+    var lookups = [];
     for (var i=0; i<num_nodes; i++)  {
       var nodeId = nodes[i];
       // MCRIT: here we can process any custom information we provided into the graph
@@ -3331,17 +3332,41 @@ function highlightUERs(UERtype){
       if (picblockhash) {
         var hash_only = picblockhash.substring(picblockhash.indexOf('x') + 1);
         
-        var xmlHttp = new XMLHttpRequest();
-        xmlHttp.open( "GET", "../getPicBlockMatches/" + hash_only, false ); // false for synchronous request
-        xmlHttp.send( null );
-        var result_json = JSON.parse(xmlHttp.responseText);
-        code['block_result'] = result_json["data"]
-        code['block_display'] = ">>> Matches: " + result_json["families"] + " families, " + result_json["samples"] + " samples, " + result_json["functions"] + " functions.\n" + label;
-        // code['block_color'] = "red";
+        lookups.push(fetchPicBlockMatches(code, hash_only));
       }
       codes[i] = code;
     }    
     
+    // mcritweb: lookups are asynchronous and parallel (synchronous XHR is deprecated); render once all settle
+    var blockCodes = codes;
+    Promise.all(lookups).then(function(){
+      // initialize() replaces `codes` when another graph is loaded; drop this one's late result
+      if (blockCodes === codes) {
+        renderCodefromGraph();
+      }
+    });
+  }
+
+  // A failed lookup leaves the block as it is without a picblockhash: no match line.
+  function fetchPicBlockMatches(code, hash_only){
+    return fetch("../getPicBlockMatches/" + hash_only)
+      .then(function(response){
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+        return response.json();
+      })
+      .then(function(result_json){
+        code['block_result'] = result_json["data"]
+        code['block_display'] = ">>> Matches: " + result_json["families"] + " families, " + result_json["samples"] + " samples, " + result_json["functions"] + " functions.\n" + code['label'];
+        // code['block_color'] = "red";
+      })
+      .catch(function(error){
+        console.warn("PicBlockHash lookup failed for " + hash_only + ": " + error);
+      });
+  }
+
+  function renderCodefromGraph(){
     // sort the codeblocks based on the addresses or labels
     codes.sort(function(a,b){
       // MCRIT fix: sort after parsing by int instead of subtracting strings
