@@ -1366,9 +1366,7 @@ def submit():
         else:
             flash('Sample was already in database', category='warning')
             return url_for('explore.sample_by_id', sample_id=sample_entry.sample_id), 202 # Accepted
-    all_families = client.getFamilies()
-    family_names = [family_entry.family_name for family_entry in all_families.values()]
-    return render_template('submit.html', families=family_names, show_submit_fields=True)
+    return render_template('submit.html', show_submit_fields=True)
 
 
 ################################################################

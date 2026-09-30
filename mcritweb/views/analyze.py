@@ -532,4 +532,4 @@ def query():
         else:
             flash('Sample could not be parsed / disassembled!', category='error')
             return "", 400 # Bad Request
-    return render_template('query.html', families=[], show_submit_fields=False)
+    return render_template('query.html', show_submit_fields=False)

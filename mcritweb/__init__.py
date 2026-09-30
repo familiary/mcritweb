@@ -3,8 +3,6 @@ import os
 
 from flask import Flask, g, redirect, render_template, request, send_from_directory, url_for
 
-from mcritweb.autocomplete import autocomplete_items
-
 #: Ceiling on TRUSTED_PROXY_COUNT. A CDN in front of a load balancer in front of NGINX
 #: is three hops; nothing real is anywhere near this. The point is that a fat-fingered
 #: count is refused loudly instead of installed: ProxyFix accepts x_for=1000000000
@@ -212,14 +210,6 @@ def create_app(test_config=None, instance_path=None):
     # through app.extensions["csrf"], which CsrfProtect registered above
     app.config['DROPZONE_ENABLE_CSRF'] = True
     Dropzone(app)
-
-    # Escapes the names a type-ahead will render, because autocomplete.js is vendored
-    # and renders them through innerHTML. The reasoning, and the known display cost,
-    # are in mcritweb/autocomplete.py - which explore.family_names shares, so the two
-    # ways into the widget cannot drift apart. See #168.
-    @app.template_filter('autocomplete_items')
-    def autocomplete_items_filter(names):
-        return autocomplete_items(names)
 
     @app.template_filter('silent')
     def silent(input):

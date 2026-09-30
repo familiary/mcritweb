@@ -194,10 +194,15 @@ DEFAULT_SEARCH_TYPES = ["family", "sample"]
 def sample_row_job_collection(client, samples):
     """The jobs a sample listing annotates its rows with.
 
+    Each request names the page's sample ids, and mcrit selects the jobs whose first
+    argument is one of them in its query, so what comes back scales with the jobs of
+    the samples on the page rather than with the installation's whole matching history.
     `filterToSampleIds` is what makes the result exact: it keeps only jobs whose own
     `sample_id` - their first argument - is on the page, which is the same set the row
-    macro would have found in a collection built from the whole queue. An empty page
-    has nothing to annotate, so it asks the backend for nothing.
+    macro would have found in a collection built from the whole queue. It also keeps a
+    backend that does not know `sample_ids` correct: that one ignores the parameter and
+    answers the whole method, as it did before. An empty page has nothing to annotate,
+    so it asks the backend for nothing.
 
     A failed queue read used to take the whole page down (`JobCollection(None)`), so
     say what was lost and render the rows without their annotations instead.
@@ -216,19 +221,23 @@ def sample_row_job_collection(client, samples):
     counter carries no number, which `Job.number` reports as -1; those sort last, as
     the oldest, and python's stable sort leaves them in the order the backend listed
     them.
+
+    Neither read takes a `limit`: the badge counts all of a sample's matching jobs, so
+    the newest N would undercount it. The page's sample ids bound them instead.
     """
     if not samples:
         return JobCollection([])
+    sample_ids = [sample.sample_id for sample in samples]
     jobs = []
     for method in SAMPLE_ROW_JOB_METHODS:
-        jobs_for_method = client.getQueueData(method=method)
+        jobs_for_method = client.getQueueData(method=method, sample_ids=sample_ids)
         if jobs_for_method is None:
             flash("Ups, reading MCRIT's job queue failed - rows are shown without their job annotations.", category="error")
             return JobCollection([])
         jobs.extend(jobs_for_method)
     jobs.sort(key=lambda job: job.number if isinstance(job.number, int) else -1, reverse=True)
     job_collection = JobCollection(jobs)
-    job_collection.filterToSampleIds([sample.sample_id for sample in samples])
+    job_collection.filterToSampleIds(sample_ids)
     return job_collection
 
 
@@ -287,7 +296,8 @@ def modifyFamily():
 @visitor_required
 @mcrit_server_required
 def family_names():
-    """Names for the family type-ahead in the edit modals, as JSON.
+    """Names for the family type-ahead, as JSON: the edit modals and, since #192, the
+    family field of the submit form and of the drop overlay.
 
     Every page carrying one of those modals used to embed the complete list of family
     names in its source. mcrit answers `getFamilies()` with one storage lookup per
@@ -301,11 +311,10 @@ def family_names():
     free-text input and stays usable without them.
 
     Answers `{label, value}` pairs rather than bare names, escaped by
-    `mcritweb.autocomplete.autocomplete_items` - the same function behind the
-    `|autocomplete_items` filter that the shipped-with-the-page type-aheads use. The
-    consumer is the vendored autocomplete.js either way, and it renders every
-    suggestion through innerHTML, so escaping here is what keeps a family name from
-    executing (#168). `jsonify` protects the transport, not the sink.
+    `mcritweb.autocomplete.autocomplete_items`. This is the only way family names reach
+    the type-ahead, and the vendored autocomplete.js renders every suggestion through
+    innerHTML, so escaping here is what keeps a family name from executing (#168).
+    `jsonify` protects the transport, not the sink.
     """
     query = request.args.get('q', "")
     client = get_client()

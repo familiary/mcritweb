@@ -29,6 +29,17 @@ def nullable_int(x):
     except Exception:
         raise ValueError("Can't cast this to int")
 
+def int_list(x):
+    """Comma-separated ints, parsed the way the backend's /jobs parses them: an item
+    that isn't one is dropped."""
+    ids = []
+    for item in x.split(","):
+        try:
+            ids.append(int(item))
+        except ValueError:
+            pass
+    return ids
+
 def stringified_bool(x):
     if not isinstance(x, str):
         return x
@@ -159,6 +170,15 @@ def api_router(api_path):
             forward_ascending = request.args.get("ascending", False, stringified_bool)
         except Exception:
             pass
+        # the backend's selectors, passed on as lists; an item that isn't an id is
+        # dropped, as the backend drops it, and a present but empty list still selects
+        # nothing rather than everything
+        forward_sample_ids = None
+        forward_job_ids = None
+        if "sample_ids" in request.args:
+            forward_sample_ids = int_list(request.args["sample_ids"])
+        if "job_ids" in request.args:
+            forward_job_ids = [item.strip() for item in request.args["job_ids"].split(",") if item.strip()]
         return handle_raw_response(
             client.getQueueData(
                 start=forward_start, 
@@ -166,7 +186,9 @@ def api_router(api_path):
                 method=forward_method, 
                 filter=forward_filter, 
                 state=forward_state, 
-                ascending=forward_ascending
+                ascending=forward_ascending,
+                sample_ids=forward_sample_ids,
+                job_ids=forward_job_ids
             )
         )
     # getJobData, getResultForJob
