@@ -519,6 +519,12 @@ def test_a_job_that_produced_no_result_at_all_says_it_is_empty(client, as_role, 
 def test_a_report_this_dispatch_cannot_render_is_reported_not_crashed(client, as_role, corpus_mcrit, monkeypatch):
     """The dispatch chain in `data.result` had no else, so a job method it does not
     know - a new one on the backend, say - returned None and Flask answered 500."""
+
+
+def test_a_report_of_a_job_type_the_dispatch_does_not_know_is_reported_not_crashed(client, as_role, corpus_mcrit, monkeypatch):
+    """The dispatch in `data.result` had no else, so a finished job whose type it does not
+    know returned None and Flask answered 500. The three repair jobs mcrit 1.9.0 added
+    were such types on a live instance."""
     as_role("visitor")
     job_id = job_id_of("matches_for_sample")
     # deep copy: the corpus client hands out the dict it keeps, and Job wraps it
