@@ -5,7 +5,7 @@ Server settings
 {% block content %}
 <h1>Server Management</h1>
 
-<h3>Server Parameters:</h3>
+<h2 class="h3">Server Parameters:</h2>
 
 <table>
     <tr>
@@ -38,7 +38,7 @@ Server settings
     </tr>
 </table>
 
-<h3>Maintenance:</h3>
+<h2 class="h3">Maintenance:</h2>
 <p>Schedule jobs for various Maintenance functionality. Note that depending on your database size, some of these operations may take some time.</p>
 
 <form action = "{{ url_for('admin.schedule_recalc_pichashes') }}" method='post'>
@@ -54,25 +54,25 @@ Server settings
     <button type="submit" class="btn btn-primary">Rebuild MinHash Index</button>
 </form>
 
-<h3>Change Backend Server:</h3>
+<h2 class="h3">Change Backend Server:</h2>
 
 <form action = "{{ url_for('admin.change_server') }}" method='post'>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group">
-        <label for="server">mcrit-server</label>
+        <label for="mcrit_server_url">mcrit-server</label>
         <input type="url" name='mcrit_server_url' class="form-control" id="mcrit_server_url" aria-describedby="Enter a URL for a MCRIT server" value={{ server_info.url }} required>
-        <input type="text" name='mcrit_server_token' class="form-control" id="mcrit_server_token" aria-describedby="Enter the (optional) AUTH_TOKEN for this MCRIT server" value={{ server_info.server_token }}>
+        <input type="text" name='mcrit_server_token' class="form-control" id="mcrit_server_token" aria-label="AUTH_TOKEN for this MCRIT server (optional)" aria-describedby="Enter the (optional) AUTH_TOKEN for this MCRIT server" value={{ server_info.server_token }}>
     </div>
     <button type="submit" class="btn btn-primary">Confirm change</button>
 </form>
 
-<h3>Reset server:</h3>
+<h2 class="h3">Reset server:</h2>
 <p>Warning: This will fully reset the backend including its database as well as cached data in the frontend.</p>
 
 <form action = "{{ url_for('admin.reset_server') }}" method='post'>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-group">
-        <label for="server">Type "RESET" to confirm the action.</label>
+        <label for="reset_server">Type "RESET" to confirm the action.</label>
         <input type="text" name='reset_server' class="form-control" id="reset_server" aria-describedby="Enter confirmation string" value="" placeholder="RESET" pattern="^RESET$" required>
     </div>
     <button type="submit" class="btn btn-primary">Reset Server</button>
