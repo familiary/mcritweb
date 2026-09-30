@@ -1053,8 +1053,9 @@ def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
         link_clusters = [cluster for cluster in link_clusters if cluster["score"] > filter_link_score]
         link_hunt_result = [link for link in link_hunt_result if link.matched_link_score > filter_link_score]
 
+    cluster_pagination = Pagination(request, len(link_clusters), limit=10, query_param="clup", limit_param="clul")
     function_pagination = Pagination(request, len(link_hunt_result), limit=100, query_param="funp", limit_param="funl")
-    return render_template("linkhunt.html", job_info=job_info, funp=function_pagination, matching_result=matching_result, lc=link_clusters, lhr=link_hunt_result, scp=score_color_provider)
+    return render_template("linkhunt.html", job_info=job_info, clup=cluster_pagination, funp=function_pagination, matching_result=matching_result, lc=link_clusters, lhr=link_hunt_result, scp=score_color_provider)
 
 
 ################################################################
