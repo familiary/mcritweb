@@ -46,6 +46,32 @@ Function: {{ function_id }}
     </div>
   </div>
 </div>
+{# "Rename": sets the function name through explore.modifyFunction (fkie-cad/mcritweb#72) #}
+{% if g.user.role in ('admin', 'contributor') %}
+<div class="modal fade" id="renameFunctionModal" tabindex="-1" aria-labelledby="renameFunctionModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="renameFunctionModalLabel">Rename function {{ function_id }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="{{ url_for('explore.modifyFunction') }}" id="rename_function_form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="function_id" value="{{ function_id }}">
+        <div class="modal-body">
+          <label for="function_name" class="col-form-label">Function name</label>
+          <input type="text" class="form-control" id="function_name" name="function_name" value="{{ entry.function_name or '' }}" maxlength="256" pattern="[ -~]{0,256}" title="up to 256 printable ASCII characters" autofocus>
+          <div class="form-text">The name is recorded as a label by you, so the label history in the function info keeps who named the function when. Leave it empty to clear the name.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">Rename</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 {{ api_usage_modal("apiUsageModal", "API usage for function %d" % function_id, [
     ("This function", "/functions/%d" % function_id),
     ("With its control flow graph", "/functions/%d?with_xcfg=true" % function_id),
@@ -99,6 +125,13 @@ Function: {{ function_id }}
       <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_sample" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id) }}" role="button" title="Go to sample {{ entry.sample_id }}"><i class="fa-solid fa-virus"></i></a>
       {% if sample_entry.family_id is not none %}
       <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_family" href="{{ url_for('explore.family_by_id', family_id=sample_entry.family_id) }}" role="button" title="Go to family {{ sample_entry.family }}"><i class="fa-solid fa-bug"></i></a>
+      {% endif %}
+      {% if g.user.role in ('admin', 'contributor') %}
+        {% if can_modify_function %}
+        <a class="btn btn-outline-dark btn-sm" id="button_function_rename" role="button" data-bs-toggle="modal" data-bs-target="#renameFunctionModal" title="Rename function"><i class="fa-solid fa-pen"></i></a>
+        {% else %}
+        <a class="btn btn-outline-dark btn-sm disabled" id="button_function_rename" role="button" aria-disabled="true" title="Renaming functions needs an MCRIT backend newer than 1.8.1"><i class="fa-solid fa-pen"></i></a>
+        {% endif %}
       {% endif %}
       {{ api_usage_button("apiUsageModal") }}
       <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" role="button" title="Go to the control flow graph"><i class="fa-solid fa-diagram-project"></i></a>
