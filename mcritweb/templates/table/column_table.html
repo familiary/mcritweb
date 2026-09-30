@@ -39,7 +39,7 @@
           <td valign="middle">
             {{ name_and_sample[1].version or "-" }} | 
             {{ name_and_sample[1].component or "-" }} | 
-            <i {% if name_and_sample[1].is_library %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+            <i {% if name_and_sample[1].is_library %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
           {% else %}
           {# a query has none of these; an empty cell keeps the row aligned without
              claiming the queried binary is not a library, which we do not know #}
