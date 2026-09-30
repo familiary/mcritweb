@@ -191,7 +191,7 @@
 {% macro job_row(job) %}
   <tr class="job-row parent_{{ kwargs['parent'] }}" >
     <th job_id="{{ job.job_id }}" class="job-cell" align="right" valign="middle" class="id" scope="row">{{ "%d"|format(job.number) }}</th>
-    <td job_id="{{ job.job_id }}" class="job-cell" valign="middle">{{ job_description(job, kwargs['families_by_id'], kwargs['samples_by_id']) }}</td>
+    <td job_id="{{ job.job_id }}" class="job-cell job-description" valign="middle">{{ job_description(job, kwargs['families_by_id'], kwargs['samples_by_id']) }}</td>
     {% if job.started_at != None %}
     <td job_id="{{ job.job_id }}" class="job-cell" align="right" valign="middle">{{ job.started_at|date_time }}</td>
     {% else %}
@@ -235,7 +235,7 @@
 {% macro minijob_row(job) %}
   <tr class="job-row parent_{{ kwargs['parent'] }}" >
     <td job_id="{{ job.job_id }}" class="job-cell" align="right" valign="middle">{{ job.finished_at|date_time }}</td>
-    <td job_id="{{ job.job_id }}" class="job-cell" valign="middle">{{ job_description(job, kwargs['families_by_id'], kwargs['samples_by_id']) }}</td>
+    <td job_id="{{ job.job_id }}" class="job-cell job-description" valign="middle">{{ job_description(job, kwargs['families_by_id'], kwargs['samples_by_id']) }}</td>
     <td align="right" class="buttons">
       <a class="btn btn-outline-dark btn-sm" href="{{ url_for('data.result', job_id=job.job_id) }}"  role="button" target="_self"><i class="fa-solid fa-square-poll-vertical"></i></a>
     </td>
