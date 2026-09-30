@@ -194,6 +194,8 @@ class CorpusMcritClient:
         self.raw = bool(kwargs.get("raw_responses"))
         self.calls = []
         self._samples = {int(k): SampleEntry.fromDict(v) for k, v in load("samples").items()}
+        # families carry their samples, as `getFamily` answers - see getFamilies()
+        # below for why the collection endpoint is served from a trimmed copy
         self._families = {int(k): FamilyEntry.fromDict(v) for k, v in load("families").items()}
         # two pools: reference-sample functions keep their control flow graph, the
         # by-id lookup pool does not. See tests/fixtures/regenerate.py.
@@ -235,13 +237,32 @@ class CorpusMcritClient:
 
     # --- families ----------------------------------------------------------------
 
-    def getFamilies(self, *args, **kwargs):
-        self._record("getFamilies", *args, **kwargs)
-        return self._families
+    @staticmethod
+    def _without_samples(family_entry):
+        overview = family_entry.toDict()
+        overview.pop("samples", None)
+        return FamilyEntry.fromDict(overview)
 
-    def getFamily(self, family_id, *args, **kwargs):
-        self._record("getFamily", family_id, *args, **kwargs)
-        return self._families.get(int(family_id))
+    def getFamilies(self, *args, **kwargs):
+        """`/families` answers without the samples.
+
+        The collection reads `MinHashIndex.getFamilies()`, and storage does not keep
+        a family's sample list; `FamilyResource.on_get` is the only place that fills
+        `samples` in, for one family at a time. The fixture holds that richer shape,
+        so serving it from here too would let a view that only works when the samples
+        happen to be there pass against a backend where they are not.
+        """
+        self._record("getFamilies", *args, **kwargs)
+        return {family_id: self._without_samples(entry) for family_id, entry in self._families.items()}
+
+    def getFamily(self, family_id, with_samples=True, *args, **kwargs):
+        """`/families/{id}` fills in the family's samples, and the client asks for
+        them unless told not to - `explore.family` is the one caller that does."""
+        self._record("getFamily", family_id, *args, with_samples=with_samples, **kwargs)
+        entry = self._families.get(int(family_id))
+        if entry is None or with_samples:
+            return entry
+        return self._without_samples(entry)
 
     def getFamiliesByIds(self, family_ids, *args, **kwargs):
         """Without sample lists, as mcrit answers `POST /families/ids`; unknown ids absent."""

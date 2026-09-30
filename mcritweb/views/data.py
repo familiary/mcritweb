@@ -11,7 +11,7 @@ from mcrit.storage.FunctionEntry import FunctionEntry
 from mcrit.storage.MatchedFunctionEntry import MatchedFunctionEntry
 from mcrit.storage.MatchingResult import MatchingResult
 from mcrit.storage.SampleEntry import SampleEntry
-from mcrit.storage.UniqueBlocksResult import UniqueBlocksResult
+from mcrit.storage.UniqueBlocksResult import UniqueBlocksResult, wrap_string
 from smda.common.SmdaReport import SmdaReport
 
 from mcritweb.db import UserColumnSettings, UserFilters, get_query_filename, utc_now
@@ -525,7 +525,60 @@ def build_yara_rule(blocks_result, yara_params):
     )
     if not block_cover["block_hashes"]:
         return None, block_cover
-    return ubr.renderRule(block_cover, yara_params["condition_required"], wrap_at=40), block_cover
+    yara_rule = ubr.renderRule(block_cover, yara_params["condition_required"], wrap_at=40)
+    # each block's comment also says which function it came from - see
+    # name_functions_in_rule and issue #80
+    return name_functions_in_rule(yara_rule, ubr.unique_blocks, block_cover), block_cover
+
+
+def name_functions_in_rule(yara_rule, unique_blocks, block_cover):
+    """Name the function each picblock was taken from, in its comment in the rule.
+
+    Issue #80 asks for either function_id in the rule or a cover spread over a
+    variety of function_ids. mcrit builds the cover greedily by how many uncovered
+    samples a block adds, tie-broken on score, with no notion of which function a
+    block sits in - so nothing stops a rule from fingerprinting a single function,
+    and `condition: N of them` fails the moment that function is recompiled. Which
+    blocks to pick is mcrit's decision; what can be said here is where each of them
+    came from, so a reader can see the spread before shipping the rule.
+
+    The comment is rebuilt exactly as `renderRule` writes it and replaced by name.
+    A format change upstream therefore leaves the rule as it was rather than
+    mangling it - the test on this is what says the annotation still lands.
+    """
+    for pichash in block_cover["block_hashes"]:
+        entry = unique_blocks[pichash]
+        rendered = f"/* picblockhash: {pichash} - coverage: {len(entry['samples'])}/{block_cover['num_samples_covered']} samples"
+        yara_rule = yara_rule.replace(f"{rendered}.", f"{rendered}, function_id: {entry['function_id']}.")
+    return yara_rule
+
+
+def get_sample_versions(client, family_entry, sample_ids):
+    """Map sample_id -> version for the samples a unique blocks report covers.
+
+    The report carries no version of its own - `statistics["by_sample_id"]` is block
+    counts and nothing else - so it has to be looked up. A family job needs no extra
+    request for it: `getFamily` already answers with the family's samples and the
+    caller is holding that entry. Whatever the family did not supply is fetched by
+    id, which for a job naming samples directly is one call per row of the table.
+
+    A lookup that comes back None leaves that row's version blank. It does not say
+    the sample is gone: `handle_response` in `McritClient` collapses a 404 and a 500
+    into the same None, so a blank cell means "no version to show" and nothing more.
+    Telling the two apart would take the raw response, which this seam does not
+    carry - and neither of them is worth failing a whole report over.
+    """
+    versions = {}
+    family_samples = getattr(family_entry, "samples", None) or {}
+    for sample_entry in family_samples.values():
+        versions[sample_entry.sample_id] = sample_entry.version
+    for sample_id in sample_ids:
+        if sample_id in versions:
+            continue
+        sample_entry = client.getSampleById(sample_id)
+        if sample_entry is not None:
+            versions[sample_id] = sample_entry.version
+    return versions
 
 def result_unique_blocks(job_info, blocks_result: dict):
     client = get_client()
@@ -545,6 +598,7 @@ def result_unique_blocks(job_info, blocks_result: dict):
         else:
             flash(f"No results for unique blocks in family with id {sample_id}", category="error")
     blocks_statistics = blocks_result["statistics"]
+    sample_versions = get_sample_versions(client, family_entry, [entry["sample_id"] for entry in blocks_statistics["by_sample_id"].values()])
     yara_params = parse_yara_rule_params(request)
     yara_rule, yara_cover = build_yara_rule(blocks_result, yara_params)
     # only what the caller actually changed, so the forms can carry the rule parameters
@@ -580,7 +634,11 @@ def result_unique_blocks(job_info, blocks_result: dict):
                 for ins in result["instructions"]:
                     yarafied += f" * {ins[1]:{maxlen_ins}} | {ins[2]} {ins[3]}\n"
                 yarafied += " */\n"
-                yarafied += "{ " + re.sub(r"(.{80})", "\\1\n", result["escaped_sequence"], flags=re.DOTALL) + " }"
+                # Wrapped between bytes, the way the rule itself is. Breaking every
+                # 80th character instead cut hex bytes in half - "6a33" became "6a3"
+                # and "3" - so a block copied out of this column was not valid YARA
+                # once the sequence was long enough to wrap at all. See issue #80.
+                yarafied += "{ " + wrap_string(result["escaped_sequence"], max_column_length=80) + " }"
                 unique_blocks[pichash]["yarafied"] = yarafied
                 paginated_block = result
                 paginated_block["key"] = pichash
@@ -588,7 +646,7 @@ def result_unique_blocks(job_info, blocks_result: dict):
                 paginated_blocks.append(paginated_block)
             index += 1
     # TODO pass the new result objects as single arguments and then render them in page tabs on the template
-    return render_template("result_unique_blocks.html", job_info=job_info, family_entry=family_entry, sample_id=sample_id, sample_ids=sample_ids, yara_rule=yara_rule, yara_cover=yara_cover, yara_params=yara_params, yara_query=yara_query, statistics=blocks_statistics, results=paginated_blocks, blkp=block_pagination, active_tab=active_tab)
+    return render_template("result_unique_blocks.html", job_info=job_info, family_entry=family_entry, sample_id=sample_id, sample_ids=sample_ids, yara_rule=yara_rule, yara_cover=yara_cover, yara_params=yara_params, yara_query=yara_query, statistics=blocks_statistics, sample_versions=sample_versions, results=paginated_blocks, blkp=block_pagination, active_tab=active_tab)
 
 #: Shown when a stored result names something the backend can no longer resolve. The
 #: cross-compare path has said this about samples for a long time; issue #96 is the

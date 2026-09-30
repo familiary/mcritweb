@@ -1,6 +1,16 @@
 {% from 'table/links.html' import format_pichash, format_function_id, format_sample_id, format_family_name %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% extends 'base.html' %}
+
+{# Click-to-sort for a table that is already fully in memory, so no round trip and
+   no new query parameter. `data-sort` marks the column type, `data-sort-value` on a
+   cell carries the raw value a formatted cell ("2844 (66.76%)") would otherwise
+   hide. Sort symbols follow the ones cursor_pagination_sort_symbol renders. #}
+{%- macro sortable_column(label, sort_type, align='left') -%}
+  <th style="text-align: {{ align }};" scope="col" class="pointer" data-sort="{{ sort_type }}">
+    <span>{{ label }}</span>&nbsp;<span style="float: right;"><i class="fa fa-sort"></i></span>
+  </th>
+{%- endmacro -%}
 {% block title%}
 {% if family_entry is not none %}
 Unique Blocks for Family: {{ family_entry.family_id }}
@@ -29,15 +39,42 @@ Unique Blocks for {{ sample_ids|length }} Samples
 
 {% block content %}
 <script>
-  function copyElementToClipboard(element) {
-    // based on https://stackoverflow.com/a/50230647
-    var $temp = $("<textarea>");
-    var brRegex = /<br\s*[\/]?>/gi;
-    $("body").append($temp);
-    $temp.val($(element).html()).select();
-    document.execCommand("copy");
-    $temp.remove();
-    alert("Copied YARA rule to clipboard!");
+  // The rule is editable, so what has to reach the clipboard is what the textarea
+  // currently holds. Copying a detached element filled from .innerHTML instead lost
+  // every edit and handed back HTML entities for & < > - see issue #80.
+  function copyTextAreaToClipboard(selector) {
+    var textarea = document.querySelector(selector);
+    if (textarea === null) {
+      return;
+    }
+    function report(copied) {
+      alert(copied ? "Copied YARA rule to clipboard!" : "Could not copy the YARA rule - please select it and copy manually.");
+    }
+    // execCommand is deprecated, but navigator.clipboard is only exposed in a
+    // secure context and MCRITweb is deployed over plain HTTP often enough that
+    // the selection fallback has to stay. It leaves the caret where it was.
+    function copyBySelection() {
+      var selectionStart = textarea.selectionStart;
+      var selectionEnd = textarea.selectionEnd;
+      textarea.focus();
+      textarea.select();
+      var copied = false;
+      try {
+        copied = document.execCommand("copy");
+      } catch (error) {
+        copied = false;
+      }
+      textarea.setSelectionRange(selectionStart, selectionEnd);
+      return copied;
+    }
+    if (window.isSecureContext && navigator.clipboard) {
+      navigator.clipboard.writeText(textarea.value).then(
+        function () { report(true); },
+        function () { report(copyBySelection()); }
+      );
+    } else {
+      report(copyBySelection());
+    }
   }
 </script>
 
@@ -102,22 +139,24 @@ Unique Blocks for {{ sample_ids|length }} Samples
     <p>
       Characteristic blocks are basic blocks only found in this collection of samples (versus rest of the whole data set), unique blocks are only found in the specific sample.
     </p>
-    <table class="table table-hover">
+    <table class="table table-hover sortable-table">
         <thead class="thead-light">
           <tr>
-            <th style="text-align: right;" scope="col">Sample ID</th>
-            <th style="text-align: right;" scope="col">Total Blocks</th>
-            <th style="text-align: right;" scope="col">Characteristic Blocks</th>
-            <th style="text-align: right;" scope="col">Unique Blocks</th>
+            {{ sortable_column("Sample ID", "number", align="right") }}
+            {{ sortable_column("Version", "text") }}
+            {{ sortable_column("Total Blocks", "number", align="right") }}
+            {{ sortable_column("Characteristic Blocks", "number", align="right") }}
+            {{ sortable_column("Unique Blocks", "number", align="right") }}
           </tr>
         </thead>
         <tbody>
           {% for sid, stats_entry in statistics["by_sample_id"].items() %}
           <tr>
-            <td style="text-align: right;" valign="middle" scope="row" class="id">{{ format_sample_id(stats_entry["sample_id"]) }}</td>
-            <td style="text-align: right;" valign="middle">{{ stats_entry["total_blocks"] }}</td>
-            <td style="text-align: right;" valign="middle">{{ stats_entry["characteristic_blocks"] }} ({% if stats_entry["total_blocks"] > 0 %}{{ "%5.2f"|format(stats_entry["characteristic_blocks"] / stats_entry["total_blocks"] * 100) }}%{%else%}0%{%endif%})</td>
-            <td style="text-align: right;" valign="middle">{{ stats_entry["unique_blocks"] }} ({% if stats_entry["total_blocks"] > 0 %}{{ "%5.2f"|format(stats_entry["unique_blocks"] / stats_entry["total_blocks"] * 100) }}%{%else%}0%{%endif%})</td>
+            <td style="text-align: right;" valign="middle" scope="row" class="id" data-sort-value="{{ stats_entry["sample_id"] }}">{{ format_sample_id(stats_entry["sample_id"]) }}</td>
+            <td valign="middle">{{ sample_versions.get(stats_entry["sample_id"]) or "" }}</td>
+            <td style="text-align: right;" valign="middle" data-sort-value="{{ stats_entry["total_blocks"] }}">{{ stats_entry["total_blocks"] }}</td>
+            <td style="text-align: right;" valign="middle" data-sort-value="{{ stats_entry["characteristic_blocks"] }}">{{ stats_entry["characteristic_blocks"] }} ({% if stats_entry["total_blocks"] > 0 %}{{ "%5.2f"|format(stats_entry["characteristic_blocks"] / stats_entry["total_blocks"] * 100) }}%{%else%}0%{%endif%})</td>
+            <td style="text-align: right;" valign="middle" data-sort-value="{{ stats_entry["unique_blocks"] }}">{{ stats_entry["unique_blocks"] }} ({% if stats_entry["total_blocks"] > 0 %}{{ "%5.2f"|format(stats_entry["unique_blocks"] / stats_entry["total_blocks"] * 100) }}%{%else%}0%{%endif%})</td>
          </tr>
           {% endfor %}
         </tbody>
@@ -144,9 +183,10 @@ Unique Blocks for {{ sample_ids|length }} Samples
           <tr>
             <th style="text-align: right;" scope="col">Score</th>
             <th scope="col">PicBlockHash</th>
-            {% if family_id is not none %}
-            <th scope="col">Samples</th>
-            {% endif %}
+            {# `family_id` is never passed to this template and Jinja reads an
+               undefined name as `is not none`, so the guard that used to be here
+               never hid anything - and the cell below was unconditional anyway. #}
+            <th style="text-align: right;" scope="col">Samples</th>
             <th style="text-align: right;" scope="col">Instructions</th>
             <th style="text-align: right;" scope="col">Function ID</th>
             <th style="text-align: center;" scope="col">Block</th>
@@ -194,11 +234,83 @@ Unique Blocks for {{ sample_ids|length }} Samples
     {% if yara_rule is none %}
     <p class="alert alert-warning">These parameters selected no blocks at all, so there is no rule to show. Widen the bounds and regenerate.</p>
     {% else %}
-    <p>Copy rule to clipboard!&nbsp;<i class="fa-regular fa-copy" onclick="copyElementToClipboard('#yara_text')"></i>
+    <p>Copy rule to clipboard!&nbsp;<i class="fa-regular fa-copy pointer" onclick="copyTextAreaToClipboard('#yara_text')"></i>
     </p>
     <textarea style="font-family:monospace; min-width: 100%" id="yara_text" name="yara_text" 
         rows="50">{{yara_rule}}</textarea>
     {% endif %}
   </div>
 </div>
+
+<script>
+  // Sorts a table in place on a header click. Only tables marked sortable-table are
+  // touched, and only headers carrying data-sort.
+  (function () {
+    function sortValue(row, index) {
+      var cell = row.cells[index];
+      if (cell === undefined) {
+        return "";
+      }
+      return cell.dataset.sortValue === undefined ? cell.textContent.trim() : cell.dataset.sortValue;
+    }
+
+    function compare(index, isNumeric, isDescending) {
+      return function (rowA, rowB) {
+        var a = sortValue(rowA, index);
+        var b = sortValue(rowB, index);
+        var order;
+        if (isNumeric) {
+          // Number() answers NaN for anything that is not a number, and a
+          // comparator that returns NaN leaves the resulting order unspecified -
+          // so those sort as the smallest value instead. This is not a guard for
+          // an empty cell: Number("") is 0, not NaN. Neither case arises in this
+          // table today, where every data-sort="number" cell carries a count.
+          var x = Number(a);
+          var y = Number(b);
+          x = Number.isNaN(x) ? -Infinity : x;
+          y = Number.isNaN(y) ? -Infinity : y;
+          order = x < y ? -1 : (x > y ? 1 : 0);
+        } else {
+          order = a.localeCompare(b, undefined, {numeric: true, sensitivity: "base"});
+        }
+        return isDescending ? -order : order;
+      };
+    }
+
+    function makeSortable(table) {
+      if (table.tHead === null || table.tHead.rows.length === 0 || table.tBodies.length === 0) {
+        return;
+      }
+      var headers = table.tHead.rows[0].cells;
+      Array.prototype.forEach.call(headers, function (header, index) {
+        if (header.dataset.sort === undefined) {
+          return;
+        }
+        header.addEventListener("click", function () {
+          var isDescending = header.dataset.sortDirection !== "desc";
+          Array.prototype.forEach.call(headers, function (other) {
+            delete other.dataset.sortDirection;
+            var symbol = other.querySelector("i.fa");
+            if (symbol !== null) {
+              symbol.className = "fa fa-sort";
+            }
+          });
+          header.dataset.sortDirection = isDescending ? "desc" : "asc";
+          var symbol = header.querySelector("i.fa");
+          if (symbol !== null) {
+            symbol.className = isDescending ? "fa fa-sort-down" : "fa fa-sort-up";
+          }
+          var body = table.tBodies[0];
+          var rows = Array.prototype.slice.call(body.rows);
+          rows.sort(compare(index, header.dataset.sort === "number", isDescending));
+          rows.forEach(function (row) {
+            body.appendChild(row);
+          });
+        });
+      });
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll("table.sortable-table"), makeSortable);
+  })();
+</script>
 {% endblock %}

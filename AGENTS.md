@@ -132,6 +132,13 @@ Three backends are available to tests, all offline. `fake_mcrit` is strict — a
 
 `corpus_mcrit` also implements the **search/cursor protocol** (`_page` in `fixtureData.py`), so `explore.*` can be tested with rows rather than against an empty result set. It models the contract the views depend on — an opaque token, a forward cursor only while results remain, a backward one only off the first page — not mcrit's cursor encoding or its `field:value` query parser; a test needing those needs a real backend. Note that `search_results` values are **dicts**, as they arrive off the wire, and the views must call `.fromDict` on them — as must `id_match` and `sha_match`. That is the client's inconsistency, not a choice of the fake's; see [ADR-0003](docs/adr/0010-search-results-arrive-as-dicts.md) for what `mcrit` would have to change to remove the requirement.
 
+`tests/testBrowser.py` is the one module that runs a browser: it serves the app on a
+loopback port with `corpus_mcrit` behind it and drives the unique-blocks page with
+Playwright, because the clipboard copy and the click-to-sort headers are script
+behaviour that no HTML assertion can reach. `playwright` is not a dependency and CI
+does not install it, so the module skips there — anything CI must keep catching needs
+a lint beside it in `testResultPages.py` as well.
+
 **Adding a route means adding a row to `tests/routePolicy.py`** — who may call it, and whether it writes. `testRoutePolicy.py` fails on any endpoint in the url_map without one. That table is the record of the current access policy; change a value only together with the code, so it keeps describing reality. Two sets in it, `IN_VIEW_GUARD` and `KNOWN_INERT_DECORATORS`, are ratchets: both are empty today, and both may only shrink. An entry appearing in either is a regression, not a note.
 
 `tests/fixtures/` holds captured backend reports; `tests/fixtures/regenerate.py` rebuilds them against any instance that has one finished job of each type, so they are not tied to one machine. Two trims in it are load-bearing rather than cosmetic — read its module docstring before changing them.
