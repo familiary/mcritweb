@@ -20,7 +20,8 @@ Family: {{ family.family }}
     <input type='submit' hidden>
   </form>
 
-{{ sample_table(samples, job_collection=job_collection, show_edit=True, no_family=True, sort_pagination=pagination, column_setup=user_column_setup) }}
+{{ sample_table(samples, job_collection=job_collection, show_edit=True, no_family=True, sort_pagination=pagination, column_setup=user_column_setup,
+                empty_message=("No samples in this family match \"" ~ query ~ "\".") if query else "This family has no samples.") }}
 {% if samples %}
 {{ pagination_widget(pagination) }}
 {% endif %}

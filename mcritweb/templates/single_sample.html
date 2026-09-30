@@ -165,7 +165,8 @@ Sample: {{ entry.sample_id }}
     <input type='submit' hidden>
   </form>
   <h3>Functions</h3>
-{{ function_table(functions, for_sample_view=True, sort_pagination=pagination, column_setup=user_column_setup) }}
+{{ function_table(functions, for_sample_view=True, sort_pagination=pagination, column_setup=user_column_setup,
+                  empty_message=("No functions in this sample match \"" ~ query ~ "\".") if query else "This sample has no functions on record.") }}
 {% if functions %}
 {{ pagination_widget(pagination) }}
 {% endif %}
