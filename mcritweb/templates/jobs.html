@@ -11,21 +11,15 @@ Jobs
 
 {{ job_row_std_js() }}
 {{ pagination_js() }}
-<script>$(document).ready(function () {
-  $('#job-table').DataTable({
-    autoWidth: false,
-    deferRender: false,
-    processing: false,
-    scrollX: false,
-    scrollY: false,
-    searching: false,
-    serverSide: false,
-    stateSave: false,
-    paging: false,
-    info: false
-  }
-  );
-});</script>
+{# The DataTables initialiser that used to be here selected `#job-table`, and this page
+   renders its table with `table_id=active` - the job method - so the selector matched
+   nothing on every request. `job_table` still defaults to `job-table`, and job_overview
+   and single_sample take that default, so the id does get rendered - just never on a
+   page that ran an initialiser. Nothing was ever styled by DataTables anywhere, and it
+   was configured with paging, searching and info all off, so even where it had matched
+   it would only have restyled the table. Removed along with the 94 KB of DataTables JS
+   and 4 KB of CSS that base.html loaded on every page to serve it. Issue #63 asks for
+   exactly this: "remove data-tables js/css once it is not needed anymore". #}
 
 <style>
   .black {

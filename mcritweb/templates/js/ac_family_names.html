@@ -5,7 +5,10 @@
     // anyone opened one. See issue #77. The submit dropzone includes this as well, for
     // its own family field (#192), so a listing page runs it twice: once for its edit
     // modals, once for the drop overlay's form.
-    (function () {
+    // Autocomplete builds a Bootstrap dropdown, and Bootstrap is deferred (issue #63):
+    // construct them once the deferred scripts have run, not while the page parses.
+    // The listener is also the scope that keeps these names off `window`.
+    document.addEventListener("DOMContentLoaded", function () {
         const familyNamesUrl = {{ url_for('explore.family_names')|tojson }};
 
         function attachFamilyAutocomplete(field) {
@@ -57,5 +60,5 @@
         attachFamilyAutocomplete(document.getElementById('sample_family_name'));
         attachFamilyAutocomplete(document.getElementById('family_new_name'));
         attachFamilyAutocomplete(document.getElementById('family'));
-    })();
+    });
 </script>
