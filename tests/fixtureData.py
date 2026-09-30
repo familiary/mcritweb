@@ -176,6 +176,12 @@ def _job_state(document):
     return "unknown"
 
 
+def _job_id(document):
+    """A captured job's id as the client names it: the fixtures keep mongo's `{"$oid": ...}`."""
+    job_id = document["_id"]
+    return job_id["$oid"] if isinstance(job_id, dict) else str(job_id)
+
+
 class CorpusMcritClient:
     """Serves the captured corpus in the types the real client returns."""
 
@@ -237,6 +243,16 @@ class CorpusMcritClient:
         self._record("getFamily", family_id, *args, **kwargs)
         return self._families.get(int(family_id))
 
+    def getFamiliesByIds(self, family_ids, *args, **kwargs):
+        """Without sample lists, as mcrit answers `POST /families/ids`; unknown ids absent."""
+        family_ids = [int(family_id) for family_id in family_ids]
+        self._record("getFamiliesByIds", family_ids, *args, **kwargs)
+        found = {}
+        for family_id in family_ids:
+            if family_id in self._families:
+                found[family_id] = FamilyEntry.fromDict({**self._families[family_id].toDict(), "samples": None})
+        return found
+
     def isFamilyId(self, family_id, *args, **kwargs):
         self._record("isFamilyId", family_id, *args, **kwargs)
         return int(family_id) in self._families
@@ -250,6 +266,12 @@ class CorpusMcritClient:
     def getSampleById(self, sample_id, *args, **kwargs):
         self._record("getSampleById", sample_id, *args, **kwargs)
         return self._samples.get(int(sample_id))
+
+    def getSamplesByIds(self, sample_ids, *args, **kwargs):
+        """{sample_id: SampleEntry} for the ids the corpus has, as `POST /samples/ids`."""
+        sample_ids = [int(sample_id) for sample_id in sample_ids]
+        self._record("getSamplesByIds", sample_ids, *args, **kwargs)
+        return {sample_id: self._samples[sample_id] for sample_id in sample_ids if sample_id in self._samples}
 
     def isSampleId(self, sample_id, *args, **kwargs):
         self._record("isSampleId", sample_id, *args, **kwargs)
@@ -383,7 +405,7 @@ class CorpusMcritClient:
         entry = self._jobs.get(job_id)
         return entry[1] if entry else None
 
-    def getQueueData(self, start=0, limit=0, method=None, filter=None, state=None, ascending=False):
+    def getQueueData(self, start=0, limit=0, method=None, filter=None, state=None, ascending=False, sample_ids=None, job_ids=None):
         """The queue, narrowed the way mcrit narrows it - including where it does so
         badly, because callers have to cope with that.
 
@@ -394,14 +416,27 @@ class CorpusMcritClient:
         applies it as a substring test over `Job.parameters` *after* start and limit
         (`QueueRemoteCalls.getQueueData`), so it drops non-matches out of an already
         paged slice rather than paging the matches. Reproduced deliberately - a caller
-        that combines `filter` with `limit` must not look correct here."""
+        that combines `filter` with `limit` must not look correct here.
+
+        `sample_ids` and `job_ids` are part of mcrit's query too, before start and limit:
+        the jobs whose first argument is one of the sample ids, and the jobs with those
+        ids. mcrit refuses `sample_ids` without a `method`, which the client reads as
+        None, and a list that is present but empty selects nothing."""
         # every parameter recorded by name, as data.jobs actually passes them: a call
         # assertion should not depend on which ones this line happened to forward
-        # positionally.
-        self._record("getQueueData", start=start, limit=limit, method=method, filter=filter, state=state, ascending=ascending)
+        # positionally. The two selectors only when given, so the assertions written
+        # before they existed still describe the calls that don't use them.
+        selectors = {name: value for name, value in (("sample_ids", sample_ids), ("job_ids", job_ids)) if value is not None}
+        self._record("getQueueData", start=start, limit=limit, method=method, filter=filter, state=state, ascending=ascending, **selectors)
+        if sample_ids is not None and method is None:
+            return None
         documents = self._queue if not ascending else list(reversed(self._queue))
         if method is not None:
             documents = [entry for entry in documents if entry["payload"]["method"] == method]
+        if sample_ids is not None:
+            documents = [entry for entry in documents if Job(entry, None).sample_id in set(sample_ids)]
+        if job_ids is not None:
+            documents = [entry for entry in documents if _job_id(entry) in {str(job_id) for job_id in job_ids}]
         if state is not None:
             documents = [entry for entry in documents if _job_state(entry) == state]
         start = start if isinstance(start, int) and start > 0 else 0

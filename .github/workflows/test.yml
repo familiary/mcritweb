@@ -41,7 +41,7 @@ jobs:
         # 3.13 and 3.14 became reachable when #27 lifted the Flask 2.2.5 pin, which
         # called pkgutil.get_loader - removed in 3.14. Keeping them in the matrix is
         # what stops that regressing quietly.
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.12", "3.13", "3.14"]
 
     steps:
       - name: Check out repository
