@@ -615,7 +615,8 @@ def fetchDotGraph(function_id):
     function_entry = client.getFunctionById(function_id, with_xcfg=True)
     # An entry can reach us without its control flow graph: mcrit deletes the xcfg after
     # minhashing when STORAGE_DROP_DISASSEMBLY is set, and an export copies that empty
-    # graph on to whoever imports it (see docs/adr/0003 and the NotImplemented
+    # graph on to whoever imports it (see
+    # docs/adr/0011-export-import-is-a-faithful-copier.md and the NotImplemented
     # getFunctionGraph in mcrit's MinHashIndex). toSmdaFunction() raises on that, which
     # took the whole request down with a 500 and left the CFG panel blank without ever
     # saying why. picblockhashes can come back empty or null for the same reason.
