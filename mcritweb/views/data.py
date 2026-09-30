@@ -243,30 +243,73 @@ def import_complete():
     return render_template("import.html")
 
 
+#: How mcrit's export routes wrap an export: `jsonify({"status": "successful", "data": ...})`,
+#: which serialises with json's default separators, so the export itself is what lies
+#: between these two.
+EXPORT_ENVELOPE = (b'{"status": "successful", "data": ', b"}")
+#: The size of the pieces a passed-through export is sent in.
+EXPORT_CHUNK_SIZE = 1 << 20
+
+
+def fetch_export(sample_ids=None):
+    """The export of `sample_ids` (every sample for None) as its JSON bytes in pieces, with
+    their total length, or None when the backend did not export.
+
+    Parsing a whole-corpus export into a dict and serialising it again held both at once
+    (#202). Asked in raw mode, the client hands over the backend's response, and the
+    export is its body minus the envelope: it is passed on as it came, in pieces, without
+    another copy of it being built. An mcrit client that ignores `raw_responses` for
+    exports, as 1.9.0's does, answers the parsed export instead, which is serialised as
+    before.
+    """
+    exported = get_client(raw_responses=True).getExportData(sample_ids)
+    if isinstance(exported, dict):
+        serialised = json.dumps(exported).encode("utf-8")
+        return [serialised], len(serialised)
+    if exported is None or exported.status_code != 200:
+        return None
+    body = exported.content
+    head, tail = EXPORT_ENVELOPE
+    # a failed export answers its own envelope, `"status": "failed"`
+    if not (body.startswith(head) and body.endswith(tail)):
+        return None
+    export = memoryview(body)[len(head):len(body) - len(tail)]
+    pieces = (bytes(export[offset:offset + EXPORT_CHUNK_SIZE]) for offset in range(0, len(export), EXPORT_CHUNK_SIZE))
+    return pieces, len(export)
+
+
+def export_download(export, filename):
+    """The download of what `fetch_export` answered. It says its length, which Werkzeug
+    cannot count in advance for pieces that are still to be cut, so the browser can show
+    the size and the progress of the download."""
+    pieces, length = export
+    return Response(
+        pieces,
+        mimetype='application/json',
+        headers={"Content-disposition": "attachment; filename=" + filename, "Content-Length": str(length)})
+
+
 @bp.route('/export',methods=('GET', 'POST'))
 @contributor_required
 @mcrit_server_required
 def export_view():
     if request.method == 'POST':
         requested_samples = request.form['samples']
-        client = get_client()
         if requested_samples == "":
-            export_file = json.dumps(client.getExportData())
-            return Response(
-                export_file,
-                mimetype='application/json',
-                headers={"Content-disposition":
-                        "attachment; filename=export_all_samples.json"})
+            export_file = fetch_export()
+            if export_file is None:
+                flash('MCRIT did not export the samples - it could not export them, or the export was too large.', category='error')
+                return render_template("export.html")
+            return export_download(export_file, "export_all_samples.json")
         # NOTE it might be nice to allow [<number>, <number>-<number>, ...] to enable 
         # spans of consecutive sample_ids
         elif re.match(r"^\d+(?:[\s]*,[\s]*\d+)*$", requested_samples):
             sample_ids = [int(sample_id.strip()) for sample_id in requested_samples.split(',')]
-            export_file = json.dumps(client.getExportData(sample_ids))
-            return Response(
-                export_file,
-                mimetype='application/json',
-                headers={"Content-disposition":
-                        "attachment; filename=export_samples.json"})
+            export_file = fetch_export(sample_ids)
+            if export_file is None:
+                flash('MCRIT did not export the samples - it could not export them, or the export was too large.', category='error')
+                return render_template("export.html")
+            return export_download(export_file, "export_samples.json")
         else:
             flash('Please use a comma-separated list of sample_ids in your export request.', category='error')
             return render_template("export.html")
@@ -284,16 +327,11 @@ def specific_export(type, item_id):
         return redirect(url_for('data.export_view'))
     if type == 'family':
         samples = client.getSamplesByFamilyId(int(item_id))
-        export_data = client.getExportData([x.sample_id for x in samples.values()]) if samples else None
-        if not export_data:
+        export_file = fetch_export([x.sample_id for x in samples.values()]) if samples else None
+        if export_file is None:
             flash(f'MCRIT did not export family "{item_id}" - it may not exist or have no samples, or MCRIT could not export it.', category='error')
             return redirect(url_for('data.export_view'))
-        export_file = json.dumps(export_data)
-        return Response(
-            export_file,
-            mimetype='application/json',
-            headers={"Content-disposition":
-                    "attachment; filename=export_family_"+str(item_id)+".json"})
+        return export_download(export_file, "export_family_" + str(item_id) + ".json")
     if type == 'samples':
         # the backend leaves out a sample_id it does not know, so the export itself says
         # whether there was one
