@@ -6,6 +6,7 @@ test needs a running mcrit-server. See issue #88.
 """
 
 import pytest
+from mcrit.storage.SampleEntry import SampleEntry
 from werkzeug.security import generate_password_hash
 
 from mcritweb import create_app
@@ -150,17 +151,26 @@ class FakeMcritClient:
         return FAKE_JOB_ID
 
     def requestMatchesForMappedBinary(self, binary, base_address, **kwargs):
-        """The 'dumped' and 'smda' branches of the same route."""
+        """The 'dumped' branch of the same route - the only one that has a base address
+        to pass, since an .smda upload carries its own inside the report."""
         self._record("requestMatchesForMappedBinary", binary, base_address, **kwargs)
         return FAKE_JOB_ID
 
     def requestMatchesForSmdaReport(self, smda_report, **kwargs):
         """The '.smda' branch of `analyze.query`: the view parses the upload into an
         SmdaReport and hands the object over, so nothing about the file survives past
-        here except what the view chose to keep on disk."""
+        here except what the view chose to keep on disk. The report carries its own
+        base address and bitness, so this takes neither."""
         self._record("requestMatchesForSmdaReport", smda_report, **kwargs)
         return FAKE_JOB_ID
 
+    def addReport(self, smda_report):
+        """Where `data.submit` ends for an uploaded .smda report. The real client
+        answers (SampleEntry, job_id) and the view reads `.sample_id` off the first
+        half, so this builds the entry the same way the server does - from the report
+        itself, which again is where base address and bitness come from."""
+        self._record("addReport", smda_report)
+        return SampleEntry(smda_report, sample_id=1, family_id=1), FAKE_JOB_ID
     def addImportData(self, import_data):
         """The dropzone upload path: `data.import_view` parses the uploaded file and
         hands the parsed object straight here.
