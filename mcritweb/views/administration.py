@@ -6,12 +6,12 @@ from flask import Blueprint, current_app, flash, g, redirect, render_template, r
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken
+from mcritweb.db import UserColumnSettings, UserFilters, UserInfo, generate_apitoken
 from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
 from mcritweb.views.client import get_client
 from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
-from mcritweb.views.utility import forget_server_probe, get_mcritweb_version_from_setup, get_session_user_id
+from mcritweb.views.utility import forget_server_probe, get_session_user_id
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -272,9 +272,9 @@ def backend_version(client):
 @bp.route('/server')
 @admin_required
 def server():
-    server_info = ServerInfo.fromDb()
+    server_info = db.get_server_info()
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
-    running_server_version = get_mcritweb_version_from_setup()
+    running_server_version = current_app.config['MCRITWEB_VERSION']
     client = get_client()
     mcrit_version = backend_version(client)
     return render_template('admin_server.html', operation_mode=operation_mode_str, server_info=server_info, running_version=running_server_version, mcrit_version=mcrit_version)
@@ -283,7 +283,7 @@ def server():
 @bp.route('/change_server' , methods=('POST',))
 @admin_required
 def change_server():
-    server_info = ServerInfo.fromDb()
+    server_info = db.get_server_info()
     new_url = request.form.get('mcrit_server_url', '')
     new_token = request.form.get('mcrit_server_token', '')
     if server_info.url != new_url or server_info.server_token != new_token:
@@ -300,7 +300,7 @@ def change_server():
     else:
         flash('No information needed change', category='success')
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
-    running_server_version = get_mcritweb_version_from_setup()
+    running_server_version = current_app.config['MCRITWEB_VERSION']
     client = get_client()
     mcrit_version = backend_version(client)
     return render_template('admin_server.html', operation_mode=operation_mode_str, server_info=server_info, running_version=running_server_version, mcrit_version=mcrit_version)

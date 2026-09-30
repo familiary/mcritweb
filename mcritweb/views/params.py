@@ -164,25 +164,19 @@ def parse_checkbox_post_param(request, query_param:str):
     return param
 
 
-def parseBaseAddrFromFilename(filename):
-    # try to infer base addr from filename:
-    baddr_match = re.search(re.compile("_0x(?P<base_addr>[0-9a-fA-F]{8,16})"), filename)
-    if baddr_match:
-        parsed_base_addr = int(baddr_match.group("base_addr"), 16)
-        logging.info("Parsed base address from file name: 0x%08x %d", parsed_base_addr, parsed_base_addr)
-        return parsed_base_addr
-    logging.warning("No base address recognized, using None.")
-    return None
+def parseBaseAddrAndBitnessFromFilename(filename):
+    """(base_addr, bitness) as a dump's filename declares them, or (None, None).
 
-
-def parseBitnessFromFilename(filename):
-    # try to infer bitness from filename:
+    Both come from the one `_0x<address>` match - the bitness is read off how many
+    digits the address was written with - so the name is parsed once. See issue #190.
+    """
     baddr_match = re.search(re.compile("_0x(?P<base_addr>[0-9a-fA-F]{8,16})"), filename)
-    if baddr_match:
-        if len(baddr_match.group("base_addr")) > 8:
-            logging.info("Parsed bitness from base addr len from file name: %s", filename)
-            return 64
-        else:
-            return 32
-    logging.warning("No base address recognized, using None.")
-    return None
+    if not baddr_match:
+        logging.warning("No base address recognized, using None.")
+        return None, None
+    parsed_base_addr = int(baddr_match.group("base_addr"), 16)
+    logging.info("Parsed base address from file name: 0x%08x %d", parsed_base_addr, parsed_base_addr)
+    if len(baddr_match.group("base_addr")) > 8:
+        logging.info("Parsed bitness from base addr len from file name: %s", filename)
+        return parsed_base_addr, 64
+    return parsed_base_addr, 32

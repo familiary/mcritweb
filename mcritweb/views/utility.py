@@ -17,17 +17,15 @@ import requests
 from flask import current_app, flash, g, redirect, session, url_for
 
 from mcritweb import db
-from mcritweb.db import ServerInfo, UserColumnSettings
+from mcritweb.db import UserColumnSettings
 
 
 def get_server_url():
-    server_info = ServerInfo.fromDb()
-    return server_info.url
+    return db.get_server_info().url
 
 
 def get_server_token():
-    server_info = ServerInfo.fromDb()
-    return server_info.server_token
+    return db.get_server_info().server_token
 
 
 # (connect, read) seconds for the reachability probe. Without a timeout, requests

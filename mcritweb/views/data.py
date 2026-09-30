@@ -30,8 +30,7 @@ from mcritweb.views.params import (
     parse_integer_list_query_param,
     parse_integer_query_param,
     parse_str_query_param,
-    parseBaseAddrFromFilename,
-    parseBitnessFromFilename,
+    parseBaseAddrAndBitnessFromFilename,
 )
 from mcritweb.views.ScoreColorProvider import ScoreColorProvider
 from mcritweb.views.utility import get_session_user_id, mcrit_server_required, query_upload_path
@@ -1401,8 +1400,7 @@ def request_filename_info():
             result['base_addr'] = hex(int(match_baseaddr.group('base_addr')))
     elif 'dump' in filename:
         result['dump'] = True
-        result['bitness'] = parseBitnessFromFilename(filename)
-        base_address = parseBaseAddrFromFilename(filename)
+        base_address, result['bitness'] = parseBaseAddrAndBitnessFromFilename(filename)
         result['base_addr'] = "" if not base_address else hex(base_address)
     else:
         result['dump'] = False

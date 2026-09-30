@@ -275,7 +275,7 @@ def create_app(test_config=None, instance_path=None):
 
     @app.route('/', methods=('GET', 'POST'))
     def index():
-        if db.is_first_user():
+        if g.first_user:
             return redirect(url_for("authentication.register"))
         if request.method == 'POST':
             return redirect(url_for("explore.search", query=request.form["Search"]))
