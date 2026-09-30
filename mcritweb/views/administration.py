@@ -188,6 +188,7 @@ def regenerate_apitoken():
 @multi_user
 def users(tab = None):
     g.all_users = get_users()
+    g.users_by_role = group_users_by_role(g.all_users)
     if tab is None:
         return render_template("users.html", active='all')    
     return render_template("users.html", active=tab)
@@ -196,6 +197,16 @@ def users(tab = None):
 def get_users():
     user_infos = db.get_all_user_info()
     return user_infos
+
+
+def group_users_by_role(user_infos):
+    """One list per role in KNOWN_ROLES, each in the order given, for the role tabs of
+    users.html. A user with any other role is only listed under "all" (#95)."""
+    grouped = {role: [] for role in KNOWN_ROLES}
+    for user_info in user_infos:
+        if user_info.role in grouped:
+            grouped[user_info.role].append(user_info)
+    return grouped
 
 
 @bp.route('/change_user_role/<int:user_id>/<role>/<tab>', methods=('POST',))
