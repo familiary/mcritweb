@@ -123,13 +123,15 @@ Sample: {{ entry.sample_id }}
 
 
 <h1>Sample Overview: {{ entry.sample_id }}</h1>
+{% set matching_jobs = job_collection.getJobsForSample(entry.sample_id, matching_only=True) -%}
+{% set last_matches_job = job_collection.getJobsForSample(entry.sample_id, method="getMatchesForSample", finished_only=True) -%}
 <div class="container">
     <div class="row">
       <div align="right" class="col">
         <div class="btn-group dropdown">
           <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="button_sample_analyze" onclick=set_analyze_sample_button_clicked() bs-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-            {% if job_collection.getJobsForSample(entry.sample_id, matching_only=True) %}
-            <i style="color:green;" class="fa-solid fa-flask"></i>&nbsp;{{ job_collection.getJobsForSample(entry.sample_id, matching_only=True) | length}}
+            {% if matching_jobs %}
+            <i style="color:green;" class="fa-solid fa-flask"></i>&nbsp;{{ matching_jobs | length}}
             {% else %}
             <i class="fa-solid fa-flask"></i>
             {% endif %}
@@ -139,8 +141,8 @@ Sample: {{ entry.sample_id }}
             <a class="dropdown-item" href="{{ url_for('analyze.compare_versus', selected_a=entry.sample_id, query_a='sha256:'+entry.sha256) }}">New: 1 vs 1</a>
             <a class="dropdown-item" href="{{ url_for('analyze.cross_compare', samples=entry.sample_id) }}">New: Cross Compare</a>
             <a class="dropdown-item" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id, _anchor='jobs') }}">Previous Jobs</a>
-            {% if job_collection.getJobsForSample(entry.sample_id, method="getMatchesForSample", finished_only=True) %}
-            <a class="dropdown-item" href="{{ url_for('data.result', job_id=job_collection.getJobsForSample(entry.sample_id, method="getMatchesForSample", finished_only=True)[0].job_id) }}">Last 1:N Job</a>
+            {% if last_matches_job %}
+            <a class="dropdown-item" href="{{ url_for('data.result', job_id=last_matches_job[0].job_id) }}">Last 1:N Job</a>
             {% endif %}
           </div>
         </div>

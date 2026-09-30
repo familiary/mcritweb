@@ -16,15 +16,23 @@ Besides the colour per node, `get_function_diff` records which blocks matched wh
 (`node_matches`, for linked highlighting across the two graphs) and reduces those
 to a one-to-one `pairs` list, which is what the combined graph of issue #74 is
 built from.
+
+A comparison is memoized per server process, keyed by what it is computed from (see
+`_memo_key`): going back to a comparison does not run the four layers again, and
+its combined graph is drawn once, from those same colours. See issue #186.
 """
 
 import hashlib
+import json
 import struct
 
+from flask import current_app
 from rapidfuzz.distance import Levenshtein
 from smda.intel.IntelInstructionEscaper import IntelInstructionEscaper
 
 from mcritweb.views.client import get_client
+from mcritweb.views.memo import app_memo
+from mcritweb.views.utility import get_server_url
 
 #: the base colour of a block nothing matched
 COLOR_UNMATCHED = "#FFA0A0"
@@ -123,24 +131,37 @@ def _adhoc_picblock_pairs(function_a, function_b, smda_function_a, smda_function
     return _pair_by_hash(_adhoc_picblock_hashes(smda_function_a, sample_a), _adhoc_picblock_hashes(smda_function_b, sample_b))
 
 
-def _escaped_sequence(block):
+def _escaped_blocks(smda_function):
+    """{block offset: [(mnemonic, escaped mnemonic, escaped operands), ...]}, in block order.
+
+    Escaping is the expensive part of layers 1 and 4 and of the combined graph's
+    check whether B's code differs, and each of them used to escape the same
+    instructions again. Escaped once per comparison here, they all read from this.
+    """
+    return {
+        block.offset: [(instruction.mnemonic, IntelInstructionEscaper.escapeMnemonic(instruction.mnemonic), IntelInstructionEscaper.escapeOperands(instruction)) for instruction in block.getInstructions()]
+        for block in smda_function.getBlocks()
+    }
+
+
+def _escaped_sequence(escaped_block):
     """The block's instructions with addresses and immediates escaped away."""
-    return [IntelInstructionEscaper.escapeMnemonic(instruction.mnemonic) + " " + IntelInstructionEscaper.escapeOperands(instruction) for instruction in block.getInstructions()]
+    return [escaped_mnemonic + " " + escaped_operands for _, escaped_mnemonic, escaped_operands in escaped_block]
 
 
-def _escaped_hashes(smda_function):
+def _escaped_hashes(escaped_blocks):
     hashes = []
-    for block in smda_function.getBlocks():
-        merged = ";".join(_escaped_sequence(block))
-        hashes.append({"offset": block.offset, "hash": _hash_sequence(merged.encode("ascii"))})
+    for offset, escaped_block in escaped_blocks.items():
+        merged = ";".join(_escaped_sequence(escaped_block))
+        hashes.append({"offset": offset, "hash": _hash_sequence(merged.encode("ascii"))})
     return hashes
 
 
-def _escaped_pairs(smda_function_a, smda_function_b):
-    return _pair_by_hash(_escaped_hashes(smda_function_a), _escaped_hashes(smda_function_b))
+def _escaped_pairs(escaped_blocks_a, escaped_blocks_b):
+    return _pair_by_hash(_escaped_hashes(escaped_blocks_a), _escaped_hashes(escaped_blocks_b))
 
 
-def _levenshtein_pairs(smda_function_a, smda_function_b, unmatched_nodes):
+def _levenshtein_pairs(escaped_blocks_a, escaped_blocks_b, unmatched_nodes):
     """(offset_a, offset_b, distance) for the still unmatched blocks, one-to-one."""
     # across all blocks in unmatched nodes, collect tokens and map to symbols
     # token -> symbol, like "M REG, REG" -> 0
@@ -148,16 +169,18 @@ def _levenshtein_pairs(smda_function_a, smda_function_b, unmatched_nodes):
     alphabet = {}
     num_symbols = 0
 
-    def symbolify(smda_function, unmatched, side):
+    def symbolify(escaped_blocks, unmatched, side):
         nonlocal num_symbols
         # offset -> symbolified block
         candidate_blocks = {}
-        for block in smda_function.getBlocks():
-            if block.offset not in unmatched:
+        for offset, escaped_block in escaped_blocks.items():
+            if offset not in unmatched:
                 continue
             symbolified_block = ""
-            for instruction in block.getInstructions():
-                escaped_ins = instruction.mnemonic + " " + IntelInstructionEscaper.escapeOperands(instruction)
+            # the unescaped mnemonic, unlike layer 1: an edit distance over mnemonic
+            # groups would call a jz and a jnz the same instruction
+            for mnemonic, _, escaped_operands in escaped_block:
+                escaped_ins = mnemonic + " " + escaped_operands
                 if escaped_ins not in alphabet:
                     alphabet[escaped_ins] = chr(0x20 + num_symbols)
                     num_symbols += 1
@@ -172,11 +195,11 @@ def _levenshtein_pairs(smda_function_a, smda_function_b, unmatched_nodes):
                             f"across both functions, limit {0xff - 0x20}. Overflowed while "
                             f"symbolifying function {side}.")
                 symbolified_block += alphabet[escaped_ins]
-            candidate_blocks[block.offset] = symbolified_block
+            candidate_blocks[offset] = symbolified_block
         return candidate_blocks
 
-    candidate_blocks_a = symbolify(smda_function_a, unmatched_nodes["a"], "a")
-    candidate_blocks_b = symbolify(smda_function_b, unmatched_nodes["b"], "b")
+    candidate_blocks_a = symbolify(escaped_blocks_a, unmatched_nodes["a"], "a")
+    candidate_blocks_b = symbolify(escaped_blocks_b, unmatched_nodes["b"], "b")
 
     by_score = {0: [], 1: [], 2: [], 3: []}
     for block_a, symbols_a in candidate_blocks_a.items():
@@ -262,10 +285,20 @@ def _one_to_one_pairs(node_matches):
 
 
 def empty_function_diff(function_entry=None, other_function_entry=None):
-    return {"node_colors": {"a": {}, "b": {}}, "node_matches": {"a": {}, "b": {}}, "pairs": [], "functions": (function_entry, other_function_entry), "smda_functions": None}
+    return {"node_colors": {"a": {}, "b": {}}, "node_matches": {"a": {}, "b": {}}, "pairs": [], "functions": (function_entry, other_function_entry), "smda_functions": None, "escaped_blocks": None}
 
 
-def get_function_diff(function_id_a, function_id_b, function_entry=None, other_function_entry=None):
+def _entries_with_xcfg(function_id_a, function_id_b, function_entry=None, other_function_entry=None):
+    """Both entries with their xcfg, fetching only those not passed in with one."""
+    client = get_client()
+    if function_entry is None or not function_entry.xcfg:
+        function_entry = client.getFunctionById(function_id_a, with_xcfg=True)
+    if other_function_entry is None or not other_function_entry.xcfg:
+        other_function_entry = client.getFunctionById(function_id_b, with_xcfg=True)
+    return function_entry, other_function_entry
+
+
+def _compute_function_diff(function_id_a, function_id_b, function_entry=None, other_function_entry=None):
     """Compare two stored functions block by block.
 
     Entries already fetched with their xcfg can be passed in, which spares the two
@@ -277,20 +310,21 @@ def get_function_diff(function_id_a, function_id_b, function_entry=None, other_f
       pairs         [(offset_a, offset_b), ...], a one-to-one selection of the above
       functions     (function_entry_a, function_entry_b)
       smda_functions (SmdaFunction a, SmdaFunction b), or None when there was nothing to compare
+      escaped_blocks (a, b) as `_escaped_blocks` returns them, or None likewise
 
     A backend that dropped the disassembly (STORAGE_DROP_DISASSEMBLY) answers with an
     empty xcfg (`None` means it was not requested, `{}` that it is gone), and the
     diff is then empty rather than a server error.
+
+    This always computes; views go through the memoized `get_function_diff`.
     """
-    client = get_client()
-    if function_entry is None or not function_entry.xcfg:
-        function_entry = client.getFunctionById(function_id_a, with_xcfg=True)
-    if other_function_entry is None or not other_function_entry.xcfg:
-        other_function_entry = client.getFunctionById(function_id_b, with_xcfg=True)
+    function_entry, other_function_entry = _entries_with_xcfg(function_id_a, function_id_b, function_entry, other_function_entry)
     if function_entry is None or other_function_entry is None or not function_entry.xcfg or not other_function_entry.xcfg:
         return empty_function_diff(function_entry, other_function_entry)
     smda_function_a = function_entry.toSmdaFunction()
     smda_function_b = other_function_entry.toSmdaFunction()
+    escaped_blocks_a = _escaped_blocks(smda_function_a)
+    escaped_blocks_b = _escaped_blocks(smda_function_b)
     node_colors = {"a": {}, "b": {}}
     node_layers = {"a": {}, "b": {}}
     layer_pairs = []
@@ -300,7 +334,7 @@ def get_function_diff(function_id_a, function_id_b, function_entry=None, other_f
     for block in smda_function_b.getBlocks():
         node_colors["b"][node_id(block.offset)] = COLOR_UNMATCHED
     # escaped blocks matches
-    _apply_layer(node_colors, node_layers, layer_pairs, 1, _escaped_pairs(smda_function_a, smda_function_b), lambda pair: COLOR_ESCAPED_MATCH)
+    _apply_layer(node_colors, node_layers, layer_pairs, 1, _escaped_pairs(escaped_blocks_a, escaped_blocks_b), lambda pair: COLOR_ESCAPED_MATCH)
     # ad-hoc picblock match (small BB): bleak teal
     _apply_layer(node_colors, node_layers, layer_pairs, 2, _adhoc_picblock_pairs(function_entry, other_function_entry, smda_function_a, smda_function_b), lambda pair: COLOR_ADHOC_PICBLOCK_MATCH)
     # override "full" picblocks with 4+ addresses
@@ -311,7 +345,7 @@ def get_function_diff(function_id_a, function_id_b, function_entry=None, other_f
         "a": [int(k[6:], 16) for k, v in node_colors["a"].items() if v == COLOR_UNMATCHED],
         "b": [int(k[6:], 16) for k, v in node_colors["b"].items() if v == COLOR_UNMATCHED],
     }
-    _apply_layer(node_colors, node_layers, layer_pairs, 4, _levenshtein_pairs(smda_function_a, smda_function_b, unmatched_nodes), lambda pair: LEVENSHTEIN_COLORS[pair[2]])
+    _apply_layer(node_colors, node_layers, layer_pairs, 4, _levenshtein_pairs(escaped_blocks_a, escaped_blocks_b, unmatched_nodes), lambda pair: LEVENSHTEIN_COLORS[pair[2]])
     node_matches = _collect_matches(node_layers, layer_pairs)
     return {
         "node_colors": node_colors,
@@ -319,6 +353,7 @@ def get_function_diff(function_id_a, function_id_b, function_entry=None, other_f
         "pairs": _one_to_one_pairs(node_matches),
         "functions": (function_entry, other_function_entry),
         "smda_functions": (smda_function_a, smda_function_b),
+        "escaped_blocks": (escaped_blocks_a, escaped_blocks_b),
     }
 
 
@@ -342,7 +377,7 @@ def _block_lines(smda_function, block):
     return lines
 
 
-def build_combined_dot_graph(smda_function_a, smda_function_b, pairs, node_colors):
+def build_combined_dot_graph(smda_function_a, smda_function_b, pairs, node_colors, escaped_blocks=None):
     """One graph holding both functions, in the format `SmdaFunction.toDotGraph` uses.
 
     A matched pair of blocks becomes a single node carrying A's id and colour, its
@@ -351,7 +386,13 @@ def build_combined_dot_graph(smda_function_a, smda_function_b, pairs, node_color
     show them on demand. Blocks without a partner in `pairs` keep A's id and get
     the unmatched colour; blocks only in B get a `NodeB` id and their own colour. Edges are the union of
     both control flows, coloured by which side has them.
+
+    `escaped_blocks` are the diff's, where it is at hand; otherwise both functions
+    are escaped here.
     """
+    if escaped_blocks is None:
+        escaped_blocks = (_escaped_blocks(smda_function_a), _escaped_blocks(smda_function_b))
+    escaped_blocks_a, escaped_blocks_b = escaped_blocks
     a_to_b = {offset_a: offset_b for offset_a, offset_b in pairs}
     b_to_a = {offset_b: offset_a for offset_a, offset_b in pairs}
     blocks_b = {block.offset: block for block in smda_function_b.getBlocks()}
@@ -376,7 +417,7 @@ def build_combined_dot_graph(smda_function_a, smda_function_b, pairs, node_color
             # B's code travels along only where it differs from A's - compared with
             # addresses and immediates escaped, since those differ between any two
             # binaries without making the code different
-            if _escaped_sequence(block_b) != _escaped_sequence(block):
+            if _escaped_sequence(escaped_blocks_b[offset_b]) != _escaped_sequence(escaped_blocks_a[block.offset]):
                 comment = _dot_label(_block_lines(smda_function_b, block_b))
         else:
             # a block that matched several candidates but lost them all in the
@@ -409,9 +450,108 @@ def build_combined_dot_graph(smda_function_a, smda_function_b, pairs, node_color
     return dot_graph
 
 
+#: what the comparisons memoized in one server process may add up to, in estimated bytes
+FUNCTION_DIFF_MEMO_BYTES = 64 * 2**20
+#: what a block, match or pair is charged in a memoized comparison - a node id
+#: string, a dict or list slot, a tuple. Deliberately high: tracemalloc measured
+#: 85-100 bytes per item for the coreutils pairs, so real use stays well under the bound
+BYTES_PER_ITEM = 160
+
+
+def _estimated_size(entry):
+    """A rough byte count of a memoized comparison: its dot graph plus its items."""
+    num_items = len(entry["pairs"])
+    for side in ("a", "b"):
+        num_items += len(entry["node_colors"][side])
+        num_items += sum(len(partners) + 1 for partners in entry["node_matches"][side].values())
+    return len(entry["combined_dot"] or "") + BYTES_PER_ITEM * num_items
+
+
+def _function_diff_memo():
+    return app_memo(current_app, "function_diff", FUNCTION_DIFF_MEMO_BYTES, weigh=_estimated_size)
+
+
+def _digest(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode("ascii")).hexdigest()
+
+
+def _memo_key(function_entry, other_function_entry):
+    """What a comparison is computed from, as far as the two entries show it.
+
+    The colours come from the two xcfgs, the PicBlockHashes the backend stores
+    (layer 3), and the base address and size of each function's sample (layer 2).
+    The first two are in the key by digest: mcrit's recalculateAllPicHashes rewrites
+    the stored PicBlockHashes in place, and a reset restarts its id counters, so the
+    same id can name another function afterwards. The PicBlockHashes are digested
+    in stored order, since the order of node_matches follows it. The sample's base
+    address and size are not in the entries; the ids stand for them, and a function
+    under a reused id that matched its predecessor's xcfg but not its sample could
+    still be served the old ad-hoc PicBlockHash layer.
+    """
+    return (
+        get_server_url(),
+        int(function_entry.function_id),
+        int(other_function_entry.function_id),
+        _digest(function_entry.xcfg),
+        _digest(other_function_entry.xcfg),
+        _digest(function_entry.picblockhashes or []),
+        _digest(other_function_entry.picblockhashes or []),
+    )
+
+
+def _memo_entry(diff):
+    return {"node_colors": diff["node_colors"], "node_matches": diff["node_matches"], "pairs": diff["pairs"], "combined_dot": None}
+
+
+def _has_xcfg(function_entry, other_function_entry):
+    return function_entry is not None and other_function_entry is not None and bool(function_entry.xcfg) and bool(other_function_entry.xcfg)
+
+
+def get_function_diff(function_id_a, function_id_b, function_entry=None, other_function_entry=None):
+    """The comparison of two functions, computed once per content.
+
+    Returns a dict with `node_colors`, `node_matches` and `pairs` as
+    `_compute_function_diff` has them, and `combined_dot`, the combined graph once
+    `get_combined_dot_graph` has drawn it and None until then. Without both xcfgs
+    all of them are empty, and nothing is memoized.
+
+    Entries already fetched with their xcfg can be passed in, which spares the two
+    backend round-trips; otherwise they are fetched here, as the memo key is taken
+    from them. What comes back is shared: read it, do not change it.
+    """
+    function_entry, other_function_entry = _entries_with_xcfg(function_id_a, function_id_b, function_entry, other_function_entry)
+    if not _has_xcfg(function_entry, other_function_entry):
+        return _memo_entry(empty_function_diff(function_entry, other_function_entry))
+    return _function_diff_memo().get(
+        _memo_key(function_entry, other_function_entry),
+        lambda: _memo_entry(_compute_function_diff(function_id_a, function_id_b, function_entry, other_function_entry)),
+    )
+
+
 def get_combined_dot_graph(function_id_a, function_id_b):
-    diff = get_function_diff(function_id_a, function_id_b)
-    if diff["smda_functions"] is None:
+    """The combined graph of two functions, drawn once per memoized comparison.
+
+    Both functions are fetched with their xcfg on every call - the memo key is taken
+    from them, and a function whose disassembly was dropped since must not be drawn
+    from memory. What a repeat call saves is the diff, the two samples and the drawing.
+    """
+    function_entry, other_function_entry = _entries_with_xcfg(function_id_a, function_id_b)
+    if not _has_xcfg(function_entry, other_function_entry):
         return ""
-    smda_function_a, smda_function_b = diff["smda_functions"]
-    return build_combined_dot_graph(smda_function_a, smda_function_b, diff["pairs"], diff["node_colors"])
+    memo = _function_diff_memo()
+    key = _memo_key(function_entry, other_function_entry)
+    entry = memo.lookup(key)
+    if entry is not None and entry["combined_dot"] is not None:
+        return entry["combined_dot"]
+    if entry is None:
+        diff = _compute_function_diff(function_id_a, function_id_b, function_entry, other_function_entry)
+        entry = _memo_entry(diff)
+        smda_function_a, smda_function_b = diff["smda_functions"]
+        escaped_blocks = diff["escaped_blocks"]
+    else:
+        smda_function_a = function_entry.toSmdaFunction()
+        smda_function_b = other_function_entry.toSmdaFunction()
+        escaped_blocks = None
+    dot_graph = build_combined_dot_graph(smda_function_a, smda_function_b, entry["pairs"], entry["node_colors"], escaped_blocks)
+    memo.store(key, dict(entry, combined_dot=dot_graph))
+    return dot_graph

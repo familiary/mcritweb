@@ -1,6 +1,8 @@
+import copy
 import hashlib
 import os
 import re
+import types
 from urllib.parse import quote
 
 from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
@@ -21,14 +23,14 @@ from mcritweb.views.client import get_client, get_family_entries, get_sample_ent
 from mcritweb.views.cross_compare import get_sample_to_job_id, score_to_color
 from mcritweb.views.functiondiff import get_function_diff
 from mcritweb.views.MatchReportRenderer import MatchReportRenderer
+from mcritweb.views.memo import app_memo
 from mcritweb.views.pagination import Pagination
 from mcritweb.views.params import (
     parse_checkbox_query_param,
     parse_integer_list_query_param,
     parse_integer_query_param,
     parse_str_query_param,
-    parseBaseAddrFromFilename,
-    parseBitnessFromFilename,
+    parseBaseAddrAndBitnessFromFilename,
 )
 from mcritweb.views.ScoreColorProvider import ScoreColorProvider
 from mcritweb.views.utility import get_session_user_id, mcrit_server_required, query_upload_path
@@ -240,30 +242,73 @@ def import_complete():
     return render_template("import.html")
 
 
+#: How mcrit's export routes wrap an export: `jsonify({"status": "successful", "data": ...})`,
+#: which serialises with json's default separators, so the export itself is what lies
+#: between these two.
+EXPORT_ENVELOPE = (b'{"status": "successful", "data": ', b"}")
+#: The size of the pieces a passed-through export is sent in.
+EXPORT_CHUNK_SIZE = 1 << 20
+
+
+def fetch_export(sample_ids=None):
+    """The export of `sample_ids` (every sample for None) as its JSON bytes in pieces, with
+    their total length, or None when the backend did not export.
+
+    Parsing a whole-corpus export into a dict and serialising it again held both at once
+    (#202). Asked in raw mode, the client hands over the backend's response, and the
+    export is its body minus the envelope: it is passed on as it came, in pieces, without
+    another copy of it being built. An mcrit client that ignores `raw_responses` for
+    exports, as 1.9.0's does, answers the parsed export instead, which is serialised as
+    before.
+    """
+    exported = get_client(raw_responses=True).getExportData(sample_ids)
+    if isinstance(exported, dict):
+        serialised = json.dumps(exported).encode("utf-8")
+        return [serialised], len(serialised)
+    if exported is None or exported.status_code != 200:
+        return None
+    body = exported.content
+    head, tail = EXPORT_ENVELOPE
+    # a failed export answers its own envelope, `"status": "failed"`
+    if not (body.startswith(head) and body.endswith(tail)):
+        return None
+    export = memoryview(body)[len(head):len(body) - len(tail)]
+    pieces = (bytes(export[offset:offset + EXPORT_CHUNK_SIZE]) for offset in range(0, len(export), EXPORT_CHUNK_SIZE))
+    return pieces, len(export)
+
+
+def export_download(export, filename):
+    """The download of what `fetch_export` answered. It says its length, which Werkzeug
+    cannot count in advance for pieces that are still to be cut, so the browser can show
+    the size and the progress of the download."""
+    pieces, length = export
+    return Response(
+        pieces,
+        mimetype='application/json',
+        headers={"Content-disposition": "attachment; filename=" + filename, "Content-Length": str(length)})
+
+
 @bp.route('/export',methods=('GET', 'POST'))
 @contributor_required
 @mcrit_server_required
 def export_view():
     if request.method == 'POST':
         requested_samples = request.form['samples']
-        client = get_client()
         if requested_samples == "":
-            export_file = json.dumps(client.getExportData())
-            return Response(
-                export_file,
-                mimetype='application/json',
-                headers={"Content-disposition":
-                        "attachment; filename=export_all_samples.json"})
+            export_file = fetch_export()
+            if export_file is None:
+                flash('MCRIT did not export the samples - it could not export them, or the export was too large.', category='error')
+                return render_template("export.html")
+            return export_download(export_file, "export_all_samples.json")
         # NOTE it might be nice to allow [<number>, <number>-<number>, ...] to enable 
         # spans of consecutive sample_ids
         elif re.match(r"^\d+(?:[\s]*,[\s]*\d+)*$", requested_samples):
             sample_ids = [int(sample_id.strip()) for sample_id in requested_samples.split(',')]
-            export_file = json.dumps(client.getExportData(sample_ids))
-            return Response(
-                export_file,
-                mimetype='application/json',
-                headers={"Content-disposition":
-                        "attachment; filename=export_samples.json"})
+            export_file = fetch_export(sample_ids)
+            if export_file is None:
+                flash('MCRIT did not export the samples - it could not export them, or the export was too large.', category='error')
+                return render_template("export.html")
+            return export_download(export_file, "export_samples.json")
         else:
             flash('Please use a comma-separated list of sample_ids in your export request.', category='error')
             return render_template("export.html")
@@ -274,21 +319,26 @@ def export_view():
 @mcrit_server_required
 def specific_export(type, item_id):
     client = get_client()
+    # the backend reads an empty selection as "every sample", so an id that is not a
+    # plain number, or a family without samples, must not reach getExportData
+    if type in ('family', 'samples') and not re.fullmatch(r"[0-9]{1,18}", item_id):
+        flash(f'Only a {"family" if type == "family" else "sample"} id made of digits can be exported.', category='error')
+        return redirect(url_for('data.export_view'))
     if type == 'family':
-        samples = client.getSamplesByFamilyId(item_id)
-        sample_ids = [x.sample_id for x in samples.values()]
-        export_file = json.dumps(client.getExportData(sample_ids))
-        return Response(
-            export_file,
-            mimetype='application/json',
-            headers={"Content-disposition":
-                    "attachment; filename=export_family_"+str(item_id)+".json"})
+        samples = client.getSamplesByFamilyId(int(item_id))
+        export_file = fetch_export([x.sample_id for x in samples.values()]) if samples else None
+        if export_file is None:
+            flash(f'MCRIT did not export family "{item_id}" - it may not exist or have no samples, or MCRIT could not export it.', category='error')
+            return redirect(url_for('data.export_view'))
+        return export_download(export_file, "export_family_" + str(item_id) + ".json")
     if type == 'samples':
-        sample_ids = []
-        sample_entry = client.getSampleById(item_id)
-        if sample_entry:
-            sample_ids.append(sample_entry.sample_id)
-        export_file = json.dumps(client.getExportData(sample_ids))
+        # the backend leaves out a sample_id it does not know, so the export itself says
+        # whether there was one
+        export_data = client.getExportData([int(item_id)])
+        if not export_data or not export_data["content"]["num_samples"]:
+            flash(f'MCRIT did not export sample "{item_id}" - it may not exist, or MCRIT could not export it.', category='error')
+            return redirect(url_for('data.export_view'))
+        export_file = json.dumps(export_data)
         return Response(
             export_file,
             mimetype='application/json',
@@ -308,8 +358,9 @@ def specific_export(type, item_id):
 @mcrit_server_required
 def match_functions(function_id_a, function_id_b):
     client = get_client()
-    if client.isFunctionId(function_id_a) and client.isFunctionId(function_id_b):
-        match_info = client.getMatchFunctionVs(function_id_a, function_id_b)
+    # the backend checks both ids itself; None is an unknown id (or a failed request)
+    match_info = client.getMatchFunctionVs(function_id_a, function_id_b)
+    if match_info is not None:
         function_entry = FunctionEntry.fromDict(match_info["function_entry_a"])
         pichash_matches_a = client.getMatchesForPicHash(function_entry.pichash, summary=True)
         sample_entry_a = SampleEntry.fromDict(match_info["sample_entry_a"])
@@ -488,6 +539,13 @@ YARA_CONDITION_MINIMUM = 1
 #: than this many strings out of one sample is not a usable YARA rule either.
 YARA_REQUIRED_PER_SAMPLE_MAXIMUM = 100
 
+#: How many block covers `build_yara_rule` keeps - issue #184. A cover is a pure
+#: function of a finished job's report and the rule parameters, and it is the expensive
+#: part of this page - the O(k*n) walk above - yet it used to be rebuilt on every
+#: render: each page of the block table, each reload. An entry is a handful of block
+#: hashes. Counted in entries, since the parameters arrive in the query string.
+YARA_COVER_MEMO_ENTRIES = 32
+
 
 def parse_yara_rule_params(request):
     """The rule generation knobs as query parameters, clamped to values YARA accepts."""
@@ -503,7 +561,7 @@ def parse_yara_rule_params(request):
     return yara_params
 
 
-def build_yara_rule(blocks_result, yara_params):
+def build_yara_rule(job_id, blocks_result, yara_params):
     """The rule, plus the block cover it was built from - or None for no rule.
 
     `generateYaraRule` throws the cover away, but the page reports what the rule covers,
@@ -514,15 +572,21 @@ def build_yara_rule(blocks_result, yara_params):
     one, but it is not YARA: an empty `strings:` section is a syntax error on its own,
     and `min(len(block_hashes), condition_required)` writes "0 of them" underneath
     YARA_CONDITION_MINIMUM. No condition rescues that, so nothing is offered to copy.
+
+    Only the cover is memoized, keyed by the job and every parameter it reads. The rule
+    renders in milliseconds even at YARA_REQUIRED_PER_SAMPLE_MAXIMUM, and `renderRule`
+    stamps it with today's date - a memoized rule would be copied out with a stale one.
     """
     ubr = UniqueBlocksResult.fromDict(blocks_result)
-    block_cover = ubr.generateBlockCover(
-        min_ins=yara_params["min_ins"],
-        max_ins=yara_params["max_ins"],
-        min_bytes=yara_params["min_bytes"],
-        max_bytes=yara_params["max_bytes"],
-        required_per_sample=yara_params["required_per_sample"],
-    )
+    cover_params = ("min_ins", "max_ins", "min_bytes", "max_bytes", "required_per_sample")
+
+    def generate_cover():
+        block_cover = ubr.generateBlockCover(**{name: yara_params[name] for name in cover_params})
+        # shared by every request that asks for these parameters, so read-only
+        return types.MappingProxyType(dict(block_cover, block_hashes=tuple(block_cover["block_hashes"])))
+
+    memo = app_memo(current_app, "unique_blocks_cover", YARA_COVER_MEMO_ENTRIES)
+    block_cover = memo.get((job_id,) + tuple(yara_params[name] for name in cover_params), generate_cover)
     if not block_cover["block_hashes"]:
         return None, block_cover
     return ubr.renderRule(block_cover, yara_params["condition_required"], wrap_at=40), block_cover
@@ -545,8 +609,14 @@ def result_unique_blocks(job_info, blocks_result: dict):
         else:
             flash(f"No results for unique blocks in family with id {sample_id}", category="error")
     blocks_statistics = blocks_result["statistics"]
+    # generateBlockCover and renderRule break ties by the order they meet the blocks in.
+    # A report fetched from the backend on this request has them in the backend's order,
+    # the cached copy every later render reads in sorted key order - so without this the
+    # first view of a job could show another rule than every view after it, and the
+    # memoized cover would depend on which of the two happened to compute it (issue #184)
+    blocks_result["unique_blocks"] = dict(sorted(blocks_result["unique_blocks"].items()))
     yara_params = parse_yara_rule_params(request)
-    yara_rule, yara_cover = build_yara_rule(blocks_result, yara_params)
+    yara_rule, yara_cover = build_yara_rule(job_info.job_id, blocks_result, yara_params)
     # only what the caller actually changed, so the forms can carry the rule parameters
     # across the block filter and back without pinning the defaults into every link
     yara_query = {name: value for name, value in yara_params.items() if value != YARA_RULE_DEFAULTS[name]}
@@ -571,7 +641,9 @@ def result_unique_blocks(job_info, blocks_result: dict):
         number_of_unique_blocks = len(filtered_blocks)
         block_pagination = Pagination(request, number_of_unique_blocks, limit=100, query_param="blkp", limit_param="blkl")
         index = 0
-        for pichash, result in sorted(unique_blocks.items(), key=lambda x: x[1]["score"], reverse=True):
+        # the blocks are already in pichash order above; breaking ties by pichash here too
+        # keeps the table from depending on that
+        for pichash, result in sorted(unique_blocks.items(), key=lambda x: (-x[1]["score"], x[0])):
             if index >= block_pagination.end_index:
                 break
             if index >= block_pagination.start_index:
@@ -618,6 +690,26 @@ def assign_matched_offsets(client, function_matches):
             continue
         function_match.matched_offset = function_entry.offset
     return is_complete
+
+
+def aggregate_function_matches_page(matching_result: MatchingResult, pagination: Pagination):
+    """The rows of the aggregated function table that fall on `pagination`'s page.
+
+    getAggregatedFunctionMatches(start, limit) builds the aggregate of every function
+    in the (filtered) report - a dict entry and several set unions per match - and
+    only then slices out the page, so the template paid for the whole report to show
+    a hundred rows of it (issue #194). A row is an aggregate over the matches of one
+    function_id, and rows are ordered by function_id, so the page is made of exactly
+    the matches whose function_id is among the page's ids. Handing only those to
+    mcrit's own aggregation, on a shallow copy so that the view's filtered list is
+    left alone, gives the same rows without re-implementing it here.
+    """
+    function_matches = matching_result.filtered_function_matches
+    function_ids = sorted({function_match.function_id for function_match in function_matches})
+    page_function_ids = set(function_ids[pagination.start_index:pagination.start_index + pagination.limit])
+    page_result = copy.copy(matching_result)
+    page_result.filtered_function_matches = [function_match for function_match in function_matches if function_match.function_id in page_function_ids]
+    return page_result.getAggregatedFunctionMatches()
 
 
 def name_query_sample(job_info, matching_result: MatchingResult):
@@ -758,12 +850,11 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         # if both sides count the same thing, so the total goes in aggregated too - taken off
         # the raw match count, it read as a four-figure "filtered" with no filter applied.
         num_original_aggregated_functions = len(matching_result.getAggregatedFunctionMatches(unfiltered=True))
-        return render_template("result_compare_family.html", famid=filtered_family_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all) 
+        return render_template("result_compare_family.html", famid=filtered_family_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, function_rows=aggregate_function_matches_page(matching_result, function_pagination), num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all)
     # filtered for sample
-    elif filtered_sample_id is not None and client.isSampleId(filtered_sample_id):
+    elif filtered_sample_id is not None and (filtered_sample_entry := client.getSampleById(filtered_sample_id)) is not None:
         matching_result.filterToSampleId(filtered_sample_id)
         create_match_diagram(current_app, job_info.job_id, matching_result, filtered_sample_id=filtered_sample_id)
-        filtered_sample_entry = client.getSampleById(filtered_sample_id)
         matching_result.other_sample_entry = filtered_sample_entry
         # get offsets for matched functions
         if not assign_matched_offsets(client, matching_result.filtered_function_matches):
@@ -809,7 +900,7 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         # was run for is still on this host - the page has to say which it is. The file
         # is filed under the job's own id, so this costs no round trip either
         is_query_result = job_info.method in QUERY_UPLOAD_KINDS
-        return render_template("result_compare_all.html", job_info=job_info, famp=family_pagination, libp=library_pagination, funp=function_pagination, num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all, is_query_result=is_query_result, can_promote_query=is_query_result and query_upload_exists(current_app, job_info.job_id))
+        return render_template("result_compare_all.html", job_info=job_info, famp=family_pagination, libp=library_pagination, funp=function_pagination, function_rows=aggregate_function_matches_page(matching_result, function_pagination), num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all, is_query_result=is_query_result, can_promote_query=is_query_result and query_upload_exists(current_app, job_info.job_id))
 
 
 def result_matches_for_cross(job_info, result_json):
@@ -982,19 +1073,36 @@ def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
         "filter_strongest_per_family": filter_strongest_per_family,
     }
     matching_result.setFilterValues(filter_values)
-    link_hunt_result = matching_result.getLinkHuntResults(filter_min_score, filter_lib_min_score, filter_min_size, filter_min_offset, filter_max_offset, filter_unpenalized_family_count, filter_exclude_families, filter_exclude_samples, filter_strongest_per_family)
+    link_hunt_args = (filter_min_score, filter_lib_min_score, filter_min_size, filter_min_offset, filter_max_offset, filter_unpenalized_family_count, filter_exclude_families, filter_exclude_samples, filter_strongest_per_family)
+    link_hunt_result = matching_result.getLinkHuntResults(*link_hunt_args)
 
-    function_entries = client.getFunctionsBySampleId(matching_result.reference_sample_entry.sample_id)
-    # TODO: probably need to paginate them as well
-    link_clusters = matching_result.clusterLinkHuntResult(function_entries, link_hunt_result)
-    link_clusters = sorted([cluster for cluster in link_clusters if len(cluster["links"]) > 1], key=lambda x: x["score"], reverse=True)
+    # Clustering fetches every function of the reference sample and walks their call
+    # references, the bulk of this request. What it clusters is the link hunt result, so
+    # it is memoized per job and per argument of getLinkHuntResults; the link score
+    # filter below applies to the clusters afterwards and paging is over the individual
+    # links, so neither needs a new clustering. An exclusion list is only read as a set,
+    # so it is keyed as one, and an empty list as None, which excludes the same nothing -
+    # the default filters and a submitted copy of them differ by exactly that. Nothing
+    # else is normalised. The checkbox always parses to a bool, so it has no None to
+    # fold; a score, size or offset of 0 filters nothing only if the report has no
+    # negative values, which getLinkHuntResults does not itself check.
+    cluster_key = (job_info.job_id,) + tuple((tuple(sorted(set(arg))) or None) if isinstance(arg, list) else arg for arg in link_hunt_args)
+
+    def cluster_link_hunt_result():
+        function_entries = client.getFunctionsBySampleId(matching_result.reference_sample_entry.sample_id)
+        # TODO: probably need to paginate them as well
+        link_clusters = matching_result.clusterLinkHuntResult(function_entries, link_hunt_result)
+        return sorted([cluster for cluster in link_clusters if len(cluster["links"]) > 1], key=lambda x: x["score"], reverse=True)
+    # shared with every later request of the same key, so filtered below into a new list only
+    link_clusters = app_memo(current_app, "linkhunt_clusters", 32).get(cluster_key, cluster_link_hunt_result)
 
     if filter_link_score:
         link_clusters = [cluster for cluster in link_clusters if cluster["score"] > filter_link_score]
         link_hunt_result = [link for link in link_hunt_result if link.matched_link_score > filter_link_score]
 
+    cluster_pagination = Pagination(request, len(link_clusters), limit=10, query_param="clup", limit_param="clul")
     function_pagination = Pagination(request, len(link_hunt_result), limit=100, query_param="funp", limit_param="funl")
-    return render_template("linkhunt.html", job_info=job_info, funp=function_pagination, matching_result=matching_result, lc=link_clusters, lhr=link_hunt_result, scp=score_color_provider)
+    return render_template("linkhunt.html", job_info=job_info, clup=cluster_pagination, funp=function_pagination, matching_result=matching_result, lc=link_clusters, lhr=link_hunt_result, scp=score_color_provider)
 
 
 ################################################################
@@ -1292,8 +1400,7 @@ def request_filename_info():
             result['base_addr'] = hex(int(match_baseaddr.group('base_addr')))
     elif 'dump' in filename:
         result['dump'] = True
-        result['bitness'] = parseBitnessFromFilename(filename)
-        base_address = parseBaseAddrFromFilename(filename)
+        base_address, result['bitness'] = parseBaseAddrAndBitnessFromFilename(filename)
         result['base_addr'] = "" if not base_address else hex(base_address)
     else:
         result['dump'] = False
