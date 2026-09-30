@@ -120,7 +120,7 @@ def test_node_colors_degrade_without_xcfg(app, fake_mcrit):
         diff = get_function_diff(_with_xcfg(fake_mcrit), _without_xcfg(fake_mcrit))
     assert diff["node_colors"] == {"a": {}, "b": {}}
     assert diff["pairs"] == []
-    assert diff["smda_functions"] is None
+    assert diff["node_matches"] == {"a": {}, "b": {}}
     assert diff["node_colors"] == empty_function_diff()["node_colors"]
 
 

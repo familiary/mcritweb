@@ -10,7 +10,6 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
 from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, utc_now
-from mcritweb.views.utility import get_session_user_id
 
 bp = Blueprint('authentication', __name__, url_prefix='/')
 
@@ -149,9 +148,12 @@ def set_is_first_user():
 
 @bp.before_app_request
 def set_operation_mode():
+    # a request run inside an already-pushed app context (as the tests do) shares its
+    # `g`, so drop anything built from the server settings before this request
+    g.pop('server_info', None)
+    g.pop('mcrit_client', None)
     if not g.first_user:
-        server_info = ServerInfo.fromDb()
-        g.operation_mode = server_info.operation_mode
+        g.operation_mode = db.get_server_info().operation_mode
 
 
 def multi_user(view):
@@ -172,7 +174,7 @@ def register():
         error = 'You already have a registered account.'
         flash(error, category='error')
         return redirect(url_for('index'))
-    server_info = ServerInfo.fromDb()
+    server_info = db.get_server_info()
     is_registration_token_required = False
     if server_info:
         is_registration_token_required = server_info.registration_token not in [None, ""]
@@ -312,10 +314,9 @@ def login_required(view):
 @bp.route('/settings')
 @login_required
 def settings():
-    user_id = get_session_user_id()
-    if user_id is None:
-        return redirect(url_for('index'))
-    user_info = UserInfo.fromDb(user_id=user_id)
+    # login_required has settled that g.user holds this session's row
+    user_info = g.user
+    user_id = user_info.user_id
     user_filters = UserFilters.fromDb(user_id)
     user_column_settings = UserColumnSettings.fromDb(user_id)
     # if we don't have them yet, create them
@@ -325,7 +326,7 @@ def settings():
     if user_column_settings is None:
         user_column_settings = UserColumnSettings.fromDict(user_id, {})
         user_column_settings.saveToDb()
-    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info is not None and user_info.role in API_ROLES)
+    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES)
 
 def admin_required(view):
     @functools.wraps(view)

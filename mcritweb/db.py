@@ -144,6 +144,18 @@ def get_stored_password_hash_method():
     leaves the smallest set of accounts distinguishable; picking an arbitrary row (a
     bare LIMIT 1) leaves whichever set that row does not belong to, which on an upgraded
     instance is every account created since the upgrade.
+
+    Read afresh on every call, deliberately. A cached answer would have to be dropped
+    by every write to the password column - registration, the rehash on login, a
+    password change, deleting a user - and by the ones this process never sees: a
+    second worker, `flask init-db`, a restored database file. A stale answer reopens
+    the timing gap without anything failing.
+
+    The price is paid on exactly the path this disguises: the query runs only when
+    the username is absent, so on a large user table it adds a small, repeatable delay
+    that a wrong password does not have - about 2 ms at 5,000 users. That is still far
+    below the hash check it precedes (66-150 ms), and the login throttle meters how
+    often anyone can ask. See issue #190.
     """
     record = get_db().execute(
         """
@@ -199,6 +211,9 @@ class ServerInfo:
         return server_info
     
     def saveToDb(self):
+        # whatever get_server_info() handed out earlier in this request is about to be
+        # out of date - dropped first, so a failed write cannot leave it believed either
+        g.pop('server_info', None)
         database = get_db()
         # query to see if row exists
         record = database.execute("SELECT rowid FROM server LIMIT 1;").fetchone()
@@ -213,6 +228,20 @@ class ServerInfo:
                 (self.url, self.operation_mode, self.registration_token, self.server_token, self.server_uuid, self.server_version),
             )
         database.commit()
+
+
+def get_server_info():
+    """The server row, read once per request.
+
+    The operation-mode hook reads it, and so do get_server_url and get_server_token,
+    which the reachability probe and the client factory each call - five reads of the
+    same row on a page that probes the backend and builds a client. Kept on `g`, so it
+    lives no longer than the request; ServerInfo.saveToDb drops it, so a request that
+    changes the settings reads its own write. See issue #190.
+    """
+    if 'server_info' not in g:
+        g.server_info = ServerInfo.fromDb()
+    return g.server_info
 
 
 class UserFilters:
@@ -779,12 +808,9 @@ def clear_login_failures(remote_addr):
 
 
 def is_first_user():
-    db = get_db()
-    cursor = db.cursor()
-    if len(cursor.execute("select * from user;").fetchall()) > 0:
-        return False
-    else:
-        return True
+    """True while the user table is empty. Asked on every request, so it only asks
+    whether a row exists rather than reading them all - see issue #190."""
+    return get_db().execute("SELECT 1 FROM user LIMIT 1;").fetchone() is None
 
 def get_registration_token():
     registration_token = None

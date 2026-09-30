@@ -1,4 +1,3 @@
-import json
 import re
 
 from flask import Blueprint, Response, abort, current_app, g, request
@@ -50,8 +49,15 @@ def stringified_bool(x):
         return False
 
 def handle_raw_response(response):
+    # the backend's JSON goes out as the bytes it sent, error answers included; of its
+    # headers only the JSON content type crosses over. A success that is not JSON (a
+    # proxy's error page, an empty answer) is a bad gateway, an error keeps its status.
+    content_type = response.headers.get("Content-Type", "")
+    if content_type.split(";")[0].strip().lower() == "application/json" and response.content:
+        return Response(response=response.content, status=response.status_code, content_type=content_type)
     if response.status_code in [200, 202]:
-        return Response(response=json.dumps(response.json()), status=response.status_code)
+        current_app.logger.warning("api passthrough: backend answered %d with %r, %d bytes", response.status_code, content_type, len(response.content))
+        return Response(status=502)
     return Response(status=response.status_code)
 
 

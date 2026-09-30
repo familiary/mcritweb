@@ -46,8 +46,10 @@ Results for Job: {{ job_info.job_id }}
       </div>
     </div>
 </form>
-<h4 id="linkhunt-matches">Link Clusters</h4>
+<h4 id="linkhunt-clusters">Link Clusters</h4>
 <p>These are clusters of matches with another single family where all functions have a direct code CFG relationship (calls, jumps, ...) among them. Bold matches are also unique with this other family.</p>
+{# a cluster can hold any number of links, so only the first few are shown open #}
+{% set shown_links = 8 %}
 <table class="table table-hover">
   <thead class="thead-light">
     <tr>
@@ -61,9 +63,9 @@ Results for Job: {{ job_info.job_id }}
     </tr>
   </thead>
   <tbody>
-    {% for cluster_entry in lc %}
+    {% for cluster_entry in lc[clup.start_index:clup.start_index+clup.limit] %}
     <tr style="background-color:#{{ scp.getMatchHexColorByScore100(cluster_entry['max_score'], 0.4) }}">
-      <td style="text-align: right;" valign="middle">{{ loop.index }}</td>
+      <td style="text-align: right;" valign="middle">{{ clup.start_index + loop.index }}</td>
       <td style="text-align: right;" valign="middle">{{ "%7.2f"|format(cluster_entry['score']) }}</td>
       <td style="text-align: right;" valign="middle">{{ "%7.2f"|format(cluster_entry['max_score']) }}</td>
       <td style="text-align: right;" valign="middle"><i class="fa-solid fa-bug " title="Family ID"></i>({{ cluster_entry['family_id'] }}) {{ format_family_name(cluster_entry['family'], cluster_entry['family_id']) }}</td>
@@ -71,7 +73,9 @@ Results for Job: {{ job_info.job_id }}
       <td style="text-align: right;" valign="middle">{{ "%d"|format(cluster_entry['unique_matches']|length) }}</td>
       <td style="text-align: right;" valign="middle">
         {% for link_entry in cluster_entry["links"] %}
-          <!-- WIP: render stuff here, we need better accessors for this though -->
+          {% if loop.index == shown_links + 1 %}
+          <details><summary>{{ loop.length - shown_links }} more</summary>
+          {% endif %}
           <a href="{{ url_for('explore.function_by_id', function_id=link_entry.function_id) }}">
             {% if link_entry.matched_unique %}
             <b style="color: black;">0x{{ "%x"|format(link_entry.offset) }}</b></a>
@@ -85,13 +89,17 @@ Results for Job: {{ job_info.job_id }}
             {% if loop.index > 0 and loop.index % 4 == 0 %}
             <br />
             {% endif %}
+          {% if loop.last and loop.length > shown_links %}
+          </details>
+          {% endif %}
         {% endfor %}
       </td>
    </tr>
     {% endfor %}
   </tbody>
 </table>
-<h4 id="linkhunt-matches">Individual Links</h4>
+{{ pagination_widget(clup, _anchor="linkhunt-clusters")}}
+<h4 id="linkhunt-links">Individual Links</h4>
 <p>Family-unique matches in bold.</p>
 <table class="table table-hover">
     <thead class="thead-light">
@@ -130,7 +138,7 @@ Results for Job: {{ job_info.job_id }}
       {% endfor %}
     </tbody>
   </table>
-  {{ pagination_widget(funp, _anchor="linkhunt-matches")}}
+  {{ pagination_widget(funp, _anchor="linkhunt-links")}}
 
 {% endblock %}
 

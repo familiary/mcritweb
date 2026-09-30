@@ -187,7 +187,7 @@ Results for Job: {{ job_info.job_id }}
     </tr>
   </thead>
   <tbody>
-    {% for aggregate in matching_result.getAggregatedFunctionMatches(funp.start_index, funp.limit) %}
+    {% for aggregate in function_rows %}
       <tr style="background-color:#{{ scp.getMatchHexColorByScore50(aggregate['best_score'] + aggregate['pichash_matches'], 0.4) }}">
         {% for column_type in ucs_functions %}
           {% if column_type == "matched_function_id" %}
