@@ -598,6 +598,14 @@ NO_XCFG_DOT_GRAPH = (
 )
 
 
+# Matches the start of a block node's label attribute, as SmdaFunction.toDotGraph
+# writes it: `Node0x<addr> [shape=record,label="<addr>: <mnemonic> ...`. The label
+# always opens with the block's own offset in hex (the first instruction's address),
+# and this is the only place `,label="` occurs - edges carry no label - so each match
+# corresponds to exactly one block, in one left-to-right pass over the text.
+BLOCK_LABEL_RX = re.compile(r',label="([0-9a-f]+)')
+
+
 # helper for @bp.route('/functions/<int:function_id>')
 @bp.route('/fetchDotGraph/<int(signed=True):function_id>', methods=['GET'])
 @visitor_required
@@ -615,13 +623,20 @@ def fetchDotGraph(function_id):
         smda_function = function_entry.toSmdaFunction()
         dot_graph = smda_function.toDotGraph(with_api=True)
         # TODO can possibly do this fixup in a better place
+        # Prefixes every block's label with a `comment` carrying its picblockhash, so
+        # the front end can look up per-block matches (getPicBlockMatches). One
+        # re.sub pass over the whole graph rather than one dot_graph.replace() per
+        # block - each replace() used to rescan the entire (already-grown) string,
+        # which made this O(blocks x graph size); see issue #204.
         pbh_by_offset = {pbh["offset"]: pbh for pbh in function_entry.picblockhashes or []}
-        for smda_block in smda_function.getBlocks():
-            needle = f',label="{smda_block.offset:x}'
-            replacement = f',comment=""{needle}'
-            if smda_block.offset in pbh_by_offset:
-                replacement = f',comment="0x{pbh_by_offset[smda_block.offset]["hash"]:x}"{needle}'
-            dot_graph = dot_graph.replace(needle, replacement)
+
+        def _add_block_comment(match):
+            offset = int(match.group(1), 16)
+            pbh = pbh_by_offset.get(offset)
+            comment = f'0x{pbh["hash"]:x}' if pbh else ""
+            return f',comment="{comment}"{match.group(0)}'
+
+        dot_graph = BLOCK_LABEL_RX.sub(_add_block_comment, dot_graph)
         return dot_graph
     if function_entry:
         # the entry exists but carries no graph - say so, rather than rendering nothing
