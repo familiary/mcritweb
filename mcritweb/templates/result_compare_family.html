@@ -217,9 +217,9 @@ Results for Job: {{ job_info.job_id }}
           {% elif column_type == "num_pichash" %}
             <td style="text-align: right;" valign="middle">{{ aggregate["pichash_matches"] }}</td>
           {% elif column_type == "is_library_match" %}
-            <td style="text-align: right;" valign="middle"><i {% if aggregate["library_matches"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+            <td style="text-align: right;" valign="middle"><i {% if aggregate["library_matches"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
           {% elif column_type == "is_unique_match" %}
-            <td style="text-align: right;" valign="middle"><i {% if aggregate["is_family_unique"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
+            <td style="text-align: right;" valign="middle"><i {% if aggregate["is_family_unique"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
           {% endif %}
         {% endfor %}
       </tr>
