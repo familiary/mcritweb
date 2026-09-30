@@ -1,4 +1,3 @@
-import json
 import re
 
 from flask import Blueprint, Response, abort, current_app, g, request
@@ -29,6 +28,17 @@ def nullable_int(x):
     except Exception:
         raise ValueError("Can't cast this to int")
 
+def int_list(x):
+    """Comma-separated ints, parsed the way the backend's /jobs parses them: an item
+    that isn't one is dropped."""
+    ids = []
+    for item in x.split(","):
+        try:
+            ids.append(int(item))
+        except ValueError:
+            pass
+    return ids
+
 def stringified_bool(x):
     if not isinstance(x, str):
         return x
@@ -39,8 +49,15 @@ def stringified_bool(x):
         return False
 
 def handle_raw_response(response):
+    # the backend's JSON goes out as the bytes it sent, error answers included; of its
+    # headers only the JSON content type crosses over. A success that is not JSON (a
+    # proxy's error page, an empty answer) is a bad gateway, an error keeps its status.
+    content_type = response.headers.get("Content-Type", "")
+    if content_type.split(";")[0].strip().lower() == "application/json" and response.content:
+        return Response(response=response.content, status=response.status_code, content_type=content_type)
     if response.status_code in [200, 202]:
-        return Response(response=json.dumps(response.json()), status=response.status_code)
+        current_app.logger.warning("api passthrough: backend answered %d with %r, %d bytes", response.status_code, content_type, len(response.content))
+        return Response(status=502)
     return Response(status=response.status_code)
 
 
@@ -113,6 +130,20 @@ def api_router(api_path):
                 target_function_ids = [int(function_id) for function_id in request.data.split(b",")]
                 return handle_raw_response(client.getFunctionsByIds(target_function_ids, with_label_only=forward_with_label_only))
             return handle_raw_response(client.getFunctionsByIds([], with_label_only=forward_with_label_only))
+    # getSamplesByIds, getFamiliesByIds: a comma-separated id list as the body, as for
+    # functions; sample ids may be negative, for query samples
+    elif re_match := re.match(r"(?P<collection>samples|families)/ids$", api_path):
+        if request.method != "POST":
+            return Response(status=405)
+        id_list = request.get_data()
+        id_pattern = rb"^-?\d+(?:[\s]*,[\s]*-?\d+)*$" if re_match.group("collection") == "samples" else rb"^\d+(?:[\s]*,[\s]*\d+)*$"
+        if not re.match(id_pattern, id_list):
+            # what the backend answers a body that isn't an id list; the client sends
+            # none it could answer that way
+            return Response(status=400)
+        entry_ids = [int(entry_id) for entry_id in id_list.split(b",")]
+        fetch_many = client.getSamplesByIds if re_match.group("collection") == "samples" else client.getFamiliesByIds
+        return handle_raw_response(fetch_many(entry_ids))
     # getMatchesForSmdaFunction
     elif re_match := re.match(r"query/function$", api_path):
         smda_report_body = request.get_json(force=True)
@@ -145,6 +176,15 @@ def api_router(api_path):
             forward_ascending = request.args.get("ascending", False, stringified_bool)
         except Exception:
             pass
+        # the backend's selectors, passed on as lists; an item that isn't an id is
+        # dropped, as the backend drops it, and a present but empty list still selects
+        # nothing rather than everything
+        forward_sample_ids = None
+        forward_job_ids = None
+        if "sample_ids" in request.args:
+            forward_sample_ids = int_list(request.args["sample_ids"])
+        if "job_ids" in request.args:
+            forward_job_ids = [item.strip() for item in request.args["job_ids"].split(",") if item.strip()]
         return handle_raw_response(
             client.getQueueData(
                 start=forward_start, 
@@ -152,7 +192,9 @@ def api_router(api_path):
                 method=forward_method, 
                 filter=forward_filter, 
                 state=forward_state, 
-                ascending=forward_ascending
+                ascending=forward_ascending,
+                sample_ids=forward_sample_ids,
+                job_ids=forward_job_ids
             )
         )
     # getJobData, getResultForJob

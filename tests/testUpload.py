@@ -374,6 +374,35 @@ def test_a_dump_filename_yields_bitness_and_base_address(client, as_role):
     }
 
 
+def test_a_32_bit_dump_and_an_unaddressed_one(client, as_role):
+    as_role("contributor")
+    assert filename_info(client, "malware_dump_0x00400000.bin") == {
+        "dump": True,
+        "bitness": 32,
+        "base_addr": "0x400000",
+    }
+    assert filename_info(client, "malware_dump.bin") == {"dump": True, "bitness": None, "base_addr": ""}
+
+
+def test_a_dump_filename_is_parsed_once(client, as_role, monkeypatch):
+    """Bitness and base address come out of the same match, so one parse answers
+    both - and a name without an address is reported once, not once per field.
+    Issue #190. Only params' own `logging` name is replaced; the module is untouched."""
+    from types import SimpleNamespace
+
+    from mcritweb.views import params
+
+    warnings = []
+    monkeypatch.setattr(params, "logging", SimpleNamespace(
+        info=lambda *args: None,
+        warning=lambda message, *args: warnings.append(message % args)))
+
+    as_role("contributor")
+    filename_info(client, "malware_dump.bin")
+
+    assert warnings == ["No base address recognized, using None."]
+
+
 def test_an_smda_report_is_read_out_of_the_uploaded_header(client, as_role):
     """For .smda the answers come from the first bytes of the file itself, which the
     browser reads and sends as text. Regex over a prefix, so a truncated header is

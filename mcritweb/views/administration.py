@@ -6,11 +6,12 @@ from flask import Blueprint, current_app, flash, g, redirect, render_template, r
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken
+from mcritweb.db import UserColumnSettings, UserFilters, UserInfo, generate_apitoken
 from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
 from mcritweb.views.client import get_client
+from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
-from mcritweb.views.utility import get_mcritweb_version_from_setup, get_session_user_id
+from mcritweb.views.utility import forget_server_probe, get_session_user_id
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -187,6 +188,7 @@ def regenerate_apitoken():
 @multi_user
 def users(tab = None):
     g.all_users = get_users()
+    g.users_by_role = group_users_by_role(g.all_users)
     if tab is None:
         return render_template("users.html", active='all')    
     return render_template("users.html", active=tab)
@@ -195,6 +197,16 @@ def users(tab = None):
 def get_users():
     user_infos = db.get_all_user_info()
     return user_infos
+
+
+def group_users_by_role(user_infos):
+    """One list per role in KNOWN_ROLES, each in the order given, for the role tabs of
+    users.html. A user with any other role is only listed under "all" (#95)."""
+    grouped = {role: [] for role in KNOWN_ROLES}
+    for user_info in user_infos:
+        if user_info.role in grouped:
+            grouped[user_info.role].append(user_info)
+    return grouped
 
 
 @bp.route('/change_user_role/<int:user_id>/<role>/<tab>', methods=('POST',))
@@ -260,9 +272,9 @@ def backend_version(client):
 @bp.route('/server')
 @admin_required
 def server():
-    server_info = ServerInfo.fromDb()
+    server_info = db.get_server_info()
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
-    running_server_version = get_mcritweb_version_from_setup()
+    running_server_version = current_app.config['MCRITWEB_VERSION']
     client = get_client()
     mcrit_version = backend_version(client)
     return render_template('admin_server.html', operation_mode=operation_mode_str, server_info=server_info, running_version=running_server_version, mcrit_version=mcrit_version)
@@ -271,18 +283,24 @@ def server():
 @bp.route('/change_server' , methods=('POST',))
 @admin_required
 def change_server():
-    server_info = ServerInfo.fromDb()
+    server_info = db.get_server_info()
     new_url = request.form.get('mcrit_server_url', '')
     new_token = request.form.get('mcrit_server_token', '')
     if server_info.url != new_url or server_info.server_token != new_token:
         server_info.url = new_url
         server_info.server_token = new_token
         server_info.saveToDb()
+        # an operator who has just corrected the URL or token should not have to wait
+        # out the reachability TTL to find out whether it worked - see issue #89. The
+        # cache is a module global, so this clears the worker that handled this request;
+        # with N gunicorn workers the other N-1 still answer from their own entry until
+        # it lapses, which the default 5s TTL bounds.
+        forget_server_probe()
         flash('Server information successfully changed', category='success')
     else:
         flash('No information needed change', category='success')
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
-    running_server_version = get_mcritweb_version_from_setup()
+    running_server_version = current_app.config['MCRITWEB_VERSION']
     client = get_client()
     mcrit_version = backend_version(client)
     return render_template('admin_server.html', operation_mode=operation_mode_str, server_info=server_info, running_version=running_server_version, mcrit_version=mcrit_version)
@@ -297,9 +315,11 @@ def reset_server():
         return redirect(url_for('admin.server'))
     client = get_client()
     client.respawn()
+    forget_server_probe()
     from mcritweb.views.utility import ensure_local_data_paths
     ensure_local_data_paths(current_app, clear_data=True)
-    # TODO also clean all locally cached data.
+    # the reset restarts the backend's id counters, so anything memoized by id is stale
+    clear_app_memos(current_app)
     flash('A reset of MCRIT was successfully performed.', category='success')
     return redirect(url_for('index'))
 

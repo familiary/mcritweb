@@ -12,7 +12,7 @@ from mcrit.storage.SampleEntry import SampleEntry
 import mcritweb.views.cfg_explorer_detector as cfg_explorer_detector
 from mcritweb.autocomplete import autocomplete_items
 from mcritweb.views.authentication import contributor_required, visitor_required
-from mcritweb.views.client import get_client
+from mcritweb.views.client import get_client, get_sample_entries, remember_samples
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.functiondiff import get_combined_dot_graph
 from mcritweb.views.pagination import request_args_for_link_building
@@ -196,10 +196,15 @@ DEFAULT_SEARCH_TYPES = ["family", "sample"]
 def sample_row_job_collection(client, samples):
     """The jobs a sample listing annotates its rows with.
 
+    Each request names the page's sample ids, and mcrit selects the jobs whose first
+    argument is one of them in its query, so what comes back scales with the jobs of
+    the samples on the page rather than with the installation's whole matching history.
     `filterToSampleIds` is what makes the result exact: it keeps only jobs whose own
     `sample_id` - their first argument - is on the page, which is the same set the row
-    macro would have found in a collection built from the whole queue. An empty page
-    has nothing to annotate, so it asks the backend for nothing.
+    macro would have found in a collection built from the whole queue. It also keeps a
+    backend that does not know `sample_ids` correct: that one ignores the parameter and
+    answers the whole method, as it did before. An empty page has nothing to annotate,
+    so it asks the backend for nothing.
 
     A failed queue read used to take the whole page down (`JobCollection(None)`), so
     say what was lost and render the rows without their annotations instead.
@@ -218,19 +223,23 @@ def sample_row_job_collection(client, samples):
     counter carries no number, which `Job.number` reports as -1; those sort last, as
     the oldest, and python's stable sort leaves them in the order the backend listed
     them.
+
+    Neither read takes a `limit`: the badge counts all of a sample's matching jobs, so
+    the newest N would undercount it. The page's sample ids bound them instead.
     """
     if not samples:
         return JobCollection([])
+    sample_ids = [sample.sample_id for sample in samples]
     jobs = []
     for method in SAMPLE_ROW_JOB_METHODS:
-        jobs_for_method = client.getQueueData(method=method)
+        jobs_for_method = client.getQueueData(method=method, sample_ids=sample_ids)
         if jobs_for_method is None:
             flash("Ups, reading MCRIT's job queue failed - rows are shown without their job annotations.", category="error")
             return JobCollection([])
         jobs.extend(jobs_for_method)
     jobs.sort(key=lambda job: job.number if isinstance(job.number, int) else -1, reverse=True)
     job_collection = JobCollection(jobs)
-    job_collection.filterToSampleIds([sample.sample_id for sample in samples])
+    job_collection.filterToSampleIds(sample_ids)
     return job_collection
 
 
@@ -366,7 +375,8 @@ def modifyFamily():
 @visitor_required
 @mcrit_server_required
 def family_names():
-    """Names for the family type-ahead in the edit modals, as JSON.
+    """Names for the family type-ahead, as JSON: the edit modals and, since #192, the
+    family field of the submit form and of the drop overlay.
 
     Every page carrying one of those modals used to embed the complete list of family
     names in its source. mcrit answers `getFamilies()` with one storage lookup per
@@ -380,11 +390,10 @@ def family_names():
     free-text input and stays usable without them.
 
     Answers `{label, value}` pairs rather than bare names, escaped by
-    `mcritweb.autocomplete.autocomplete_items` - the same function behind the
-    `|autocomplete_items` filter that the shipped-with-the-page type-aheads use. The
-    consumer is the vendored autocomplete.js either way, and it renders every
-    suggestion through innerHTML, so escaping here is what keeps a family name from
-    executing (#168). `jsonify` protects the transport, not the sink.
+    `mcritweb.autocomplete.autocomplete_items`. This is the only way family names reach
+    the type-ahead, and the vendored autocomplete.js renders every suggestion through
+    innerHTML, so escaping here is what keeps a family name from executing (#168).
+    `jsonify` protects the transport, not the sink.
     """
     query = request.args.get('q', "")
     client = get_client()
@@ -629,11 +638,9 @@ def sample_by_id(sample_id):
                 job_collection.filterToSampleIds([sample_id])
             for function_dict in results['search_results'].values():
                 functions.append(FunctionEntry.fromDict(function_dict))
-        samples_by_id = {}
-        for job in job_collection.getJobs():
-            if job.sample_ids is not None:
-                for sample_id in [sid for sid in job.sample_ids if sid not in samples_by_id]:
-                    samples_by_id[sample_id] = client.getSampleById(sample_id)
+        # every job listed here names this sample, which the page already holds
+        remember_samples([sample_entry])
+        samples_by_id = get_sample_entries(sid for job in job_collection.getJobs() for sid in job.sample_ids or [])
         user_column_setup = get_user_column_setup("functions_table")
         return render_template("single_sample.html", entry=sample_entry, functions=functions, pagination=pagination, query=original_query, samples=samples_by_id, job_collection=job_collection, user_column_setup=user_column_setup)
     else:
@@ -670,6 +677,14 @@ NO_XCFG_DOT_GRAPH = (
 )
 
 
+# Matches the start of a block node's label attribute, as SmdaFunction.toDotGraph
+# writes it: `Node0x<addr> [shape=record,label="<addr>: <mnemonic> ...`. The label
+# always opens with the block's own offset in hex (the first instruction's address),
+# and this is the only place `,label="` occurs - edges carry no label - so each match
+# corresponds to exactly one block, in one left-to-right pass over the text.
+BLOCK_LABEL_RX = re.compile(r',label="([0-9a-f]+)')
+
+
 # helper for @bp.route('/functions/<int:function_id>')
 @bp.route('/fetchDotGraph/<int(signed=True):function_id>', methods=['GET'])
 @visitor_required
@@ -687,13 +702,20 @@ def fetchDotGraph(function_id):
         smda_function = function_entry.toSmdaFunction()
         dot_graph = smda_function.toDotGraph(with_api=True)
         # TODO can possibly do this fixup in a better place
+        # Prefixes every block's label with a `comment` carrying its picblockhash, so
+        # the front end can look up per-block matches (getPicBlockMatches). One
+        # re.sub pass over the whole graph rather than one dot_graph.replace() per
+        # block - each replace() used to rescan the entire (already-grown) string,
+        # which made this O(blocks x graph size); see issue #204.
         pbh_by_offset = {pbh["offset"]: pbh for pbh in function_entry.picblockhashes or []}
-        for smda_block in smda_function.getBlocks():
-            needle = f',label="{smda_block.offset:x}'
-            replacement = f',comment=""{needle}'
-            if smda_block.offset in pbh_by_offset:
-                replacement = f',comment="0x{pbh_by_offset[smda_block.offset]["hash"]:x}"{needle}'
-            dot_graph = dot_graph.replace(needle, replacement)
+
+        def _add_block_comment(match):
+            offset = int(match.group(1), 16)
+            pbh = pbh_by_offset.get(offset)
+            comment = f'0x{pbh["hash"]:x}' if pbh else ""
+            return f',comment="{comment}"{match.group(0)}'
+
+        dot_graph = BLOCK_LABEL_RX.sub(_add_block_comment, dot_graph)
         return dot_graph
     if function_entry:
         # the entry exists but carries no graph - say so, rather than rendering nothing

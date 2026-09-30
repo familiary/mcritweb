@@ -161,7 +161,7 @@ compute_loops_from_backedges_WorkUnit = namedtuple(
         "backedge", "graph", "dominanators"])
 
 
-def compute_loops_from_backedges(work_unit):
+def compute_loops_from_backedges(work_unit, reverse_graph=None):
     backedge = work_unit.backedge
     graph = work_unit.graph
     dominanators = work_unit.dominanators
@@ -172,31 +172,51 @@ def compute_loops_from_backedges(work_unit):
         # dominator set
         list(filter(
             lambda node: backedge[1] in dominanators[node],
-            getNodes(graph, backedge)
+            getNodes(graph, backedge, reverse_graph=reverse_graph)
         ))
     }
 
 
-def getNodes(graph, backedge):
+def getNodes(graph, backedge, reverse_graph=None):
+    '''
+    Nodes reachable from backedge[0] without passing through the loop header
+    backedge[1], in the reversed graph - i.e. the body of the loop this backedge
+    closes.
+
+    collect_loops computes the reversed graph once for the whole set of backedges
+    and passes it in as `reverse_graph`, since it does not depend on which backedge
+    is being resolved. A caller with only one backedge can omit it and this builds
+    its own, as before.
+    '''
     if backedge[0] == backedge[1]:
         return [backedge[0]]
-    reverseGraph = graph.reverse()
-    # remove the header
-    reverseGraph.remove_node(backedge[1])
-    nodeList = list(nwx.dfs_preorder_nodes(reverseGraph, backedge[0]))
-    # nodeList = nwx.depth_first_search.dfs_tree(reverseGraph, backedge[0]).nodes()
-    nodeList.append(backedge[1])
+    if reverse_graph is None:
+        reverse_graph = graph.reverse()
+    # exclude the header by viewing it out rather than removing it, so a
+    # reverse_graph shared across backedges is never mutated
+    header = backedge[1]
+    reachable = nwx.subgraph_view(reverse_graph, filter_node=lambda node: node != header)
+    nodeList = list(nwx.dfs_preorder_nodes(reachable, backedge[0]))
+    nodeList.append(header)
     return nodeList
 
 
 def collect_loops(graph, backedges, dominanators):
     '''
-    Farms out work to a pool of tasks to collect loops
+    Computes the loop each backedge defines: the backedge itself and the nodes that
+    make up its body.
+
+    A plain loop, not farmed out to a pool - nothing here runs in parallel. Every
+    backedge shares the same graph and dominator sets, so the one thing worth doing
+    once for all of them is the reversed graph getNodes needs for its reachability
+    search; that is built here and passed to each call instead of being rebuilt from
+    the same graph for every backedge.
     '''
+    reverse_graph = graph.reverse()
     result = []
-    for entry in map(lambda backedge: compute_loops_from_backedges_WorkUnit(backedge=backedge, graph=graph, dominanators=dominanators), backedges):
-        loops = compute_loops_from_backedges(entry)
-        result.append(loops)
+    for backedge in backedges:
+        work_unit = compute_loops_from_backedges_WorkUnit(backedge=backedge, graph=graph, dominanators=dominanators)
+        result.append(compute_loops_from_backedges(work_unit, reverse_graph=reverse_graph))
     return result
 
 def addParentInfo(loopsObj):

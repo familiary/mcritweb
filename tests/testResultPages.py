@@ -385,6 +385,40 @@ def test_the_filtered_figure_accounts_for_the_rest_of_the_report(client, as_role
     assert not wrong, "the filtered figure does not account for the report:\n  " + "\n  ".join(wrong)
 
 
+# Issue #207: `?samid=` asked `isSampleId` and then `getSampleById` for the same id,
+# and the match diagram asked `isSampleId` for the reference sample before
+# `getFunctionsBySampleId` - both fetches answer None for an id the backend does not
+# know, so each check was one request more than the question needed.
+
+def _sample_lookups(backend):
+    return [(name, args) for name, args, _ in backend.calls if name in ("isSampleId", "getSampleById")]
+
+
+@pytest.mark.parametrize("report", ["matches_for_sample", "matches_for_query"])
+def test_the_sample_filter_looks_the_sample_up_once(client, as_role, widened_corpus_mcrit, app, report):
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: widened_corpus_mcrit
+    as_role("visitor")
+    sample_id = matched_sample_ids(report)[0]
+    widened_corpus_mcrit.calls.clear()
+    response = client.get(f"/data/result/{job_id_of(report)}?samid={sample_id}")
+    assert response.status_code == 200
+    assert b"are corrupted" not in response.data and b"Offset B" in response.data
+    # the diagram was drawn on this request, off the reference sample's functions
+    assert any(name == "getFunctionsBySampleId" for name, _, _ in widened_corpus_mcrit.calls)
+    assert _sample_lookups(widened_corpus_mcrit) == [("getSampleById", (sample_id,))]
+
+
+def test_an_unknown_sample_filter_falls_back_to_the_whole_report(client, as_role):
+    as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+    unfiltered = client.get(f"/data/result/{job_id}")
+    response = client.get(f"/data/result/{job_id}?samid=987654321")
+    assert response.status_code == 200
+    # the sample-filtered page has an Offset B column; the report overview does not
+    assert b"Offset B" not in response.data
+    assert response.data.count(b"<tr") == unfiltered.data.count(b"<tr")
+
+
 def test_a_job_id_nobody_knows_is_reported_not_crashed(client, as_role):
     as_role("visitor")
     response = client.get("/data/result/ffffffffffffffffffffffff")
