@@ -10,7 +10,7 @@ from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, g
 from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
 from mcritweb.views.client import get_client
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
-from mcritweb.views.utility import get_mcritweb_version_from_setup, get_session_user_id
+from mcritweb.views.utility import forget_server_probe, get_mcritweb_version_from_setup, get_session_user_id
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -278,6 +278,12 @@ def change_server():
         server_info.url = new_url
         server_info.server_token = new_token
         server_info.saveToDb()
+        # an operator who has just corrected the URL or token should not have to wait
+        # out the reachability TTL to find out whether it worked - see issue #89. The
+        # cache is a module global, so this clears the worker that handled this request;
+        # with N gunicorn workers the other N-1 still answer from their own entry until
+        # it lapses, which the default 5s TTL bounds.
+        forget_server_probe()
         flash('Server information successfully changed', category='success')
     else:
         flash('No information needed change', category='success')
@@ -297,6 +303,7 @@ def reset_server():
         return redirect(url_for('admin.server'))
     client = get_client()
     client.respawn()
+    forget_server_probe()
     from mcritweb.views.utility import ensure_local_data_paths
     ensure_local_data_paths(current_app, clear_data=True)
     # TODO also clean all locally cached data.
