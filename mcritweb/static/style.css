@@ -182,6 +182,34 @@ html {
   .pointer {
     cursor: pointer;
   }
+
+  /* Issue #41. A job's description can hold a long unbroken token: the filename of
+     an upload, a SHA-256, or the raw `job.parameters` string the fallback branch of
+     job_description prints for a method it does not recognise. With nowhere to break,
+     it pushes the column - and the table - wider than the viewport.
+     `anywhere` rather than `break-word` because it has to break a token that is alone
+     on its line, which is exactly this case. */
+  table.table td.job-description {
+    overflow-wrap: anywhere;
+  }
+
+  /* Same string, two more places it can widen the page. The job overview and progress
+     headings print the raw `job.parameters`, and a heading that overflows does not
+     enlarge its own bounding box - it just pushes documentElement.scrollWidth out, so
+     it is invisible to an element-overflow check and very visible to a reader. Scoped
+     to the content region so the navbar and the manual are untouched. */
+  section.content h1 {
+    overflow-wrap: anywhere;
+  }
+
+  /* And a failed job's error message is a backend traceback in a <pre>, which is
+     white-space: pre - so it never wraps whatever the cell around it does. The template
+     already meant to say this: it carries `<div white-space: pre-wrap;>`, which is
+     three invalid attributes rather than a style. */
+  table.table td .job-error {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
   /* The user manual, rendered from docs/manual/README.md by mcritweb/manual.py.
      Markdown output carries no Bootstrap classes, so the few elements it produces
      that need them are styled here rather than by post-processing the HTML. */
