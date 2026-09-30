@@ -1098,6 +1098,10 @@ def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
         filter_exclude_samples = None
         filter_unpenalized_family_count = 2
         filter_strongest_per_family = False
+    if filter_unpenalized_family_count is None:
+        # the form sends this field empty when the user clears it, and mcrit compares the
+        # count to an int, so an empty one was a 500; both presets above use 2
+        filter_unpenalized_family_count = 2
     filter_values = {
         "filter_min_score": filter_min_score,
         "filter_lib_min_score": filter_lib_min_score,
