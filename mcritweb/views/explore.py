@@ -10,7 +10,7 @@ from mcrit.storage.SampleEntry import SampleEntry
 import mcritweb.views.cfg_explorer_detector as cfg_explorer_detector
 from mcritweb.autocomplete import autocomplete_items
 from mcritweb.views.authentication import contributor_required, visitor_required
-from mcritweb.views.client import get_client
+from mcritweb.views.client import get_client, get_sample_entries, remember_samples
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.functiondiff import get_combined_dot_graph
 from mcritweb.views.pagination import request_args_for_link_building
@@ -550,11 +550,9 @@ def sample_by_id(sample_id):
                 job_collection.filterToSampleIds([sample_id])
             for function_dict in results['search_results'].values():
                 functions.append(FunctionEntry.fromDict(function_dict))
-        samples_by_id = {}
-        for job in job_collection.getJobs():
-            if job.sample_ids is not None:
-                for sample_id in [sid for sid in job.sample_ids if sid not in samples_by_id]:
-                    samples_by_id[sample_id] = client.getSampleById(sample_id)
+        # every job listed here names this sample, which the page already holds
+        remember_samples([sample_entry])
+        samples_by_id = get_sample_entries(sid for job in job_collection.getJobs() for sid in job.sample_ids or [])
         user_column_setup = get_user_column_setup("functions_table")
         return render_template("single_sample.html", entry=sample_entry, functions=functions, pagination=pagination, query=original_query, samples=samples_by_id, job_collection=job_collection, user_column_setup=user_column_setup)
     else:

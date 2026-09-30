@@ -6,7 +6,7 @@ from smda.common.SmdaReport import SmdaReport
 
 from mcritweb.db import remember_query_filename
 from mcritweb.views.authentication import visitor_required
-from mcritweb.views.client import get_client
+from mcritweb.views.client import get_client, get_sample_entries, remember_samples
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.pagination import Pagination
 from mcritweb.views.params import parse_band_range, parse_checkbox_query_param, parse_integer_list_query_param
@@ -89,12 +89,22 @@ def unique_blocks():
         flash(f'A unique blocks request can name at most {MAX_SELECTED_SAMPLES} samples, the rest of the selection was dropped.', category='warning')
         selected_list = selected_list[:MAX_SELECTED_SAMPLES]
 
+    query = request.args.get('query', "")
+    samples = []
+    pagination = CursorPagination(request, default_sort="sample_id")
+    results = client.search_samples(query, **pagination.getSearchParams(), limit=pagination.limit)
+    pagination.read_cursor_from_result(results)
+    if results is not None:
+        samples = get_unique_samples_from_search_result(results)
+        # a selected sample listed in the search below needs no lookup of its own
+        remember_samples(samples)
+
     pagination_selected = Pagination(request, len(selected_list), limit=10, query_param="ps", limit_param="psl")
     # id -> entry, or None for one the backend would not resolve. Only the page being
     # rendered is looked up: McritClient has no batched sample lookup, so resolving the
     # whole selection here would cost one round trip per selected sample on every page
     # view. start_unique_blocks checks the rest, once, on a deliberate submit.
-    selected_dict = {x: client.getSampleById(x) for x in selected_list[pagination_selected.start_index:pagination_selected.start_index + pagination_selected.limit]}
+    selected_dict = get_sample_entries(selected_list[pagination_selected.start_index:pagination_selected.start_index + pagination_selected.limit])
     unresolved_ids = [sample_id for sample_id, sample in selected_dict.items() if sample is None]
     if unresolved_ids:
         # kept in the selection, not dropped. `handle_response` answers None for a 500 as
@@ -108,16 +118,8 @@ def unique_blocks():
         # ten at a time, which is 25 redirect hops. Browsers stop following around 20, so
         # the selection that most needed cleaning was the one that could not load at all.
         flash(f"MCRIT did not confirm sample id {', '.join(str(sample_id) for sample_id in unresolved_ids)} - they may have been deleted, or the backend may be unavailable.", category="warning")
-
-    query = request.args.get('query', "")
-    samples = []
-    pagination = CursorPagination(request, default_sort="sample_id")
-    results = client.search_samples(query, **pagination.getSearchParams(), limit=pagination.limit)
-    pagination.read_cursor_from_result(results)
     if results is None:
         flash(f"Ups, search for {query} in MCRIT's samples failed!", category="error")
-    else:
-        samples = get_unique_samples_from_search_result(results)
 
     return render_template(
         "unique_blocks.html",
@@ -255,8 +257,18 @@ def cross_compare():
     cached_list = [int(x) for x in cached.split(',') if x!='']
     selected_list = [int(x) for x in selected.split(',') if x != '']
 
+    query = request.args.get('query', "")
+    samples = []
+    pagination = CursorPagination(request, default_sort="sample_id")
+    results = client.search_samples(query, **pagination.getSearchParams(), limit=pagination.limit)
+    pagination.read_cursor_from_result(results)
+    if results is not None:
+        samples = get_unique_samples_from_search_result(results)
+        # a selected sample listed in the search below needs no lookup of its own
+        remember_samples(samples)
+
     pagination_selected = Pagination(request, len(selected_list), limit=10, query_param="ps", limit_param="psl")
-    selected_dict = {x: client.getSampleById(x) for x in sorted(selected_list)[pagination_selected.start_index:pagination_selected.start_index+pagination_selected.limit]}
+    selected_dict = get_sample_entries(sorted(selected_list)[pagination_selected.start_index:pagination_selected.start_index+pagination_selected.limit])
     invalid_ids = []
     for id, sample in selected_dict.items():
         if sample is None:
@@ -273,16 +285,8 @@ def cross_compare():
             cache = ",".join([str(id) for id in cached_list]),
             rematch = "true" if is_forcing_rematch else "false",
         ))
-
-    query = request.args.get('query', "")
-    samples = []
-    pagination = CursorPagination(request, default_sort="sample_id")
-    results = client.search_samples(query, **pagination.getSearchParams(), limit=pagination.limit)
-    pagination.read_cursor_from_result(results)
     if results is None:
         flash(f"Ups, search for {query} in MCRIT's samples failed!", category="error")
-    else:
-        samples = get_unique_samples_from_search_result(results)
 
     # #53: the tint the search table used to hand-roll as two inline style attributes.
     # A sample already in the selection wins over one merely clicked on this page,

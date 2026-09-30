@@ -17,7 +17,7 @@ from smda.common.SmdaReport import SmdaReport
 from mcritweb.db import UserColumnSettings, UserFilters, get_query_filename, utc_now
 from mcritweb.views.analyze import query as analyze_query
 from mcritweb.views.authentication import contributor_required, visitor_required
-from mcritweb.views.client import get_client
+from mcritweb.views.client import get_client, get_family_entries, get_sample_entries
 from mcritweb.views.cross_compare import get_sample_to_job_id, score_to_color
 from mcritweb.views.functiondiff import get_function_diff
 from mcritweb.views.MatchReportRenderer import MatchReportRenderer
@@ -813,11 +813,11 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
 
 
 def result_matches_for_cross(job_info, result_json):
-    client = get_client()
     samples = []
     sample_ids = [int(id) for id in next(iter(result_json.values()))["clustered_sequence"]]
+    sample_entries = get_sample_entries(sample_ids)
     for sample_id in sample_ids:
-        sample_entry = client.getSampleById(sample_id)
+        sample_entry = sample_entries[sample_id]
         if sample_entry:
             samples.append(sample_entry)
         else:
@@ -1176,24 +1176,48 @@ def job_by_id(job_id):
             return redirect(url_for('data.result', job_id=job_id))
     if 'addBinarySample' in job_info.parameters and not suppress_processing_message and auto_refresh:
         flash('We received your sample, currently processing!', category='info')
-    # a dependency can be gone by the time this page is opened - deleted through this
-    # app's own job delete, which also has a "delete every job of this method" form, or
-    # cleaned up in the backend - and getJobData answers None for it rather than raising.
-    # Sorting that None on .number used to take the whole overview down with a 500.
-    resolved_children = [client.getJobData(id) for id in job_info.all_dependencies]
-    missing_children = sum(1 for job in resolved_children if job is None)
-    child_jobs = sorted([job for job in resolved_children if job is not None], key=lambda x: x.number)
+    # the dependencies in a few requests, see `dependency_jobs`. One can be gone by the
+    # time this page is opened - deleted through this app's own job delete, which also
+    # has a "delete every job of this method" form, or cleaned up in the backend - and
+    # is then simply not in the answer. A failed read counts its dependencies as
+    # missing rather than failing the overview, as a None per dependency used to.
+    dependencies = list(dict.fromkeys(job_info.all_dependencies))
+    resolved_children = dependency_jobs(client, dependencies)
+    missing_children = len(dependencies) - len(resolved_children)
+    child_jobs = sorted(resolved_children, key=lambda x: x.number)
     samples_by_id = {}
     families_by_id = {}
     if child_jobs:
-        for job in child_jobs:
-            if job.sample_ids is not None:
-                for sample_id in [sid for sid in job.sample_ids if sid not in samples_by_id]:
-                    samples_by_id[sample_id] = client.getSampleById(sample_id)
-        for job in child_jobs:
-            if job.family_id is not None:
-                families_by_id[job.family_id] = client.getFamily(job.family_id)
+        samples_by_id.update(get_sample_entries(sample_id for job in child_jobs for sample_id in job.sample_ids or []))
+        families_by_id.update(get_family_entries(job.family_id for job in child_jobs if job.family_id is not None))
     return render_template('job_overview.html', families=families_by_id, samples=samples_by_id, job_info=job_info, auto_refresh=auto_refresh, child_jobs=child_jobs, missing_children=missing_children)
+
+
+#: job ids per `getQueueData(job_ids=...)` request. The ids travel in the query string,
+#: 25 characters each: 250 of them, a cross compare of MAX_SELECTED_SAMPLES samples, make
+#: a request line of about 6,250 bytes, over gunicorn's default limit_request_line of
+#: 4,094 (mcrit's USE_GUNICORN). 100 keep it at about 2,530.
+JOB_IDS_PER_REQUEST = 100
+
+
+def dependency_jobs(client, job_ids):
+    """The jobs of `job_ids` the backend still has, read `JOB_IDS_PER_REQUEST` at a time.
+
+    A failed read loses only its own ids, which the caller counts as missing. A backend
+    older than mcrit 1.12 ignores `job_ids` and answers the whole queue: such an answer
+    already holds every job there is, so the reads stop there, and the answer is kept
+    to the ids asked for.
+    """
+    asked = set(job_ids)
+    answered = []
+    for start in range(0, len(job_ids), JOB_IDS_PER_REQUEST):
+        chunk = job_ids[start:start + JOB_IDS_PER_REQUEST]
+        jobs = client.getQueueData(job_ids=chunk) or []
+        answered.extend(jobs)
+        chunk_ids = set(chunk)
+        if any(job.job_id not in chunk_ids for job in jobs):
+            break
+    return list({job.job_id: job for job in answered if job.job_id in asked}.values())
 
 
 @bp.route('/jobs/<job_id>/delete', methods=('POST',))

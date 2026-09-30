@@ -113,6 +113,20 @@ def api_router(api_path):
                 target_function_ids = [int(function_id) for function_id in request.data.split(b",")]
                 return handle_raw_response(client.getFunctionsByIds(target_function_ids, with_label_only=forward_with_label_only))
             return handle_raw_response(client.getFunctionsByIds([], with_label_only=forward_with_label_only))
+    # getSamplesByIds, getFamiliesByIds: a comma-separated id list as the body, as for
+    # functions; sample ids may be negative, for query samples
+    elif re_match := re.match(r"(?P<collection>samples|families)/ids$", api_path):
+        if request.method != "POST":
+            return Response(status=405)
+        id_list = request.get_data()
+        id_pattern = rb"^-?\d+(?:[\s]*,[\s]*-?\d+)*$" if re_match.group("collection") == "samples" else rb"^\d+(?:[\s]*,[\s]*\d+)*$"
+        if not re.match(id_pattern, id_list):
+            # what the backend answers a body that isn't an id list; the client sends
+            # none it could answer that way
+            return Response(status=400)
+        entry_ids = [int(entry_id) for entry_id in id_list.split(b",")]
+        fetch_many = client.getSamplesByIds if re_match.group("collection") == "samples" else client.getFamiliesByIds
+        return handle_raw_response(fetch_many(entry_ids))
     # getMatchesForSmdaFunction
     elif re_match := re.match(r"query/function$", api_path):
         smda_report_body = request.get_json(force=True)

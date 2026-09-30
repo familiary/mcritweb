@@ -60,7 +60,7 @@ def create_app(test_config=None, instance_path=None):
     from .csrf import CsrfProtect
     from .secret_key import INSECURE_DEFAULT, load_or_create_secret_key
     from .views import administration, analyze, api, authentication, data, explore
-    from .views.client import get_client
+    from .views.client import get_client, get_family_entries, get_sample_entries, remember_samples
     from .views.params import get_minhash_matching_label
     from .views.utility import ensure_local_data_paths, get_mcritweb_version_from_setup
 
@@ -286,22 +286,17 @@ def create_app(test_config=None, instance_path=None):
         else:
             client = get_client()
             jobs = client.getQueueData(0, 5, method="getMatchesForSample", state="finished", ascending=False)
-            samples_by_id = {}
-            families_by_id = {}
             latest_samples = []
-            if jobs:
-                for job in jobs:
-                    if job.sample_ids is not None:
-                        for sample_id in [sid for sid in job.sample_ids if sid not in samples_by_id]:
-                            samples_by_id[sample_id] = client.getSampleById(sample_id)
-                for job in jobs:
-                    if job.family_id is not None:
-                        families_by_id[job.family_id] = client.getFamily(job.family_id)
-            
+            # already the bounded way to ask: one query, sorted by the sample_id index and
+            # cut at five. Asked before the job rows are filled, since a sample that was
+            # just submitted is often the one that was just matched.
             sample_results = client.search_samples("", is_ascending=False, cursor=None, sort_by="sample_id", limit=5)
             if sample_results:
                 for sample_dict in sample_results['search_results'].values():
                     latest_samples.append(SampleEntry.fromDict(sample_dict))
+            remember_samples(latest_samples)
+            samples_by_id = get_sample_entries(sample_id for job in jobs or [] for sample_id in job.sample_ids or [])
+            families_by_id = get_family_entries(job.family_id for job in jobs or [] if job.family_id is not None)
             return render_template("index.html", samples=samples_by_id, families=families_by_id, latest_samples=latest_samples, jobs=jobs)
 
     return app
