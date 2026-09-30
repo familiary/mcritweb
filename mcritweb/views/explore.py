@@ -301,6 +301,22 @@ def is_sample_modified(client, sample_id, family_name=None, version=None, is_lib
     return all(getattr(sample, field) == value for field, value in requested.items() if value is not None)
 
 
+def family_read_back(family_id):
+    """Read one family back. Returns a FamilyEntry, "absent", or None if the read failed.
+
+    As with `sha256_second_opinion`: `getFamily` in its ordinary mode maps a 404 and a
+    500 to the same None, and raw mode returns the response so the status can be read.
+    """
+    response = get_client(raw_responses=True).getFamily(family_id, with_samples=False)
+    if response.status_code == 404:
+        return "absent"
+    if response.status_code in (200, 202):
+        payload = response.json()
+        if payload.get("status") == "successful" and payload.get("data") is not None:
+            return FamilyEntry.fromDict(payload["data"])
+    return None
+
+
 def is_family_modified(client, family_id, family_name=None, is_library=None):
     """Whether the family shows the modification, following `MongoDbStorage.modifyFamily`.
 
@@ -311,12 +327,17 @@ def is_family_modified(client, family_id, family_name=None, is_library=None):
 
     is_library alone sets num_library_samples to num_samples, so a family without
     samples reads as not a library whatever was asked for.
+
+    A rename is confirmed by the row being gone, so it is read back in raw mode: only
+    a 404 is a deleted row. The ordinary getFamily answers None for a failed read as
+    well, and taking that for a finished rename would report one that never landed.
     """
-    family = client.getFamily(family_id, with_samples=False)
     if family_name is not None:
-        if family is None:
+        family = family_read_back(family_id)
+        if family == "absent":
             return True
-        return family_id == 0 and family.num_samples == 0
+        return family is not None and family_id == 0 and family.num_samples == 0
+    family = client.getFamily(family_id, with_samples=False)
     if family is None:
         return False
     return family.is_library == (is_library and family.num_samples > 0)

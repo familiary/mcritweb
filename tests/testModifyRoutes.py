@@ -20,6 +20,7 @@ import logging
 import pytest
 import requests
 from conftest import FakeMcritClient
+from fixtureData import RawResponse
 from mcrit.storage.FamilyEntry import FamilyEntry
 from mcrit.storage.SampleEntry import SampleEntry
 
@@ -44,6 +45,8 @@ class QueueingBackend(FakeMcritClient):
     busy with a long matching job. `rejects` answers the way the client does for
     anything but a 200/202, and `read_error` is raised by every read after the
     modification - a ConnectionError, as the client raises when the backend has gone away.
+    `read_status` is what a raw read answers once the modification has been applied, as
+    a backend does whose GET fails although the PUT went through.
     """
 
     def __init__(self, lag=0):
@@ -51,6 +54,7 @@ class QueueingBackend(FakeMcritClient):
         self.lag = lag
         self.rejects = False
         self.read_error = None
+        self.read_status = None
         self.sample = SampleEntry(None, sample_id=SAMPLE_ID, family_id=0)
         self.sample.family = ""
         self.sample.version = ""
@@ -79,10 +83,27 @@ class QueueingBackend(FakeMcritClient):
         self._read()
         return self.sample if sample_id == SAMPLE_ID else None
 
-    def getFamily(self, family_id, *args, **kwargs):
+    def raw_variant(self):
+        """This backend in raw mode. Unlike FakeMcritClient's copy, it shares `lag` and
+        `pending` with the ordinary client, so a raw read and a parsed one see one worker."""
+        backend = self
+
+        class RawView:
+            def getFamily(self, family_id, *args, **kwargs):
+                return backend.getFamily(family_id, *args, _raw=True, **kwargs)
+
+        return RawView()
+
+    def getFamily(self, family_id, *args, _raw=False, **kwargs):
+        """In raw mode, as FamilyResource.on_get answers: 404 for a family without a row."""
         self._record("getFamily", family_id, *args, **kwargs)
         self._read()
-        return self.families.get(family_id)
+        family = self.families.get(family_id)
+        if not _raw:
+            return family
+        if self.pending is None and self.read_status is not None:
+            return RawResponse(self.read_status)
+        return RawResponse(200, family.toDict()) if family is not None else RawResponse(404)
 
     def getJobData(self, job_id, *args, **kwargs):
         self._record("getJobData", job_id, *args, **kwargs)
@@ -380,6 +401,16 @@ class TestModifyFamily:
         [(category, message)] = flashes(client)
         assert category == "info" and NOT_CONFIRMED in message
         assert f"modification of family {SED_FAMILY_ID}" in logged.text
+
+    def test_a_rename_whose_read_back_fails_is_not_taken_for_the_family_going_away(self, client, as_role, clock, fake_mcrit):
+        """getFamily answers None for a 500 as for a deleted row; only a 404 is the rename."""
+        as_role("contributor")
+        fake_mcrit.read_status = 500
+
+        response = modify_family(client, family_new_name="sed189")
+
+        assert response.status_code == 302
+        assert_gave_up(clock, client, "family")
 
     def test_a_change_not_accepted_is_reported_and_not_waited_for(self, client, as_role, clock, fake_mcrit):
         as_role("contributor")
