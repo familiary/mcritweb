@@ -575,7 +575,7 @@ FUNCTION_NAME_PATTERN = re.compile(r"^[ -~]{0,256}$")
 
 #: the last mcrit release without PUT /functions/{id}; a backend reporting this version or
 #: older cannot rename, whatever the installed McritClient offers
-LAST_MCRIT_WITHOUT_FUNCTION_RENAME = (1, 8, 1)
+FIRST_MCRIT_WITH_FUNCTION_RENAME = (1, 10, 0)
 
 
 def _version_tuple(version):
@@ -587,7 +587,7 @@ def _version_tuple(version):
 
 def can_modify_functions(client):
     """Renaming a function needs McritClient.modifyFunction and a backend that serves
-    PUT /functions/{id}; both arrived after mcrit 1.8.1, and an up-to-date client can well
+    PUT /functions/{id}; both arrived in mcrit 1.10.0, and an up-to-date client can well
     be talking to an older server, so the server's own version decides."""
     if not callable(getattr(client, "modifyFunction", None)):
         return False
@@ -600,7 +600,7 @@ def can_modify_functions(client):
     if isinstance(version, dict):
         version = version.get("version")
     version = _version_tuple(version)
-    return version is not None and version > LAST_MCRIT_WITHOUT_FUNCTION_RENAME
+    return version is not None and version >= FIRST_MCRIT_WITH_FUNCTION_RENAME
 
 
 @bp.route('/modifyFunction', methods=['POST'])
@@ -619,7 +619,7 @@ def modifyFunction():
         flash("No valid function_id received.", category="error")
         return redirect(url_for('explore.functions'))
     if not can_modify_functions(client):
-        flash("The connected MCRIT backend cannot rename functions - it needs a version newer than 1.8.1.", category="error")
+        flash("The connected MCRIT backend cannot rename functions - it needs version 1.10.0 or newer.", category="error")
         return redirect(url_for('explore.function_by_id', function_id=function_id))
     new_name = request.form.get("function_name", "").strip()
     if not FUNCTION_NAME_PATTERN.match(new_name):
