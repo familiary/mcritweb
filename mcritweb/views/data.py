@@ -1,3 +1,4 @@
+import copy
 import hashlib
 import os
 import re
@@ -643,6 +644,26 @@ def assign_matched_offsets(client, function_matches):
     return is_complete
 
 
+def aggregate_function_matches_page(matching_result: MatchingResult, pagination: Pagination):
+    """The rows of the aggregated function table that fall on `pagination`'s page.
+
+    getAggregatedFunctionMatches(start, limit) builds the aggregate of every function
+    in the (filtered) report - a dict entry and several set unions per match - and
+    only then slices out the page, so the template paid for the whole report to show
+    a hundred rows of it (issue #194). A row is an aggregate over the matches of one
+    function_id, and rows are ordered by function_id, so the page is made of exactly
+    the matches whose function_id is among the page's ids. Handing only those to
+    mcrit's own aggregation, on a shallow copy so that the view's filtered list is
+    left alone, gives the same rows without re-implementing it here.
+    """
+    function_matches = matching_result.filtered_function_matches
+    function_ids = sorted({function_match.function_id for function_match in function_matches})
+    page_function_ids = set(function_ids[pagination.start_index:pagination.start_index + pagination.limit])
+    page_result = copy.copy(matching_result)
+    page_result.filtered_function_matches = [function_match for function_match in function_matches if function_match.function_id in page_function_ids]
+    return page_result.getAggregatedFunctionMatches()
+
+
 def name_query_sample(job_info, matching_result: MatchingResult):
     """Fill in the filename of a queried binary, in place.
 
@@ -781,7 +802,7 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         # if both sides count the same thing, so the total goes in aggregated too - taken off
         # the raw match count, it read as a four-figure "filtered" with no filter applied.
         num_original_aggregated_functions = len(matching_result.getAggregatedFunctionMatches(unfiltered=True))
-        return render_template("result_compare_family.html", famid=filtered_family_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all) 
+        return render_template("result_compare_family.html", famid=filtered_family_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, function_rows=aggregate_function_matches_page(matching_result, function_pagination), num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all)
     # filtered for sample
     elif filtered_sample_id is not None and client.isSampleId(filtered_sample_id):
         matching_result.filterToSampleId(filtered_sample_id)
@@ -832,7 +853,7 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         # was run for is still on this host - the page has to say which it is. The file
         # is filed under the job's own id, so this costs no round trip either
         is_query_result = job_info.method in QUERY_UPLOAD_KINDS
-        return render_template("result_compare_all.html", job_info=job_info, famp=family_pagination, libp=library_pagination, funp=function_pagination, num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all, is_query_result=is_query_result, can_promote_query=is_query_result and query_upload_exists(current_app, job_info.job_id))
+        return render_template("result_compare_all.html", job_info=job_info, famp=family_pagination, libp=library_pagination, funp=function_pagination, function_rows=aggregate_function_matches_page(matching_result, function_pagination), num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all, is_query_result=is_query_result, can_promote_query=is_query_result and query_upload_exists(current_app, job_info.job_id))
 
 
 def result_matches_for_cross(job_info, result_json):
