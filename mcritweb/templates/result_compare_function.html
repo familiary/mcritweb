@@ -93,7 +93,7 @@ Results for Job: {{ job_info.job_id }}
       {% elif column_type == "sample_id_b" %}
       <td style="text-align: right;" valign="middle"><a href="{{ url_for('explore.sample_by_id', sample_id=matched_function.matched_sample_id) }}">{{ matched_function.matched_sample_id }}</a></td>
       {% elif column_type == "best_score" %}
-      <td style="text-align: right;" valign="middle">{{ "%d"|format(matched_function.matched_score) }}</td>
+      <td style="text-align: right;" valign="middle">{{ "%3.0f"|format(matched_function.matched_score) }}</td>
       {% elif column_type == "is_minhash_match" %}
       <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_minhash %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle"> {% endif %}</i></td>
       {% elif column_type == "is_pichash_match" %}
