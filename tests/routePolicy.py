@@ -126,8 +126,9 @@ ROUTE_POLICY = {
 
     # --- visitor and above -------------------------------------------------------
     "explore.families": (VISITOR, READ_ONLY),
-    # the family type-ahead behind the edit modals (#77). Visitors already read every
-    # family name off explore.families, so this exposes nothing the listing does not.
+    # the family type-ahead behind the edit modals (#77), and since #192 behind the
+    # submit form and the drop overlay too. Visitors already read every family name
+    # off explore.families, so this exposes nothing the listing does not.
     "explore.family_names": (VISITOR, READ_ONLY),
     "explore.family_by_id": (VISITOR, READ_ONLY),
     "explore.samples": (VISITOR, READ_ONLY),
