@@ -26,7 +26,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
 <div class="container">
 <span><h1>Function Comparison: {{ format_function_id(function_id_a) }} vs. {{ format_function_id(function_id_b) }}</h1></span>
     <div id="match_score">
-        <h3>Match Score: <span id="match_score_value"></span>{% if match_result.matched_score is not none %}{{ "%d"|format(match_result.matched_score) }}{% else %}n/a{% endif %}
+        <h3>Match Score: <span id="match_score_value"></span>{% if match_result.matched_score is not none %}{{ "%.0f"|format(match_result.matched_score) }}{% else %}n/a{% endif %}
           {% if match_result.match_is_pichash %}<span class="badge bg-primary" title="Both functions have the same PicHash">PicHash</span>{% endif %}
           {% if match_result.match_is_minhash %}<span class="badge bg-secondary" title="MinHash score above the matching threshold">MinHash</span>{% endif %}
           {% if match_result.match_is_library %}<span class="badge bg-success" title="Function B belongs to a library sample">Library</span>{% endif %}
