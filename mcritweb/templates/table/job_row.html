@@ -11,11 +11,15 @@
 </script>
 {% endmacro %}
 
+{# The label each branch prints is the same lookup in every case - it moved to
+   mcritweb/jobnames.py so the result and overview pages can say the same thing (issue
+   #39). The branches stay because what follows the label differs per method: which ids
+   to resolve, which of them may be deleted, how to word the count. #}
 {% macro job_description(job, families_by_id, samples_by_id) %}
 
 {% if job.method == "getMatchesForSample" %}
   {% set sample_entry = samples_by_id.get(job.sample_id) %}
-  Match 1vN | 
+  {{ job.method|job_name }} | 
   {% if sample_entry %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> {{ format_sample_id(job.sample_id) }}<br />
     {{ format_monospace(samples_by_id[job.sample_id].sha256[:8]) }} | {{ samples_by_id[job.sample_id].getShortFilename() or "-" }}
@@ -27,7 +31,7 @@
 {% elif job.method == "getMatchesForSampleVs" %}
   {% set sample_entry_a = samples_by_id.get(job.sample_id) %}
   {% set sample_entry_b = samples_by_id.get(job.other_sample_id) %}
-  Match 1v1 | 
+  {{ job.method|job_name }} | 
   {% if sample_entry_a %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(sample_entry_a.family, sample_entry_a.family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> {{ format_sample_id(job.sample_id) }} vs. 
   {% else %}
@@ -52,7 +56,7 @@
   {% endif %}
   
 {% elif job.method == "combineMatchesToCross" %}
-  CrossCompare | {{ job.arguments[0] | length }} samples<br />
+  {{ job.method|job_name }} | {{ job.arguments[0] | length }} samples<br />
   {# reorganize data #}
   {% set grouped_samples = grouped_samples|default({}) %}
   {% for target_sample_id in job.arguments[0] %}
@@ -74,13 +78,13 @@
   {% endfor %}
 
 {% elif job.method == "getMatchesForUnmappedBinary" %}
-  Match Binary (unmapped) | {{ format_monospace(job.sha256[:8]) }}
+  {{ job.method|job_name }} | {{ format_monospace(job.sha256[:8]) }}
 
 {% elif job.method == "getMatchesForMappedBinary" %}
-  Match Binary (mapped) | {{ format_monospace(job.sha256[:8]) }}
+  {{ job.method|job_name }} | {{ format_monospace(job.sha256[:8]) }}
 
   {% elif job.method == "getMatchesForSmdaReport" %}
-  Match SMDA Report | {{ format_monospace(job.sha256[:8]) }}
+  {{ job.method|job_name }} | {{ format_monospace(job.sha256[:8]) }}
 
 {% elif job.method == "getUniqueBlocks" %}
 
@@ -93,9 +97,9 @@
   {% endfor %}
 
   {% if job.arguments[0]|length > 1 %}
-    UniqueBlocks | {{ job.arguments[0] | length }} samples<br />
+    {{ job.method|job_name }} | {{ job.arguments[0] | length }} samples<br />
   {% else %}
-    UniqueBlocks | {{ job.arguments[0] | length }} sample<br />
+    {{ job.method|job_name }} | {{ job.arguments[0] | length }} sample<br />
   {% endif %}
 
   {% if job.arguments|length > 1 %}
@@ -115,7 +119,7 @@
 
 {% elif job.method == "updateMinHashesForSample" %}
   {% set sample_entry = samples_by_id.get(job.sample_id) %}
-  Update MinHash | 
+  {{ job.method|job_name }} | 
   {% if sample_entry %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> {{ format_sample_id(job.sample_id) }}
   {% else %}
@@ -123,27 +127,27 @@
   {% endif %}
 
 {% elif job.method == "updateMinHashes" %}
-  Update all missing MinHashes
+  {{ job.method|job_name }}
 
 {% elif job.method == "rebuildIndex" %}
-  Rebuild full Index
+  {{ job.method|job_name }}
 
 {% elif job.method == "recalculatePicHashes" %}
-  Recalculate PicHashes
+  {{ job.method|job_name }}
 
 {% elif job.method == "recalculateMinHashes" %}
-  Recalculate MinHashes and Index
+  {{ job.method|job_name }}
 
 {% elif job.method == "addBinarySample" %}
-  Add Binary | <i class="fa-solid fa-bug " title="Family ID"></i> {{ job.family }}<br />
+  {{ job.method|job_name }} | <i class="fa-solid fa-bug " title="Family ID"></i> {{ job.family }}<br />
   {{ format_monospace(job.sha256[:8]) }} | {{ job.filename }}
 
 {% elif job.method == "deleteSample" %}
-  Delete Sample | <i class="fa-solid fa-virus " title="Sample ID"></i>  {{ job.arguments[0] }}
+  {{ job.method|job_name }} | <i class="fa-solid fa-virus " title="Sample ID"></i>  {{ job.arguments[0] }}
 
 {% elif job.method == "modifySample" %}
   {% set sample_entry = samples_by_id.get(job.sample_id) %}
-  Modify Sample | 
+  {{ job.method|job_name }} | 
   {% if sample_entry %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> {{ format_sample_id(job.sample_id) }}
   {% else %}
@@ -154,11 +158,11 @@
   {% endfor %}
 
   {% elif job.method == "deleteFamily" %}
-  Delete Family | <i class="fa-solid fa-bug " title="Family ID"></i>  {{ job.arguments[0] }}
+  {{ job.method|job_name }} | <i class="fa-solid fa-bug " title="Family ID"></i>  {{ job.arguments[0] }}
 
 {% elif job.method == "modifyFamily" %}
   {% set family_entry = families_by_id.get(job.family_id) %}
-  Modify Family | 
+  {{ job.method|job_name }} | 
   {% if family_entry %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(family_entry.family_name, family_entry.family_id) }} 
   {% else %}

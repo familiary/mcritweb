@@ -11,7 +11,7 @@ Results for Job: {{ job_info.job_id }}
 {{ pagination_js() }}
 {% endblock %}
 {% block content %}
-<h1>Results for Job: {{ job_info.method }}</h1>
+<h1>Results for Job: {{ job_info.method|job_name }}</h1>
 <p>Showing matches against full database</p>
 <hr />
 

@@ -173,7 +173,7 @@ Results for Job: {{ job_info.job_id }}
 
 
 
-<h1>Results for Job: {{ job_info.method }}</h1>
+<h1>Results for Job: {{ job_info.method|job_name }}</h1>
 {{ job_column_table(job_info, show_created=False, show_started=False, show_finished=False) }}
 
 <p>Cross Comparison of {{ samples["unweighted"]|length }} samples in the data set. You can order the samples in this list per drag and drop to change the order in the matrices.</p>

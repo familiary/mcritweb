@@ -56,6 +56,7 @@ def create_app(test_config=None, instance_path=None):
 
     from . import db, manual
     from .csrf import CsrfProtect
+    from .jobnames import job_method_name, job_task
     from .secret_key import INSECURE_DEFAULT, load_or_create_secret_key
     from .views import administration, analyze, api, authentication, data, explore
     from .views.client import get_client, get_family_entries, get_sample_entries, remember_samples
@@ -222,6 +223,14 @@ def create_app(test_config=None, instance_path=None):
     @app.template_filter('getattr')
     def _getattr(obj, attr, default):
         return getattr(obj, attr, default)
+
+    @app.template_filter('job_name')
+    def job_name(method):
+        return job_method_name(method)
+
+    @app.template_filter('job_task')
+    def job_task_filter(job):
+        return job_task(job)
 
     @app.template_filter('date')
     def date(input):

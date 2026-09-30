@@ -6,7 +6,7 @@ Results for Job: {{ job_info.job_id }}
 {% block style %}
 {% endblock %}
 {% block content %}
-<h1>Results for Job: {{ job_info.job_parameters }}</h1>
+<h1>Results for Job: {{ job_info.method|job_name }}</h1>
 {{ matching_result_job_column_table(job_info) }}
 <h3>Report</h3>
 <p>Maintenance job completed with the following updates:</p>
