@@ -173,6 +173,49 @@ def test_the_comparison_page_renders_with_the_match_data(client, as_role):
     assert f"/api/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}" in page
 
 
+def test_the_comparison_page_asks_for_the_pair_without_checking_the_ids_first(client, as_role, fake_mcrit):
+    """The backend checks both ids when it is asked for the comparison, so two
+    `isFunctionId` requests ahead of it only repeated that check (issue #207)."""
+    as_role("visitor")
+    fake_mcrit.calls.clear()
+    response = client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}")
+    assert response.status_code == 200
+    called = [name for name, _, _ in fake_mcrit.calls]
+    assert "isFunctionId" not in called
+    assert called.count("getMatchFunctionVs") == 1
+
+
+def test_the_comparison_page_reports_an_unknown_function_id(client, as_role):
+    as_role("visitor")
+    response = client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/999999")
+    assert response.status_code == 200
+    assert b"One of the function_ids is not valid" in response.data
+
+
+class _ComparisonFailingClient:
+    """A backend that knows both functions but fails the comparison itself: the
+    client answers None for a 500 just as it does for a 404."""
+
+    def __init__(self, corpus):
+        self._corpus = corpus
+
+    def getMatchFunctionVs(self, *args, **kwargs):
+        return None
+
+    def __getattr__(self, name):
+        return getattr(self._corpus, name)
+
+
+def test_the_comparison_page_reports_a_failed_comparison_instead_of_500ing(client, as_role, app, fake_mcrit):
+    """Both ids passed `isFunctionId`, so a None from the comparison went on into
+    `match_info["function_entry_a"]` and took the page down."""
+    as_role("visitor")
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: _ComparisonFailingClient(fake_mcrit)
+    response = client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}")
+    assert response.status_code == 200
+    assert b"One of the function_ids is not valid" in response.data
+
+
 def test_the_comparison_page_flags_a_pichash_match(client, as_role):
     as_role("visitor")
     page = client.get(f"/data/matches/function/{IDENTICAL_PAIR[0]}/{IDENTICAL_PAIR[1]}").data.decode()

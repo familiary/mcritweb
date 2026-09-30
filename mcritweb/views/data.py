@@ -277,21 +277,31 @@ def export_view():
 @mcrit_server_required
 def specific_export(type, item_id):
     client = get_client()
+    # the backend reads an empty selection as "every sample", so an id that is not a
+    # plain number, or a family without samples, must not reach getExportData
+    if type in ('family', 'samples') and not re.fullmatch(r"[0-9]{1,18}", item_id):
+        flash(f'Only a {"family" if type == "family" else "sample"} id made of digits can be exported.', category='error')
+        return redirect(url_for('data.export_view'))
     if type == 'family':
-        samples = client.getSamplesByFamilyId(item_id)
-        sample_ids = [x.sample_id for x in samples.values()]
-        export_file = json.dumps(client.getExportData(sample_ids))
+        samples = client.getSamplesByFamilyId(int(item_id))
+        export_data = client.getExportData([x.sample_id for x in samples.values()]) if samples else None
+        if not export_data:
+            flash(f'MCRIT did not export family "{item_id}" - it may not exist or have no samples, or MCRIT could not export it.', category='error')
+            return redirect(url_for('data.export_view'))
+        export_file = json.dumps(export_data)
         return Response(
             export_file,
             mimetype='application/json',
             headers={"Content-disposition":
                     "attachment; filename=export_family_"+str(item_id)+".json"})
     if type == 'samples':
-        sample_ids = []
-        sample_entry = client.getSampleById(item_id)
-        if sample_entry:
-            sample_ids.append(sample_entry.sample_id)
-        export_file = json.dumps(client.getExportData(sample_ids))
+        # the backend leaves out a sample_id it does not know, so the export itself says
+        # whether there was one
+        export_data = client.getExportData([int(item_id)])
+        if not export_data or not export_data["content"]["num_samples"]:
+            flash(f'MCRIT did not export sample "{item_id}" - it may not exist, or MCRIT could not export it.', category='error')
+            return redirect(url_for('data.export_view'))
+        export_file = json.dumps(export_data)
         return Response(
             export_file,
             mimetype='application/json',
@@ -311,8 +321,9 @@ def specific_export(type, item_id):
 @mcrit_server_required
 def match_functions(function_id_a, function_id_b):
     client = get_client()
-    if client.isFunctionId(function_id_a) and client.isFunctionId(function_id_b):
-        match_info = client.getMatchFunctionVs(function_id_a, function_id_b)
+    # the backend checks both ids itself; None is an unknown id (or a failed request)
+    match_info = client.getMatchFunctionVs(function_id_a, function_id_b)
+    if match_info is not None:
         function_entry = FunctionEntry.fromDict(match_info["function_entry_a"])
         pichash_matches_a = client.getMatchesForPicHash(function_entry.pichash, summary=True)
         sample_entry_a = SampleEntry.fromDict(match_info["sample_entry_a"])
@@ -804,10 +815,9 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         num_original_aggregated_functions = len(matching_result.getAggregatedFunctionMatches(unfiltered=True))
         return render_template("result_compare_family.html", famid=filtered_family_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, function_rows=aggregate_function_matches_page(matching_result, function_pagination), num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all)
     # filtered for sample
-    elif filtered_sample_id is not None and client.isSampleId(filtered_sample_id):
+    elif filtered_sample_id is not None and (filtered_sample_entry := client.getSampleById(filtered_sample_id)) is not None:
         matching_result.filterToSampleId(filtered_sample_id)
         create_match_diagram(current_app, job_info.job_id, matching_result, filtered_sample_id=filtered_sample_id)
-        filtered_sample_entry = client.getSampleById(filtered_sample_id)
         matching_result.other_sample_entry = filtered_sample_entry
         # get offsets for matched functions
         if not assign_matched_offsets(client, matching_result.filtered_function_matches):

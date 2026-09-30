@@ -85,8 +85,10 @@ class MatchReportRenderer:
         client = get_client()
         self.sample_info = self.match_report.reference_sample_entry
         self.sample_infos = {matched_sample.sample_id: matched_sample for matched_sample in self.match_report.getSampleMatches()}
-        if client.isSampleId(self.sample_info.sample_id):
-            self.function_infos = {function_info.function_id: function_info for function_info in client.getFunctionsBySampleId(self.match_report.reference_sample_entry.sample_id)}
+        # None is an unknown id (or a failed request), so this needs no isSampleId first
+        sample_functions = client.getFunctionsBySampleId(self.sample_info.sample_id)
+        if sample_functions is not None:
+            self.function_infos = {function_info.function_id: function_info for function_info in sample_functions}
         else:
             # TODO: find a way to get function_infos
             self.function_infos = {}
