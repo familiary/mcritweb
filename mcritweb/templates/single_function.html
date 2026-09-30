@@ -96,12 +96,12 @@ Function: {{ function_id }}
           <li><a class="dropdown-item" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id, _anchor='jobs') }}">Previous Jobs</a></li>
         </ul>
       </div>
-      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_sample" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id) }}" role="button" title="Go to sample {{ entry.sample_id }}"><i class="fa-solid fa-virus"></i></a>
+      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_sample" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id) }}" role="button" aria-label="Go to sample {{ entry.sample_id }}" title="Go to sample {{ entry.sample_id }}"><i class="fa-solid fa-virus"></i></a>
       {% if sample_entry.family_id is not none %}
-      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_family" href="{{ url_for('explore.family_by_id', family_id=sample_entry.family_id) }}" role="button" title="Go to family {{ sample_entry.family }}"><i class="fa-solid fa-bug"></i></a>
+      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_family" href="{{ url_for('explore.family_by_id', family_id=sample_entry.family_id) }}" role="button" aria-label="Go to family {{ sample_entry.family }}" title="Go to family {{ sample_entry.family }}"><i class="fa-solid fa-bug"></i></a>
       {% endif %}
       {{ api_usage_button("apiUsageModal") }}
-      <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" role="button" title="Go to the control flow graph"><i class="fa-solid fa-diagram-project"></i></a>
+      <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" role="button" aria-label="Go to the control flow graph" title="Go to the control flow graph"><i class="fa-solid fa-diagram-project"></i></a>
     </div>
   </div>
 </div>

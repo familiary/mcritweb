@@ -1,5 +1,7 @@
+/* the logos carry intrinsic width/height attributes; without width:auto the attribute width would stretch them at these heights */
 .navbar-brand img {
   height: 100px;
+  width: auto;
 }
 .navbar-brand-small img {
   height: 40px;
@@ -16,4 +18,5 @@
 }
 .navbar .right-logo img{
   height:50px;
+  width: auto;
 }
