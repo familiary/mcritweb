@@ -1,7 +1,7 @@
 import hashlib
 import os
 import re
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
 from mcrit.libs.utility import decode_two_complement
@@ -1072,6 +1072,16 @@ def jobs():
     state_category = request.args.get('state', None)
     if state_category:
         active_category = None
+    elif request.method != 'POST' and active_category is not None and request.args.get('active') != active_category:
+        # the category picked above is derived from the live queue statistics, so a URL
+        # that does not name it means something different on every request: a refresh
+        # or a step back in history then lands on a different tab (issue #36).
+        # redirect to the URL that does name it, so the browser can reproduce this page.
+        # the query is rebuilt rather than handed to url_for as keyword arguments,
+        # because the names url_for reserves for itself are user input here
+        canonical_args = request.args.to_dict()
+        canonical_args['active'] = active_category
+        return redirect(f"{url_for('data.jobs')}?{urlencode(canonical_args)}")
     totals = {"queued": 0, "in_progress": 0, "finished": 0, "failed": 0, "terminated": 0}
     for category, status_dict in statistics.items():
         for state, count in status_dict.items():

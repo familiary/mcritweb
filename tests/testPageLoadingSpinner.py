@@ -58,7 +58,7 @@ def test_the_spinner_script_exists():
 def test_a_page_that_paginates_also_loads_the_spinner(client, as_role, path):
     as_role("admin")
 
-    response = client.get(path)
+    response = client.get(path, follow_redirects=True)
 
     assert response.status_code == 200
     assert b'class="pagination' in response.data, (

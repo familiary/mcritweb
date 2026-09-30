@@ -61,7 +61,7 @@ def test_the_menu_really_does_link_to_an_empty_category(client, as_role):
     reachable, bookmarkable and crawlable whatever the disabled styling suggests."""
     as_role("visitor")
 
-    page = client.get("/data/jobs").get_data(as_text=True)
+    page = client.get("/data/jobs", follow_redirects=True).get_data(as_text=True)
 
     assert "/data/jobs?active=rebuildIndex" in page
 
@@ -91,7 +91,7 @@ def test_every_category_the_menu_offers_is_accepted(client, as_role):
     """A ratchet against the guard and the menu drifting apart: rejecting a category the
     page itself links to would turn this fix into a different bug."""
     as_role("visitor")
-    page = client.get("/data/jobs").get_data(as_text=True)
+    page = client.get("/data/jobs", follow_redirects=True).get_data(as_text=True)
 
     import re
     linked = set(re.findall(r"/data/jobs\?active=([A-Za-z]+)", page))

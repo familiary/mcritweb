@@ -58,7 +58,9 @@ def test_a_queue_that_answers_is_untouched(client, as_role, fake_mcrit):
     """The guard must not cost the page: the ordinary render still carries its menu."""
     as_role("visitor")
 
-    response = client.get("/data/jobs")
+    # a queue that answers has a default tab, and a bare /data/jobs is redirected to the
+    # URL that names it (issue #36) - the ordinary render is one hop further on
+    response = client.get("/data/jobs", follow_redirects=True)
 
     assert response.status_code == 200
     page = response.get_data(as_text=True)
