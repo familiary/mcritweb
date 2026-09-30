@@ -1,6 +1,8 @@
+import functools
 import re
 import time
 
+import requests
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from mcrit.queue.JobCollection import JobCollection
 from mcrit.storage.FamilyEntry import FamilyEntry
@@ -245,6 +247,102 @@ def sample_row_job_collection(client, samples):
 ### Unfiltered Collections: Families, Samples, Function
 ##############################################################
 
+#: How long a modify request waits for its change to become visible, and how often it
+#: looks. See await_modification. Issue #189.
+MODIFICATION_TIMEOUT = 0.3
+MODIFICATION_POLL_INTERVAL = 0.05
+
+
+def await_modification(description, is_applied):
+    """Wait until `is_applied()` holds, for at most MODIFICATION_TIMEOUT seconds.
+
+    mcrit queues modifySample and modifyFamily as worker jobs and answers before they
+    have run, with no job id to follow (`SampleResource.on_put`, `FamilyResource.on_put`),
+    so the only way to know the change has landed is to read it back. A read that fails
+    counts as not confirmed: the modification has been sent by then, and a failed check
+    is no reason to answer with an error page.
+
+    Returns whether the change was seen.
+    """
+    deadline = time.monotonic() + MODIFICATION_TIMEOUT
+    while True:
+        try:
+            if is_applied():
+                return True
+        except requests.RequestException:
+            current_app.logger.warning("Could not read back the modification of %s to confirm it.", description, exc_info=True)
+            return False
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(MODIFICATION_POLL_INTERVAL, remaining))
+
+
+def flash_modification(kind, sent, is_applied, client, entry_id, **requested):
+    """Tell the user what became of a modification: not accepted, applied, or unconfirmed.
+
+    `sent` is what the client answered for the request - None for anything but a 200/202.
+    `is_applied(client, entry_id, **requested)` is the check that confirms it.
+    """
+    if sent is None:
+        flash(f"MCRIT did not accept the {kind} modification.", category="error")
+    elif await_modification(f"{kind} {entry_id}", functools.partial(is_applied, client, entry_id, **requested)):
+        flash(f"{kind.capitalize()} modified.", category="success")
+    else:
+        flash(f"The {kind} modification was sent, but MCRIT has not confirmed it yet - reload in a moment to check.", category="info")
+
+
+def is_sample_modified(client, sample_id, family_name=None, version=None, is_library=None):
+    """Whether the sample shows every value that was asked for (None: not asked for)."""
+    sample = client.getSampleById(sample_id)
+    if sample is None:
+        return False
+    requested = {"family": family_name, "version": version, "is_library": is_library}
+    return all(getattr(sample, field) == value for field, value in requested.items() if value is not None)
+
+
+def family_read_back(family_id):
+    """Read one family back. Returns a FamilyEntry, "absent", or None if the read failed.
+
+    As with `sha256_second_opinion`: `getFamily` in its ordinary mode maps a 404 and a
+    500 to the same None, and raw mode returns the response so the status can be read.
+    """
+    response = get_client(raw_responses=True).getFamily(family_id, with_samples=False)
+    if response.status_code == 404:
+        return "absent"
+    if response.status_code in (200, 202):
+        payload = response.json()
+        if payload.get("status") == "successful" and payload.get("data") is not None:
+            return FamilyEntry.fromDict(payload["data"])
+    return None
+
+
+def is_family_modified(client, family_id, family_name=None, is_library=None):
+    """Whether the family shows the modification, following `MongoDbStorage.modifyFamily`.
+
+    A rename moves the samples to the family carrying the new name - a new one, or an
+    existing one they merge into - and deletes this family's row. Family 0 is the
+    exception: its row stays, keeping its name, with its counters zeroed. is_library
+    is written by the same job before the rename, so a finished rename implies it.
+
+    is_library alone sets num_library_samples to num_samples, so a family without
+    samples reads as not a library whatever was asked for.
+
+    A rename is confirmed by the row being gone, so it is read back in raw mode: only
+    a 404 is a deleted row. The ordinary getFamily answers None for a failed read as
+    well, and taking that for a finished rename would report one that never landed.
+    """
+    if family_name is not None:
+        family = family_read_back(family_id)
+        if family == "absent":
+            return True
+        return family is not None and family_id == 0 and family.num_samples == 0
+    family = client.getFamily(family_id, with_samples=False)
+    if family is None:
+        return False
+    return family.is_library == (is_library and family.num_samples > 0)
+
+
 @bp.route('/modifyFamily', methods=['POST'])
 @contributor_required
 @mcrit_server_required
@@ -287,9 +385,11 @@ def modifyFamily():
         if new_is_library is None or new_is_library == family_entry.is_library:
             new_is_library = None
         if any([item is not None for item in [new_family_name, new_is_library]]):
-            job_id = client.modifyFamily(family_id, family_name=new_family_name, is_library=new_is_library)
-            time.sleep(0.3)
-        flash("Job to modify family was scheduled.", category="info")
+            sent = client.modifyFamily(family_id, family_name=new_family_name, is_library=new_is_library)
+            flash_modification("family", sent, is_family_modified, client, family_id,
+                               family_name=new_family_name, is_library=new_is_library)
+        else:
+            flash("Nothing to change.", category="info")
     return redirect(url_for('explore.families'))
 
 @bp.route('/familyNames')
@@ -406,13 +506,13 @@ def modifySample():
         if new_is_library is None or new_is_library == sample_entry.is_library:
             new_is_library = None
         if any([item is not None for item in [new_family_name, new_version, new_is_library]]):
-            client.modifySample(sample_id, family_name=new_family_name, version=new_version, is_library=new_is_library)
-            time.sleep(0.3)
+            sent = client.modifySample(sample_id, family_name=new_family_name, version=new_version, is_library=new_is_library)
+            flash_modification("sample", sent, is_sample_modified, client, sample_id,
+                               family_name=new_family_name, version=new_version, is_library=new_is_library)
+        else:
+            flash("Nothing to change.", category="info")
         if redirection_job_id:
-            time.sleep(1)
-            flash("Delayed redirect for 1 second to let requested sample modification propagate", category="info")
             return redirect(url_for('data.result', job_id=redirection_job_id))
-        flash("Job to modify sample was scheduled.", category="info")
     return redirect(url_for('explore.samples'))
 
 
