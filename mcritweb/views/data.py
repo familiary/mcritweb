@@ -13,6 +13,7 @@ from mcrit.storage.MatchingResult import MatchingResult
 from mcrit.storage.SampleEntry import SampleEntry
 from mcrit.storage.UniqueBlocksResult import UniqueBlocksResult
 from smda.common.SmdaReport import SmdaReport
+from werkzeug.exceptions import NotFound
 
 from mcritweb.db import UserColumnSettings, UserFilters, get_query_filename, utc_now
 from mcritweb.views.analyze import query as analyze_query
@@ -58,6 +59,61 @@ def quote_backend_query_value(value):
     return quote(str(value), safe="")
 
 
+def trim_result_cache(app):
+    """Evict the oldest cached reports until instance/cache/results/ is back within
+    RESULT_CACHE_MAX_BYTES and RESULT_CACHE_MAX_FILES.
+
+    Oldest by modification time, which is when cache_result wrote the file. The
+    timestamp in the filename says the same to the second; mtime breaks the ties that
+    leaves within a second, and orders a file cache_result did not name as well. That is
+    oldest-written rather than least-recently-used, because a cache hit does not touch
+    the file; evicting a report that is still popular costs one fetch from the backend,
+    after which it is the newest again. A single report larger than the byte bound is
+    evicted straight away - the page it was fetched for is rendered from memory anyway.
+    Called after every write, so the directory never holds more than one report past
+    its bounds. A deployment upgrading with more reports than that is trimmed in full
+    by its first write.
+
+    The directory is shared by concurrent requests and, under a multi-process server, by
+    other processes, so nothing is kept in memory between calls. Two trims racing for the
+    same victim is harmless: whichever comes second finds it gone. A request still
+    reading an evicted report keeps its open file on POSIX; only one that has listed the
+    directory but not yet opened the file misses it.
+    """
+    max_bytes = app.config.get("RESULT_CACHE_MAX_BYTES")
+    max_files = app.config.get("RESULT_CACHE_MAX_FILES")
+    if max_bytes is None and max_files is None:
+        return
+    cache_path = os.sep.join([app.instance_path, "cache", "results"])
+    cached = []
+    with os.scandir(cache_path) as entries:
+        for entry in entries:
+            try:
+                if entry.is_file():
+                    stat = entry.stat()
+                    cached.append((stat.st_mtime_ns, entry.name, stat.st_size))
+            except FileNotFoundError:
+                # evicted by a concurrent trim since the listing
+                continue
+    num_bytes = sum(size for _, _, size in cached)
+    num_files = len(cached)
+    for _, filename, size in sorted(cached):
+        if (max_bytes is None or num_bytes <= max_bytes) and (max_files is None or num_files <= max_files):
+            break
+        try:
+            os.remove(os.sep.join([cache_path, filename]))
+        except FileNotFoundError:
+            # a concurrent trim got there first, which is just as good
+            pass
+        except OSError:
+            # Windows refuses to remove a file that is open for reading; the next
+            # trim will have another go at it
+            app.logger.warning("Could not evict cached result %s", filename, exc_info=True)
+            continue
+        num_bytes -= size
+        num_files -= 1
+
+
 def load_cached_result(app, job_id):
     matching_result = {}
     cache_path = os.sep.join([app.instance_path, "cache", "results"])
@@ -83,12 +139,19 @@ def find_cached_result_filename(app, job_id):
 
 
 def cache_result(app, job_info, matching_result):
-    # TODO potentially implement a cache control that manages maximum allowed cache size?
     if job_info.result is not None:
         cache_path = os.sep.join([app.instance_path, "cache", "results"])
         timestamped_filename = utc_now().strftime(f"%Y%m%d-%H%M%S-{job_info.job_id}.json")
+        # compact: the file is only ever parsed, or streamed as the download, and
+        # indentation made it about 1.5 times the size on disk and on the wire
         with open(cache_path + os.sep + timestamped_filename, "w") as fout:
-            json.dump(matching_result, fout, indent=1)
+            json.dump(matching_result, fout, separators=(",", ":"))
+        try:
+            trim_result_cache(app)
+        except Exception:
+            # bookkeeping: the report is written and the page is rendered from memory,
+            # so a trim that fails (an unreadable directory, say) must not fail it
+            app.logger.exception("Could not trim the result cache")
 
 
 def create_match_diagram(app, job_id, matching_result, filtered_family_id=None, filtered_sample_id=None, filtered_function_id=None):
@@ -367,15 +430,21 @@ def download_result(job_id):
         # the backend answered, so this costs no parse and re-encode of a report that
         # can run to tens of megabytes, and the download cannot disagree with the
         # page that was rendered from the same file. Nothing goes stale by preferring
-        # it - a finished job's result never changes, which is also why the cache is
-        # never invalidated.
+        # it - a finished job's result never changes, which is why nothing is ever
+        # evicted for being stale, only for size (see trim_result_cache).
         cache_path = os.sep.join([current_app.instance_path, "cache", "results"])
-        return send_from_directory(
-            cache_path,
-            cached_filename,
-            mimetype='application/json',
-            as_attachment=True,
-            download_name=f"mcrit_result_{job_id}.json")
+        try:
+            return send_from_directory(
+                cache_path,
+                cached_filename,
+                mimetype='application/json',
+                as_attachment=True,
+                download_name=f"mcrit_result_{job_id}.json")
+        except (NotFound, FileNotFoundError):
+            # evicted by trim_result_cache since it was looked up: NotFound if that
+            # happened before send_from_directory checked for the file, and the bare
+            # error if it happened between that check and the open. Fetch it again.
+            pass
     result_json = client.getResultForJob(job_id)
     if not result_json:
         # unfinished, failed, or a job type that produces nothing - the report page
@@ -385,10 +454,10 @@ def download_result(job_id):
     cache_result(current_app, job_info, result_json)
     # the fetch above already holds the whole report as a dict, so serialising it
     # once more is the cheap half of a cache miss; it is the cached path that keeps
-    # every later download off the heap. indent=1 as cache_result writes it, so both
+    # every later download off the heap. Compact, as cache_result writes it, so both
     # paths answer with the same bytes.
     return Response(
-        json.dumps(result_json, indent=1),
+        json.dumps(result_json, separators=(",", ":")),
         mimetype='application/json',
         headers={"Content-disposition":
                 f"attachment; filename=mcrit_result_{job_id}.json"})

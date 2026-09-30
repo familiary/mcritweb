@@ -46,6 +46,41 @@ def _trusted_proxy_count(configured, logger):
     return value
 
 
+#: What RESULT_CACHE_MAX_BYTES and RESULT_CACHE_MAX_FILES fall back to when the
+#: configured value is not a bound.
+RESULT_CACHE_DEFAULTS = {'RESULT_CACHE_MAX_BYTES': 1024 * 2**20, 'RESULT_CACHE_MAX_FILES': 1000}
+
+
+def _result_cache_bound(name, configured, logger):
+    """Validate one result cache bound: a non-negative int, a string of digits, or None.
+
+    The bound is compared on every cache write, so a value that is not a number would
+    fail there instead - after the report is written, turning every first view of a
+    result into a 500 and leaving the cache untrimmed. Anything else is refused with a
+    warning and the default is used, the same leniency and the same refusals as
+    _trusted_proxy_count: a bool is not a size, and a float is not a count.
+    """
+    if configured is None:
+        return None
+    if isinstance(configured, bool):
+        value = None
+    elif isinstance(configured, int):
+        value = configured
+    elif isinstance(configured, str):
+        try:
+            value = int(configured.strip())
+        except ValueError:
+            value = None
+    else:
+        value = None
+    if value is None or value < 0:
+        logger.warning(
+            "%s=%r is not a non-negative whole number or None; using the default of %d",
+            name, configured, RESULT_CACHE_DEFAULTS[name])
+        return RESULT_CACHE_DEFAULTS[name]
+    return value
+
+
 def create_app(test_config=None, instance_path=None):
     # NOTE: these are imported here rather than at module scope on purpose. Importing any
     # mcritweb submodule executes this file first, so module-level blueprint imports would
@@ -90,6 +125,12 @@ def create_app(test_config=None, instance_path=None):
         # uncapped beyond MAX_CONTENT_LENGTH. Issue #19: this was hardcoded at 1 MiB for
         # visitors, which is the right default but the wrong place for it.
         QUERY_UPLOAD_LIMITS={'visitor': 1 * 2**20},
+        # Bounds on instance/cache/results/, enforced whenever a report is added to it by
+        # evicting the oldest reports first. An evicted report is simply fetched from the
+        # backend again the next time it is viewed. The byte bound is the disk budget; the
+        # file bound caps how many reports the directory holds whatever their size.
+        # None lifts either bound. Issue #202.
+        **RESULT_CACHE_DEFAULTS,
         # How many reverse proxies sit in front of this app, all of which append to
         # X-Forwarded-For. 0 means "served directly": nothing about the request is
         # taken from a header. See the block below create_app's config load.
@@ -110,6 +151,11 @@ def create_app(test_config=None, instance_path=None):
     else:
         # load the test config if passed in
         app.config.from_mapping(test_config)
+
+    # checked here rather than on use, where a value that is not a number would fail
+    # every cache write - see _result_cache_bound
+    for name in RESULT_CACHE_DEFAULTS:
+        app.config[name] = _result_cache_bound(name, app.config.get(name), app.logger)
 
     # Behind a reverse proxy - and the recommended deployment, docker-mcrit, terminates
     # TLS in NGINX in front of this app - the only peer the WSGI server ever sees is the
