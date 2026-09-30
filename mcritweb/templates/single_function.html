@@ -8,11 +8,6 @@
 <script src="{{ url_for('static', filename='trace_CFG/lib/split.js') }}"></script>
 -->
 
-<script src="{{ url_for('static', filename='trace_CFG/lib/d3.min.js') }}"></script>
-<script src="{{ url_for('static', filename='trace_CFG/lib/graphlib.min.js') }}"></script>
-<script src="{{ url_for('static', filename='trace_CFG/lib/graphlib-dot.min.js') }}"></script>
-<script src="{{ url_for('static', filename='trace_CFG/lib/dagre-d3.min.js') }}"></script>
-<script src="{{ url_for('static', filename='trace_CFG/lib/convexhull.js') }}"></script>
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='trace_CFG/cfg_style.css') }}">
 
 {% endblock %}
@@ -192,6 +187,12 @@ Function: {{ function_id }}
     </div>
   </div>
   {% endif %}
+    {# the graph libraries load here, not in <head>: only the scripts below and window.onload use them, and in <head> they held back the first paint #}
+    <script src="{{ url_for('static', filename='trace_CFG/lib/d3.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='trace_CFG/lib/graphlib.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='trace_CFG/lib/graphlib-dot.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='trace_CFG/lib/dagre-d3.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='trace_CFG/lib/convexhull.js') }}"></script>
     <script src="{{ url_for('static', filename='trace_CFG/main.js') }}"></script>
     <script src="{{ url_for('static', filename='trace_CFG/fnManip.js') }}"></script>
     <script src="{{ url_for('static', filename='trace_CFG/loopCollapser.js') }}"></script>

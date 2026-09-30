@@ -188,3 +188,26 @@ def test_the_manual_names_the_menu_entry_that_reaches_the_selection_page():
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_only_the_first_screenshot_loads_eagerly():
+    """The first screenshot is the largest paint of /help; the other twenty would
+    otherwise share the connection with it on every visit."""
+    images = re.findall(r"<img [^>]*>", str(render("/help/images/")))
+    assert len(images) > 1
+    assert "loading=" not in images[0]
+    assert all('loading="lazy"' in image for image in images[1:])
+
+
+def test_every_screenshot_carries_the_size_of_its_file():
+    """A lazy screenshot without a size is a 2px placeholder until it loads, so the
+    ones arriving next to a /help#section target pushed that section 4,000+ px away
+    after the browser had scrolled to it."""
+    from mcritweb.manual import IMAGE_DIRECTORY, _png_size
+
+    images = re.findall(r"<img [^>]*>", str(render("/help/images/")))
+    assert images
+    for image in images:
+        name = re.search(r'src="/help/images/([^"]+)"', image).group(1)
+        width, height = _png_size(IMAGE_DIRECTORY / name)
+        assert f'width="{width}" height="{height}"' in image, image
