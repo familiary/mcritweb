@@ -117,6 +117,8 @@
   {% if column_setup is none %}
     {% set column_setup = ["sample_id", "sha256", "family", "version", "filename", "bitness", "num_functions", "is_library"] %}
   {% endif %}
+  {% set matching_jobs = job_collection.getJobsForSample(sample.sample_id, matching_only=True) if job_collection else None -%}
+  {% set last_matches_job = job_collection.getJobsForSample(sample.sample_id, method="getMatchesForSample", finished_only=True) if job_collection else None -%}
   <tr class="sample-row parent_{{ kwargs['parent'] }}"{{ row_tint(row_decorations, sample.sample_id) }} >
     {{ badge_column_cell(row_decorations, sample.sample_id) }}
     {% for column_type in column_setup %}
@@ -149,8 +151,8 @@
       <td align="right" class="buttons">
         {% if show_analyze %}
           <button type="button" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_analyze" onclick=set_analyze_sample_button_clicked() bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            {% if job_collection and job_collection.getJobsForSample(sample.sample_id, matching_only=True) %}
-            <i style="color:green;" class="fa-solid fa-flask"></i>&nbsp;{{ job_collection.getJobsForSample(sample.sample_id, matching_only=True) | length}}
+            {% if job_collection and matching_jobs %}
+            <i style="color:green;" class="fa-solid fa-flask"></i>&nbsp;{{ matching_jobs | length}}
             {% else %}
             <i class="fa-solid fa-flask"></i>
             {% endif %}
@@ -160,8 +162,8 @@
             <a class="dropdown-item" href="{{ url_for('analyze.compare_versus', selected_a=sample.sample_id, query_a='sha256:'+sample.sha256) }}">New: 1 vs 1</a>
             <a class="dropdown-item" href="{{ url_for('analyze.cross_compare', samples=sample.sample_id) }}">Cross Compare</a>
             <a class="dropdown-item" href="{{ url_for('explore.sample_by_id', sample_id=sample.sample_id, _anchor='jobs') }}">Previous Jobs</a>
-            {% if job_collection and job_collection.getJobsForSample(sample.sample_id, method="getMatchesForSample", finished_only=True) %}
-            <a class="dropdown-item" href="{{ url_for('data.result', job_id=job_collection.getJobsForSample(sample.sample_id, method="getMatchesForSample", finished_only=True)[0].job_id) }}">Last 1:N Job</a>
+            {% if job_collection and last_matches_job %}
+            <a class="dropdown-item" href="{{ url_for('data.result', job_id=last_matches_job[0].job_id) }}">Last 1:N Job</a>
             {% endif %}
           </div>
         {% endif %}
