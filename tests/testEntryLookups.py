@@ -137,7 +137,8 @@ def test_a_backend_without_the_family_batch_is_asked_per_id_without_sample_lists
     with app.test_request_context():
         families = get_family_entries([1, 2])
 
-    assert families == {1: fake_mcrit._families[1], 2: fake_mcrit._families[2]}
+    assert {family_id: entry.family_name for family_id, entry in families.items()} == {1: fake_mcrit._families[1].family_name, 2: fake_mcrit._families[2].family_name}
+    assert all(entry.samples is None for entry in families.values())
     singles = [(args[0], kwargs) for called, args, kwargs in fake_mcrit.calls if called == "getFamily"]
     assert singles == [(1, {"with_samples": False}), (2, {"with_samples": False})]
 

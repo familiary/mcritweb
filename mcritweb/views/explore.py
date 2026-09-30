@@ -592,9 +592,14 @@ def can_modify_functions(client):
     if not callable(getattr(client, "modifyFunction", None)):
         return False
     try:
-        version = _version_tuple(client.getVersion())
+        version = client.getVersion()
     except Exception:
         return False
+    # McritClient answers with mcrit's `{"version": "1.9.0"}`, not a bare string -
+    # see administration.backend_version
+    if isinstance(version, dict):
+        version = version.get("version")
+    version = _version_tuple(version)
     return version is not None and version > LAST_MCRIT_WITHOUT_FUNCTION_RENAME
 
 

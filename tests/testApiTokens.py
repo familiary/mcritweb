@@ -89,6 +89,14 @@ def test_a_contributor_token_may_rename_a_function(client, make_user, role):
     assert _verdict(lambda: client.put("/api/functions/1", headers=token_for(role), json={"function_name": "x"})) == ALLOWED
 
 
+@pytest.mark.parametrize("path", ["/api/matches/sample/1", "/api/samples/1", "/api/status"])
+def test_put_is_refused_everywhere_but_a_function(client, make_user, path):
+    """PUT is on the router for modifyFunction; on any other path it used to be served
+    as that path's GET, which for /api/matches/sample/1 queues a job."""
+    make_user("admin")
+    assert client.put(path, headers=token_for("admin"), json={}).status_code == 405
+
+
 def test_a_visitor_token_can_still_read_samples(client, make_user):
     """The same path by GET is a read, and stays visitor-level."""
     make_user("visitor")

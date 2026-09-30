@@ -655,14 +655,14 @@ def name_functions_in_rule(yara_rule, unique_blocks, block_cover):
     return yara_rule
 
 
-def get_sample_versions(client, family_entry, sample_ids):
+def get_sample_versions(family_entry, sample_ids):
     """Map sample_id -> version for the samples a unique blocks report covers.
 
     The report carries no version of its own - `statistics["by_sample_id"]` is block
     counts and nothing else - so it has to be looked up. A family job needs no extra
     request for it: `getFamily` already answers with the family's samples and the
-    caller is holding that entry. Whatever the family did not supply is fetched by
-    id, which for a job naming samples directly is one call per row of the table.
+    caller is holding that entry. Whatever the family did not supply is fetched in one
+    `get_sample_entries` batch (issue #191), however many samples the job names.
 
     A lookup that comes back None leaves that row's version blank. It does not say
     the sample is gone: `handle_response` in `McritClient` collapses a 404 and a 500
@@ -674,13 +674,12 @@ def get_sample_versions(client, family_entry, sample_ids):
     family_samples = getattr(family_entry, "samples", None) or {}
     for sample_entry in family_samples.values():
         versions[sample_entry.sample_id] = sample_entry.version
-    for sample_id in sample_ids:
-        if sample_id in versions:
-            continue
-        sample_entry = client.getSampleById(sample_id)
+    missing = [sample_id for sample_id in sample_ids if sample_id not in versions]
+    for sample_id, sample_entry in get_sample_entries(missing).items():
         if sample_entry is not None:
             versions[sample_id] = sample_entry.version
     return versions
+
 
 def result_unique_blocks(job_info, blocks_result: dict):
     client = get_client()
@@ -706,7 +705,7 @@ def result_unique_blocks(job_info, blocks_result: dict):
     # first view of a job could show another rule than every view after it, and the
     # memoized cover would depend on which of the two happened to compute it (issue #184)
     blocks_result["unique_blocks"] = dict(sorted(blocks_result["unique_blocks"].items()))
-    sample_versions = get_sample_versions(client, family_entry, [entry["sample_id"] for entry in blocks_statistics["by_sample_id"].values()])
+    sample_versions = get_sample_versions(family_entry, [entry["sample_id"] for entry in blocks_statistics["by_sample_id"].values()])
     yara_params = parse_yara_rule_params(request)
     yara_rule, yara_cover = build_yara_rule(job_info.job_id, blocks_result, yara_params)
     # only what the caller actually changed, so the forms can carry the rule parameters

@@ -678,7 +678,8 @@ def test_the_yara_rule_names_the_function_each_picblock_came_from(client, as_rol
     mcrit picks the cover blind to which function a block sits in, so a rule can
     quietly end up fingerprinting one function - and `7 of them` then dies with
     the next recompile of it. The captured report spreads its ten blocks over
-    seven functions; naming them is what lets a reader see that at all.
+    eight functions (seven in backend order - the cover breaks ties by block order,
+    which is sorted since #184); naming them is what lets a reader see that at all.
     """
     as_role("visitor")
     response = client.get(f"/data/result/{job_id_of('unique_blocks')}?tab=yara")
@@ -690,7 +691,7 @@ def test_the_yara_rule_names_the_function_each_picblock_came_from(client, as_rol
     for pichash, tail in comments:
         assert tail.startswith(", function_id: "), f"{pichash} does not name the function it came from"
     # and the annotation is per block, not one id repeated over all of them
-    assert len({tail for _, tail in comments}) == 7
+    assert len({tail for _, tail in comments}) == 8
 
 
 def test_unique_blocks_statistics_table_carries_the_sorting_markup(client, as_role):
@@ -768,6 +769,8 @@ def test_unique_blocks_page_survives_a_backend_that_lost_a_sample(client, as_rol
     family = fake_mcrit.getFamily(1)
     assert family.samples, "the captured family carries no samples - see tests/fixtures/regenerate.py"
     family.samples = {key: entry for key, entry in family.samples.items() if entry.sample_id != 2}
+    # neither the batch nor the per-id fallback it takes on an empty answer can resolve it
+    fake_mcrit.getSamplesByIds = lambda sample_ids, *args, **kwargs: {}
     fake_mcrit.getSampleById = lambda sample_id, *args, **kwargs: None
 
     response = client.get(f"/data/result/{job_id_of('unique_blocks')}")
@@ -789,48 +792,52 @@ class _StubFamily:
         self.samples = samples
 
 
-class _StubClient:
-    """Answers getSampleById from a dict and counts what it was asked for."""
+class _StubLookup:
+    """Stands in for `get_sample_entries`: answers from a dict, records each batch."""
 
     def __init__(self, samples):
         self.samples = samples
         self.requested = []
 
-    def getSampleById(self, sample_id):
-        self.requested.append(sample_id)
-        return self.samples.get(sample_id)
+    def __call__(self, sample_ids):
+        sample_ids = list(sample_ids)
+        self.requested.append(sample_ids)
+        return {sample_id: self.samples.get(sample_id) for sample_id in sample_ids}
 
 
-def test_sample_versions_come_from_the_family_without_extra_requests():
+def test_sample_versions_come_from_the_family_without_extra_requests(monkeypatch):
     """getFamily already answers with the family's samples, and result_unique_blocks
     has that entry in hand before the statistics table is built."""
-    from mcritweb.views.data import get_sample_versions
+    from mcritweb.views import data
 
-    client = _StubClient({})
+    lookup = _StubLookup({})
+    monkeypatch.setattr(data, "get_sample_entries", lookup)
     family = _StubFamily({"0": _StubSample(0, "1.0"), "1": _StubSample(1, "2.0")})
 
-    assert get_sample_versions(client, family, [0, 1]) == {0: "1.0", 1: "2.0"}
-    assert client.requested == []
+    assert data.get_sample_versions(family, [0, 1]) == {0: "1.0", 1: "2.0"}
+    assert lookup.requested in ([], [[]]), "nothing left to look up"
 
 
-def test_sample_versions_fall_back_to_a_lookup_per_sample():
+def test_sample_versions_fall_back_to_one_batched_lookup(monkeypatch):
     """The sample-job case has no family, and a backend answering a family without
-    its samples lands here too."""
-    from mcritweb.views.data import get_sample_versions
+    its samples lands here too - one `get_sample_entries` batch for all of them (#191)."""
+    from mcritweb.views import data
 
-    client = _StubClient({7: _StubSample(7, "3.x")})
+    lookup = _StubLookup({7: _StubSample(7, "3.x"), 8: _StubSample(8, "4.x")})
+    monkeypatch.setattr(data, "get_sample_entries", lookup)
 
-    assert get_sample_versions(client, None, [7]) == {7: "3.x"}
-    assert client.requested == [7]
+    assert data.get_sample_versions(None, [7, 8]) == {7: "3.x", 8: "4.x"}
+    assert lookup.requested == [[7, 8]]
 
 
-def test_sample_versions_omit_a_sample_the_backend_no_longer_has():
-    from mcritweb.views.data import get_sample_versions
+def test_sample_versions_omit_a_sample_the_backend_no_longer_has(monkeypatch):
+    from mcritweb.views import data
 
-    client = _StubClient({})
+    lookup = _StubLookup({})
+    monkeypatch.setattr(data, "get_sample_entries", lookup)
 
-    assert get_sample_versions(client, _StubFamily(None), [7]) == {}
-    assert client.requested == [7]
+    assert data.get_sample_versions(_StubFamily(None), [7]) == {}
+    assert lookup.requested == [[7]]
 
 
 #: (report fixture, query string, the template the request has to reach). `data.result`
