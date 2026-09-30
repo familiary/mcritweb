@@ -385,6 +385,11 @@ In this section, you can view all of these jobs, categorized by their type.
 
 ![An example for the job queue](images/jobs.png "An example for the job queue")
 
+The *User* column names who requested a job, as the MCRIT backend records it from the user MCRITweb acts for; the job page repeats it as *Requested by*.
+A backend that does not record it yet, or a job from before it did, shows a dash.
+
+![Who requested a job](images/jobs_owner.png "Who requested a job")
+
 
 ### User / Settings
 
