@@ -9,6 +9,7 @@ from mcritweb import db
 from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken
 from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
 from mcritweb.views.client import get_client
+from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
 from mcritweb.views.utility import forget_server_probe, get_mcritweb_version_from_setup, get_session_user_id
 
@@ -306,7 +307,8 @@ def reset_server():
     forget_server_probe()
     from mcritweb.views.utility import ensure_local_data_paths
     ensure_local_data_paths(current_app, clear_data=True)
-    # TODO also clean all locally cached data.
+    # the reset restarts the backend's id counters, so anything memoized by id is stale
+    clear_app_memos(current_app)
     flash('A reset of MCRIT was successfully performed.', category='success')
     return redirect(url_for('index'))
 

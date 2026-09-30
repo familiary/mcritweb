@@ -1,6 +1,7 @@
 import hashlib
 import os
 import re
+import types
 from urllib.parse import quote
 
 from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
@@ -21,6 +22,7 @@ from mcritweb.views.client import get_client, get_family_entries, get_sample_ent
 from mcritweb.views.cross_compare import get_sample_to_job_id, score_to_color
 from mcritweb.views.functiondiff import get_function_diff
 from mcritweb.views.MatchReportRenderer import MatchReportRenderer
+from mcritweb.views.memo import app_memo
 from mcritweb.views.pagination import Pagination
 from mcritweb.views.params import (
     parse_checkbox_query_param,
@@ -488,6 +490,13 @@ YARA_CONDITION_MINIMUM = 1
 #: than this many strings out of one sample is not a usable YARA rule either.
 YARA_REQUIRED_PER_SAMPLE_MAXIMUM = 100
 
+#: How many block covers `build_yara_rule` keeps - issue #184. A cover is a pure
+#: function of a finished job's report and the rule parameters, and it is the expensive
+#: part of this page - the O(k*n) walk above - yet it used to be rebuilt on every
+#: render: each page of the block table, each reload. An entry is a handful of block
+#: hashes. Counted in entries, since the parameters arrive in the query string.
+YARA_COVER_MEMO_ENTRIES = 32
+
 
 def parse_yara_rule_params(request):
     """The rule generation knobs as query parameters, clamped to values YARA accepts."""
@@ -503,7 +512,7 @@ def parse_yara_rule_params(request):
     return yara_params
 
 
-def build_yara_rule(blocks_result, yara_params):
+def build_yara_rule(job_id, blocks_result, yara_params):
     """The rule, plus the block cover it was built from - or None for no rule.
 
     `generateYaraRule` throws the cover away, but the page reports what the rule covers,
@@ -514,15 +523,21 @@ def build_yara_rule(blocks_result, yara_params):
     one, but it is not YARA: an empty `strings:` section is a syntax error on its own,
     and `min(len(block_hashes), condition_required)` writes "0 of them" underneath
     YARA_CONDITION_MINIMUM. No condition rescues that, so nothing is offered to copy.
+
+    Only the cover is memoized, keyed by the job and every parameter it reads. The rule
+    renders in milliseconds even at YARA_REQUIRED_PER_SAMPLE_MAXIMUM, and `renderRule`
+    stamps it with today's date - a memoized rule would be copied out with a stale one.
     """
     ubr = UniqueBlocksResult.fromDict(blocks_result)
-    block_cover = ubr.generateBlockCover(
-        min_ins=yara_params["min_ins"],
-        max_ins=yara_params["max_ins"],
-        min_bytes=yara_params["min_bytes"],
-        max_bytes=yara_params["max_bytes"],
-        required_per_sample=yara_params["required_per_sample"],
-    )
+    cover_params = ("min_ins", "max_ins", "min_bytes", "max_bytes", "required_per_sample")
+
+    def generate_cover():
+        block_cover = ubr.generateBlockCover(**{name: yara_params[name] for name in cover_params})
+        # shared by every request that asks for these parameters, so read-only
+        return types.MappingProxyType(dict(block_cover, block_hashes=tuple(block_cover["block_hashes"])))
+
+    memo = app_memo(current_app, "unique_blocks_cover", YARA_COVER_MEMO_ENTRIES)
+    block_cover = memo.get((job_id,) + tuple(yara_params[name] for name in cover_params), generate_cover)
     if not block_cover["block_hashes"]:
         return None, block_cover
     return ubr.renderRule(block_cover, yara_params["condition_required"], wrap_at=40), block_cover
@@ -545,8 +560,14 @@ def result_unique_blocks(job_info, blocks_result: dict):
         else:
             flash(f"No results for unique blocks in family with id {sample_id}", category="error")
     blocks_statistics = blocks_result["statistics"]
+    # generateBlockCover and renderRule break ties by the order they meet the blocks in.
+    # A report fetched from the backend on this request has them in the backend's order,
+    # the cached copy every later render reads in sorted key order - so without this the
+    # first view of a job could show another rule than every view after it, and the
+    # memoized cover would depend on which of the two happened to compute it (issue #184)
+    blocks_result["unique_blocks"] = dict(sorted(blocks_result["unique_blocks"].items()))
     yara_params = parse_yara_rule_params(request)
-    yara_rule, yara_cover = build_yara_rule(blocks_result, yara_params)
+    yara_rule, yara_cover = build_yara_rule(job_info.job_id, blocks_result, yara_params)
     # only what the caller actually changed, so the forms can carry the rule parameters
     # across the block filter and back without pinning the defaults into every link
     yara_query = {name: value for name, value in yara_params.items() if value != YARA_RULE_DEFAULTS[name]}
@@ -571,7 +592,9 @@ def result_unique_blocks(job_info, blocks_result: dict):
         number_of_unique_blocks = len(filtered_blocks)
         block_pagination = Pagination(request, number_of_unique_blocks, limit=100, query_param="blkp", limit_param="blkl")
         index = 0
-        for pichash, result in sorted(unique_blocks.items(), key=lambda x: x[1]["score"], reverse=True):
+        # the blocks are already in pichash order above; breaking ties by pichash here too
+        # keeps the table from depending on that
+        for pichash, result in sorted(unique_blocks.items(), key=lambda x: (-x[1]["score"], x[0])):
             if index >= block_pagination.end_index:
                 break
             if index >= block_pagination.start_index:
