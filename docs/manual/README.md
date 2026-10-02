@@ -406,6 +406,7 @@ The user settings page allows user to edit their preferences.
 On the home screen, name and registration date for the user are shown.
 If the user has access level contributor or administrator, it further shows an apitoken.
 This token can be used for API passthrough, using the MCRIT Web front-end as a relay when using the MCRIT python client to interact with (normally not exposed) MCRIT server.
+A token issued before MCRITweb 1.5.0 has only 32 characters; the settings page marks it as deprecated and asks you to regenerate it, since a deployment may be configured to refuse such tokens.
 
 ![An example for the user information](images/user_info.png "An example for the user information")
 

@@ -1,5 +1,6 @@
 import datetime
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -59,10 +60,28 @@ def generate_apitoken():
     MD5's, so the tokens were never weak - but MD5 in an authentication path is a
     finding every auditor writes up, and there is no reason to keep it. See issue #100.
 
-    Tokens already issued stay valid: nothing validates their shape, and
-    `get_user_by_apitoken` matches on equality.
+    Tokens already issued stay valid - except that a deployment may retire the
+    pre-1.5.0 (32-character) ones with `ACCEPT_LEGACY_APITOKENS` (issue #250).
+    Nothing here validates a token's shape, and `get_user_by_apitoken` matches
+    on equality.
     """
     return secrets.token_hex(APITOKEN_BYTES)
+
+
+#: Pre-1.5.0 tokens were `md5(uuid4().bytes)` and are always 32 hex characters;
+#: tokens generated since are `secrets.token_hex(APITOKEN_BYTES)` and always 64.
+#: The length is therefore a reliable discriminator, so finding the old ones needs
+#: no migration and no extra column. See issue #250.
+LEGACY_APITOKEN_RE = re.compile(r"[0-9a-f]{32}")
+
+
+def is_legacy_apitoken(apitoken):
+    """True when `apitoken` has the pre-1.5.0 (32-character) shape.
+
+    The 'no login' placeholder a freshly inserted row carries and the tokens the
+    test fixtures invent do not match, so they are never reported as legacy.
+    """
+    return apitoken is not None and LEGACY_APITOKEN_RE.fullmatch(apitoken) is not None
 
 
 class UserInfo:
