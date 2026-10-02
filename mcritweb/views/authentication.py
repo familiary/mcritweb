@@ -9,7 +9,7 @@ from flask import Blueprint, abort, current_app, flash, g, redirect, render_temp
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, utc_now
+from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, is_legacy_apitoken, utc_now
 
 bp = Blueprint('authentication', __name__, url_prefix='/')
 
@@ -326,7 +326,7 @@ def settings():
     if user_column_settings is None:
         user_column_settings = UserColumnSettings.fromDict(user_id, {})
         user_column_settings.saveToDb()
-    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES)
+    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken))
 
 def admin_required(view):
     @functools.wraps(view)
@@ -380,6 +380,16 @@ def token_required(view):
         g.api_user = UserInfo.fromDb(user_id=user_id)
         if g.api_user is None or g.api_user.role not in API_ROLES:
             abort(403)
+        # a token that authenticates can still be one the deployment has retired. The
+        # pre-1.5.0 (32-character) tokens were left valid by 1.5.0 and would have stayed
+        # valid forever; the switch lets an operator pick the cutover moment once their
+        # users have regenerated. Issue #250.
+        if is_legacy_apitoken(provided_token) and not current_app.config.get("ACCEPT_LEGACY_APITOKENS", True):
+            return {
+                "error": "This API token has the pre-1.5.0 (32-character) form, which this "
+                         "deployment no longer accepts. Regenerate the token on your user "
+                         "settings page and update whatever uses it."
+            }, 403
         return view(**kwargs)
     return wrapped_view
 

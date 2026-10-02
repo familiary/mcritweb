@@ -21,6 +21,18 @@ Users
     <button class="nav-link {% if active == 'admins' %}active{% endif %}" id="pills-admins-tab" data-bs-toggle="pill" data-bs-target="#pills-admins" type="button" role="tab" aria-controls="pills-admins" aria-selected="false">Admins</button>
   </li>
 </ul>
+{% if legacy_token_user_ids %}
+<div class="alert alert-warning" role="alert">
+  <i class="fa-solid fa-key" aria-hidden="true"></i>
+  {{ legacy_token_user_ids|length }} account{{ 's' if legacy_token_user_ids|length != 1 }} still hold{{ 's' if legacy_token_user_ids|length == 1 }} a pre-1.5.0 (32-character) API token - marked with the key icon below. These would have stayed valid forever had nobody regenerated (issue #250).
+  {# a write behind a confirmation, so postTo() runs from the confirm handler rather
+     than data-post firing unconditionally - see post_action.js #}
+  <button type="button" class="btn btn-outline-danger btn-sm"
+          onclick="if (confirm('Regenerate the API token of every account still holding a pre-1.5.0 (32-character) token? Anything using those tokens stops working.')) postTo('{{ url_for('admin.regenerate_legacy_apitokens') }}')">
+    Regenerate all legacy tokens
+  </button>
+</div>
+{% endif %}
 <div class="tab-content" id="pills-tabContent">
   <div class="tab-pane fade {% if active == 'pending' %}show active{% endif %}"id="pills-pending" role="tabpanel" aria-labelledby="pills-pending-tab">
     <table class="table table-hover">
@@ -38,7 +50,7 @@ Users
         {% for user in g.users_by_role['pending'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}</td>
+          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
@@ -73,7 +85,7 @@ Users
         {% for user in g.users_by_role['contributor'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}</td>
+          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
@@ -107,7 +119,7 @@ Users
         {% for user in g.users_by_role['admin'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}</td>
+          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
@@ -141,7 +153,7 @@ Users
         {% for user in g.all_users %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}</td>
+          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
@@ -190,7 +202,7 @@ Users
         {% for user in g.users_by_role['visitor'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}</td>
+          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
