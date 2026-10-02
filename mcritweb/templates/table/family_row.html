@@ -105,13 +105,13 @@
     {% endif %}
   {% endfor %}
     <td align="center" valign="middle" class="buttons">
-      <a class="btn btn-outline-dark btn-sm" name="compare" href="{{ url_for('analyze.compare', query=family.family_name, rematch='true') }}" role="button" target="_self"><i class="fa-solid fa-flask"></i></a>
-      <a class="btn btn-outline-dark btn-sm" name="family_blocks" href="{{ url_for('analyze.blocks_family', family_id=family.family_id) }}" role="button" target="_self"><i class="fa-solid fa-cubes-stacked"></i></a>
+      <a class="btn btn-outline-dark btn-sm" name="compare" href="{{ url_for('analyze.compare', query=family.family_name, rematch='true') }}" role="button" target="_self" title="Compare 1vsN" aria-label="Compare family {{ family.family_name }}"><i class="fa-solid fa-flask"></i></a>
+      <a class="btn btn-outline-dark btn-sm" name="family_blocks" href="{{ url_for('analyze.blocks_family', family_id=family.family_id) }}" role="button" target="_self" title="Unique Blocks" aria-label="Unique blocks for family {{ family.family_name }}"><i class="fa-solid fa-cubes-stacked"></i></a>
       {% if show_export %}
-        <a class="btn btn-outline-dark btn-sm" href="{{ url_for('data.specific_export', type='family', item_id=family.family_id) }}" role="button" target="_self"><i class="fa-solid fa-file-export"></i></a>
+        <a class="btn btn-outline-dark btn-sm" href="{{ url_for('data.specific_export', type='family', item_id=family.family_id) }}" role="button" target="_self" title="Export Family" aria-label="Export family {{ family.family_name }}"><i class="fa-solid fa-file-export"></i></a>
       {% endif %}
       {% if show_edit %}
-      <a class="btn btn-outline-dark btn-sm" id="sample_{{ family.family_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editFamilyModal" data-bs-islibrary="{{ family.is_library }}"  data-bs-familyid="{{ family.family_id }}" data-bs-familyname="{{ family.family_name }}"><i class="fa-solid fa-pen-to-square"></i></a>
+      <a class="btn btn-outline-dark btn-sm" id="family_{{ family.family_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editFamilyModal" data-bs-islibrary="{{ family.is_library }}" data-bs-familyid="{{ family.family_id }}" data-bs-familyname="{{ family.family_name }}" title="Edit Family" aria-label="Edit family {{ family.family_name }}"><i class="fa-solid fa-pen-to-square"></i></a>
     {% endif %}
     </td>
   </tr>

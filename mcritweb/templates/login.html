@@ -4,16 +4,24 @@ Login
 {% endblock %}
 {% block style %}  <link href="{{ url_for('static', filename='signin.css') }}" rel="stylesheet">{% endblock %}
 {% block content %}
-<center>
+<div class="d-flex justify-content-center">
     <form class="form-signin" method='POST'>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <h1 class="h3 mb-3 mono-font">Please sign in</h1>
-        <input type = 'text' name='username' id="username" class="form-control" placeholder="Enter username" margin-bottom= "-1px"; required autofocus>
-        <input type="password" name = 'inputPassword'id="inputPassword" class="form-control" placeholder="Password" required>
-        <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
+        <h1 class="h3 mb-3 text-center mono-font">Please sign in</h1>
+        <div class="mb-2">
+            <label for="username" class="visually-hidden">Username</label>
+            <input type='text' name='username' id="username" class="form-control" placeholder="Enter username" required autofocus>
+        </div>
+        <div class="mb-3">
+            <label for="inputPassword" class="visually-hidden">Password</label>
+            <input type="password" name='inputPassword' id="inputPassword" class="form-control" placeholder="Password" required>
+        </div>
+        <button class="btn btn-lg btn-primary w-100 mb-2" type="submit">Sign in</button>
         {% if g.operation_mode == 'multi' %}
-        <a class="mono-font"href="{{ url_for('authentication.register') }}">Click here to register</a>
+        <div class="text-center">
+            <a class="mono-font" href="{{ url_for('authentication.register') }}">Click here to register</a>
+        </div>
         {% endif %}
       </form>
-</center>
+</div>
 {% endblock %}

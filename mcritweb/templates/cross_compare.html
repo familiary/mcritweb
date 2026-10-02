@@ -121,9 +121,9 @@ function handleSliderChange(val) {
 <h1>Cross Compare</h1>
 <div>
   <table class="table table-hover">
-    <thead class="thead-light">
+    <thead class="table-light">
       <tr>
-        <th scope="col"><i class="fa-solid fa-virus" title="Sample ID"></th>
+        <th scope="col"><i class="fa-solid fa-virus" title="Sample ID"></i></th>
         <th scope="col">SHA256</th>
         <th scope="col">Family</th>
         <th scope="col">Version</th>
@@ -152,9 +152,9 @@ function handleSliderChange(val) {
     {% endif %}
   </table>
   {% if not selected_ids %}
-  <center>
+  <div class="text-center">
   <h4>Selected samples will show here</h4>
-  </center>
+  </div>
   {% else %}
   {{ pagination_widget(pagination_selected, _js_argument_provider="fetchState") }}
   {% endif %}
@@ -167,7 +167,7 @@ function handleSliderChange(val) {
   {% if samples %}
   {{ set_pagination_params(pagination, _anchor="Search", _js_argument_provider="fetchState") }}
   <table class="table table-hover">
-      <thead class="thead-light">
+      <thead class="table-light">
         {{ sample_header(show_analyze=False, sort_pagination=pagination) }}
       </thead>
       <tbody>
@@ -186,18 +186,18 @@ function handleSliderChange(val) {
       </tbody>
     </table>
     {{ pagination_widget(pagination) }}
-    <center>
+    <div class="text-center">
     <div class="form-group">
       <div class="col-sm-6 d-inline-flex justify-content-center">
         <div class="col-sm-4 d-inline-flex justify-content-center">
           <input class="form-check-input shadow-none" type="checkbox" name="input_rematch" value="true" id="force_rematch" {% if rematch %}checked{% else %}{% endif %}>
-          <label class="form-check-label" for="flexCheckChecked">
+          <label class="form-check-label" for="force_rematch">
             &nbsp;Force rematch    
           </label>
         </div>
           <div class="col-sm-4 d-inline-flex justify-content-center">
           <input class="form-check-input shadow-none" type="checkbox" name="input_only_selected" value="true" id="only_selected" {% if only_selected %}checked{% else %}{% endif %}>
-          <label class="form-check-label" for="flexCheckChecked">
+          <label class="form-check-label" for="only_selected">
             &nbsp;Compare only selected samples
           </label>
         </div>
@@ -205,7 +205,7 @@ function handleSliderChange(val) {
       <div class="col-sm-8 d-inline-flex justify-content-center">
         <div class="col-sm-2">
           <label class="form-check-label" for="minhashBandRange">
-            Minhash Matching:
+            MinHash Matching:
           </label>
         </div>
         <div class="col-sm-2" id="minhashBandRange-currentSelection">&nbsp;{{ minhash_slider_mapping[request.args.get('minhashBandRange', '2')|int] }}</div>
@@ -215,14 +215,14 @@ function handleSliderChange(val) {
       </div>
 </div>
       <br>
-      <button type="button"  onclick="goInitCrossFromHashlist()" id="button2" class="btn btn-outline-primary">Initialize from hash list</button>
-      <button type="button"  onclick="setSelected()" id="button2" class="btn btn-outline-primary">Add</button>
+      <button type="button" onclick="goInitCrossFromHashlist()" id="btn-hashlist" class="btn btn-outline-primary">Initialize from hash list</button>
+      <button type="button" onclick="setSelected()" id="btn-add-samples" class="btn btn-outline-primary">Add</button>
       {% if selected_ids %}
-      <button type="button"  onclick="createJob()" id="button2" class="btn btn-primary">Compare</button>
+      <button type="button" onclick="createJob()" id="btn-compare" class="btn btn-primary">Compare</button>
       {% endif %}
-  </center>
+  </div>
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  <div class="text-center my-3"><a href='{{ url_for("data.submit") }}' class="text-primary text-decoration-underline">No samples available. Click here to upload your first sample</a></div>
 {% endif %}
 </div>
 {% endblock %}

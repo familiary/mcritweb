@@ -17,8 +17,8 @@ Settings
 {% endblock %}
 
 {% block content %}
-<center>
-<ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+<div class="settings-container">
+<ul class="nav nav-pills justify-content-center mb-3" id="pills-tab" role="tablist">
   <li class="nav-item" role="presentation">
     <button class="nav-link active" id="pills-info-tab" data-bs-toggle="pill" data-bs-target="#pills-info" type="button" role="tab" aria-controls="pills-info" aria-selected="true">User Information</button>
   </li>
@@ -80,28 +80,28 @@ Settings
   <div class="tab-pane fade" id="pills-username" role="tabpanel" aria-labelledby="pills-username-tab">
       <form action = "{{ url_for('admin.change_username') }}" method='post'>
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <div class="form-group">
-            <input name='username' class="form-control" id="username" aria-describedby="usernameHelp" placeholder="Enter new username" autofocus required >
+          <div class="form-group mb-2">
+            <input name='username' class="form-control" id="username" aria-label="Enter new username" placeholder="Enter new username" autofocus required >
           </div>
-          <div class="form-group">
-            <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" placeholder="Enter password" required>
+          <div class="form-group mb-2">
+            <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" aria-label="Enter password" placeholder="Enter password" required>
           </div>
-          <button type="submit" class="btn btn-primary">Confirm change</button>
+          <button type="submit" class="btn btn-primary">Confirm Change</button>
       </form>
   </div>
   <div class="tab-pane fade" id="pills-password" role="tabpanel" aria-labelledby="pills-password-tab">
       <form action = "{{ url_for('admin.change_password') }}" method='post'>
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <div class="form-group">
-            <input type="password" name='inputPassword2' class="form-control" id="inputPassword2" placeholder="Enter old password" required>
+          <div class="form-group mb-2">
+            <input type="password" name='inputPassword2' class="form-control" id="inputPassword2" aria-label="Enter old password" placeholder="Enter old password" required>
           </div>
-          <div class="form-group">
-              <input type="password" class="form-control" name="inputPassword3" id="inputPassword3" placeholder="Enter new password" >
+          <div class="form-group mb-2">
+              <input type="password" class="form-control" name="inputPassword3" id="inputPassword3" aria-label="Enter new password" placeholder="Enter new password" >
             </div>
-          <div class="form-group">
-              <input type="password" class="form-control" name="inputPassword4" id="inputPassword4" placeholder="Confirm new password" >
+          <div class="form-group mb-2">
+              <input type="password" class="form-control" name="inputPassword4" id="inputPassword4" aria-label="Confirm new password" placeholder="Confirm new password" >
             </div>
-          <button type="submit" class="btn btn-primary">Confirm change</button>
+          <button type="submit" class="btn btn-primary">Confirm Change</button>
       </form>
   </div>
   {% endif %}
@@ -116,23 +116,23 @@ Settings
           <label class="col-8">Filter results to (nonlib) frequency score</label>
           <input class="col-2" type="text" name='filter_frequency_min_score' id="filter_frequency_min_score" placeholder="regular" {% if user_filters.filter_frequency_min_score is not none %}value={{user_filters.filter_frequency_min_score}}{% endif %}>
           <input class="col-2" type="text" name='filter_frequency_nonlib_min_score' id="filter_frequency_nonlib_min_score" placeholder="nonlib" {% if user_filters.filter_frequency_nonlib_min_score is not none %}value={{user_filters.filter_frequency_nonlib_min_score}}{% endif %}>
-          <label class="col-8" for="block_count">only show families/samples with unique matches</label>
-          <input class="col-4" type="checkbox" name='filter_unique_only' id="filter_unique_only" aria-describedby="filter_unique_only" {% if user_filters.filter_unique_only %}checked{% endif %}>
-          <label class="col-8" for="block_count">exclude own family</label>
-          <input class="col-4" type="checkbox" name='filter_exclude_own_family' id="filter_exclude_own_family" aria-describedby="filter_exclude_own_family" {% if user_filters.filter_exclude_own_family %}checked{% endif %}>
+          <label class="col-8" for="filter_unique_only">only show families/samples with unique matches</label>
+          <input class="col-4" type="checkbox" name='filter_unique_only' id="filter_unique_only" {% if user_filters.filter_unique_only %}checked{% endif %}>
+          <label class="col-8" for="filter_exclude_own_family">exclude own family</label>
+          <input class="col-4" type="checkbox" name='filter_exclude_own_family' id="filter_exclude_own_family" {% if user_filters.filter_exclude_own_family %}checked{% endif %}>
           <h3>Function result filter</h3> 
           <label class="col-8">Filter results to min score</label>
-          <input class="col-4" type="text" name='filter_function_min_score' id="filter_function_min_score" aria-describedby="filter_function_min_score" placeholder="min score (0-100)" {% if user_filters.filter_function_min_score is not none %}value={{user_filters.filter_function_min_score}}{% endif %}>
+          <input class="col-4" type="text" name='filter_function_min_score' id="filter_function_min_score" placeholder="min score (0-100)" {% if user_filters.filter_function_min_score is not none %}value={{user_filters.filter_function_min_score}}{% endif %}>
           <label class="col-8">Filter results to max score</label>
-          <input class="col-4" type="text" name='filter_function_max_score' id="filter_function_max_score" aria-describedby="filter_function_max_score" placeholder="max score (0-100)" {% if user_filters.filter_function_max_score is not none %}value={{user_filters.filter_function_max_score}}{% endif %}>
+          <input class="col-4" type="text" name='filter_function_max_score' id="filter_function_max_score" placeholder="max score (0-100)" {% if user_filters.filter_function_max_score is not none %}value={{user_filters.filter_function_max_score}}{% endif %}>
           <label class="col-8">Filter results to max num families/samples</label>
-          <input class="col-4" type="text" name='filter_max_num_families' id="filter_max_num_families" aria-describedby="filter_max_num_families" placeholder="max. families" {% if user_filters.filter_max_num_families is not none %}value={{user_filters.filter_max_num_families}}{% endif %}>
-          <label class="col-8" for="block_count">exclude functions with library hits</label>
-          <input class="col-4" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" aria-describedby="filter_exclude_library" {% if user_filters.filter_exclude_library %}checked{% endif %}>
-          <label class="col-8" for="block_count">exclude PIC hits</label>
-          <input class="col-4" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" aria-describedby="filter_exclude_pic" {% if user_filters.filter_exclude_pic %}checked{% endif %}>
+          <input class="col-4" type="text" name='filter_max_num_families' id="filter_max_num_families" placeholder="max. families" {% if user_filters.filter_max_num_families is not none %}value={{user_filters.filter_max_num_families}}{% endif %}>
+          <label class="col-8" for="filter_exclude_library">exclude functions with library hits</label>
+          <input class="col-4" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" {% if user_filters.filter_exclude_library %}checked{% endif %}>
+          <label class="col-8" for="filter_exclude_pic">exclude PIC hits</label>
+          <input class="col-4" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" {% if user_filters.filter_exclude_pic %}checked{% endif %}>
         </div>
-        <button type="submit" class="btn btn-primary">Confirm change</button>
+        <button type="submit" class="btn btn-primary">Confirm Change</button>
     </form>
   </div>
   <div class="tab-pane fade" id="pills-column-settings" role="tabpanel" aria-labelledby="pills-column-settings-tab">
@@ -274,7 +274,7 @@ Settings
     </div>
   </div>
 </div>
-</center>
+</div>
 
 
     <script type="text/javascript">
@@ -364,6 +364,12 @@ Settings
             form.action = "{{ url_for('admin.change_column_settings') }}";
             form.style.display = 'none';
 
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrf_token';
+            csrfInput.value = csrfToken();
+            form.appendChild(csrfInput);
+
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = 'column_settings';
@@ -376,14 +382,7 @@ Settings
 
         function resetColumnSettings() {
             if (confirm('Are you sure you want to reset all column settings to default? This will undo all your customizations.')) {
-                // Create a hidden form for the reset action
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = "{{ url_for('admin.reset_column_settings') }}";
-                form.style.display = 'none';
-
-                document.body.appendChild(form);
-                form.submit();
+                postTo("{{ url_for('admin.reset_column_settings') }}");
             }
         }
     </script>

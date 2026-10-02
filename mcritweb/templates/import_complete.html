@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block title%}
-Statistics
+Import completed
 {% endblock %}
 {% block content %}
   <h1>Import completed</h1>
@@ -8,10 +8,14 @@ Statistics
     {% if results %}
     {% for key in results %}
     <tr>
-      <th valign="middle">{{ key }}</td>
-      <td valign="middle">{{ results[key] }}</td>
+      <th class="align-middle">{{ key }}</th>
+      <td class="align-middle">{{ results[key] }}</td>
     </tr>
     {% endfor %}
     {% endif %}
   </table>
+  <div class="mt-4">
+    <a href="{{ url_for('explore.samples') }}" class="btn btn-primary">View Samples</a>
+    <a href="{{ url_for('data.jobs') }}" class="btn btn-outline-secondary">View Jobs</a>
+  </div>
 {% endblock %}

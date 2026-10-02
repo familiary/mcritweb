@@ -103,7 +103,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
       Characteristic blocks are basic blocks only found in this collection of samples (versus rest of the whole data set), unique blocks are only found in the specific sample.
     </p>
     <table class="table table-hover">
-        <thead class="thead-light">
+        <thead class="table-light">
           <tr>
             <th style="text-align: right;" scope="col">Sample ID</th>
             <th style="text-align: right;" scope="col">Total Blocks</th>
@@ -127,20 +127,20 @@ Unique Blocks for {{ sample_ids|length }} Samples
     <h3 id="unique-blocks">Explore Unique Blocks</h3>
     <form class="form-inline" action ="{{ url_for('data.result', job_id=job_info.job_id) }}" method='GET'>
         <div class="form-group row">
-          <label class="col-3" for="block_count">Filter blocks to</label>
+          <label class="col-3" for="min_score">Filter blocks to</label>
           {# prefilled, so that the filter is not silently reset by using it twice - the
              rule form below carries these across for the same reason #}
-          <input class="col-3" type="text" name='min_score' id="min_score" aria-describedby="min_score" placeholder="min score (0-100)" value="{{ request.args.get('min_score', '') }}">
-          <input class="col-3" type="text" name='min_block_length' id="min_block_length" aria-describedby="min_block_length" placeholder="min block length" value="{{ request.args.get('min_block_length', '') }}">
-          <input class="col-3" type="text" name='max_block_length' id="max_block_length" aria-describedby="max_block_length" placeholder="max block length" value="{{ request.args.get('max_block_length', '') }}">
+          <input class="col-3" type="text" name='min_score' id="min_score" placeholder="min score (0-100)" value="{{ request.args.get('min_score', '') }}">
+          <input class="col-3" type="text" name='min_block_length' id="min_block_length" placeholder="min block length" value="{{ request.args.get('min_block_length', '') }}">
+          <input class="col-3" type="text" name='max_block_length' id="max_block_length" placeholder="max block length" value="{{ request.args.get('max_block_length', '') }}">
           <input type="hidden" name="tab" value="blocks">{{ carry_yara_rule_params() }}
-          <button type="submit" class="btn btn-primary">filter</button>
+          <button type="submit" class="btn btn-primary">Filter</button>
         </div>
     </form>
     
     <p>total: {{ blkp.max_value }}, showing: {{ 1 + blkp.start_index }} - {{ blkp.end_index }}</p>
     <table class="table table-hover">
-        <thead class="thead-light">
+        <thead class="table-light">
           <tr>
             <th style="text-align: right;" scope="col">Score</th>
             <th scope="col">PicBlockHash</th>
@@ -177,14 +177,14 @@ Unique Blocks for {{ sample_ids|length }} Samples
     </p>
     <form class="form-inline" action="{{ url_for('data.result', job_id=job_info.job_id) }}" method='GET'>
         <div class="form-group row">
-          <input class="col-2" type="text" name='min_ins' id="min_ins" aria-describedby="min_ins" placeholder="min instructions" value="{{ yara_params['min_ins'] if yara_params['min_ins'] is not none }}">
-          <input class="col-2" type="text" name='max_ins' id="max_ins" aria-describedby="max_ins" placeholder="max instructions" value="{{ yara_params['max_ins'] if yara_params['max_ins'] is not none }}">
-          <input class="col-2" type="text" name='min_bytes' id="min_bytes" aria-describedby="min_bytes" placeholder="min bytes" value="{{ yara_params['min_bytes'] if yara_params['min_bytes'] is not none }}">
-          <input class="col-2" type="text" name='max_bytes' id="max_bytes" aria-describedby="max_bytes" placeholder="max bytes" value="{{ yara_params['max_bytes'] if yara_params['max_bytes'] is not none }}">
-          <input class="col-2" type="text" name='required_per_sample' id="required_per_sample" aria-describedby="required_per_sample" placeholder="blocks per sample" value="{{ yara_params['required_per_sample'] }}">
-          <input class="col-2" type="text" name='condition_required' id="condition_required" aria-describedby="condition_required" placeholder="strings required" value="{{ yara_params['condition_required'] }}">
+          <input class="col-2" type="text" name='min_ins' id="min_ins" placeholder="min instructions" value="{{ yara_params['min_ins'] if yara_params['min_ins'] is not none }}">
+          <input class="col-2" type="text" name='max_ins' id="max_ins" placeholder="max instructions" value="{{ yara_params['max_ins'] if yara_params['max_ins'] is not none }}">
+          <input class="col-2" type="text" name='min_bytes' id="min_bytes" placeholder="min bytes" value="{{ yara_params['min_bytes'] if yara_params['min_bytes'] is not none }}">
+          <input class="col-2" type="text" name='max_bytes' id="max_bytes" placeholder="max bytes" value="{{ yara_params['max_bytes'] if yara_params['max_bytes'] is not none }}">
+          <input class="col-2" type="text" name='required_per_sample' id="required_per_sample" placeholder="blocks per sample" value="{{ yara_params['required_per_sample'] }}">
+          <input class="col-2" type="text" name='condition_required' id="condition_required" placeholder="strings required" value="{{ yara_params['condition_required'] }}">
           <input type="hidden" name="tab" value="yara">{{ carry_block_filter_params() }}
-          <button type="submit" class="btn btn-primary">regenerate rule</button>
+          <button type="submit" class="btn btn-primary">Regenerate Rule</button>
         </div>
     </form>
     {# keyed on the rule rather than on the cover's has_rule flag, so the warning appears
@@ -194,8 +194,9 @@ Unique Blocks for {{ sample_ids|length }} Samples
     {% if yara_rule is none %}
     <p class="alert alert-warning">These parameters selected no blocks at all, so there is no rule to show. Widen the bounds and regenerate.</p>
     {% else %}
-    <p>Copy rule to clipboard!&nbsp;<i class="fa-regular fa-copy" onclick="copyElementToClipboard('#yara_text')"></i>
-    </p>
+    <div class="mb-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyElementToClipboard('#yara_text')"><i class="fa-regular fa-copy"></i> Copy YARA rule to clipboard</button>
+    </div>
     <textarea style="font-family:monospace; min-width: 100%" id="yara_text" name="yara_text" 
         rows="50">{{yara_rule}}</textarea>
     {% endif %}

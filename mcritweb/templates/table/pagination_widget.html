@@ -152,18 +152,18 @@
   {% if not pagination is none %}
     {% if pagination.sort_by is none %}
       {# we do not know the search order #}
-      <i class="fa fa-sort"></i>
+      <i class="fa-solid fa-sort"></i>
     {% else %}
       {% if pagination.sort_by == sort_by %}
         {# we are considering the column that is sorted by #}
         {% if pagination.is_ascending %}
-          <i class="fa fa-sort-up"></i>
+          <i class="fa-solid fa-sort-up"></i>
         {% else %}
-          <i class="fa fa-sort-down"></i>
+          <i class="fa-solid fa-sort-down"></i>
         {% endif %}
       {% else %}
         {# a column not used for sort right now #}
-        <i class="fa fa-sort"></i>
+        <i class="fa-solid fa-sort"></i>
       {% endif %}
     {% endif %}
   {% endif %}
@@ -202,7 +202,7 @@
 
   {% set params = {} %}
   {{ params.update(pagination|getattr("_extra_pagination_params", {}))|silent }}
-  <th style="text-align:{{align}};" scope="col" {% if pagination is not none %}class="pointer"{% endif %} onclick="{{ _get_onclick(**params).strip() }}">
+  <th style="text-align:{{align}};" scope="col" {% if pagination is not none %}class="pointer" role="button" tabindex="0"{% endif %} onclick="{{ _get_onclick(**params).strip() }}">
     <span>
       {{ caller() }}
     </span>

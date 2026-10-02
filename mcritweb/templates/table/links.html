@@ -39,13 +39,13 @@
   {# the value travels in a data attribute rather than as a quoted JS literal: the HTML
      parser decodes &#39; back to ' before the handler is compiled as script, so a value
      containing a quote used to break out of it - see issues #40 and #85 #}
-  <button class="btn btn-light btn-sm" style="max-height: 20px; max-width: 20px; padding: 0px;" title="Copy to Clipboard" data-toggle="tooltip" data-clipboard-value="{{ clipboard_value }}" onclick="copy_to_clipboard(this)"><i class="fa-regular fa-copy"></i></button>
+  <button class="btn btn-light btn-sm" style="max-height: 20px; max-width: 20px; padding: 0px;" title="Copy to Clipboard" data-bs-toggle="tooltip" data-toggle="tooltip" data-clipboard-value="{{ clipboard_value }}" onclick="copy_to_clipboard(this)"><i class="fa-regular fa-copy"></i></button>
 {%- endmacro -%}
 
 {%- macro clipboard_js() -%}
 <script>
 $(function () {
-  $('[data-toggle="tooltip"]').tooltip()
+  $('[data-bs-toggle="tooltip"], [data-toggle="tooltip"]').tooltip()
 })
 function copy_to_clipboard(btn){
   navigator.clipboard.writeText(btn.getAttribute('data-clipboard-value') || "");

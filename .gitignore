@@ -62,6 +62,7 @@ ENV/
 
 # local operator agreement for agent sessions - AGENTS.md is the committed, public one
 CLAUDE.md
+.claude/
 
 # project files
 config.ini

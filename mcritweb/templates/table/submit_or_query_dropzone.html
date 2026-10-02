@@ -3,7 +3,7 @@
 
 {% macro submit_or_query_dropzone_js(select_form_type=False) %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
-{{ dropzone.style('border: 2px dashed black; margin: 30%; min-height: 200px;border-radius: 25px; background: rgb(240, 240, 240);') }}
+{{ dropzone.style('border: 2px dashed black; margin: 20px auto; max-width: 600px; min-height: 200px; border-radius: 25px; background: rgb(240, 240, 240);') }}
 <script>
   function show_extended(x) {
     if (x.checked) {      
@@ -155,7 +155,7 @@ function handleSliderChange_dropzone(val) {
 
 {% macro submit_or_query_dropzone(select_form_type=False, show_submit_fields=False) %}
 {% set show_query_fields = not show_submit_fields %}
-<center>
+<div class="d-flex flex-column align-items-center">
 
 {% if select_form_type %}
   {% set target_link = url_for('data.submit_or_query') %}
@@ -181,18 +181,18 @@ function handleSliderChange_dropzone(val) {
     </div>
   {% endif %}
     <div class="form-group submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
-      <input type='text' name='family' class="form-control" id="family" aria-describedby="familyHelp" placeholder="Enter family" autofocus autocomplete="off">
-      <input name='version' class="form-control" id="version" aria-describedby="versionHelp" placeholder="Enter version">
+      <input type='text' name='family' class="form-control" id="family" aria-label="Family" placeholder="Enter family" autofocus autocomplete="off">
+      <input name='version' class="form-control" id="version" aria-label="Version" placeholder="Enter version">
     </div>
     <div class="form-group" style="display:none" id='extendedFields'>
-        <input name='base_addr' class="form-control" id="base_addr" aria-describedby="baseAddressHelp" placeholder="Enter base address">
+        <input name='base_addr' class="form-control" id="base_addr" aria-label="Base address" placeholder="Enter base address">
         <div class="form-check form-check-inline submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
           <input class="form-check-input" type="radio" name="bitness" id="bitness32" value="32">
-          <label class="form-check-label" for="inlineRadio1">32bit</label>
+          <label class="form-check-label" for="bitness32">32bit</label>
         </div>
         <div class="form-check form-check-inline submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
           <input class="form-check-input" type="radio" name="bitness" id="bitness64" value="64">
-          <label class="form-check-label" for="inlineRadio2">64bit</label>
+          <label class="form-check-label" for="bitness64">64bit</label>
         </div>
       </div>
 
@@ -222,9 +222,9 @@ function handleSliderChange_dropzone(val) {
       </div>
     </div>
     </div>
-    <button type="submit" class="btn btn-primary" id="submit-dropzone" disabled>Submit <span id="submit-spinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display:none"></span></button>
+    <button type="submit" class="btn btn-primary" id="submit-dropzone" disabled>{% if not select_form_type and not show_submit_fields %}Query{% else %}Submit{% endif %} <span id="submit-spinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display:none"></span></button>
 </form>
-</center>
+</div>
 {% include 'js/ac_family_names.html' %}
 {% endmacro %}
 

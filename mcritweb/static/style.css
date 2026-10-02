@@ -1,175 +1,65 @@
 html {
     font-family: 'Roboto', sans-serif;
     background: white;
-    padding: 1rem;
-  }
+}
   
-  body {
-    min-width: 900px;
+body {
     max-width: 1824px;
     font-size: 0.9em;
     margin: 0 auto;
     background: white;
-  }
+}
   
-  h1, h2, h3, h4, h5, h6 {
+h1, h2, h3, h4, h5, h6 {
     color: #377ba8;
     margin: 1rem 0;
-  }
+}
   
-  a {
+a {
     color: #377ba8;
-  }
+}
   
-  hr {
+hr {
     border: none;
     border-top: 1px solid #377ba8;
-  }
-  
+}
 
-
-  nav {
-    background: rgb(240, 240, 240);
-    display: flex;
-    align-items: center;
-    padding: 0 0.5rem;
-  }
-  
-  nav h1 {
-    flex: auto;
-    margin: 0;
-  }
-  
-  nav h1 a {
-    text-decoration: none;
-    padding: 0.25rem 0.5rem;
-  }
-  
-  nav ul  {
-    display: flex;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  
-  nav ul li a, nav ul li span, header .action {
-    display: block;
-    padding: 0.5rem;
-  }
-  
-  .content {
+.content {
     padding: 0 1rem 1rem;
-  }
-  
-  .content > header {
-    border-bottom: 1px solid lightgray;
-    display: flex;
-    align-items: flex-end;
-  }
-  
-  .content > header h1 {
-    flex: auto;
-    margin: 1rem 0 0.25rem 0;
-  }
-  
-  .flash {
-    margin: 1em 0;
-    padding: 1em;
-    background: #cae6f6;
-    border: 1px solid #377ba8;
-  }
-  
-  .post > header {
-    display: flex;
-    align-items: flex-end;
-    font-size: 0.85em;
-  }
-  
-  .post > header > div:first-of-type {
-    flex: auto;
-  }
-  
-  .post > header h1 {
-    font-size: 1.5em;
+}
+
+.content:last-child {
     margin-bottom: 0;
-  }
-  
-  .post .about {
-    color: slategray;
-    font-style: italic;
-  }
-  
-  .post .body {
-    white-space: pre-line;
-  }
-  
-  .content:last-child {
-    margin-bottom: 0;
-  }
-  
-  .content form {
-    margin: 1em 0;
-    display: flex;
-    flex-direction: column;
-    width: 50%;
-  }
-  
-  .content label {
-    font-weight: bold;
-    margin-bottom: 0.5em;
-  }
-  
-  .content input, .content textarea {
-    margin-bottom: 1em;
-  }
-  
-  .content textarea {
-    min-height: 12em;
-    resize: vertical;
-  }
-  
-  input.danger {
-    color: #cc2f2e;
-  }
-  
-  input[type=submit] {
-    align-self: start;
-    min-width: 10em;
-  }
-  .nav-pills .nav-link.active { background-color: rgb(240, 240, 240); color:black}
-  .nav-pills .nav-link{color:black}
-  .thead-light { background-color: rgb(240, 240, 240); color:black}
- a > * {
-    pointer-events: none;
-  }
+}
 
-  .accordion-button:link, .accordion-button:visited, .accordion-button:hover, .accordion-button:active  {
-    background-color: rgb(240, 240, 240)!important;
-      color:black !important;
-      text-decoration: none !important;
-         border-color: rgb(240, 240, 240) !important;
-      box-shadow: 0px !important;   
-  }
-
-  .accordion-button:focus {
-    z-index: 3;
-    border-color: rgb(240, 240, 240)!important;
-    outline: 0;
-    box-shadow: 0 0 0 .25rem #FFF !important;
-  }
-  .accordion-button:not(.collapsed) {
-    color:black  !important;
-    background-color: rgb(240, 240, 240)!important;
-    border-color: rgb(240, 240, 240)!important;
-  }
-
-  .page-link {
+.thead-light, .table-light {
+    background-color: rgb(240, 240, 240);
     color: black;
-  }
-  .page-item.active .page-link{ 
-    color:black;
-    background-color:rgb(240, 240, 240);
-    border-color:rgb(240, 240, 240)}
+}
+
+.mcrit-dropzone {
+    border: 2px dashed #6c757d;
+    border-radius: 0.5rem;
+    background-color: #f8f9fa;
+    min-height: 180px;
+    margin: 1.5rem auto;
+}
+
+.btn-clipboard {
+    max-height: 24px;
+    max-width: 24px;
+    padding: 0;
+    line-height: 1;
+}
+
+.page-link {
+    color: black;
+}
+.page-item.active .page-link { 
+    color: black;
+    background-color: rgb(240, 240, 240);
+    border-color: rgb(240, 240, 240);
+}
 
   .fa-sort {
     color: rgba(0, 0, 0, 0.3);
