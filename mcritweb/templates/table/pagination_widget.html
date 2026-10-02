@@ -202,7 +202,7 @@
 
   {% set params = {} %}
   {{ params.update(pagination|getattr("_extra_pagination_params", {}))|silent }}
-  <th style="text-align:{{align}};" scope="col" {% if pagination is not none %}class="pointer" role="button" tabindex="0"{% endif %} onclick="{{ _get_onclick(**params).strip() }}">
+  <th style="text-align:{{align}};" scope="col" {% if pagination is not none %}class="pointer" role="button" tabindex="0" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }"{% endif %} onclick="{{ _get_onclick(**params).strip() }}">
     <span>
       {{ caller() }}
     </span>

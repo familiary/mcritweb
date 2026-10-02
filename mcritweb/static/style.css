@@ -37,14 +37,6 @@ hr {
     color: black;
 }
 
-.mcrit-dropzone {
-    border: 2px dashed #6c757d;
-    border-radius: 0.5rem;
-    background-color: #f8f9fa;
-    min-height: 180px;
-    margin: 1.5rem auto;
-}
-
 .btn-clipboard {
     max-height: 24px;
     max-width: 24px;
