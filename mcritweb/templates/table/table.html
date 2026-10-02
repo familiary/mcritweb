@@ -5,7 +5,7 @@
 
 {% macro _table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table") %}
   <table class="table table-hover" id="{{table_id}}">
-    <thead class="thead-light">
+    <thead class="table-light">
       {{ header_macro(**kwargs) }}
     </thead>
     <tbody>
@@ -19,7 +19,7 @@
 {% macro _half_table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table") %}
 
   <table class="table table-hover" style="width: 66%;" id="{{table_id}}">
-    <thead class="thead-light">
+    <thead class="table-light">
       {{ header_macro(**kwargs) }}
     </thead>
     <tbody>
@@ -34,7 +34,7 @@
   {% if jobs %}
   {{ _table_base(jobs, job_header, job_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("analyze.compare") }}' style="color: #0d6efd; text-decoration: underline;" >No jobs available. Click here to create your first job</a></center>
+  <div class="text-center my-3"><a href='{{ url_for("analyze.compare") }}' class="text-primary text-decoration-underline">No jobs available. Click here to create your first job</a></div>
   {% endif %}
 {% endmacro %}
 
@@ -42,7 +42,7 @@
   {% if jobs %}
   {{ _half_table_base(jobs, minijob_header, minijob_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("analyze.compare") }}' style="color: #0d6efd; text-decoration: underline;" >No jobs available. Click here to create your first job</a></center>
+  <div class="text-center my-3"><a href='{{ url_for("analyze.compare") }}' class="text-primary text-decoration-underline">No jobs available. Click here to create your first job</a></div>
   {% endif %}
 {% endmacro %}
 
@@ -55,9 +55,10 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="editFamilyModalLabel">Modify Family</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-          <form action='{{ url_for("explore.modifyFamily") }}'' method="POST" style="width: 80%">
+          <form action="{{ url_for('explore.modifyFamily') }}" method="POST" style="width: 80%">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" class="form-control" name="family_id" id="family_id" hidden value="">
           <div class="form-group mb-3">
@@ -104,7 +105,7 @@
   </script>
   {{ _table_base(families, family_header, family_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No families available. Click here to upload your first sample</a></center>
+  <div class="text-center my-3"><a href='{{ url_for("data.submit") }}' class="text-primary text-decoration-underline">No families available. Click here to upload your first sample</a></div>
   {% endif %}
 {% endmacro %}
 
@@ -112,7 +113,7 @@
   {% if functions %}
   {{ _table_base(functions, function_header, function_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No functions available. Click here to upload your first sample</a></center>
+  <div class="text-center my-3"><a href='{{ url_for("data.submit") }}' class="text-primary text-decoration-underline">No functions available. Click here to upload your first sample</a></div>
   {% endif %}
 {% endmacro %}
 
@@ -124,9 +125,10 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="editSampleModalLabel">Modify Sample</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-          <form action='{{ url_for("explore.modifySample") }}'' method="POST" style="width: 80%">
+          <form action="{{ url_for('explore.modifySample') }}" method="POST" style="width: 80%">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" class="form-control" name="sample_id" id="sample_id" hidden value="">
           <div class="form-group mb-3">
@@ -169,7 +171,7 @@
   </script>
   {{ _table_base(samples, sample_header, sample_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  <div class="text-center my-3"><a href='{{ url_for("data.submit") }}' class="text-primary text-decoration-underline">No samples available. Click here to upload your first sample</a></div>
   {% endif %}
 {% endmacro %}
 
@@ -177,6 +179,6 @@
   {% if samples %}
   {{ _half_table_base(samples, minisample_header, minisample_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  <div class="text-center my-3"><a href='{{ url_for("data.submit") }}' class="text-primary text-decoration-underline">No samples available. Click here to upload your first sample</a></div>
   {% endif %}
 {% endmacro %}

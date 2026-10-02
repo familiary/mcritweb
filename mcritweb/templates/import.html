@@ -8,13 +8,13 @@ Import
 {% endblock %}
 {% set suppress_dropzone_overlay=true %}
 {% block content %}
-<center>
+<div class="d-flex flex-column align-items-center">
     {{ dropzone.create(action= url_for('data.import_view')) }}
     <div id="import-status" class="alert alert-info" role="status" aria-live="polite" style="display:none; width:60%;">
       <span id="import-status-spinner" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
       <span id="import-status-text"></span>
     </div>
-</center>
+</div>
 <script src="{{ url_for('static', filename='dropzone.js') }}"></script>
 {% set import_status_js %}
     // An import is one blocking request: MCRIT's /import is not queued and returns no

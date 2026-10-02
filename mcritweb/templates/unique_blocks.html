@@ -94,9 +94,9 @@ Unique Blocks
 </p>
 <div>
   <table class="table table-hover">
-    <thead class="thead-light">
+    <thead class="table-light">
       <tr>
-        <th scope="col"><i class="fa-solid fa-virus" title="Sample ID"></th>
+        <th scope="col"><i class="fa-solid fa-virus" title="Sample ID"></i></th>
         <th scope="col">SHA256</th>
         <th scope="col">Family</th>
         <th scope="col">Version</th>
@@ -132,9 +132,9 @@ Unique Blocks
     {% endif %}
   </table>
   {% if not selected_ids %}
-  <center>
+  <div class="text-center">
   <h4>Selected samples will show here</h4>
-  </center>
+  </div>
   {% else %}
   {{ pagination_widget(pagination_selected, _js_argument_provider="fetchState") }}
   {% endif %}
@@ -147,7 +147,7 @@ Unique Blocks
   {% if samples %}
   {{ set_pagination_params(pagination, _anchor="Search", _js_argument_provider="fetchState") }}
   <table class="table table-hover">
-      <thead class="thead-light">
+      <thead class="table-light">
         {{ sample_header(show_analyze=False, sort_pagination=pagination) }}
       </thead>
       <tbody>
@@ -166,14 +166,14 @@ Unique Blocks
       </tbody>
     </table>
     {{ pagination_widget(pagination) }}
-    <center>
+    <div class="text-center">
       <button type="button" onclick="setSelected()" class="btn btn-outline-primary">Add</button>
       {% if selected_ids %}
       <button type="button" onclick="createJob()" class="btn btn-primary">Find Unique Blocks</button>
       {% endif %}
-    </center>
+    </div>
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  <div class="text-center my-3"><a href='{{ url_for("data.submit") }}' class="text-primary text-decoration-underline">No samples available. Click here to upload your first sample</a></div>
 {% endif %}
 </div>
 {% endblock %}

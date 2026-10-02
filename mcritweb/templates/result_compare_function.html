@@ -2,6 +2,7 @@
 {% from 'table/column_table.html' import sample_column_table, matching_result_job_column_table %}
 {% from 'table/matching_statistics_table.html' import matching_statistics_table %}
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
+{% from 'table/compare_breadcrumb.html' import compare_breadcrumb %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -12,6 +13,9 @@ Results for Job: {{ job_info.job_id }}
 {% endblock %}
 {% block content %}
 <h1>Results for Job: {{ matching_result.method }}</h1>
+<hr />
+
+{{ compare_breadcrumb(job_info.job_id, 'function', funid=funid) }}
 
 {{ matching_result_job_column_table(job_info) }}
 
@@ -36,32 +40,32 @@ Results for Job: {{ job_info.job_id }}
     <input type="hidden" id="funid" name="funid" value="{{ funid }}">
     <input type="hidden" id="funp" name="funp" value="{{ funp.page }}">
     <label class="col-6">Filter results to</label>
-    <input class="col-3" type="text" name='filter_function_min_score' id="filter_function_min_score" aria-describedby="filter_function_min_score" placeholder="min score (0-100)" {% if matching_result.getFilterValue("filter_function_min_score") is not none %}value={{matching_result.getFilterValue("filter_function_min_score")}}{% endif %}>
-    <input class="col-3" type="text" name='filter_function_max_score' id="filter_function_max_score" aria-describedby="filter_function_max_score" placeholder="max score (0-100)" {% if matching_result.getFilterValue("filter_function_max_score") is not none %}value={{matching_result.getFilterValue("filter_function_max_score")}}{% endif %}>
-    <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" aria-describedby="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>
-    <label class="col-3" for="block_count">exclude PIC hits</label>
-    <button type="submit" class="btn btn-primary">filter</button>
+    <input class="col-3" type="text" name='filter_function_min_score' id="filter_function_min_score" placeholder="min score (0-100)" {% if matching_result.getFilterValue("filter_function_min_score") is not none %}value={{matching_result.getFilterValue("filter_function_min_score")}}{% endif %}>
+    <input class="col-3" type="text" name='filter_function_max_score' id="filter_function_max_score" placeholder="max score (0-100)" {% if matching_result.getFilterValue("filter_function_max_score") is not none %}value={{matching_result.getFilterValue("filter_function_max_score")}}{% endif %}>
+    <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>
+    <label class="col-3" for="filter_exclude_pic">exclude PIC hits</label>
+    <button type="submit" class="btn btn-primary">Filter</button>
   </div>
 </form>
 <table class="table table-hover">
-  <thead class="thead-light">
+  <thead class="table-light">
     <tr>
     {% if ucs_functions is none %}
       {% set ucs_functions = ["function_id_a", "offset_a", "offset_b", "function_id_b", "family_name_b", "sample_id_b", "best_score", "is_minhash_match", "is_pichash_match", "is_library_match", "is_unique_match"] %}
     {% endif %}
     {% for column_type in ucs_functions %}
       {% if column_type == "function_id_a" %}
-      <th scope="col">Function A&nbsp;<i class="fa-solid fa-project-diagram " title="Function ID"></th>
+      <th scope="col">Function A&nbsp;<i class="fa-solid fa-project-diagram " title="Function ID"></i></th>
       {% elif column_type == "offset_a" %}
       <th style="text-align: right;" scope="col">Offset A</th>
       {% elif column_type == "offset_b" %}
       <th style="text-align: right;" scope="col">Offset B</th>
       {% elif column_type == "function_id_b" %}
-      <th style="text-align: right;" scope="col">Function B&nbsp;<i class="fa-solid fa-project-diagram " title="Function ID"></th>
+      <th style="text-align: right;" scope="col">Function B&nbsp;<i class="fa-solid fa-project-diagram " title="Function ID"></i></th>
       {% elif column_type == "family_name_b" %}
-      <th style="text-align: right;" scope="col">Family B&nbsp;<i class="fa-solid fa-bug " title="Family ID"></th>
+      <th style="text-align: right;" scope="col">Family B&nbsp;<i class="fa-solid fa-bug " title="Family ID"></i></th>
       {% elif column_type == "sample_id_b" %}
-      <th style="text-align: right;" scope="col">Sample B&nbsp;<i class="fa-solid fa-virus" title="Sample ID"></th>
+      <th style="text-align: right;" scope="col">Sample B&nbsp;<i class="fa-solid fa-virus" title="Sample ID"></i></th>
       {% elif column_type == "best_score" %}
       <th style="text-align: right;" scope="col">Score</th>
       {% elif column_type == "is_minhash_match" %}

@@ -8,10 +8,16 @@ Job {{ job_info.job_id }} did not finish
 
 <h1>Job {{ job_info.job_id }} did not finish</h1>
 
-<p>{{ reason }}</p>
+{% if reason %}
+<div class="alert alert-danger" role="alert">
+  {{ reason }}
+</div>
+{% endif %}
 
 {{ job_column_table(job_info, show_progress=False) }}
 
-<p>back to <a href="{{ url_for('data.jobs') }}">Jobs and Results</a></p>
+<div class="mt-3">
+  <a href="{{ url_for('data.jobs') }}" class="btn btn-primary">Back to Jobs</a>
+</div>
 
 {% endblock %}

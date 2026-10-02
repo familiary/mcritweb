@@ -68,8 +68,6 @@
   {# Print the grouped samples #}
   {% for family_id, sample_ids in grouped_samples.items() %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(samples_by_id[sample_ids[0]].family, family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> 
-    {% for family_id, sample_ids in grouped_samples.items() %}
-    {% endfor %}
     {{ sample_ids|join(', ') }}<br />
   {% endfor %}
 

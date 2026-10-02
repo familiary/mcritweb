@@ -24,9 +24,9 @@ Users
 <div class="tab-content" id="pills-tabContent">
   <div class="tab-pane fade {% if active == 'pending' %}show active{% endif %}"id="pills-pending" role="tabpanel" aria-labelledby="pills-pending-tab">
     <table class="table table-hover">
-      <thead class="thead-light">
+      <thead class="table-light">
         <tr>
-          <th scope="col">User_ID</th>
+          <th scope="col">User ID</th>
           <th scope="col">Username</th>
           <th scope="col">Role</th>
           <th scope="col">Registered</th>
@@ -42,15 +42,14 @@ Users
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
-          <td align="right"><button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <td align="right"><button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
             <i class="fas fa-user-cog fa-xs"></i>
           </button>
           <div class="dropdown-menu">
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role = 'admin', user_id=user.user_id, tab='pending') }}">Change role to admin</button>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role = 'contributor', user_id=user.user_id, tab='pending') }}">Change role to contributor</button>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role = 'visitor', user_id=user.user_id, tab='pending') }}">Change role to visitor</button>
-            <a class="dropdown-item" href="{{ url_for('analyze.cross_compare') }}">View profile</a>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='pending') }}">Delete user</button>
+            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='pending') }}">Change role to admin</button>
+            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='pending') }}">Change role to contributor</button>
+            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab='pending') }}">Change role to visitor</button>
+            <button type="button" class="dropdown-item text-danger" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='pending') }}">Delete User</button>
           </div>
         </td>
         </tr>
@@ -60,9 +59,9 @@ Users
   </div>
   <div class="tab-pane fade {% if active == 'contributors' %}show active{% endif %}" id="pills-contributors" role="tabpanel" aria-labelledby="pills-contributors-tab">
     <table class="table table-hover">
-      <thead class="thead-light">
+      <thead class="table-light">
         <tr>
-          <th scope="col">User_ID</th>
+          <th scope="col">User ID</th>
           <th scope="col">Username</th>
           <th scope="col">Role</th>
           <th scope="col">Registered</th>
@@ -78,14 +77,13 @@ Users
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
-          <td align="right"><button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <td align="right"><button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
             <i class="fas fa-user-cog fa-xs"></i>
           </button>
           <div class="dropdown-menu">
-            <button type="button" class="dropdown-item" data-post="{{url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='contributors')}}">Change role to admin</button>
+            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='contributors') }}">Change role to admin</button>
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab='contributors') }}">Change role to visitor</button>
-            <a class="dropdown-item" href="{{ url_for('analyze.cross_compare') }}">View profile</a>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='contributors') }}">Delete user</button>
+            <button type="button" class="dropdown-item text-danger" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='contributors') }}">Delete User</button>
           </div>
         </td>
         </tr>
@@ -95,9 +93,9 @@ Users
   </div>
   <div class="tab-pane fade {% if active == 'admins' %}show active{% endif %}" id="pills-admins" role="tabpanel" aria-labelledby="pills-admins-tab">
     <table class="table table-hover">
-      <thead class="thead-light">
+      <thead class="table-light">
         <tr>
-          <th scope="col">User_ID</th>
+          <th scope="col">User ID</th>
           <th scope="col">Username</th>
           <th scope="col">Role</th>
           <th scope="col">Registered</th>
@@ -113,14 +111,13 @@ Users
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
-          <td align="right"><button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <td align="right"><button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
             <i class="fas fa-user-cog fa-xs"></i>
           </button>
           <div class="dropdown-menu">
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='admins') }}">Change role to contributor</button>
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab='admins') }}">Change role to visitor</button>
-            <a class="dropdown-item" href="{{ url_for('analyze.cross_compare') }}">View profile</a>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='admin') }}">Delete user</button>
+            <button type="button" class="dropdown-item text-danger" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='admins') }}">Delete User</button>
           </div>
         </td>
         </tr>
@@ -130,9 +127,9 @@ Users
   </div>
   <div class="tab-pane fade{% if active == 'all' %}show active{% endif %}" id="pills-all" role="tabpanel" aria-labelledby="pills-all-tab">
     <table class="table table-hover">
-      <thead class="thead-light">
+      <thead class="table-light">
         <tr>
-          <th scope="col">User_ID</th>
+          <th scope="col">User ID</th>
           <th scope="col">Username</th>
           <th scope="col">Role</th>
           <th scope="col">Registered</th>
@@ -148,7 +145,7 @@ Users
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
-          <td align="right"><button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <td align="right"><button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
             <i class="fas fa-user-cog fa-xs"></i>
           </button>
           <div class="dropdown-menu">
@@ -169,8 +166,7 @@ Users
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='all') }}">Change role to contributor</button>
             <button type="button" class="dropdown-item" data-post="{{url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='all')}}">Change role to admin</button>
             {% endif %}
-            <a class="dropdown-item" href="{{ url_for('analyze.cross_compare') }}">View profile</a>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='all') }}">Delete user</button>
+            <button type="button" class="dropdown-item text-danger" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='all') }}">Delete User</button>
           </div>
         </td>
         </tr>
@@ -180,9 +176,9 @@ Users
   </div>
   <div class="tab-pane fade {% if active == 'visitors' %}show active{% endif %}"id="pills-visitors" role="tabpanel" aria-labelledby="pills-visitors-tab">
     <table class="table table-hover">
-      <thead class="thead-light">
+      <thead class="table-light">
         <tr>
-          <th scope="col">User_ID</th>
+          <th scope="col">User ID</th>
           <th scope="col">Username</th>
           <th scope="col">Role</th>
           <th scope="col">Registered</th>
@@ -198,14 +194,13 @@ Users
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
-          <td align="right"><button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <td align="right"><button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
             <i class="fas fa-user-cog fa-xs"></i>
           </button>
           <div class="dropdown-menu">
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='visitors') }}">Change role to admin</button>
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='visitors') }}">Change role to contributor</button>
-            <a class="dropdown-item" href="{{ url_for('analyze.cross_compare') }}">View profile</a>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='visitors') }}">Delete user</button>
+            <button type="button" class="dropdown-item text-danger" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='visitors') }}">Delete User</button>
           </div>
         </td>
         </tr>

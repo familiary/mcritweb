@@ -95,18 +95,18 @@ function handleSliderChange(val) {
 {% if samples %}
   {{ pagination_widget(pagination)}}
 {% endif %}
-<center>
+<div class="text-center">
   <div class="form-group">
     <div class="col-sm-6 d-inline-flex justify-content-center">
         <input class="form-check-input shadow-none" type="checkbox" name="rematch" value="true" id="force_rematch" {% if rematch %}checked{% else %}{% endif %}>
-        <label class="form-check-label" for="flexCheckChecked">
+        <label class="form-check-label" for="force_rematch">
           &nbsp;Force rematch    
         </label>
     </div>
     <div class="col-sm-8 d-inline-flex justify-content-center">
       <div class="col-sm-2">
         <label class="form-check-label" for="minhashBandRange">
-          Minhash Matching:
+          MinHash Matching:
         </label>
       </div>
       <div class="col-sm-2" id="minhashBandRange-currentSelection">&nbsp;{{ minhash_slider_mapping[request.args.get('minhashBandRange', '2')|int] }}</div>
@@ -118,7 +118,7 @@ function handleSliderChange(val) {
   <input type='submit' hidden>
   <br>
   <button type="button" {% if not selected  %}style="display:none"{% endif %} onclick="createJob()" id="button_match" class="btn btn-primary">Compare</button>
-</center>
+</div>
 
 
 

@@ -8,8 +8,8 @@ Statistics
     {% for key in stats['status'] %}
     {% if loop.index <= 12 %}
     <tr>
-      <th valign="middle">{{ key }}</td>
-      <td align="right" valign="middle">{{ stats['status'][key] }}</td>
+      <th class="align-middle">{{ key }}</th>
+      <td class="text-end align-middle">{{ stats['status'][key] }}</td>
     </tr>
     {% endif %}
     {% endfor %}

@@ -3,52 +3,56 @@
 Register
 {% endblock %}
 {% block content %}
-<center>
+<div class="d-flex justify-content-center my-4">
+  <div style="max-width: 500px; width: 100%;">
   <form method='post'>
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <h3>Define User Details:</h3>
-    <div class="form-group">
-      <input name='username' class="form-control" id="username" aria-describedby="usernameHelp" placeholder="Enter username" title="Allowed: ^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$ -- i.e. 3-20 chars, alphanumeric with single dots and underscores in the middle" pattern="^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$", required autofocus>
+    <h3 class="mb-3">Define User Details:</h3>
+    <div class="mb-2">
+      <input name='username' class="form-control" id="username" aria-label="Enter username" placeholder="Enter username" title="Allowed: ^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$ -- i.e. 3-20 chars, alphanumeric with single dots and underscores in the middle" pattern="^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$" required autofocus>
     </div>
-    <div class="form-group">
-      <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" placeholder="Enter password" required>
+    <div class="mb-2">
+      <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" aria-label="Enter password" placeholder="Enter password" required>
     </div>
-    <div class="form-group">
-        <input type="password" class="form-control" name="inputPassword2" id="inputPassword2" placeholder="Confirm password" required>
+    <div class="mb-3">
+        <input type="password" class="form-control" name="inputPassword2" id="inputPassword2" aria-label="Confirm password" placeholder="Confirm password" required>
     </div>
     {% if is_registration_token_required %}
-      <div class="form-group">
-        <input class="form-control" name="registrationToken" id="registrationToken" placeholder="Enter registration token" value="{{ query_token }}" required>
+      <div class="mb-3">
+        <input class="form-control" name="registrationToken" id="registrationToken" aria-label="Registration token" placeholder="Enter registration token" value="{{ query_token }}" required>
       </div>
     {% endif %}
       {% if g.first_user %}
-      <h3>Define Server Details:</h3>
-      <div class="form-group">
-        <label for="server">Choose MCRIT backend server:</label>
-        <input type="url" name='url' class="form-control" id="server" aria-describedby="serverHelp" value="{{ default_mcrit_server }}" required>
-        <label for="set-server-token">Enter the (optional) AUTH_TOKEN for this MCRIT server:</label>
-        <input type="text" name='mcritServerToken' class="form-control" id="mcritServerToken" aria-describedby="Enter the (optional) AUTH_TOKEN for this MCRIT server" value="">
+      <h3 class="mt-4 mb-3">Define Server Details:</h3>
+      <div class="mb-3">
+        <label for="server" class="form-label">Choose MCRIT backend server:</label>
+        <input type="url" name='url' class="form-control" id="server" value="{{ default_mcrit_server }}" required>
       </div>
-      <div class="form-group">
-        <label for="set-registration-token">Optional registration token (replace or clear if other or no token desired):</label>
-        <input name='setRegistrationToken' class="form-control" id="set-registration-token" aria-describedby="tokenHelp" value="{{ proposed_registration_token }}" pattern="^[a-zA-Z0-9._\-]{3,36}$">
+      <div class="mb-3">
+        <label for="mcritServerToken" class="form-label">Enter optional Server Token (sent as AUTH_TOKEN):</label>
+        <input type="text" name='mcritServerToken' class="form-control" id="mcritServerToken" value="">
       </div>
-    <h3>Define Operation Mode:</h3>
-    <div class="form-group form-check">
+      <div class="mb-3">
+        <label for="set-registration-token" class="form-label">Optional registration token (replace or clear if other or no token desired):</label>
+        <input name='setRegistrationToken' class="form-control" id="set-registration-token" value="{{ proposed_registration_token }}" pattern="^[a-zA-Z0-9._\-]{3,36}$">
+      </div>
+    <h3 class="mt-4 mb-3">Define Operation Mode:</h3>
+    <div class="form-check mb-2">
         <input class="form-check-input" type="radio" name="operationMode" id="radio_single" value="single" checked>
         <label class="form-check-label" for="radio_single">
-          Single user
+          Single-user
         </label>
     </div>
-    <div class="form-group form-check">
+    <div class="form-check mb-3">
         <input class="form-check-input" type="radio" name="operationMode" id="radio_multi" value="multi">
         <label class="form-check-label" for="radio_multi">
-          Multi user
+          Multi-user
         </label>
     </div>
     {% endif %}
-    <button type="submit" class="btn btn-primary">Register</button>
-</form>
-</center>
+    <button type="submit" class="btn btn-primary w-100">Register</button>
+  </form>
+  </div>
+</div>
 
 {% endblock %}
