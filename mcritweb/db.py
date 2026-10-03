@@ -617,11 +617,20 @@ class UserColumnSettings:
         database.commit()
 
 
+#: Seconds a connection waits on another one's lock before giving up with "database is
+#: locked". Passed as sqlite3's `timeout`, which is how Python installs SQLite's busy
+#: handler. 5 is also Python's default, so this changes nothing on its own - it is
+#: spelled out because two gunicorn workers with several threads each share this file,
+#: and the wait is part of how they do it rather than an accident of a default.
+DATABASE_TIMEOUT = 5.0
+
+
 def get_db():
     if 'db' not in g:
         g.db = sqlite3.connect(
             current_app.config['DATABASE'],
-            detect_types=sqlite3.PARSE_DECLTYPES
+            detect_types=sqlite3.PARSE_DECLTYPES,
+            timeout=DATABASE_TIMEOUT,
         )
         g.db.row_factory = sqlite3.Row
     return g.db
@@ -661,14 +670,36 @@ def init_app(app):
     app.cli.add_command(init_db_command)
 
 
+def enable_write_ahead_log(db):
+    """Switch the database file to WAL, and return the journal mode it ended up in.
+
+    In the default rollback-journal mode a write locks out every reader in every worker
+    until it commits, and a reader holds off a writer; with WAL, readers carry on
+    against the last commit while one writer appends. The mode is stored in the file,
+    so setting it once at startup covers every connection opened later.
+
+    SQLite does not refuse a mode it cannot use, it keeps the old one and answers with
+    that - ":memory:" says "memory". That is reported rather than raised: the app works
+    without WAL, it just serializes readers behind writers as it always has.
+    """
+    journal_mode = db.execute("PRAGMA journal_mode=WAL;").fetchone()[0]
+    if journal_mode.lower() != "wal":
+        print(f"SQLite kept journal_mode={journal_mode} instead of WAL, readers will wait for writers.")
+    return journal_mode
+
+
 def migrate(app_context):
     # custom connect since we are before app initialization
     db = sqlite3.connect(
             app_context.config['DATABASE'],
-            detect_types=sqlite3.PARSE_DECLTYPES
+            detect_types=sqlite3.PARSE_DECLTYPES,
+            timeout=DATABASE_TIMEOUT,
         )
     # close on every exit path, including the early return and any failing migration
     try:
+        # before the early return below, so a database `flask init-db` is about to
+        # create - it builds the app, and with it runs this, first - is in WAL too
+        enable_write_ahead_log(db)
         # check if DB was initialized before taking further action.
         try:
             db.execute('SELECT * FROM user').fetchone()
