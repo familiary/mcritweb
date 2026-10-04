@@ -121,7 +121,7 @@ function handleSliderChange(val) {
 {{ compare_nav("1vs1") }}
 <h1>Compare Samples 1vs1</h1>
 <div class="row">
-  <div class="col">
+  <div class="col-12 col-lg-6 mb-3">
     <form style="width:100%" id="compare_search_form_a">
       <input type="text" class="form-control shadow-none" name="query_a" id="Search_a" value="{{ query_a }}" placeholder="Search" autofocus autocomplete="on">
     </form>
@@ -131,7 +131,7 @@ function handleSliderChange(val) {
       {{ pagination_widget(pagination_a)}}
     {% endif %}
   </div>
-  <div class="col">
+  <div class="col-12 col-lg-6 mb-3">
     <form style="width:100%" id="compare_search_form_b">
       <input type="text" class="form-control shadow-none" name="query_b" id="Search_b" value="{{ query_b }}" placeholder="Search" autofocus autocomplete="on">
     </form>
@@ -142,18 +142,18 @@ function handleSliderChange(val) {
     {% endif %}
   </div>
 </div>
-<center>
+<div class="text-center">
   <div class="form-group">
     <div class="col-sm-6 d-inline-flex justify-content-center">
         <input class="form-check-input shadow-none" type="checkbox" name="rematch" value="true" id="force_rematch" {% if rematch %}checked{% else %}{% endif %}>
-        <label class="form-check-label" for="flexCheckChecked">
+        <label class="form-check-label" for="force_rematch">
           &nbsp;Force rematch    
         </label>
     </div>
     <div class="col-sm-8 d-inline-flex justify-content-center">
       <div class="col-sm-2">
         <label class="form-check-label" for="minhashBandRange">
-          Minhash Matching:
+          MinHash Matching:
         </label>
       </div>
       <div class="col-sm-2" id="minhashBandRange-currentSelection">&nbsp;{{ minhash_slider_mapping[request.args.get('minhashBandRange', '2')|int] }}</div>
@@ -165,7 +165,7 @@ function handleSliderChange(val) {
   <input type='submit' hidden>
   <br>
   <button type="button" {% if not selected_a or not selected_b  %}style="display:none"{% endif %} onclick="createJob()" id="button_match" class="btn btn-primary">Compare</button>
-</center>
+</div>
 {% endblock %}
 
  

@@ -13,7 +13,7 @@
     {% if name_and_sample[1].sample_id is not none and name_and_sample[1].sample_id >= 0 %}{% set identity.is_stored = true %}{% endif %}
   {% endfor %}
   <table class="table table-hover">
-    <thead class="thead-light">
+    <thead class="table-light">
       <tr>
         <th scope="col">Field</th>
         {% for name_and_sample in varargs %}
@@ -89,7 +89,7 @@
 
 {% macro function_column_table()%}
   <table class="table table-hover">
-    <thead class="thead-light">
+    <thead class="table-light">
       <tr>
         <th scope="col">Field</th>
         {% for name_fe_se_ph in varargs %}
@@ -253,7 +253,7 @@
             {% if job_info.finished_at %}
               {{ job_info.finished_at|date_time }}
             {% elif job_info.is_failed %}
-              Failed</td>
+              Failed
             {% else %}
               This job hasn't finished yet
             {% endif %}
@@ -302,7 +302,7 @@
         <tr>
           <td valign="middle">Error Message: </td>
           <td valign="middle">
-            <div white-space: pre-wrap;>
+            <div style="white-space: pre-wrap;">
               <pre><code>{{ (job_info.last_error.rstrip()|e) -}}</code></pre>
             </div>
           </td>

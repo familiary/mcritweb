@@ -4,7 +4,7 @@
 {% from 'table/job_row.html' import job_row_std_js %}
 {% extends 'base.html' %}
 {% block title%}
-Sample: {{ entry.sample_id }}
+Query Sample: *{{ entry.sample_id|abs }}
 {% endblock %}
 
 {% block style %}
@@ -14,8 +14,8 @@ Sample: {{ entry.sample_id }}
 
 {% block content %}
 
-<h1>Sample: {{ entry.sample_id }}</h1>
-<p>This sample was uploaded for a query and is not part of the database.</p>
+<h1>Query Sample: *{{ entry.sample_id|abs }}</h1>
+<p>This is a Query matched against the collection without being stored.</p>
 <div class="accordion accordion-flush mb-3" id="accordionFlushExample">
   <div class="accordion-item">
     <h2 class="accordion-header" id="flush-headingOne">
@@ -28,18 +28,18 @@ Sample: {{ entry.sample_id }}
         {% for key in entry.toDict() %}
           {% if loop.index <= 12 %}
             <tr>
-              <th valign="middle">{{ key.replace('_', ' ')|capitalize_all }}</td>
-              <td valign="middle">{% if key == 'family' %}<a href='{{ url_for("explore.family_by_id",family_id=entry.toDict()['family_id']) }}' >{{ entry.toDict()[key] }}</a>{% else %}{{ entry.toDict()[key] }}{% endif %}</td>
+              <th class="align-middle">{{ key.replace('_', ' ')|capitalize_all }}</th>
+              <td class="align-middle">{% if key == 'family' %}<a href='{{ url_for("explore.family_by_id",family_id=entry.toDict()['family_id']) }}' >{{ entry.toDict()[key] }}</a>{% else %}{{ entry.toDict()[key] }}{% endif %}</td>
             </tr>
           {% endif %}
         {% endfor %}
         <tr>
-          <th valign="middle">Timestamp</td>
-          <td valign="middle">{{ entry.timestamp }}</td>
+          <th class="align-middle">Timestamp</th>
+          <td class="align-middle">{{ entry.timestamp }}</td>
         </tr>
         <tr>
-          <th valign="middle">Version</td>
-          <td valign="middle">{{ entry.version }}</td>
+          <th class="align-middle">Version</th>
+          <td class="align-middle">{{ entry.version }}</td>
         </tr>
       </table>
     </div>
@@ -54,8 +54,8 @@ Sample: {{ entry.sample_id }}
       <table class="table table-sm table-borderless" style="width:50%;">
         {% for key in entry.statistics%}
         <tr>
-          <th valign="middle">{{ key.replace('_', ' ')|capitalize_all  }}</td>
-          <td valign="middle">{{ entry.statistics[key] }}</td>
+          <th class="align-middle">{{ key.replace('_', ' ')|capitalize_all  }}</th>
+          <td class="align-middle">{{ entry.statistics[key] }}</td>
         </tr>
         {% endfor %}
 

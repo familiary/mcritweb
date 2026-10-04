@@ -11,7 +11,7 @@ Results for Job: {{ job_info.job_id }}
 {{ pagination_js() }}
 {% endblock %}
 {% block content %}
-<h1>Linkhunt for Job: {{ job_info.job_parameters }}</h1>
+<h1>LinkHunt for Job: {{ job_info.parameters }}</h1>
 <hr />
 
 {{ matching_result_job_column_table(job_info) }}
@@ -19,7 +19,7 @@ Results for Job: {{ job_info.job_id }}
 <h3>Input Sample</h3>
 {{ sample_column_table(("Reference Sample", matching_result.reference_sample_entry)) }}
 
-<p><a href="{{'/data/result/' + job_info.job_id}}">Go to full matching report</a></p>
+<p><a href="{{ url_for('data.result', job_id=job_info.job_id) }}">Go to full matching report</a></p>
 
 <h3 id="linkhunt-matches">Results</h3>
 <p>selection: {{ funp.max_value }}, showing: {{ 1 + funp.start_index }} - {{ funp.end_index }} (filtered: {{ matching_result.num_original_function_matches - funp.max_value}})</p>
@@ -38,11 +38,11 @@ Results for Job: {{ job_info.job_id }}
       <label class="col-4">Exclude families/samples</label>
       <input class="col-4" type="text" name='filter_exclude_families' id="filter_exclude_families" aria-describedby="filter_exclude_families" placeholder="1, 2, 3" {% if matching_result.getFilterValue("filter_exclude_families") is not none %}value='{{matching_result.getFilterValue("filter_exclude_families")}}'{% endif %}>
       <input class="col-4" type="text" name='filter_exclude_samples' id="filter_exclude_samples" aria-describedby="filter_exclude_samples" placeholder="1, 2, 3" {% if matching_result.getFilterValue("filter_exclude_samples") is not none %}value='{{matching_result.getFilterValue("filter_exclude_samples")}}'{% endif %}>
-      <label class="col-4" for="block_count">strongest per family only</label>
+      <label class="col-4" for="filter_strongest_per_family">strongest per family only</label>
       <input class="col-1" type="checkbox" name='filter_strongest_per_family' id="filter_strongest_per_family" aria-describedby="filter_strongest_per_family" {% if matching_result.getFilterValue("filter_strongest_per_family") %}checked{% endif %}>
       <div class="d-grid gap-4 d-md-block">
-        <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">filter</button>
-        <button class="btn btn-secondary" type="submit" name="filter_button_action" value="clear">clear</button>
+        <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">Filter</button>
+        <button class="btn btn-secondary" type="submit" name="filter_button_action" value="clear">Clear</button>
       </div>
     </div>
 </form>
@@ -51,7 +51,7 @@ Results for Job: {{ job_info.job_id }}
 {# a cluster can hold any number of links, so only the first few are shown open #}
 {% set shown_links = 8 %}
 <table class="table table-hover">
-  <thead class="thead-light">
+  <thead class="table-light">
     <tr>
       <th style="text-align: right;" scope="col">Rank</th>
       <th style="text-align: right;" scope="col">Clusterscore</th>
@@ -102,13 +102,13 @@ Results for Job: {{ job_info.job_id }}
 <h4 id="linkhunt-links">Individual Links</h4>
 <p>Family-unique matches in bold.</p>
 <table class="table table-hover">
-    <thead class="thead-light">
+    <thead class="table-light">
       <tr>
         <th style="text-align: right;" scope="col">Rank</th>
         <th style="text-align: right;" scope="col">Linkscore</th>
         <th style="text-align: right;" scope="col">Function ID</th>
         <th style="text-align: right;" scope="col">Offset</th>
-        <th style="text-align: right;" scope="col">num_bytes</th>
+        <th style="text-align: right;" scope="col">Bytes</th>
         <th style="text-align: right;" scope="col">Family</th>
         <th style="text-align: right;" scope="col">Sample ID</th>
         <th style="text-align: right;" scope="col">Function ID</th>

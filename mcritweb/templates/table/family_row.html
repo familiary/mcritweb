@@ -32,19 +32,16 @@
 
 
     $("tr.family-row").click(function(e){
-      console.log(e.target.name)
-      if(event.target.id.includes("_edit")) {
+      // links and buttons in the row (edit, compare, export, Malpedia) do their own thing;
+      // closest() also catches a click on the icon inside them
+      if ($(e.target).closest("a, button").length) {
+        return;
       }
-      else if(e.target.name === 'malpedia') {
-        e.stopPropagation();
+      var family_id = $(this).children("th.id").text();
+      if (family_id === ''){
+        throw Error("Assertion failed")
       }
-      else{
-        var family_id = $(this).children("th.id").text();
-        if (family_id === ''){
-          throw Error("Assertion failed")
-        }
-        window.location.href="{{ url_for('explore.families') }}"+ "/" + family_id;  
-      }
+      window.location.href="{{ url_for('explore.families') }}"+ "/" + family_id;
     });
   });
 </script>
@@ -105,13 +102,13 @@
     {% endif %}
   {% endfor %}
     <td align="center" valign="middle" class="buttons">
-      <a class="btn btn-outline-dark btn-sm" name="compare" href="{{ url_for('analyze.compare', query=family.family_name, rematch='true') }}" role="button" target="_self"><i class="fa-solid fa-flask"></i></a>
-      <a class="btn btn-outline-dark btn-sm" name="family_blocks" href="{{ url_for('analyze.blocks_family', family_id=family.family_id) }}" role="button" target="_self"><i class="fa-solid fa-cubes-stacked"></i></a>
+      <a class="btn btn-outline-dark btn-sm" name="compare" href="{{ url_for('analyze.compare', query=family.family_name, rematch='true') }}" role="button" target="_self" title="Compare 1vsN" aria-label="Compare family {{ family.family_name }}"><i class="fa-solid fa-flask"></i></a>
+      <a class="btn btn-outline-dark btn-sm" name="family_blocks" href="{{ url_for('analyze.blocks_family', family_id=family.family_id) }}" role="button" target="_self" title="Unique Blocks" aria-label="Unique blocks for family {{ family.family_name }}"><i class="fa-solid fa-cubes-stacked"></i></a>
       {% if show_export %}
-        <a class="btn btn-outline-dark btn-sm" href="{{ url_for('data.specific_export', type='family', item_id=family.family_id) }}" role="button" target="_self"><i class="fa-solid fa-file-export"></i></a>
+        <a class="btn btn-outline-dark btn-sm" href="{{ url_for('data.specific_export', type='family', item_id=family.family_id) }}" role="button" target="_self" title="Export Family" aria-label="Export family {{ family.family_name }}"><i class="fa-solid fa-file-export"></i></a>
       {% endif %}
       {% if show_edit %}
-      <a class="btn btn-outline-dark btn-sm" id="sample_{{ family.family_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editFamilyModal" data-bs-islibrary="{{ family.is_library }}"  data-bs-familyid="{{ family.family_id }}" data-bs-familyname="{{ family.family_name }}"><i class="fa-solid fa-pen-to-square"></i></a>
+      <a class="btn btn-outline-dark btn-sm" id="family_{{ family.family_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editFamilyModal" data-bs-islibrary="{{ family.is_library }}" data-bs-familyid="{{ family.family_id }}" data-bs-familyname="{{ family.family_name }}" title="Edit Family" aria-label="Edit family {{ family.family_name }}"><i class="fa-solid fa-pen-to-square"></i></a>
     {% endif %}
     </td>
   </tr>

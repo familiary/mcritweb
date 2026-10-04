@@ -1,19 +1,22 @@
 .navbar-brand img {
-  height: 100px;
+  height: 48px;
+  width: auto;
 }
-.navbar-brand-small img {
-  height: 40px;
+@media (min-width: 992px) {
+  .navbar-brand img {
+    height: 60px;
+  }
 }
-.navbar{
+.navbar {
   margin-bottom: 20px;
-  padding: 0.5rem;  
+  padding: 0.5rem 1rem;  
 }
 .navbar .right-logo {
-  position:absolute;
-  top:0;
-  right:0;
-  margin: 0.5rem;
+  display: flex;
+  align-items: center;
+  margin-left: 1rem;
 }
-.navbar .right-logo img{
-  height:50px;
+.navbar .right-logo img {
+  height: 40px;
+  width: auto;
 }

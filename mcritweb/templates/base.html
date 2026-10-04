@@ -1,7 +1,11 @@
 {% from 'table/submit_or_query_dropzone.html' import submit_or_query_dropzone, submit_or_query_dropzone_js with context%}
 {% from 'table/links.html' import clipboard_btn, clipboard_js %}
 <!doctype html>
+<html lang="en">
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="MCRITweb - browser front-end for MCRIT, the MinHash-based code relationship and investigation toolkit.">
   <title>{% block title %}{% endblock %} - MCRIT Web</title>
   {# how scripts reach the CSRF token - forms carry it as a hidden input instead #}
   <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -37,7 +41,7 @@
   <script src="{{ url_for('static', filename='post_action.js') }}"></script>
   <script src="{{ url_for('static', filename='page_loading.js') }}"></script>
 
-  {% if not suppress_dropzone_overlay %}
+  {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
     {{ submit_or_query_dropzone_js(select_form_type=True) }}
     <script>
     $(document).ready(function(){
@@ -70,16 +74,16 @@
     <noscript>Please enable JavaScript to use all features of this site. </noscript>
 <nav class="navbar navbar-expand-lg navbar-light">
   <a class="navbar-brand d-none d-md-block" href="{{ url_for('index') }}">
-    <img src="{{ url_for('static', filename='d20_mcrit_cabaret.png') }}" class="img-fluid">
+    <img src="{{ url_for('static', filename='d20_mcrit_cabaret.png') }}" class="img-fluid" alt="MCRIT logo" width="459" height="150">
   </a>
   <a class="navbar-brand d-md-none" href="{{ url_for('index') }}">
-    <img src="{{ url_for('static', filename='d20_mcrit_cabaret.png') }}" class="img-fluid">
+    <img src="{{ url_for('static', filename='d20_mcrit_cabaret.png') }}" class="img-fluid" alt="MCRIT logo" width="459" height="150">
   </a>
   <button class="navbar-toggler navbar-toggler-end float-end" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
     <span class="navbar-toggler-icon"></span>
   </button>
   <a class="right-logo d-none d-lg-block ms-lg-auto mb-lg-auto" href="https://www.fkie.fraunhofer.de/">
-    <img src="{{ url_for('static', filename='fkie_190x52.gif') }}">
+    <img src="{{ url_for('static', filename='fkie_190x52.gif') }}" alt="Fraunhofer FKIE" width="187" height="52">
   </a>
 
 
@@ -119,7 +123,7 @@
         {% if g.user.role == 'admin' or g.user.role == 'contributor' %}
         <a class="dropdown-item" href="{{ url_for('data.import_view') }}">Import</a>
         <a class="dropdown-item" href="{{ url_for('data.export_view') }}">Export</a>
-        <a class="dropdown-item" href="{{ url_for('data.submit') }}">Submit binary</a>
+        <a class="dropdown-item" href="{{ url_for('data.submit') }}">Submit Binary</a>
         <div class="dropdown-divider"></div>
         {% endif %}
         <a class="dropdown-item" href="{{ url_for('data.jobs') }}">Jobs/Results</a>
@@ -146,13 +150,13 @@
       {% endif %}
     </li>
     <li class="nav-item">
-      <a class="nav-link" href="{{ url_for('help') }}" title="Documentation"><i class="fas fa-question-circle"></i></a>
+      <a class="nav-link" href="{{ url_for('help') }}" title="Documentation" aria-label="Documentation"><i class="fas fa-question-circle"></i></a>
     </li>
   </ul>
 </nav>
 
   </header>
-  <section class="content">
+  <main class="content">
       {% for category, message in get_flashed_messages(with_categories=true) %}
         {% if category == 'error' %}
           <div class="alert alert-danger mt-3" role="alert">{{ message }}</div>
@@ -169,7 +173,7 @@
 
       {% block content %}{% endblock %}
 
-      {% if not suppress_dropzone_overlay %}
+      {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
         <div class="modal fade" id="submitFileModal" tabindex="-1" aria-labelledby="submitFileModalLabel" aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
@@ -184,7 +188,7 @@
           </div>
         </div>
       {% endif %}
-  </section>
+  </main>
 
 
 </body>

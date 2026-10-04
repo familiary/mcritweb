@@ -5,8 +5,12 @@ Results for Job: {{ job_id }}
 {% block style %}
 {% endblock %}
 {% block content %}
-<h1>Result</h1>
-<p>Job ID: {{ job_id }} does not contain any data.</p>
-
+<h1>No Results</h1>
+<div class="alert alert-info" role="alert">
+  Job ID: {{ job_id }} does not contain any data.
+</div>
+<div class="mt-3">
+  <a href="{{ url_for('data.jobs') }}" class="btn btn-primary">Back to Jobs</a>
+</div>
 {% endblock %}
 

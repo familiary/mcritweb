@@ -36,27 +36,13 @@
     })
 
     $("tr.sample-row").click(function(e){
-    if(event.target.id.includes("_edit")) {
-    }
-    else if(button_clicked) {
-      e.stopPropagation();
-      button_clicked = false;
-      const own_menu = $(this).find('#dropdown-menu');
-      const was_visible = own_menu.is(":visible");
-      $("tr.sample-row").find('#dropdown-menu').hide();
-      if (!was_visible){
-        $(this).find('#dropdown-menu').toggle();
+      if ($(e.target).closest(".buttons").length) {
+        return;
       }
-    }
-    else{
       var sample_id = $(this).children("th.sample-id").text();
       window.location.href="{{ url_for('explore.samples') }}"+ "/" + sample_id;
-    }
     });
   });
-  function set_analyze_sample_button_clicked() {
-    button_clicked = true;
-  }
 </script>
 {% endmacro %}
 
@@ -150,14 +136,14 @@
     {% if (show_export or show_analyze) %}
       <td align="right" class="buttons">
         {% if show_analyze %}
-          <button type="button" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_analyze" onclick=set_analyze_sample_button_clicked() bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="sample_{{ sample.sample_id }}_analyze" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Analyze actions for sample {{ sample.sample_id }}">
             {% if job_collection and matching_jobs %}
             <i style="color:green;" class="fa-solid fa-flask"></i>&nbsp;{{ matching_jobs | length}}
             {% else %}
             <i class="fa-solid fa-flask"></i>
             {% endif %}
           </button>
-          <div class="dropdown-menu dropdown-menu-end" id="dropdown-menu">
+          <div class="dropdown-menu dropdown-menu-end" id="sample-menu-{{ sample.sample_id }}">
             <a class="dropdown-item" href="{{ url_for('analyze.compare', query='sha256:'+sample.sha256) }}">New: 1 vs N</a>
             <a class="dropdown-item" href="{{ url_for('analyze.compare_versus', selected_a=sample.sample_id, query_a='sha256:'+sample.sha256) }}">New: 1 vs 1</a>
             <a class="dropdown-item" href="{{ url_for('analyze.cross_compare', samples=sample.sample_id) }}">Cross Compare</a>
@@ -168,13 +154,13 @@
           </div>
         {% endif %}
         {% if show_analyze %}
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_family_blocks" href="{{ url_for('analyze.blocks_sample', sample_id=sample.sample_id) }}" role="button" target="_self"><i class="fa-solid fa-cubes-stacked"></i></a>
+          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_family_blocks" href="{{ url_for('analyze.blocks_sample', sample_id=sample.sample_id) }}" role="button" target="_self" aria-label="Unique blocks for sample {{ sample.sample_id }}"><i class="fa-solid fa-cubes-stacked"></i></a>
         {% endif %}
         {% if show_export %}
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=sample.sample_id) }}" role="button" target="_self"><i class="fa-solid fa-file-export"></i></a>
+          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=sample.sample_id) }}" role="button" target="_self" aria-label="Export sample {{ sample.sample_id }}"><i class="fa-solid fa-file-export"></i></a>
         {% endif %}
         {% if show_edit %}
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square"></i></a>
+          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}" aria-label="Edit sample {{ sample.sample_id }}"><i class="fa-solid fa-pen-to-square"></i></a>
         {% endif %}
       </td>
     {% endif %}

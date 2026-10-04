@@ -33,15 +33,15 @@ Search
     <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" {% if focus_search.value %}autofocus{% endif %} autocomplete="on">
     <div>
       <input class="form-check-input shadow-none" type="checkbox" name="type" value="family" id="families_checkbox" {% if search_types.__contains__('family') %}checked{% endif %}>
-      <label class="form-check-label" for="flexCheckChecked">
+      <label class="form-check-label" for="families_checkbox">
         Families
       </label>
       <input class="form-check-input shadow-none" type="checkbox" name="type" value="sample" id="samples_checkbox" {% if search_types.__contains__('sample') %}checked{% endif %}>
-      <label class="form-check-label" for="flexCheckChecked">
+      <label class="form-check-label" for="samples_checkbox">
         Samples
       </label>
       <input class="form-check-input shadow-none" type="checkbox" name="type" value="function" id="functions_checkbox" {% if search_types.__contains__('function') %}checked{% endif %}>
-      <label class="form-check-label" for="flexCheckChecked">
+      <label class="form-check-label" for="functions_checkbox">
         Functions
       </label>
       | <a href="{{ url_for('help') }}#search"><i class="fas fa-book"></i> Search Syntax</a>

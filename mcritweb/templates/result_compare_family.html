@@ -2,6 +2,7 @@
 {% from 'table/column_table.html' import sample_column_table, matching_result_job_column_table %}
 {% from 'table/matching_statistics_table.html' import matching_statistics_table %}
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
+{% from 'table/compare_breadcrumb.html' import compare_breadcrumb %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -13,6 +14,9 @@ Results for Job: {{ job_info.job_id }}
 {% block content %}
 <h1>Results for Job: {{ matching_result.method }}</h1>
 <p>Showing matches against family: {{ matching_result.getFamilyNameByFamilyId(famid) }}</p>
+<hr />
+
+{{ compare_breadcrumb(job_info.job_id, 'family', famid=famid, family_name=matching_result.getFamilyNameByFamilyId(famid)) }}
 
 {{ matching_result_job_column_table(job_info) }}
 
@@ -36,26 +40,26 @@ Results for Job: {{ job_info.job_id }}
     <input class="col-3" type="text" name='filter_frequency_min_score' id="filter_frequency_min_score" aria-describedby="filter_frequency_min_score" placeholder="regular (0-100)" {% if matching_result.getFilterValue("filter_frequency_min_score") is not none %}value={{matching_result.getFilterValue("filter_frequency_min_score")}}{% endif %}>
     <input class="col-3" type="text" name='filter_frequency_nonlib_min_score' id="filter_frequency_nonlib_min_score" aria-describedby="filter_frequency_nonlib_min_score" placeholder="nonlib (0-100)" {% if matching_result.getFilterValue("filter_frequency_nonlib_min_score") is not none %}value={{matching_result.getFilterValue("filter_frequency_nonlib_min_score")}}{% endif %}>
     <input class="col-1" type="checkbox" name='filter_unique_only' id="filter_unique_only" aria-describedby="filter_unique_only" {% if matching_result.getFilterValue("filter_unique_only") %}checked{% endif %}>
-    <label class="col-5" for="block_count">only show samples with unique matches</label>
+    <label class="col-5" for="filter_unique_only">only show samples with unique matches</label>
     <div class="d-grid gap-4 d-md-block">
-      <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">filter</button>
-      <button class="btn btn-secondary" type="submit" name="filter_button_action" value="clear">clear</button>
+      <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">Filter</button>
+      <button class="btn btn-secondary" type="submit" name="filter_button_action" value="clear">Clear</button>
     </div>
   </div>
 </form>
 <table class="table table-hover">
-  <thead class="thead-light">
+  <thead class="table-light">
     <tr>
       {% if ucs_famlib is none %}
         {% set ucs_famlib = ["family_name", "version", "sample_id", "sha256", "filename", "bitness", "num_functions", "num_minhash", "num_pichash", "num_library", "direct_score", "direct_nonlib_score", "frequency_score", "frequency_nonlib_score", "uniq_score"] %}
       {% endif %}
       {% for column_type in ucs_famlib %}
         {% if column_type == "family_name" %}
-        <th scope="col"><i class="fa-solid fa-bug " title="Family ID"></th>
+        <th scope="col"><i class="fa-solid fa-bug " title="Family ID"></i></th>
         {% elif column_type == "version" %}
           <th scope="col">Version</th>
         {% elif column_type == "sample_id" %}
-        <th style="text-align: right;" scope="col"><i class="fa-solid fa-virus" title="Sample ID"></th>
+        <th style="text-align: right;" scope="col"><i class="fa-solid fa-virus" title="Sample ID"></i></th>
         {% elif column_type == "sha256" %}
           <th style="text-align: right;" scope="col">SHA256</th>
         {% elif column_type == "filename" %}
@@ -142,19 +146,19 @@ Results for Job: {{ job_info.job_id }}
     <input class="col-4" type="text" name='filter_min_num_samples' id="filter_min_num_samples" aria-describedby="filter_min_num_samples" placeholder="min. samples" {% if matching_result.getFilterValue("filter_min_num_samples") is not none %}value={{matching_result.getFilterValue("filter_min_num_samples")}}{% endif %}>
     <input class="col-4" type="text" name='filter_max_num_samples' id="filter_max_num_samples" aria-describedby="filter_max_num_samples" placeholder="max. samples" {% if matching_result.getFilterValue("filter_max_num_samples") is not none %}value={{matching_result.getFilterValue("filter_max_num_samples")}}{% endif %}>
     <input class="col-1" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" aria-describedby="filter_exclude_library" {% if matching_result.getFilterValue("filter_exclude_library") %}checked{% endif %}>
-    <label class="col-3" for="block_count">exclude functions with library hits</label>
+    <label class="col-3" for="filter_exclude_library">exclude functions with library hits</label>
     <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" aria-describedby="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>
-    <label class="col-3" for="block_count">exclude PIC hits</label>
+    <label class="col-3" for="filter_exclude_pic">exclude PIC hits</label>
     <input class="col-1" type="checkbox" name='filter_func_unique' id="filter_func_unique" aria-describedby="filter_func_unique" {% if matching_result.getFilterValue("filter_func_unique") %}checked{% endif %}>
-    <label class="col-3" for="block_count">unique only</label>
+    <label class="col-3" for="filter_func_unique">unique only</label>
     <div class="d-grid gap-4 d-md-block">
-      <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">filter</button>
-      <button class="btn btn-secondary" type="submit" name="filter_button_action" value="clear">clear</button>
+      <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">Filter</button>
+      <button class="btn btn-secondary" type="submit" name="filter_button_action" value="clear">Clear</button>
     </div>
   </div>
 </form>
 <table class="table table-hover">
-  <thead class="thead-light">
+  <thead class="table-light">
     <tr>
     {% if ucs_functions is none %}
       {% set ucs_functions = ["matched_function_id", "offset", "num_bytes", "num_matched_families", "num_matched_samples", "num_matched_functions", "best_score", "num_minhash", "num_pichash", "is_library_match", "is_unique_match"] %}
@@ -163,9 +167,9 @@ Results for Job: {{ job_info.job_id }}
     {% if column_type == "matched_function_id" %}
     <th scope="col">Function ID</th>
     {% elif column_type == "offset" %}
-    <th style="text-align: right;" scope="col">offset</th>
+    <th style="text-align: right;" scope="col">Offset</th>
     {% elif column_type == "num_bytes" %}
-    <th style="text-align: right;" scope="col">num_bytes</th>
+    <th style="text-align: right;" scope="col">Bytes</th>
     {% elif column_type == "num_matched_families" %}
     <th style="text-align: right;" scope="col">Matched Families</th>
     {% elif column_type == "num_matched_samples" %}

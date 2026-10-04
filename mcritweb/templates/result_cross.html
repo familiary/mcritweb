@@ -41,7 +41,7 @@
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.bitness}}</td>
         <td class="" style="padding: 0 5px; font-size: 13px;color: black">{{sample.statistics['num_functions']}}</td>
       {% for sample2 in samples %}
-        <td><span onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}'";" class="hint--top" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) &#10;
+        <td><span onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}';" class="hint--top" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) &#10;
             {{ sample.sample_id }}: {{sample.sha256[:8]}} -- {{ sample.family }} {{ sample.version }} -- ({{sample.statistics['num_functions']}} func)
             &#10;vs.&#10;
             {{ sample2.sample_id }}: {{sample2.sha256[:8]}} -- {{ sample2.family }} {{ sample2.version }} -- ({{sample2.statistics['num_functions']}} func)" 
@@ -66,7 +66,7 @@ Results for Job: {{ job_info.job_id }}
   $(document).ready(function(){
     $("td.clickable").click(function(){
       var result = $(this).parent().children("td.result").text();
-      window.location.href="/data/result/"+result;
+      window.location.href = "{{ url_for('data.result', job_id='') }}" + result;
     });
   });
   $( function() {
@@ -77,9 +77,7 @@ Results for Job: {{ job_info.job_id }}
     var array2 = []
     for (let i = 0; i < array1.length; i++) {
         array2.push(array1[i].innerHTML.split(' ')[0]);} 
-    var result = {{ job_info.job_id|tojson }};
-    window.location.href="/data/result/"+result+"?custom="+array2;
-
+    window.location.href = "{{ url_for('data.result', job_id=job_info.job_id) }}" + "?custom=" + array2;
   }
 </script>
 {% endblock %} 
@@ -125,9 +123,10 @@ Results for Job: {{ job_info.job_id }}
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="editSampleModalLabel">Modify Sample</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-          <form action='{{ url_for("explore.modifySample") }}'' method="POST" style="width: 80%">
+          <form action="{{ url_for('explore.modifySample') }}" method="POST" style="width: 80%">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" class="form-control" name="sample_id" id="sample_id" hidden value="">
             <input type="text" class="form-control" name="redirection_job_id" id="redirection_job_id" hidden value="{{ job_info.job_id }}">
@@ -195,22 +194,22 @@ Results for Job: {{ job_info.job_id }}
 
 <ul class="nav nav-pills mb-3 justify-content-center" id="pills-tab" role="tablist">
     <li class="nav-item" role="presentation">
-      <button class="nav-link show active" id="pills-unweighted-tab" data-bs-toggle="pill" data-bs-target="#pills-unweighted" type="button" role="tab" aria-controls="pills-unweighted" aria-selected="true">unweighted</button>
+      <button class="nav-link show active" id="pills-unweighted-tab" data-bs-toggle="pill" data-bs-target="#pills-unweighted" type="button" role="tab" aria-controls="pills-unweighted" aria-selected="true">Unweighted</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="pills-score_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-score_weighted" type="button" role="tab" aria-controls="pills-score_weighted" aria-selected="false">score_weighted</button>
+      <button class="nav-link" id="pills-score_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-score_weighted" type="button" role="tab" aria-controls="pills-score_weighted" aria-selected="false">Score Weighted</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="pills-frequency_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-frequency_weighted" type="button" role="tab" aria-controls="pills-frequency_weighted" aria-selected="false">frequency_weighted</button>
+      <button class="nav-link" id="pills-frequency_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-frequency_weighted" type="button" role="tab" aria-controls="pills-frequency_weighted" aria-selected="false">Frequency Weighted</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="pills-nonlib_unweighted-tab" data-bs-toggle="pill" data-bs-target="#pills-nonlib_unweighted" type="button" role="tab" aria-controls="pills-nonlib_unweighted" aria-selected="false">nonlib_unweighted</button>
+      <button class="nav-link" id="pills-nonlib_unweighted-tab" data-bs-toggle="pill" data-bs-target="#pills-nonlib_unweighted" type="button" role="tab" aria-controls="pills-nonlib_unweighted" aria-selected="false">Non-Library Unweighted</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="pills-nonlib_score_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-nonlib_score_weighted" type="button" role="tab" aria-controls="pills-nonlib_score_weighted" aria-selected="false">nonlib_score_weighted</button>
+      <button class="nav-link" id="pills-nonlib_score_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-nonlib_score_weighted" type="button" role="tab" aria-controls="pills-nonlib_score_weighted" aria-selected="false">Non-Library Score Weighted</button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="pills-nonlib_frequency_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-nonlib_frequency_weighted" type="button" role="tab" aria-controls="pills-nonlib_frequency_weighted" aria-selected="false">nonlib_frequency_weighted</button>
+        <button class="nav-link" id="pills-nonlib_frequency_weighted-tab" data-bs-toggle="pill" data-bs-target="#pills-nonlib_frequency_weighted" type="button" role="tab" aria-controls="pills-nonlib_frequency_weighted" aria-selected="false">Non-Library Frequency Weighted</button>
       </li>
   </ul>
 
@@ -219,9 +218,9 @@ Results for Job: {{ job_info.job_id }}
 
     {% for method in matching_percent.keys() %}
       <div class="tab-pane fade {% if method=='unweighted' %}show active{%endif%}" id="pills-{{ method }}" role="tabpanel" aria-labelledby="pills-{{ method }}-tab">
-          <center> 
+          <div class="d-flex justify-content-center overflow-auto">
             {{ cross_table(method, samples[method], matching_percent[method], matching_matches[method], sample_indices[method], job_info) }}
-          </center>
+          </div>
       </div>
     {% endfor %}
 
