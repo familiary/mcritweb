@@ -8,6 +8,7 @@ Prevents UI/UX regressions:
 - Checks for well-formed `<i>` icon tags inside `<th>` table headers.
 - Verifies absence of hardcoded global `min-width: 900px` in `style.css`.
 - Prohibits informal `:(` emoticons in user-facing error templates.
+- Keeps the family-row click handler from navigating on clicks inside its links and buttons.
 """
 
 import os
@@ -112,3 +113,15 @@ def test_base_html_accessibility_and_semantics():
     assert 'width="459" height="150"' in content, "base.html brand logo is missing explicit dimensions"
     assert 'width="187" height="52"' in content, "base.html FKIE logo is missing explicit dimensions"
 
+
+
+def test_family_row_click_skips_links_and_buttons():
+    """A click on a family row's edit or Malpedia icon must not also open the family page.
+
+    The handler used to compare event.target.id, which only worked while style.css had
+    `a > * { pointer-events: none; }`; without it the target is the <i> icon.
+    """
+    with open(os.path.join(TEMPLATE_ROOT, "table", "family_row.html"), encoding="utf-8") as f:
+        content = f.read()
+    assert 'closest("a, button")' in content, "family-row click handler does not skip links and buttons"
+    assert "event.target.id" not in content, "family-row click handler still keys on event.target.id"

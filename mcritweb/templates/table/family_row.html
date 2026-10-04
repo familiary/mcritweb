@@ -32,19 +32,16 @@
 
 
     $("tr.family-row").click(function(e){
-      console.log(e.target.name)
-      if(event.target.id.includes("_edit")) {
+      // links and buttons in the row (edit, compare, export, Malpedia) do their own thing;
+      // closest() also catches a click on the icon inside them
+      if ($(e.target).closest("a, button").length) {
+        return;
       }
-      else if(e.target.name === 'malpedia') {
-        e.stopPropagation();
+      var family_id = $(this).children("th.id").text();
+      if (family_id === ''){
+        throw Error("Assertion failed")
       }
-      else{
-        var family_id = $(this).children("th.id").text();
-        if (family_id === ''){
-          throw Error("Assertion failed")
-        }
-        window.location.href="{{ url_for('explore.families') }}"+ "/" + family_id;  
-      }
+      window.location.href="{{ url_for('explore.families') }}"+ "/" + family_id;
     });
   });
 </script>
