@@ -90,6 +90,12 @@ def create_app(test_config=None, instance_path=None):
         # uncapped beyond MAX_CONTENT_LENGTH. Issue #19: this was hardcoded at 1 MiB for
         # visitors, which is the right default but the wrong place for it.
         QUERY_UPLOAD_LIMITS={'visitor': 1 * 2**20},
+        # Whether the API still accepts the pre-1.5.0 (32-character) API tokens. Issue
+        # #250 retired them deliberately rather than leaving them valid forever: flip
+        # this to False in instance/config.py to answer them with a 403 that says why.
+        # The default stays True for one release so operators can warn their users
+        # first - the settings page and the admin users page now point those out.
+        ACCEPT_LEGACY_APITOKENS=True,
         # Seconds to reuse the backend reachability answer for. `mcrit_server_required`
         # is on 36 routes and probed on every request to each of them, so a page load
         # could pay for several round-trips to say the same thing (issue #89). Short

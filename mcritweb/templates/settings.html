@@ -66,11 +66,20 @@ Settings
         <td>
           {{user_info.apitoken}} {{ clipboard_btn(user_info.apitoken) }}
           {# a write, so it is a button that POSTs rather than a link - see post_action.js #}
-          <button type="button" class="btn btn-outline-dark btn-sm"
+          <button type="button" class="btn {% if legacy_apitoken %}btn-danger{% else %}btn-outline-dark{% endif %} btn-sm"
                   data-post="{{ url_for('admin.regenerate_apitoken') }}"
                   title="Issue a new token. Anything using the old one stops working.">
             <i class="fa-solid fa-arrows-rotate"></i>
           </button>
+          {# a 32-character token predates 1.5.0's 64-character ones. The release kept
+             the old ones valid, so without this notice nothing ever moves them on. #250 #}
+          {% if legacy_apitoken %}
+          <div class="text-warning small mt-1">
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+            This token was issued before 1.5.0 (32-character form) and is deprecated.
+            Please regenerate it and update whatever uses the old one.
+          </div>
+          {% endif %}
         </td>
       </tr>
       {% endif %}
