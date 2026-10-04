@@ -16,6 +16,12 @@ html {
     color: #377ba8;
     margin: 1rem 0;
   }
+
+  /* headings moved to h2/h3 for a correct outline keep their old look through Bootstrap's
+     .h3/.h4 classes, but those also reset the margin; restore the one above */
+  h2.h3, h2.h4, h3.h4 {
+    margin: 1rem 0;
+  }
   
   a {
     color: #377ba8;
