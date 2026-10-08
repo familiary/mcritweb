@@ -143,7 +143,7 @@ def test_analyzing_a_function_lands_on_the_function_filtered_result(client, as_r
     assert response.status_code == 200
     assert response.request.path == f"/data/result/{job_id_of('matches_for_sample')}"
     assert response.request.args.get("funid") == str(FUNCTION_ID)
-    # the h3 of result_compare_function.html
+    # the h2 of result_compare_function.html
     assert f"Matches for Function: {FUNCTION_ID}".encode() in response.data
 
 

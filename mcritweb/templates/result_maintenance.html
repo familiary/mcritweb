@@ -8,7 +8,7 @@ Results for Job: {{ job_info.job_id }}
 {% block content %}
 <h1>Results for Job: {{ job_info.job_parameters }}</h1>
 {{ matching_result_job_column_table(job_info) }}
-<h3>Report</h3>
+<h2 class="h3">Report</h2>
 <p>Maintenance job completed with the following updates:</p>
 {% if job_info.parameters == "rebuildIndex()" %}
 Updated functions: {{ result['minhash_functions_indexed'] }}

@@ -116,9 +116,9 @@ Settings
           <label class="col-8">Filter results to (nonlib) frequency score</label>
           <input class="col-2" type="text" name='filter_frequency_min_score' id="filter_frequency_min_score" placeholder="regular" {% if user_filters.filter_frequency_min_score is not none %}value={{user_filters.filter_frequency_min_score}}{% endif %}>
           <input class="col-2" type="text" name='filter_frequency_nonlib_min_score' id="filter_frequency_nonlib_min_score" placeholder="nonlib" {% if user_filters.filter_frequency_nonlib_min_score is not none %}value={{user_filters.filter_frequency_nonlib_min_score}}{% endif %}>
-          <label class="col-8" for="block_count">only show families/samples with unique matches</label>
+          <label class="col-8" for="filter_unique_only">only show families/samples with unique matches</label>
           <input class="col-4" type="checkbox" name='filter_unique_only' id="filter_unique_only" aria-describedby="filter_unique_only" {% if user_filters.filter_unique_only %}checked{% endif %}>
-          <label class="col-8" for="block_count">exclude own family</label>
+          <label class="col-8" for="filter_exclude_own_family">exclude own family</label>
           <input class="col-4" type="checkbox" name='filter_exclude_own_family' id="filter_exclude_own_family" aria-describedby="filter_exclude_own_family" {% if user_filters.filter_exclude_own_family %}checked{% endif %}>
           <h3>Function result filter</h3> 
           <label class="col-8">Filter results to min score</label>
@@ -127,9 +127,9 @@ Settings
           <input class="col-4" type="text" name='filter_function_max_score' id="filter_function_max_score" aria-describedby="filter_function_max_score" placeholder="max score (0-100)" {% if user_filters.filter_function_max_score is not none %}value={{user_filters.filter_function_max_score}}{% endif %}>
           <label class="col-8">Filter results to max num families/samples</label>
           <input class="col-4" type="text" name='filter_max_num_families' id="filter_max_num_families" aria-describedby="filter_max_num_families" placeholder="max. families" {% if user_filters.filter_max_num_families is not none %}value={{user_filters.filter_max_num_families}}{% endif %}>
-          <label class="col-8" for="block_count">exclude functions with library hits</label>
+          <label class="col-8" for="filter_exclude_library">exclude functions with library hits</label>
           <input class="col-4" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" aria-describedby="filter_exclude_library" {% if user_filters.filter_exclude_library %}checked{% endif %}>
-          <label class="col-8" for="block_count">exclude PIC hits</label>
+          <label class="col-8" for="filter_exclude_pic">exclude PIC hits</label>
           <input class="col-4" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" aria-describedby="filter_exclude_pic" {% if user_filters.filter_exclude_pic %}checked{% endif %}>
         </div>
         <button type="submit" class="btn btn-primary">Confirm change</button>

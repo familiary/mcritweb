@@ -16,12 +16,12 @@ Results for Job: {{ job_info.job_id }}
 
 {{ matching_result_job_column_table(job_info) }}
 
-<h3>Input Sample</h3>
+<h2 class="h3">Input Sample</h2>
 {{ sample_column_table(("Reference Sample", matching_result.reference_sample_entry)) }}
 
 <p><a href="{{'/data/result/' + job_info.job_id}}">Go to full matching report</a></p>
 
-<h3 id="linkhunt-matches">Results</h3>
+<h2 class="h3" id="linkhunt-matches">Results</h2>
 <p>selection: {{ funp.max_value }}, showing: {{ 1 + funp.start_index }} - {{ funp.end_index }} (filtered: {{ matching_result.num_original_function_matches - funp.max_value}})</p>
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#linkhunt-matches" method='GET'>
     <div class="form-group row">
@@ -38,7 +38,7 @@ Results for Job: {{ job_info.job_id }}
       <label class="col-4">Exclude families/samples</label>
       <input class="col-4" type="text" name='filter_exclude_families' id="filter_exclude_families" aria-describedby="filter_exclude_families" placeholder="1, 2, 3" {% if matching_result.getFilterValue("filter_exclude_families") is not none %}value='{{matching_result.getFilterValue("filter_exclude_families")}}'{% endif %}>
       <input class="col-4" type="text" name='filter_exclude_samples' id="filter_exclude_samples" aria-describedby="filter_exclude_samples" placeholder="1, 2, 3" {% if matching_result.getFilterValue("filter_exclude_samples") is not none %}value='{{matching_result.getFilterValue("filter_exclude_samples")}}'{% endif %}>
-      <label class="col-4" for="block_count">strongest per family only</label>
+      <label class="col-4" for="filter_strongest_per_family">strongest per family only</label>
       <input class="col-1" type="checkbox" name='filter_strongest_per_family' id="filter_strongest_per_family" aria-describedby="filter_strongest_per_family" {% if matching_result.getFilterValue("filter_strongest_per_family") %}checked{% endif %}>
       <div class="d-grid gap-4 d-md-block">
         <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">filter</button>
@@ -46,7 +46,7 @@ Results for Job: {{ job_info.job_id }}
       </div>
     </div>
 </form>
-<h4 id="linkhunt-clusters">Link Clusters</h4>
+<h3 class="h4" id="linkhunt-clusters">Link Clusters</h3>
 <p>These are clusters of matches with another single family where all functions have a direct code CFG relationship (calls, jumps, ...) among them. Bold matches are also unique with this other family.</p>
 {# a cluster can hold any number of links, so only the first few are shown open #}
 {% set shown_links = 8 %}
@@ -71,7 +71,7 @@ Results for Job: {{ job_info.job_id }}
       <td style="text-align: right;" valign="middle"><i class="fa-solid fa-bug " title="Family ID"></i>({{ cluster_entry['family_id'] }}) {{ format_family_name(cluster_entry['family'], cluster_entry['family_id']) }}</td>
       <td style="text-align: right;" valign="middle">{{ "%d"|format(cluster_entry['links']|length) }}</td>
       <td style="text-align: right;" valign="middle">{{ "%d"|format(cluster_entry['unique_matches']|length) }}</td>
-      <td style="text-align: right;" valign="middle">
+      <td style="text-align: right;" valign="middle" class="linkhunt-links">
         {% for link_entry in cluster_entry["links"] %}
           {% if loop.index == shown_links + 1 %}
           <details><summary>{{ loop.length - shown_links }} more</summary>
@@ -83,7 +83,7 @@ Results for Job: {{ job_info.job_id }}
             0x{{ "%x"|format(link_entry.offset) }}</a>
             {% endif %}
             {% if not matching_result.is_query %}
-              <a target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>
+              <a aria-label="Compare the two functions" title="Compare the two functions" target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>
               &nbsp;
             {% endif %}
             {% if loop.index > 0 and loop.index % 4 == 0 %}
@@ -99,7 +99,7 @@ Results for Job: {{ job_info.job_id }}
   </tbody>
 </table>
 {{ pagination_widget(clup, _anchor="linkhunt-clusters")}}
-<h4 id="linkhunt-links">Individual Links</h4>
+<h3 class="h4" id="linkhunt-links">Individual Links</h3>
 <p>Family-unique matches in bold.</p>
 <table class="table table-hover">
     <thead class="thead-light">
@@ -132,7 +132,7 @@ Results for Job: {{ job_info.job_id }}
           {% else %}
           {{ link_entry.matched_function_id }}
           {% endif %}
-        </a>{% if not matching_result.is_query %}&nbsp;<a target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>{% endif %}</td>
+        </a>{% if not matching_result.is_query %}&nbsp;<a aria-label="Compare the two functions" title="Compare the two functions" target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>{% endif %}</td>
         <td style="text-align: right;" valign="middle">{{ "%5.2f"|format(link_entry.matched_score) }}</td>
      </tr>
       {% endfor %}

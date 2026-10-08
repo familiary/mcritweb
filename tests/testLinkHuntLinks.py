@@ -21,7 +21,7 @@ logging.disable(logging.CRITICAL)
 REPORT = "matches_for_sample"
 
 #: The body of the link cluster table.
-CLUSTER_TABLE = re.compile(r"Link Clusters</h4>.*?<tbody>(.*?)</tbody>", re.S)
+CLUSTER_TABLE = re.compile(r"Link Clusters</h\d>.*?<tbody>(.*?)</tbody>", re.S)
 
 #: One link of a cluster: the offset of the function it starts from.
 CLUSTER_LINK = re.compile(r"/explore/functions/\d+\">\s*(?:<b[^>]*>)?(0x[0-9a-f]+)")

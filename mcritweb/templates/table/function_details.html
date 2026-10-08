@@ -58,7 +58,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
 {% endmacro %}
 
 {% macro api_usage_button(modal_id) %}
-  <a class="btn btn-outline-dark btn-sm" role="button" data-bs-toggle="modal" data-bs-target="#{{ modal_id }}" title="API usage"><i class="fa-solid fa-code"></i></a>
+  <a class="btn btn-outline-dark btn-sm" role="button" data-bs-toggle="modal" data-bs-target="#{{ modal_id }}" aria-label="API usage" title="API usage"><i class="fa-solid fa-code"></i></a>
 {% endmacro %}
 
 
@@ -117,7 +117,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
         </tbody>
       </table>
     {% else %}
-      <p class="mt-2 mb-0" style="color: grey; font-size: 0.9em;">No shingle composition recorded (the backend tracks it only with <code>MINHASH_TRACK_SHINGLES</code>).</p>
+      <p class="mt-2 mb-0" style="color: #6c757d; font-size: 0.9em;">No shingle composition recorded (the backend tracks it only with <code>MINHASH_TRACK_SHINGLES</code>).</p>
     {% endif %}
   {% else %}
     <p class="mb-0">

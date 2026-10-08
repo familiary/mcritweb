@@ -33,15 +33,15 @@ Search
     <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" {% if focus_search.value %}autofocus{% endif %} autocomplete="on">
     <div>
       <input class="form-check-input shadow-none" type="checkbox" name="type" value="family" id="families_checkbox" {% if search_types.__contains__('family') %}checked{% endif %}>
-      <label class="form-check-label" for="flexCheckChecked">
+      <label class="form-check-label" for="families_checkbox">
         Families
       </label>
       <input class="form-check-input shadow-none" type="checkbox" name="type" value="sample" id="samples_checkbox" {% if search_types.__contains__('sample') %}checked{% endif %}>
-      <label class="form-check-label" for="flexCheckChecked">
+      <label class="form-check-label" for="samples_checkbox">
         Samples
       </label>
       <input class="form-check-input shadow-none" type="checkbox" name="type" value="function" id="functions_checkbox" {% if search_types.__contains__('function') %}checked{% endif %}>
-      <label class="form-check-label" for="flexCheckChecked">
+      <label class="form-check-label" for="functions_checkbox">
         Functions
       </label>
       | <a href="{{ url_for('help') }}#search"><i class="fas fa-book"></i> Search Syntax</a>
@@ -64,7 +64,7 @@ Search
 
   {% if families |length > 0 or (family_pagination and family_pagination.hasCurrent) %}
     {% if families |length > 0 %}{% set rendered.anything = True %}{% endif %}
-    <h3 id="family-results">Families</h3>
+    <h2 class="h3" id="family-results">Families</h2>
     {{ set_pagination_params(family_pagination, _anchor="family-results") }}
     {{ family_table(families, sort_pagination=family_pagination, column_setup=family_column_setup, row_decorations=family_decorations) }}
     {% if families %}
@@ -74,7 +74,7 @@ Search
 
   {% if samples |length > 0 or (sample_pagination and sample_pagination.hasCurrent) %}
     {% if samples |length > 0 %}{% set rendered.anything = True %}{% endif %}
-    <h3 id="sample-results">Samples</h3>
+    <h2 class="h3" id="sample-results">Samples</h2>
     {{ set_pagination_params(sample_pagination, _anchor="sample-results") }}
     {{ sample_table(samples, sort_pagination=sample_pagination, column_setup=sample_column_setup, row_decorations=sample_decorations) }}
     {% if samples %}
@@ -85,7 +85,7 @@ Search
   {% if query and not search_types.__contains__('function') %}
     {# Never leave the omission silent: without this, a search for a function name
        reads as "no such function" rather than "functions were not searched". #}
-    <h3 id="function-results">Functions</h3>
+    <h2 class="h3" id="function-results">Functions</h2>
     <p class="text-muted">
       Not searched.
       <a href="{{ url_for('explore.search', query=query, type=(search_types + ['function'])|join(',')) }}">Search functions too</a>
@@ -95,7 +95,7 @@ Search
 
   {% if functions |length > 0 or (function_pagination and function_pagination.hasCurrent) %}
     {% if functions |length > 0 %}{% set rendered.anything = True %}{% endif %}
-    <h3 id="function-results">Functions</h3>
+    <h2 class="h3" id="function-results">Functions</h2>
     {{ set_pagination_params(function_pagination, _anchor="function-results") }}
     {{ function_table(functions, sort_pagination=function_pagination, column_setup=function_column_setup, row_decorations=function_decorations) }}
     {% if functions %}

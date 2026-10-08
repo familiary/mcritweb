@@ -8,7 +8,7 @@
   
   $(document).ready(function(){
     var editSampleModal = document.getElementById('editSampleModal');
-    editSampleModal.addEventListener('show.bs.modal', function (event) {
+    editSampleModal?.addEventListener('show.bs.modal', function (event) {
     // Button that triggered the modal
     var button = event.relatedTarget;
     // Extract info from data-bs-* attributes
@@ -150,9 +150,9 @@
     {% if (show_export or show_analyze) %}
       <td align="right" class="buttons">
         {% if show_analyze %}
-          <button type="button" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_analyze" onclick=set_analyze_sample_button_clicked() bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <button type="button" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_analyze" title="Analyze" onclick=set_analyze_sample_button_clicked() bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             {% if job_collection and matching_jobs %}
-            <i style="color:green;" class="fa-solid fa-flask"></i>&nbsp;{{ matching_jobs | length}}
+            <i style="color:green;" class="fa-solid fa-flask"></i><span class="visually-hidden">Analyze, matching jobs:</span>&nbsp;{{ matching_jobs | length}}
             {% else %}
             <i class="fa-solid fa-flask"></i>
             {% endif %}
@@ -168,13 +168,13 @@
           </div>
         {% endif %}
         {% if show_analyze %}
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_family_blocks" href="{{ url_for('analyze.blocks_sample', sample_id=sample.sample_id) }}" role="button" target="_self"><i class="fa-solid fa-cubes-stacked"></i></a>
+          <a aria-label="Unique blocks" title="Unique blocks" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_family_blocks" href="{{ url_for('analyze.blocks_sample', sample_id=sample.sample_id) }}" role="button" target="_self"><i class="fa-solid fa-cubes-stacked"></i></a>
         {% endif %}
         {% if show_export %}
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=sample.sample_id) }}" role="button" target="_self"><i class="fa-solid fa-file-export"></i></a>
+          <a aria-label="Export" title="Export" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=sample.sample_id) }}" role="button" target="_self"><i class="fa-solid fa-file-export"></i></a>
         {% endif %}
         {% if show_edit %}
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square"></i></a>
+          <a aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square"></i></a>
         {% endif %}
       </td>
     {% endif %}
