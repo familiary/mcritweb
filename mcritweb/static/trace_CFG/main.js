@@ -95,6 +95,9 @@
   var CFG_DEFERRED_LAYOUT_BLOCKS = 250;
   // set when the code panel was built before the graph, so showGraph() leaves it be
   var isCodeShownWithoutGraph = false;
+  // set once getCodefromGraph() has started: it renders after its lookups, so the panel's
+  // paragraphs can't tell whether a build is already under way
+  var isCodePanelRequested = false;
 
   var isHoverOnLeftPanel=false;
 
@@ -1290,7 +1293,12 @@ function highlightUERs(UERtype){
           try {
             // console.log("Response: ", result.responseText);
             loopsObj = JSON.parse(result.responseText);
-
+          } catch (error) {
+            // a 200 that is not loop data: a login page, once the session has expired
+            graphNotDrawn("the loop detection did not answer with loop data", error, isDeferred);
+            return;
+          }
+          try {
             loopify_dagre.init();
             var modifiedDotFile = loopify_dagre.modifiedDotFile;
             // console.log(modifiedDotFile);
@@ -1300,14 +1308,8 @@ function highlightUERs(UERtype){
             // load; the note painted on the click stays on screen until the layout is done
             d3.select("#cfgDeferred").classed("hidden", true);
             showGraph(isTraceSupplied);
-            loopify_dagre.addBackground();
-
-            fnManip.init();
-            loopCollapser.init();
           } catch (error) {
-            // a 200 that is not loop data (a login page, once the session has expired) or a
-            // layout that failed: say so, rather than leave the page waiting for a graph
-            graphNotDrawn("the graph could not be laid out", error);
+            graphNotDrawn("the graph could not be laid out", error, isDeferred);
             return;
           }
 
@@ -1316,24 +1318,32 @@ function highlightUERs(UERtype){
             // the focused note is gone with the prompt; keep keyboard users in the graph's controls
             d3.select("#showCycles").node().focus();
           }
+          loopify_dagre.addBackground();
+
+          fnManip.init();
+          loopCollapser.init();
         });
   }
 
   // mcritweb, issue #267: any failure to draw the graph ends here, whether it was deferred
   // or meant to be drawn on load. The code panel is shown if it is not yet, and the prompt
-  // comes back with the reason and its button, so the user can try again.
-  function graphNotDrawn(reason, error) {
+  // comes back with the reason and its button, so the user can try again. After a click, focus
+  // goes back to the note, which the layout had hidden.
+  function graphNotDrawn(reason, error, refocus) {
     console.warn("control flow graph not drawn: " + reason, error);
     d3.select("#graphContainer g").selectAll("*").remove();
     if (!isCodeShownWithoutGraph) {
       isCodeShownWithoutGraph = true;
-      getCodefromGraph();
+      getCodefromGraph();  // once per page: showGraph() may have built it before failing
       offerDeferredGraph(g.nodes().length);
     }
     d3.select("#cfgDeferred").classed("hidden", false);
-    d3.select("#cfgDeferredNote").text("The graph of these " + g.nodes().length + " blocks was not drawn: "
+    var note = d3.select("#cfgDeferredNote").text("The graph of these " + g.nodes().length + " blocks was not drawn: "
       + reason + ". Its code is on the right. Try again, or reload the page if your session has expired.");
     d3.select("#drawGraph").property("disabled", false);
+    if (refocus) {
+      note.node().focus();
+    }
   }
 
   // mcritweb, issue #267: instead of laying a large graph out on load, say how large it is
@@ -1459,6 +1469,7 @@ function highlightUERs(UERtype){
   // Reset on loading new files
   function initialize() {
     isCodeShownWithoutGraph = false;  // mcritweb, issue #267
+    isCodePanelRequested = false;
     currentNode = null;
     g = null;
     codes = [];
@@ -2415,7 +2426,7 @@ function highlightUERs(UERtype){
     // If trace is supplied, find the trace text instead of the CFG text
     // Setup highlighting and linking code to link to trace blocks instead of CFG blocks if trace supplied
     // getCodefromGraph(); 
-    if(!isTraceSupplied && !isCodeShownWithoutGraph){
+    if(!isTraceSupplied){
       getCodefromGraph();
       // MCRIT fix: we might need to resize the SVG to the text
       // var text_box_height = d3.select("#text_code").node().getBoundingClientRect().height;
@@ -3370,6 +3381,11 @@ function highlightUERs(UERtype){
   // Wires up linked highlighting
   // TODO:Add linked scrolling to trace and non-trace version
   function getCodefromGraph(){
+    // mcritweb, issue #267: a failed layout can ask again after showGraph() did
+    if (isCodePanelRequested) {
+      return;
+    }
+    isCodePanelRequested = true;
     var nodes = g.nodes();
     var num_nodes = nodes.length;
     var lookups = [];

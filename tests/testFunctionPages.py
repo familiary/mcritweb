@@ -608,21 +608,23 @@ def test_every_failure_to_draw_the_graph_is_reported():
     must bring the prompt and its button back rather than leave a page waiting (#267)."""
     draw = _main_js_function("findLoopsAndShowGraph")
     assert re.search(r"if\s*\(\s*err\s*\|\|\s*!result\s*\)\s*\{\s*graphNotDrawn\(", draw)
-    attempt = draw[draw.index("try {"):draw.index("catch (error)")]
-    assert _calls(attempt, "JSON.parse") and _calls(attempt, "showGraph")
-    assert _calls(draw[draw.index("catch (error)"):], "graphNotDrawn")
+    # parsing the answer and laying the graph out each fail into graphNotDrawn()
+    attempts = re.findall(r"try\s*\{(.*?)\}\s*catch\s*\(error\)\s*\{(.*?)\}", draw, re.S)
+    assert [bool(_calls(t, "JSON.parse")) for t, _ in attempts] == [True, False]
+    assert [bool(_calls(t, "showGraph")) for t, _ in attempts] == [False, True]
+    assert all(_calls(c, "graphNotDrawn") for _, c in attempts)
     failed = _main_js_function("graphNotDrawn")
     assert re.search(r'd3\.select\("#drawGraph"\)\.property\("disabled",\s*false\)', failed)
     assert re.search(r'd3\.select\("#cfgDeferred"\)\.classed\("hidden",\s*false\)', failed)
     assert _calls(failed, "getCodefromGraph")
 
 
-def test_show_graph_does_not_build_the_code_panel_twice():
-    """A deferred graph's code panel exists before the graph; showGraph must not build a
-    second one, which would also send every block lookup again (#267)."""
-    # commented-out lines are not calls; upstream left one there
-    show = re.sub(r"(?m)^\s*//.*$", "", _main_js_function("showGraph"))
-    calls = _calls(show, "getCodefromGraph")
-    assert len(calls) == 1
-    guard = show.rfind("if", 0, calls[0])
-    assert "!isCodeShownWithoutGraph" in show[guard:calls[0]]
+def test_the_code_panel_is_built_once_per_page():
+    """A deferred graph's code panel exists before the graph, and a failed layout can ask for
+    it after showGraph() did; a second build would send every block lookup again (#267).
+    getCodefromGraph() returns before its first lookup when it has already run."""
+    build = re.sub(r"(?m)^\s*//.*$", "", _main_js_function("getCodefromGraph"))
+    first_lookup = build.find("var nodes")
+    assert re.search(r"if\s*\(\s*isCodePanelRequested\s*\)\s*\{\s*return;\s*\}", build[:first_lookup])
+    assert re.search(r"isCodePanelRequested\s*=\s*true;", build[:first_lookup])
+    assert re.search(r"isCodePanelRequested\s*=\s*false;", _main_js_function("initialize"))
