@@ -3,9 +3,8 @@
 
 Hovering a node highlights its block in the code panel and scrolls the panel to it.
 main.js looked the panel up as `#xcfg_right`, which only the comparison page has, and
-threw on every hover; a node without a code paragraph of its own threw from a d3
-selection used as an array. Both only show in a browser, so they are watched here on
-the offline harness of testFunctionVsBrowser.py, which skips without playwright.
+threw on every hover. That only shows in a browser, so it is watched here on the
+offline harness of testFunctionVsBrowser.py, which skips without playwright.
 """
 
 import pytest

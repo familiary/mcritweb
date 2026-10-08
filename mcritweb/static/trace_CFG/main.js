@@ -2685,17 +2685,9 @@ function highlightUERs(UERtype){
           if(nodeId in nodeToTextGroups){
             textToHighlight = nodeToTextGroups[nodeId];
           } else {
-            // mcritweb: a block the code panel has no entry for yet, or a node that is not a
-            // block (loopify_dagre.js adds some). The code paragraphs carry their block as
-            // `d.nodeId`, and the loop below wants one selection per paragraph; a d3 v3
-            // selection here threw "node is not a function" on every such hover.
-            textToHighlight = [];
-            d3.selectAll("#text_code p")
+            textToHighlight = d3.selectAll("#text_code p")
               .filter(function(d) {
-                return d && d.nodeId === nodeId;
-              })
-              .each(function() {
-                textToHighlight.push(d3.select(this));
+                return nodeId === d;
               });
           }
 

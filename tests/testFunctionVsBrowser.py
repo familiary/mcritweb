@@ -663,5 +663,5 @@ def test_the_combined_tooltip_stays_inside_its_pane(comparison_page):
         shown += 1
         assert state["right"] <= 1 and state["left"] <= 1, f"combined block {index}: {state}"
         assert state["text"] <= 1, f"combined block {index}: the text runs out of its tooltip"
-    if not shown:
-        pytest.skip("no block of this pair differs, so the combined view shows no tooltip")
+    # the captured pair has blocks that differ; a tooltip that stops appearing must not pass
+    assert shown > 0, "no combined block showed a tooltip"
