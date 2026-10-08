@@ -38,6 +38,19 @@ html {
     display: inline-block;
     min-width: 24px;
   }
+
+  /* the link hunt's cluster cell stacks four matches to a line, so its links sit one
+     21.6px line apart - closer than the 24px WCAG 2.5.8 asks - and the "N more" toggle
+     sits right under them; give that one cell 24px lines instead of every table */
+  .linkhunt-links a {
+    display: inline-block;
+    min-height: 24px;
+    line-height: 24px;
+  }
+  /* a summary keeps display: list-item, which is what draws its disclosure triangle */
+  .linkhunt-links summary {
+    line-height: 24px;
+  }
   
   hr {
     border: none;

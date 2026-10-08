@@ -71,7 +71,7 @@ Results for Job: {{ job_info.job_id }}
       <td style="text-align: right;" valign="middle"><i class="fa-solid fa-bug " title="Family ID"></i>({{ cluster_entry['family_id'] }}) {{ format_family_name(cluster_entry['family'], cluster_entry['family_id']) }}</td>
       <td style="text-align: right;" valign="middle">{{ "%d"|format(cluster_entry['links']|length) }}</td>
       <td style="text-align: right;" valign="middle">{{ "%d"|format(cluster_entry['unique_matches']|length) }}</td>
-      <td style="text-align: right;" valign="middle">
+      <td style="text-align: right;" valign="middle" class="linkhunt-links">
         {% for link_entry in cluster_entry["links"] %}
           {% if loop.index == shown_links + 1 %}
           <details><summary>{{ loop.length - shown_links }} more</summary>
