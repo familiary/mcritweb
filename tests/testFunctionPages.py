@@ -556,3 +556,75 @@ def test_the_cfg_scripts_make_no_synchronous_request(script):
         source = f.read()
     assert not re.search(r"\.open\s*\([^;]*,\s*false\s*\)", source)
     assert 'fetch("../getPicBlockMatches/" + hash_only)' in source
+
+
+def _main_js_function(name):
+    """The source of `function <name>(...)` in main.js, up to the next function at the
+    same indentation; functions nested inside it are indented deeper and stay in."""
+    import os
+    path = os.path.join(os.path.dirname(__file__), "..", "mcritweb", "static", "trace_CFG", "main.js")
+    with open(path) as f:
+        source = f.read()
+    start = re.search(r"\n(\s*)function " + re.escape(name) + r"\(", source)
+    assert start, name
+    end = source.find("\n" + start.group(1) + "function ", start.end())
+    return source[start.start():end]
+
+
+def _calls(source, call):
+    """Where `call(...)` appears in `source`, whitespace inside it ignored."""
+    return [m.start() for m in re.finditer(re.escape(call).replace(r"\ ", r"\s*") + r"\s*\(", source)]
+
+
+def test_the_function_page_carries_the_deferred_graph_prompt(client, as_role):
+    """main.js shows `#cfgDeferred` and toggles `.cfg-graph-control` for a large graph (#267);
+    without them in the template the page would neither offer the graph nor block its controls."""
+    as_role("visitor")
+    page = client.get(f"/explore/functions/{MULTI_BLOCK_FUNCTION}").get_data(as_text=True)
+    deferred = re.search(r'<div id="cfgDeferred"[^>]*>', page)
+    assert deferred and re.search(r'class="[^"]*\bhidden\b', deferred.group(0))
+    note = re.search(r'<p id="cfgDeferredNote"[^>]*>', page)
+    assert note and 'role="status"' in note.group(0) and 'aria-live="polite"' in note.group(0)
+    assert 'id="cfgDeferredBlocks"' in page
+    assert re.search(r'<button type="button"[^>]*id="drawGraph"', page)
+    for control in ("showCycles", "showLoops", "loopBgFill", "enableTooltip"):
+        tag = re.search(r'<input\b[^>]*\bid="' + control + r'"[^>]*>', page)
+        assert tag and re.search(r'class="[^"]*\bcfg-graph-control\b', tag.group(0)), control
+
+
+def test_a_large_graph_is_offered_rather_than_laid_out_on_load():
+    """dagre's layout froze the page for seconds on large functions (#267): above the
+    threshold the code panel is shown at once and the graph waits for a click."""
+    load = _main_js_function("loadWithDotGraphAndFunctionId")
+    branch = re.search(r"if\s*\(\s*num_blocks\s*>\s*CFG_DEFERRED_LAYOUT_BLOCKS\s*\)", load)
+    otherwise = re.search(r"\}\s*else\s*\{", load[branch.end():])
+    deferred, eager = load[branch.end():branch.end() + otherwise.start()], load[branch.end() + otherwise.end():]
+    assert _calls(deferred, "getCodefromGraph") and _calls(deferred, "offerDeferredGraph")
+    assert not _calls(deferred, "findLoopsAndShowGraph") and _calls(eager, "findLoopsAndShowGraph")
+
+
+def test_every_failure_to_draw_the_graph_is_reported():
+    """A failed loop request, an answer that is not loop data, or a layout that throws
+    must bring the prompt and its button back rather than leave a page waiting (#267)."""
+    draw = _main_js_function("findLoopsAndShowGraph")
+    assert re.search(r"if\s*\(\s*err\s*\|\|\s*!result\s*\)\s*\{\s*graphNotDrawn\(", draw)
+    # parsing the answer and laying the graph out each fail into graphNotDrawn()
+    attempts = re.findall(r"try\s*\{(.*?)\}\s*catch\s*\(error\)\s*\{(.*?)\}", draw, re.S)
+    assert [bool(_calls(t, "JSON.parse")) for t, _ in attempts] == [True, False]
+    assert [bool(_calls(t, "showGraph")) for t, _ in attempts] == [False, True]
+    assert all(_calls(c, "graphNotDrawn") for _, c in attempts)
+    failed = _main_js_function("graphNotDrawn")
+    assert re.search(r'd3\.select\("#drawGraph"\)\.property\("disabled",\s*false\)', failed)
+    assert re.search(r'd3\.select\("#cfgDeferred"\)\.classed\("hidden",\s*false\)', failed)
+    assert _calls(failed, "getCodefromGraph")
+
+
+def test_the_code_panel_is_built_once_per_page():
+    """A deferred graph's code panel exists before the graph, and a failed layout can ask for
+    it after showGraph() did; a second build would send every block lookup again (#267).
+    getCodefromGraph() returns before its first lookup when it has already run."""
+    build = re.sub(r"(?m)^\s*//.*$", "", _main_js_function("getCodefromGraph"))
+    first_lookup = build.find("var nodes")
+    assert re.search(r"if\s*\(\s*isCodePanelRequested\s*\)\s*\{\s*return;\s*\}", build[:first_lookup])
+    assert re.search(r"isCodePanelRequested\s*=\s*true;", build[:first_lookup])
+    assert re.search(r"isCodePanelRequested\s*=\s*false;", _main_js_function("initialize"))
