@@ -46,6 +46,9 @@ VISITOR_PAGES = [
     "/analyze/compare_versus",
     "/analyze/cross_compare",
     "/analyze/unique_blocks",
+    # with samples selected, both list them with a remove control
+    "/analyze/cross_compare?samples=0,1",
+    "/analyze/unique_blocks?samples=0,1",
     "/settings",
     "/help",
     f"/data/jobs/{job_id_of('matches_for_sample')}",
