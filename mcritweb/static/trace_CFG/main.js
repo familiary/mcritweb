@@ -2728,21 +2728,27 @@ function highlightUERs(UERtype){
             var xPosition = pos[0];	
             var yPosition = pos[1];
 
-            var text = "";
+            var lines = [];
             thisNode.selectAll("text tspan").each(function(){
-              text+=d3.select(this).text() + "<br/>";
+              lines.push(d3.select(this).text());
             });
 
             var width = rect.node().getBBox().width;
 
             //Update the tooltip position and value
-            d3.select("#tooltip")
+            var value = d3.select("#tooltip")
               .style("left", xPosition + "px")
               .style("top", yPosition + "px")
               .style("width", function(){return (width*1.25) + "px"})
               .select("#value")
-              .node().innerHTML = text;
-              // .text(text);
+              .node();
+            // mcritweb: a block's lines are text from the analysed binary (API names among
+            // them), so they go in as text nodes; joined into innerHTML they ran as markup
+            value.textContent = "";
+            lines.forEach(function(line){
+              value.appendChild(document.createTextNode(line));
+              value.appendChild(document.createElement("br"));
+            });
 
             //Show the tooltip
             d3.select("#tooltip").classed("hidden", false);
