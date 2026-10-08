@@ -556,3 +556,61 @@ def test_the_cfg_scripts_make_no_synchronous_request(script):
         source = f.read()
     assert not re.search(r"\.open\s*\([^;]*,\s*false\s*\)", source)
     assert 'fetch("../getPicBlockMatches/" + hash_only)' in source
+
+
+
+def _main_js_function(name):
+    """The source of `function <name>(...)` in main.js, up to the next top-level function."""
+    import os
+    path = os.path.join(os.path.dirname(__file__), "..", "mcritweb", "static", "trace_CFG", "main.js")
+    with open(path) as f:
+        source = f.read()
+    start = source.index(f"  function {name}(")
+    end = source.find("\n  function ", start + 1)
+    return source[start:end]
+
+
+def test_the_function_page_carries_the_deferred_graph_prompt(client, as_role):
+    """main.js shows `#cfgDeferred` and toggles `.cfg-graph-control` for a large graph (#267);
+    without them in the template the page would neither offer the graph nor block its controls."""
+    as_role("visitor")
+    page = client.get(f"/explore/functions/{MULTI_BLOCK_FUNCTION}").get_data(as_text=True)
+    assert '<div id="cfgDeferred" class="hidden"' in page
+    assert 'id="cfgDeferredNote" role="status" aria-live="polite"' in page
+    assert 'id="cfgDeferredBlocks"' in page
+    assert re.search(r'<button type="button"[^>]*id="drawGraph"', page)
+    for control in ("showCycles", "showLoops", "loopBgFill", "enableTooltip"):
+        assert re.search(r'id="' + control + r'" class="cfg-graph-control"', page), control
+
+
+def test_a_large_graph_is_offered_rather_than_laid_out_on_load():
+    """dagre's layout froze the page for seconds on large functions (#267): above the
+    threshold the code panel is shown at once and the graph waits for a click."""
+    load = _main_js_function("loadWithDotGraphAndFunctionId")
+    deferred = load.index("if (num_blocks > CFG_DEFERRED_LAYOUT_BLOCKS) {")
+    otherwise = load.index("} else {", deferred)
+    assert "getCodefromGraph();" in load[deferred:otherwise]
+    assert "offerDeferredGraph(num_blocks);" in load[deferred:otherwise]
+    assert "findLoopsAndShowGraph();" in load[otherwise:]
+    assert "findLoopsAndShowGraph();" not in load[deferred:otherwise]
+
+
+def test_drawing_a_deferred_graph_restores_the_page():
+    """Drawing hides the prompt and re-enables the graph's controls; a failed loop request
+    gives the button back instead of leaving a page that promises a graph forever (#267)."""
+    draw = _main_js_function("findLoopsAndShowGraph")
+    failure = draw.index("if (err || !result) {")
+    success = draw.index("loopsObj = JSON.parse(result.responseText);")
+    assert failure < success
+    assert 'd3.select("#drawGraph").property("disabled", false);' in draw[failure:success]
+    hide = draw.index('d3.select("#cfgDeferred").classed("hidden", true);')
+    assert success < hide < draw.index("showGraph(isTraceSupplied);")
+    assert 'd3.selectAll(".cfg-graph-control").property("disabled", false);' in draw[hide:]
+
+
+def test_show_graph_does_not_build_the_code_panel_twice():
+    """A deferred graph's code panel exists before the graph; showGraph must not build a
+    second one, which would also send every block lookup again (#267)."""
+    show = _main_js_function("showGraph")
+    assert "if(!isTraceSupplied && !isCodeShownWithoutGraph){\n      getCodefromGraph();" in show
+    assert show.count("\n      getCodefromGraph();") == 1

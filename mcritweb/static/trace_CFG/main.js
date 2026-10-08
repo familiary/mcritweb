@@ -89,6 +89,13 @@
 
   var isTraceSupplied = false;
 
+  // mcritweb, issue #267: above this many blocks, dagre's layout freezes the page for
+  // seconds (measured on a real backend: about 1 s at 250 blocks, 19 s at 971), so the
+  // graph waits for a click
+  var CFG_DEFERRED_LAYOUT_BLOCKS = 250;
+  // set when the code panel was built before the graph, so showGraph() leaves it be
+  var isCodeShownWithoutGraph = false;
+
   var isHoverOnLeftPanel=false;
 
   //This variable stores whether the node's weighted degrees are encoded on the graph with color
@@ -1253,31 +1260,72 @@ function highlightUERs(UERtype){
         dot_graph = result.responseText;
         dotFile = dot_graph.replace(/\\l/g, "\n");
         g = graphlibDot.parse(dotFile);
-        // Send request for loop information; load when ready
-        d3.xhr("../findLoops/")
-          .header("X-CSRFToken", csrfToken())  // mcritweb: issue #83
-          .header("Content-Type", "text/plain")
-          .post(dotFile,
-            function(err, result){
-              // console.log("Response: ", result.responseText);
-              loopsObj = JSON.parse(result.responseText);
-              
-              loopify_dagre.init();
-              var modifiedDotFile = loopify_dagre.modifiedDotFile;
-              // console.log(modifiedDotFile);
-              graph_to_display = graphlibDot.parse(modifiedDotFile);
-    
-    
-              showGraph(isTraceSupplied);
-              loopify_dagre.addBackground();
-    
-              fnManip.init();
-              loopCollapser.init();
-            });
+        // mcritweb, issue #267: a large graph shows its code at once and waits for a click to be laid out
+        var num_blocks = g.nodes().length;
+        if (num_blocks > CFG_DEFERRED_LAYOUT_BLOCKS) {
+          isCodeShownWithoutGraph = true;
+          getCodefromGraph();
+          offerDeferredGraph(num_blocks);
+        } else {
+          findLoopsAndShowGraph();
+        }
     });
 
 
     d3.select("#loading").classed("hidden", true);
+  }
+
+  // Send request for loop information; load when ready
+  function findLoopsAndShowGraph() {
+    d3.xhr("../findLoops/")
+      .header("X-CSRFToken", csrfToken())  // mcritweb: issue #83
+      .header("Content-Type", "text/plain")
+      .post(dotFile,
+        function(err, result){
+          if (err || !result) {
+            // mcritweb, issue #267: a deferred graph keeps its button, so the user can try again
+            console.warn("loop detection request failed", err);
+            d3.select("#cfgDeferredNote").text("Could not prepare the graph. Try again, or reload the page.");
+            d3.select("#drawGraph").property("disabled", false);
+            return;
+          }
+          // console.log("Response: ", result.responseText);
+          loopsObj = JSON.parse(result.responseText);
+
+          loopify_dagre.init();
+          var modifiedDotFile = loopify_dagre.modifiedDotFile;
+          // console.log(modifiedDotFile);
+          graph_to_display = graphlibDot.parse(modifiedDotFile);
+
+          // hidden before the layout, so the graph is fitted to the same space as one drawn on
+          // load; the note painted on the click stays on screen until the layout is done
+          d3.select("#cfgDeferred").classed("hidden", true);
+          showGraph(isTraceSupplied);
+          loopify_dagre.addBackground();
+
+          fnManip.init();
+          loopCollapser.init();
+
+          d3.selectAll(".cfg-graph-control").property("disabled", false);
+        });
+  }
+
+  // mcritweb, issue #267: instead of laying a large graph out on load, say how large it is
+  // and draw it on request. The graph's own controls do nothing without a graph, so they
+  // stay disabled until then.
+  function offerDeferredGraph(num_blocks) {
+    d3.selectAll(".cfg-graph-control").property("disabled", true);
+    d3.select("#cfgDeferredBlocks").text(num_blocks);
+    d3.select("#cfgDeferred").classed("hidden", false);
+    d3.select("#drawGraph").on("click", function(){
+      d3.select(this).property("disabled", true);
+      // the note is painted while the loop detection request is out, before the layout
+      // takes over the main thread; focus follows it rather than the disabled button
+      d3.select("#cfgDeferredNote")
+        .text("Laying out " + num_blocks + " blocks. The page may stop responding until the graph appears.")
+        .node().focus();
+      findLoopsAndShowGraph();
+    });
   }
 
   // loads the dot and trace files one after the other
@@ -1384,6 +1432,7 @@ function highlightUERs(UERtype){
 
   // Reset on loading new files
   function initialize() {
+    isCodeShownWithoutGraph = false;  // mcritweb, issue #267
     currentNode = null;
     g = null;
     codes = [];
@@ -2340,7 +2389,7 @@ function highlightUERs(UERtype){
     // If trace is supplied, find the trace text instead of the CFG text
     // Setup highlighting and linking code to link to trace blocks instead of CFG blocks if trace supplied
     // getCodefromGraph(); 
-    if(!isTraceSupplied){
+    if(!isTraceSupplied && !isCodeShownWithoutGraph){
       getCodefromGraph();
       // MCRIT fix: we might need to resize the SVG to the text
       // var text_box_height = d3.select("#text_code").node().getBoundingClientRect().height;

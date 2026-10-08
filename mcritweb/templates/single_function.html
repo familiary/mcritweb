@@ -165,11 +165,11 @@ Function: {{ function_id }}
           <div id="xcfg_top" style="height: 60px;">
               <span id="function_xcfg"></span>
               <span style="float:right"><a href="#top">go to top</a></span>
-              <input style=" margin: 3px;" type="button" id="showCycles" value="Show Cycles"/>
-              <input style=" margin: 3px;" type="button" id="showLoops" value="Show Loops"/>
-              <label style=" margin:3px; background-color:#fdd0a2; padding:1px"><input style=" margin: 3px;" type="checkbox" id="loopBgFill" value="loopBgFill" checked>Show Loop Boundaries</label>
+              <input style=" margin: 3px;" type="button" id="showCycles" class="cfg-graph-control" value="Show Cycles"/>
+              <input style=" margin: 3px;" type="button" id="showLoops" class="cfg-graph-control" value="Show Loops"/>
+              <label style=" margin:3px; background-color:#fdd0a2; padding:1px"><input style=" margin: 3px;" type="checkbox" id="loopBgFill" class="cfg-graph-control" value="loopBgFill" checked>Show Loop Boundaries</label>
               <!-- <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableNodeDrag" value="enableNodeDrag">Enable Node Dragging</label> -->
-              <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableTooltip" value="enableTooltip">Enable Tooltip</label>
+              <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableTooltip" class="cfg-graph-control" value="enableTooltip">Enable Tooltip</label>
           </div>
           <div id="xcfg_container">
               <div id="xcfg_left">
@@ -178,6 +178,11 @@ Function: {{ function_id }}
                   </div>
                   <div id="loading" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:#3f51b5 ; ">
                   Loading. Please Wait!
+                  </div>
+                  {# issue #267: main.js shows this instead of laying out a large graph on load #}
+                  <div id="cfgDeferred" class="hidden" style="margin: 20px;">
+                    <p id="cfgDeferredNote" role="status" aria-live="polite" tabindex="-1">This function has <span id="cfgDeferredBlocks"></span> blocks. Its code is on the right; laying out its graph can make this page unresponsive for several seconds.</p>
+                    <button type="button" class="btn btn-primary" id="drawGraph">Draw the graph</button>
                   </div>
                   <svg id="graphContainer">
                   <g/>
