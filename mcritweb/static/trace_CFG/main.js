@@ -2685,9 +2685,17 @@ function highlightUERs(UERtype){
           if(nodeId in nodeToTextGroups){
             textToHighlight = nodeToTextGroups[nodeId];
           } else {
-            textToHighlight = d3.selectAll("#text_code p")
+            // mcritweb: a block the code panel has no entry for yet, or a node that is not a
+            // block (loopify_dagre.js adds some). The code paragraphs carry their block as
+            // `d.nodeId`, and the loop below wants one selection per paragraph; a d3 v3
+            // selection here threw "node is not a function" on every such hover.
+            textToHighlight = [];
+            d3.selectAll("#text_code p")
               .filter(function(d) {
-                return nodeId === d;
+                return d && d.nodeId === nodeId;
+              })
+              .each(function() {
+                textToHighlight.push(d3.select(this));
               });
           }
 
@@ -3042,7 +3050,7 @@ function highlightUERs(UERtype){
         }
       });
 
-      var divRight = d3.select("#xcfg_right");
+      var divRight = d3.select("#xcfg_text_right");  // mcritweb: this page's code panel, as on hover
       last_known_scroll_position = divRight.node().scrollTop;
       last_known_panel_height = divRight.node().offsetHeight;
 

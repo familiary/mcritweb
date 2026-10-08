@@ -259,7 +259,6 @@ table.table td.buttons {
 }
 #tooltip_c {
   position: absolute;
-  max-width: 45%;
   padding: 3px;
   background-color: white;
   border-radius: 10px;

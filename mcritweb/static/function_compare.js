@@ -331,28 +331,37 @@ function placeCfgTooltip(tooltip, frame, mouse) {
   text.style.whiteSpace = "pre";
   text.style.overflowWrap = "normal";
   tooltip.style.whiteSpace = "normal";
+  // the width set below is the whole box's, padding included, whatever the stylesheet says
+  tooltip.style.boxSizing = "border-box";
   tooltip.style.maxWidth = "none";
   tooltip.style.left = "0px";
   tooltip.style.top = "0px";
   tooltip.style.width = "max-content";
+  // the pane's inner width, less a pixel either side so a box exactly as wide as the
+  // pane does not touch its clipping edge
   var room = Math.max(0, frame.clientWidth - 2);
-  var width = Math.min(tooltip.offsetWidth, room);
-  if (tooltip.offsetWidth > room) {
+  // fractional, and rounded up: offsetWidth rounds down, and a box a fraction of a
+  // pixel narrower than its longest line wraps it
+  var natural = Math.ceil(tooltip.getBoundingClientRect().width);
+  var width = Math.min(natural, room);
+  if (natural > room) {
     text.style.whiteSpace = "pre-wrap";
     text.style.overflowWrap = "anywhere";
   }
   tooltip.style.width = width + "px";
   var height = tooltip.offsetHeight;
   var left = Math.max(0, Math.min(mouse[0] + gap, frame.clientWidth - width));
-  // below the pointer, or above it when below would leave the pane or the window
+  // below the pointer, or above it when below would leave the pane or the window;
+  // clientHeight, not innerHeight, which counts a horizontal scrollbar as visible
   var frameTop = frame.getBoundingClientRect().top;
-  var bottom = Math.min(frame.clientHeight, window.innerHeight - frameTop);
+  var bottom = Math.min(frame.clientHeight, document.documentElement.clientHeight - frameTop);
   var top = mouse[1] + gap;
   if (top + height > bottom) {
     top = mouse[1] - gap - height;
   }
-  // a box that fits neither above nor below ends at the bottom edge, never past it
-  // unless it is taller than the whole visible part of the pane
+  // a box that fits neither above nor below ends at the bottom edge. One taller than the
+  // whole visible part of the pane starts at its top and is cut off by the pane, which
+  // clips; a block that long is rare, and the pointer is over it, not under the tooltip.
   top = Math.max(0, -frameTop, Math.min(top, bottom - height));
   tooltip.style.left = left + "px";
   tooltip.style.top = top + "px";

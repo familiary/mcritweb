@@ -2914,11 +2914,8 @@ function highlightUERs(UERtype){
 
             //Show the tooltip
             d3.select(tooltip_id).classed("hidden", false);
-            if (typeof placeCfgTooltip === "function") {
-              placeCfgTooltip(d3.select(tooltip_id).node(), frame, [xPosition, yPosition]);
-            } else {
-              d3.select(tooltip_id).style("left", xPosition + "px").style("top", yPosition + "px");
-            }
+            // function_compare.js, loaded by this page's template
+            placeCfgTooltip(d3.select(tooltip_id).node(), frame, [xPosition, yPosition]);
           }
 
       })

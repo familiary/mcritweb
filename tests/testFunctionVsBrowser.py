@@ -567,6 +567,13 @@ def tooltip_metrics(page, panel):
                 tooltip_font_size: parseFloat(getComputedStyle(tooltip).fontSize),
                 overflow_right: box.right - frame.right,
                 overflow_left: frame.left - box.left,
+                // the text running out of its own box, and the box out of the window
+                text_overflow: paragraph.scrollWidth - paragraph.clientWidth,
+                overflow_bottom: box.bottom - document.documentElement.clientHeight,
+                // how much of the panel is on screen, and where the box starts within it
+                visible_height: Math.min(frame.bottom, document.documentElement.clientHeight) - Math.max(frame.top, 0),
+                height: box.height,
+                top_in_view: box.top - Math.max(frame.top, 0),
             };
         }""",
         panel,
@@ -594,12 +601,14 @@ def test_the_tooltip_matches_the_styling_the_single_graph_page_gets(comparison_p
 def test_the_tooltip_stays_inside_its_panel(comparison_page, panel):
     """The width came from the block's bounding box in unscaled SVG units, with nothing
     clamping it to the panel, so a wide block produced a tooltip wider than the half of
-    the window it lives in and the text ran off the edge and was clipped."""
+    the window it lives in and the text ran off the edge and was clipped. Clamping that
+    width to the panel kept the box in, but the box was still sized from the drawn block,
+    so the instructions ran out of it; and a low block's tooltip ran below the window."""
     comparison_page.check("#enableTooltip")
     comparison_page.locator("#xcfg_container").scroll_into_view_if_needed()
 
     count = blocks_of(comparison_page, panel).count()
-    for index in range(min(count, 6)):
+    for index in range(count):
         hover_a_block(comparison_page, panel, index)
         metrics = tooltip_metrics(comparison_page, panel)
         assert metrics["overflow_right"] <= 1, (
@@ -610,3 +619,49 @@ def test_the_tooltip_stays_inside_its_panel(comparison_page, panel):
             f"block {index} of panel {panel} overflows its panel to the left by "
             f"{metrics['overflow_left']:.1f}px"
         )
+        assert metrics["text_overflow"] <= 1, (
+            f"the text of block {index} of panel {panel} runs out of its tooltip by "
+            f"{metrics['text_overflow']}px"
+        )
+        if metrics["height"] <= metrics["visible_height"]:
+            assert metrics["overflow_bottom"] <= 1, (
+                f"block {index} of panel {panel} has its tooltip run below the window by "
+                f"{metrics['overflow_bottom']:.1f}px"
+            )
+        else:
+            # taller than the part of the panel on screen: it can only start at the top of
+            # that part, since the panel clips it everywhere else
+            assert abs(metrics["top_in_view"]) <= 1, (
+                f"block {index} of panel {panel} has a tooltip taller than the visible panel "
+                f"that does not start at its top ({metrics['top_in_view']:.1f}px off)"
+            )
+
+
+def test_the_combined_tooltip_stays_inside_its_pane(comparison_page):
+    """The combined view shows B's instructions for a block that differs, in a tooltip
+    that was put at the pointer with nothing holding it inside the pane."""
+    comparison_page.check("#viewCombined")
+    comparison_page.wait_for_selector("#graphContainer_c g.node", state="attached")
+    comparison_page.locator("#xcfg_combined").scroll_into_view_if_needed()
+    blocks = comparison_page.locator("#graphContainer_c g.node.enter")
+    shown = 0
+    for index in range(blocks.count()):
+        blocks.nth(index).hover(force=True)
+        state = comparison_page.evaluate(
+            """() => {
+                const tooltip = document.getElementById('tooltip_c');
+                if (tooltip.classList.contains('hidden')) { return null; }
+                const box = tooltip.getBoundingClientRect();
+                const frame = document.getElementById('xcfg_combined').getBoundingClientRect();
+                const paragraph = tooltip.querySelector('p');
+                return {right: box.right - frame.right, left: frame.left - box.left,
+                        text: paragraph.scrollWidth - paragraph.clientWidth};
+            }"""
+        )
+        if state is None:
+            continue
+        shown += 1
+        assert state["right"] <= 1 and state["left"] <= 1, f"combined block {index}: {state}"
+        assert state["text"] <= 1, f"combined block {index}: the text runs out of its tooltip"
+    if not shown:
+        pytest.skip("no block of this pair differs, so the combined view shows no tooltip")
