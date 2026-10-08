@@ -558,16 +558,22 @@ def test_the_cfg_scripts_make_no_synchronous_request(script):
     assert 'fetch("../getPicBlockMatches/" + hash_only)' in source
 
 
-
 def _main_js_function(name):
-    """The source of `function <name>(...)` in main.js, up to the next top-level function."""
+    """The source of `function <name>(...)` in main.js, up to the next function at the
+    same indentation; functions nested inside it are indented deeper and stay in."""
     import os
     path = os.path.join(os.path.dirname(__file__), "..", "mcritweb", "static", "trace_CFG", "main.js")
     with open(path) as f:
         source = f.read()
-    start = source.index(f"  function {name}(")
-    end = source.find("\n  function ", start + 1)
-    return source[start:end]
+    start = re.search(r"\n(\s*)function " + re.escape(name) + r"\(", source)
+    assert start, name
+    end = source.find("\n" + start.group(1) + "function ", start.end())
+    return source[start.start():end]
+
+
+def _calls(source, call):
+    """Where `call(...)` appears in `source`, whitespace inside it ignored."""
+    return [m.start() for m in re.finditer(re.escape(call).replace(r"\ ", r"\s*") + r"\s*\(", source)]
 
 
 def test_the_function_page_carries_the_deferred_graph_prompt(client, as_role):
@@ -575,42 +581,48 @@ def test_the_function_page_carries_the_deferred_graph_prompt(client, as_role):
     without them in the template the page would neither offer the graph nor block its controls."""
     as_role("visitor")
     page = client.get(f"/explore/functions/{MULTI_BLOCK_FUNCTION}").get_data(as_text=True)
-    assert '<div id="cfgDeferred" class="hidden"' in page
-    assert 'id="cfgDeferredNote" role="status" aria-live="polite"' in page
+    deferred = re.search(r'<div id="cfgDeferred"[^>]*>', page)
+    assert deferred and re.search(r'class="[^"]*\bhidden\b', deferred.group(0))
+    note = re.search(r'<p id="cfgDeferredNote"[^>]*>', page)
+    assert note and 'role="status"' in note.group(0) and 'aria-live="polite"' in note.group(0)
     assert 'id="cfgDeferredBlocks"' in page
     assert re.search(r'<button type="button"[^>]*id="drawGraph"', page)
     for control in ("showCycles", "showLoops", "loopBgFill", "enableTooltip"):
-        assert re.search(r'id="' + control + r'" class="cfg-graph-control"', page), control
+        tag = re.search(r'<input\b[^>]*\bid="' + control + r'"[^>]*>', page)
+        assert tag and re.search(r'class="[^"]*\bcfg-graph-control\b', tag.group(0)), control
 
 
 def test_a_large_graph_is_offered_rather_than_laid_out_on_load():
     """dagre's layout froze the page for seconds on large functions (#267): above the
     threshold the code panel is shown at once and the graph waits for a click."""
     load = _main_js_function("loadWithDotGraphAndFunctionId")
-    deferred = load.index("if (num_blocks > CFG_DEFERRED_LAYOUT_BLOCKS) {")
-    otherwise = load.index("} else {", deferred)
-    assert "getCodefromGraph();" in load[deferred:otherwise]
-    assert "offerDeferredGraph(num_blocks);" in load[deferred:otherwise]
-    assert "findLoopsAndShowGraph();" in load[otherwise:]
-    assert "findLoopsAndShowGraph();" not in load[deferred:otherwise]
+    branch = re.search(r"if\s*\(\s*num_blocks\s*>\s*CFG_DEFERRED_LAYOUT_BLOCKS\s*\)", load)
+    otherwise = re.search(r"\}\s*else\s*\{", load[branch.end():])
+    deferred, eager = load[branch.end():branch.end() + otherwise.start()], load[branch.end() + otherwise.end():]
+    assert _calls(deferred, "getCodefromGraph") and _calls(deferred, "offerDeferredGraph")
+    assert not _calls(deferred, "findLoopsAndShowGraph") and _calls(eager, "findLoopsAndShowGraph")
 
 
-def test_drawing_a_deferred_graph_restores_the_page():
-    """Drawing hides the prompt and re-enables the graph's controls; a failed loop request
-    gives the button back instead of leaving a page that promises a graph forever (#267)."""
+def test_every_failure_to_draw_the_graph_is_reported():
+    """A failed loop request, an answer that is not loop data, or a layout that throws
+    must bring the prompt and its button back rather than leave a page waiting (#267)."""
     draw = _main_js_function("findLoopsAndShowGraph")
-    failure = draw.index("if (err || !result) {")
-    success = draw.index("loopsObj = JSON.parse(result.responseText);")
-    assert failure < success
-    assert 'd3.select("#drawGraph").property("disabled", false);' in draw[failure:success]
-    hide = draw.index('d3.select("#cfgDeferred").classed("hidden", true);')
-    assert success < hide < draw.index("showGraph(isTraceSupplied);")
-    assert 'd3.selectAll(".cfg-graph-control").property("disabled", false);' in draw[hide:]
+    assert re.search(r"if\s*\(\s*err\s*\|\|\s*!result\s*\)\s*\{\s*graphNotDrawn\(", draw)
+    attempt = draw[draw.index("try {"):draw.index("catch (error)")]
+    assert _calls(attempt, "JSON.parse") and _calls(attempt, "showGraph")
+    assert _calls(draw[draw.index("catch (error)"):], "graphNotDrawn")
+    failed = _main_js_function("graphNotDrawn")
+    assert re.search(r'd3\.select\("#drawGraph"\)\.property\("disabled",\s*false\)', failed)
+    assert re.search(r'd3\.select\("#cfgDeferred"\)\.classed\("hidden",\s*false\)', failed)
+    assert _calls(failed, "getCodefromGraph")
 
 
 def test_show_graph_does_not_build_the_code_panel_twice():
     """A deferred graph's code panel exists before the graph; showGraph must not build a
     second one, which would also send every block lookup again (#267)."""
-    show = _main_js_function("showGraph")
-    assert "if(!isTraceSupplied && !isCodeShownWithoutGraph){\n      getCodefromGraph();" in show
-    assert show.count("\n      getCodefromGraph();") == 1
+    # commented-out lines are not calls; upstream left one there
+    show = re.sub(r"(?m)^\s*//.*$", "", _main_js_function("showGraph"))
+    calls = _calls(show, "getCodefromGraph")
+    assert len(calls) == 1
+    guard = show.rfind("if", 0, calls[0])
+    assert "!isCodeShownWithoutGraph" in show[guard:calls[0]]

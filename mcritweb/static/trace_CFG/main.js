@@ -1283,31 +1283,57 @@ function highlightUERs(UERtype){
       .post(dotFile,
         function(err, result){
           if (err || !result) {
-            // mcritweb, issue #267: a deferred graph keeps its button, so the user can try again
-            console.warn("loop detection request failed", err);
-            d3.select("#cfgDeferredNote").text("Could not prepare the graph. Try again, or reload the page.");
-            d3.select("#drawGraph").property("disabled", false);
+            graphNotDrawn("the loop detection request failed" + (err && err.status ? " (HTTP " + err.status + ")" : ""), err);
             return;
           }
-          // console.log("Response: ", result.responseText);
-          loopsObj = JSON.parse(result.responseText);
+          var isDeferred = isCodeShownWithoutGraph;
+          try {
+            // console.log("Response: ", result.responseText);
+            loopsObj = JSON.parse(result.responseText);
 
-          loopify_dagre.init();
-          var modifiedDotFile = loopify_dagre.modifiedDotFile;
-          // console.log(modifiedDotFile);
-          graph_to_display = graphlibDot.parse(modifiedDotFile);
+            loopify_dagre.init();
+            var modifiedDotFile = loopify_dagre.modifiedDotFile;
+            // console.log(modifiedDotFile);
+            graph_to_display = graphlibDot.parse(modifiedDotFile);
 
-          // hidden before the layout, so the graph is fitted to the same space as one drawn on
-          // load; the note painted on the click stays on screen until the layout is done
-          d3.select("#cfgDeferred").classed("hidden", true);
-          showGraph(isTraceSupplied);
-          loopify_dagre.addBackground();
+            // hidden before the layout, so the graph is fitted to the same space as one drawn on
+            // load; the note painted on the click stays on screen until the layout is done
+            d3.select("#cfgDeferred").classed("hidden", true);
+            showGraph(isTraceSupplied);
+            loopify_dagre.addBackground();
 
-          fnManip.init();
-          loopCollapser.init();
+            fnManip.init();
+            loopCollapser.init();
+          } catch (error) {
+            // a 200 that is not loop data (a login page, once the session has expired) or a
+            // layout that failed: say so, rather than leave the page waiting for a graph
+            graphNotDrawn("the graph could not be laid out", error);
+            return;
+          }
 
           d3.selectAll(".cfg-graph-control").property("disabled", false);
+          if (isDeferred) {
+            // the focused note is gone with the prompt; keep keyboard users in the graph's controls
+            d3.select("#showCycles").node().focus();
+          }
         });
+  }
+
+  // mcritweb, issue #267: any failure to draw the graph ends here, whether it was deferred
+  // or meant to be drawn on load. The code panel is shown if it is not yet, and the prompt
+  // comes back with the reason and its button, so the user can try again.
+  function graphNotDrawn(reason, error) {
+    console.warn("control flow graph not drawn: " + reason, error);
+    d3.select("#graphContainer g").selectAll("*").remove();
+    if (!isCodeShownWithoutGraph) {
+      isCodeShownWithoutGraph = true;
+      getCodefromGraph();
+      offerDeferredGraph(g.nodes().length);
+    }
+    d3.select("#cfgDeferred").classed("hidden", false);
+    d3.select("#cfgDeferredNote").text("The graph of these " + g.nodes().length + " blocks was not drawn: "
+      + reason + ". Its code is on the right. Try again, or reload the page if your session has expired.");
+    d3.select("#drawGraph").property("disabled", false);
   }
 
   // mcritweb, issue #267: instead of laying a large graph out on load, say how large it is
