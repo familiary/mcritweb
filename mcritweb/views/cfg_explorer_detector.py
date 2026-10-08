@@ -239,6 +239,9 @@ def addParentInfo(loopsObj):
 def run(dot_content):
     # print(dot_content)
     graph = parse_dot_to_graph(dot_content)
+    # a graph without blocks has no loops, and get_roots() cannot take min() of no nodes
+    if graph.number_of_nodes() == 0:
+        return "[]"
     roots = get_roots(graph)
     assert len(roots) == 1, "Must have exactly one root to perform analysis: {}".format(str(roots))
     root = roots[0]
@@ -250,19 +253,4 @@ def run(dot_content):
 
 
 def main(file_path):
-    dot_content = load_dot_file(file_path)
-    # print("dot_content", dot_content)
-    graph = parse_dot_to_graph(dot_content)
-    # print("graph", graph)
-    roots = get_roots(graph)
-    assert len(roots) == 1, "Must have exactly one root to perform analysis: {}".format(str(roots))
-    root = roots[0]
-    # print("root", root)
-    dominanator_dict = dominanators(graph, root)
-    # print("dominanator_dict", dominanator_dict)
-    backedges = compute_backedges(graph, dominanator_dict)
-    # print("backedges", backedges)
-    loops = collect_loops(graph, backedges, dominanator_dict)
-    # print("loops", loops)
-    addParentInfo(loops)
-    return json.dumps(loops)
+    return run(load_dot_file(file_path))

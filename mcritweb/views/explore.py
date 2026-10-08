@@ -663,8 +663,9 @@ def fetchCombinedDotGraph(function_id_a, function_id_b):
 def findLoops():
     out_str = ""
     if request.method=='POST':
-        data = request.data
-        data = data.decode("utf-8")
+        # a body that is not UTF-8 is not a dot graph this app produced either; decoded
+        # with replacement it parses to whatever blocks it has, or to none
+        data = request.data.decode("utf-8", errors="replace")
         out_str = cfg_explorer_detector.run(data)
     return out_str
 
