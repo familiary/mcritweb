@@ -2709,7 +2709,13 @@ function highlightUERs(UERtype){
           textToHighlight[i].classed("highlight", true);
           if(i==0){
             //Scroll to the first matching block
-            d3.select("#xcfg_right").node().scrollTop = textToHighlight[i].node().offsetTop;
+            // mcritweb: this page's code panel is #xcfg_text_right (#xcfg_right is the comparison
+            // page's, which looked nothing up here and threw on every hover), and it is not
+            // positioned, so offsetTop is not relative to it
+            var codePanel = d3.select("#xcfg_text_right").node();
+            if (codePanel) {
+              codePanel.scrollTop += textToHighlight[i].node().getBoundingClientRect().top - codePanel.getBoundingClientRect().top;
+            }
           }
 
         }
@@ -2722,21 +2728,27 @@ function highlightUERs(UERtype){
             var xPosition = pos[0];	
             var yPosition = pos[1];
 
-            var text = "";
+            var lines = [];
             thisNode.selectAll("text tspan").each(function(){
-              text+=d3.select(this).text() + "<br/>";
+              lines.push(d3.select(this).text());
             });
 
             var width = rect.node().getBBox().width;
 
             //Update the tooltip position and value
-            d3.select("#tooltip")
+            var value = d3.select("#tooltip")
               .style("left", xPosition + "px")
               .style("top", yPosition + "px")
               .style("width", function(){return (width*1.25) + "px"})
               .select("#value")
-              .node().innerHTML = text;
-              // .text(text);
+              .node();
+            // mcritweb: a block's lines are text from the analysed binary (API names among
+            // them), so they go in as text nodes; joined into innerHTML they ran as markup
+            value.textContent = "";
+            lines.forEach(function(line){
+              value.appendChild(document.createTextNode(line));
+              value.appendChild(document.createElement("br"));
+            });
 
             //Show the tooltip
             d3.select("#tooltip").classed("hidden", false);
@@ -3036,7 +3048,7 @@ function highlightUERs(UERtype){
         }
       });
 
-      var divRight = d3.select("#xcfg_right");
+      var divRight = d3.select("#xcfg_text_right");  // mcritweb: this page's code panel, as on hover
       last_known_scroll_position = divRight.node().scrollTop;
       last_known_panel_height = divRight.node().offsetHeight;
 
