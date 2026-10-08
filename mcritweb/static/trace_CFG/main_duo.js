@@ -2882,19 +2882,11 @@ function highlightUERs(UERtype){
               text+=d3.select(this).text() + "\n";
             });
 
-            // mcritweb: issue #69 - getBBox is in the graph's own units while the
-            // graph is drawn at whatever the zoom currently is, so an unscaled width
-            // was wrong by that factor, and nothing held the result inside the panel:
-            // a wide block gave a 344px tooltip in a 558px half and overflowed it by
-            // 43.7px, clipping the text. Scaled, then clamped to the frame, with the
-            // left edge clamped so the right edge lands inside it too.
-            var graph_transform = inner.attr("transform");
-            var graph_scale = graph_transform ? d3.transform(graph_transform).scale[0] : 1;
-            var box_padding = 6;  // the 3px this handler sets, on both sides
-            var frame_width = frame.clientWidth;
-            var width = rect.node().getBBox().width * graph_scale * 1.25;
-            width = Math.min(width, frame_width - box_padding - 2);
-            xPosition = Math.max(0, Math.min(xPosition, frame_width - width - box_padding - 1));
+            // mcritweb: the box used to be sized from the block's drawn width, which
+            // says nothing about the width of its text at the tooltip's own font, so
+            // most instructions ran out of the box and out of the pane. The box now
+            // takes its text's width and placeCfgTooltip() (function_compare.js)
+            // keeps it in the pane and the window once it is shown.
 
             //Update the tooltip position and value
             // The stylesheet under static/trace_CFG/ is vendored and styles
@@ -2913,9 +2905,6 @@ function highlightUERs(UERtype){
               .style("pointer-events", "none")
               .style("white-space", "pre")
               .style("font-family", "monospace")
-              .style("left", xPosition + "px")
-              .style("top", yPosition + "px")
-              .style("width", function(){return width + "px"})
               .select(value_id)
               .text(text);
 
@@ -2925,6 +2914,11 @@ function highlightUERs(UERtype){
 
             //Show the tooltip
             d3.select(tooltip_id).classed("hidden", false);
+            if (typeof placeCfgTooltip === "function") {
+              placeCfgTooltip(d3.select(tooltip_id).node(), frame, [xPosition, yPosition]);
+            } else {
+              d3.select(tooltip_id).style("left", xPosition + "px").style("top", yPosition + "px");
+            }
           }
 
       })

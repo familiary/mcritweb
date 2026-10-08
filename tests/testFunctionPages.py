@@ -546,6 +546,41 @@ def test_main_duo_keeps_the_hook_function_compare_needs():
     assert "function onGraphShown(graph_id) {" in function_compare
 
 
+def test_hovering_a_graph_node_scrolls_this_pages_code_panel():
+    """Hovering a node scrolls the code panel to its block; main.js used to look the panel
+    up as #xcfg_right, which only the comparison page has, and threw on every hover."""
+    import os
+    root = os.path.join(os.path.dirname(__file__), "..", "mcritweb")
+    with open(os.path.join(root, "static", "trace_CFG", "main.js")) as f:
+        main = f.read()
+    with open(os.path.join(root, "templates", "single_function.html")) as f:
+        page = f.read()
+    scroll = main[main.index("//Scroll to the first matching block"):]
+    scroll = scroll[:scroll.index("\n          }\n")]
+    assert 'd3.select("#xcfg_text_right")' in scroll
+    assert "getBoundingClientRect()" in scroll and "offsetTop" not in scroll.replace("offsetTop is not", "")
+    assert 'id="xcfg_text_right"' in page
+    assert "#xcfg_right" not in scroll.replace("#xcfg_right is the comparison", "")
+
+
+def test_the_comparison_tooltips_are_placed_by_one_helper():
+    """Both side-by-side tooltips and the combined view's are sized to their text and kept in
+    their pane by `placeCfgTooltip`; the side-by-side ones used to take the drawn block's
+    width, which most instructions ran out of, and the combined one was not held in at all."""
+    import os
+    static = os.path.join(os.path.dirname(__file__), "..", "mcritweb", "static")
+    with open(os.path.join(static, "function_compare.js")) as f:
+        compare = f.read()
+    with open(os.path.join(static, "trace_CFG", "main_duo.js")) as f:
+        main_duo = f.read()
+    helper = compare[compare.index("function placeCfgTooltip(tooltip, frame, mouse) {"):]
+    assert 'tooltip.querySelector("p")' in helper and 'text.style.whiteSpace = "pre"' in helper
+    assert "Math.min(top, bottom - height)" in helper and "frame.clientWidth - width" in helper
+    assert "placeCfgTooltip(tooltip.node(), frame, position);" in compare
+    assert "placeCfgTooltip(d3.select(tooltip_id).node(), frame, [xPosition, yPosition]);" in main_duo
+    assert "rect.node().getBBox().width * graph_scale" not in main_duo
+
+
 @pytest.mark.parametrize("script", ["main.js", "main_duo.js"])
 def test_the_cfg_scripts_make_no_synchronous_request(script):
     """A synchronous XMLHttpRequest on the main thread is deprecated and freezes the page

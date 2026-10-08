@@ -2709,7 +2709,13 @@ function highlightUERs(UERtype){
           textToHighlight[i].classed("highlight", true);
           if(i==0){
             //Scroll to the first matching block
-            d3.select("#xcfg_right").node().scrollTop = textToHighlight[i].node().offsetTop;
+            // mcritweb: this page's code panel is #xcfg_text_right (#xcfg_right is the comparison
+            // page's, which looked nothing up here and threw on every hover), and it is not
+            // positioned, so offsetTop is not relative to it
+            var codePanel = d3.select("#xcfg_text_right").node();
+            if (codePanel) {
+              codePanel.scrollTop += textToHighlight[i].node().getBoundingClientRect().top - codePanel.getBoundingClientRect().top;
+            }
           }
 
         }

@@ -290,13 +290,13 @@ var FunctionCompare = (function () {
         if (!attributes.comment) {
           return;
         }
-        var position = d3.mouse(d3.select("#xcfg_combined").node());
+        var frame = d3.select("#xcfg_combined").node();
+        var position = d3.mouse(frame);
         tooltip
-          .style("left", (position[0] + 20) + "px")
-          .style("top", (position[1] + 20) + "px")
           .classed("hidden", false)
           .select("#value_c")
           .text("B:\n" + attributes.comment);
+        placeCfgTooltip(tooltip.node(), frame, position);
       })
       .on("mouseout.tooltip", function () {
         tooltip.classed("hidden", true);
@@ -315,4 +315,45 @@ var FunctionCompare = (function () {
 // the hook main_duo.js calls after rendering a graph
 function onGraphShown(graph_id) {
   FunctionCompare.onGraphShown(graph_id);
+}
+
+// Puts a block's hover tooltip next to the pointer and keeps all of it in view: inside
+// the pane it belongs to (#xcfg_left, #xcfg_right or #xcfg_combined, each a positioned
+// box that clips what overflows it) and above the bottom of the window. The box is as
+// wide as its longest line, up to the pane's width; only text wider than the pane
+// wraps, inside the box. `mouse` is the pointer's position relative to `frame`. Called
+// with the tooltip already shown, since a hidden box has no size to measure.
+function placeCfgTooltip(tooltip, frame, mouse) {
+  var gap = 12;
+  // the whitespace rules go on the text, not the box: the template indents the <p>
+  // inside it, and preserved, that indentation is a blank line above and below
+  var text = tooltip.querySelector("p") || tooltip;
+  text.style.whiteSpace = "pre";
+  text.style.overflowWrap = "normal";
+  tooltip.style.whiteSpace = "normal";
+  tooltip.style.maxWidth = "none";
+  tooltip.style.left = "0px";
+  tooltip.style.top = "0px";
+  tooltip.style.width = "max-content";
+  var room = Math.max(0, frame.clientWidth - 2);
+  var width = Math.min(tooltip.offsetWidth, room);
+  if (tooltip.offsetWidth > room) {
+    text.style.whiteSpace = "pre-wrap";
+    text.style.overflowWrap = "anywhere";
+  }
+  tooltip.style.width = width + "px";
+  var height = tooltip.offsetHeight;
+  var left = Math.max(0, Math.min(mouse[0] + gap, frame.clientWidth - width));
+  // below the pointer, or above it when below would leave the pane or the window
+  var frameTop = frame.getBoundingClientRect().top;
+  var bottom = Math.min(frame.clientHeight, window.innerHeight - frameTop);
+  var top = mouse[1] + gap;
+  if (top + height > bottom) {
+    top = mouse[1] - gap - height;
+  }
+  // a box that fits neither above nor below ends at the bottom edge, never past it
+  // unless it is taller than the whole visible part of the pane
+  top = Math.max(0, -frameTop, Math.min(top, bottom - height));
+  tooltip.style.left = left + "px";
+  tooltip.style.top = top + "px";
 }
