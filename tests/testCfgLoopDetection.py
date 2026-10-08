@@ -262,7 +262,6 @@ def test_get_nodes_without_a_shared_reverse_graph_answers_as_before(client, as_r
         assert cfg_explorer_detector.getNodes(graph, backedge, reverse_graph=shared_reverse_graph) == expected
 
 
-
 # --- input without blocks -----------------------------------------------------------
 
 @pytest.mark.parametrize("body", ["digraph G {\n}\n", "", "not a dot graph", b"\xff\xfe not UTF-8"])
@@ -287,4 +286,3 @@ def test_main_reads_a_file_and_runs_the_same_analysis(tmp_path, cfg_loop_functio
 
 if __name__ == "__main__":
     unittest.main()
-
