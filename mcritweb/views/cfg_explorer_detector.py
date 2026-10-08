@@ -121,9 +121,13 @@ def get_roots(graph):
     roots = list(set(graph.nodes()) -
                  set(map(lambda twople: twople[1], graph.edges())))
     if len(roots) > 1:
-        graph.add_node("my_super_root", _name="my_super_root")
+        # a block of that name would be one more root's parent instead of a new root
+        super_root = "my_super_root"
+        while super_root in graph:
+            super_root += "_"
+        graph.add_node(super_root, _name=super_root)
         for r in roots:
-            graph.add_edge("my_super_root", r)
+            graph.add_edge(super_root, r)
     # only ever case we noted like this so far is if we somehow loop to our entry block
     # in that case, we return the block with lowest address as entry node
     elif len(roots) == 0:

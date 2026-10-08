@@ -275,6 +275,17 @@ def test_find_loops_answers_a_graph_without_blocks_with_no_loops(client, as_role
     assert json.loads(response.data) == []
 
 
+def test_find_loops_does_not_take_a_block_for_the_super_root(client, as_role):
+    """With several roots get_roots() adds my_super_root above them; a block of that name
+    used to become one more root's parent instead, leaving no root and a 500."""
+    as_role("visitor")
+    loop = "a -> c\nc -> a\nb -> a\n"
+    response = client.post("/explore/findLoops/", data="my_super_root -> a\n" + loop, content_type="text/plain")
+    assert response.status_code == 200
+    assert json.loads(response.data) == json.loads(cfg_explorer_detector.run("x -> a\n" + loop))
+    assert json.loads(response.data) == [{"backedge": ["c", "a"], "nodes": ["c", "a"], "parent": ""}]
+
+
 def test_main_reads_a_file_and_runs_the_same_analysis(tmp_path, cfg_loop_functions):
     """main() is run() on a file's content; it used to carry its own copy of run()'s body."""
     dot_for_loops = _dot_for_loops(cfg_loop_functions[MULTI_BACKEDGE_FUNCTION].toSmdaFunction().toDotGraph(with_api=True))
