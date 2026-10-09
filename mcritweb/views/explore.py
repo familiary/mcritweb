@@ -663,9 +663,15 @@ def fetchCombinedDotGraph(function_id_a, function_id_b):
 def findLoops():
     out_str = ""
     if request.method=='POST':
-        data = request.data
-        data = data.decode("utf-8")
-        out_str = cfg_explorer_detector.run(data)
+        # a body that is not UTF-8 is not a dot graph this app produced either; decoded
+        # with replacement it parses to whatever blocks it has, or to none
+        data = request.data.decode("utf-8", errors="replace")
+        try:
+            out_str = cfg_explorer_detector.run(data)
+        except cfg_explorer_detector.LoopAnalysisTooLarge as exc:
+            # still JSON: the page draws the graph, without loops, rather than nothing
+            current_app.logger.warning("findLoops: graph of %d bytes not analysed: %s", len(request.data), exc)
+            out_str = "[]"
     return out_str
 
 
