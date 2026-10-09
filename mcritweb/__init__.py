@@ -222,6 +222,13 @@ def create_app(test_config=None, instance_path=None):
     app.config['DROPZONE_ENABLE_CSRF'] = True
     Dropzone(app)
 
+    @app.after_request
+    def no_content_sniffing(response):
+        # nothing we serve relies on the browser guessing a type; without this a
+        # response with a wrong or missing Content-Type can still be read as HTML
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        return response
+
     @app.template_filter('silent')
     def silent(input):
         return ""
