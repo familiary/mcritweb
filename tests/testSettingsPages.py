@@ -149,6 +149,29 @@ def test_a_taken_name_is_refused_to_the_right_password(app, client, as_role, mak
         assert UserInfo.fromDb(user_id=user_id).username == "contributoruser"
 
 
+def test_a_name_taken_after_the_lookup_is_refused_not_a_500(app, client, as_role, make_user, monkeypatch):
+    """The lookup and the write are separate steps; another request can take the name
+    in between. The lookup is made to miss here, as it does in that window."""
+    user_id = as_role("contributor")
+    make_user(role="visitor", username="taken_name")
+    real_from_db = UserInfo.fromDb.__func__
+    def _from_db(cls, user_id=None, username=None):
+        if username == "taken_name":
+            return None
+        return real_from_db(cls, user_id=user_id, username=username)
+    monkeypatch.setattr(UserInfo, "fromDb", classmethod(_from_db))
+
+    response = client.post("/admin/change_username", data={"username": "taken_name", "inputPassword1": "password"})
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/settings")
+    assert _flashes(client) == ["Username is already taken!"]
+    monkeypatch.undo()
+    with app.app_context():
+        assert UserInfo.fromDb(user_id=user_id).username == "contributoruser"
+    assert client.get("/settings").status_code == 200
+
+
 def test_changing_the_username(app, client, as_role):
     user_id = as_role("contributor")
 
