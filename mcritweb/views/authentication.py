@@ -39,6 +39,29 @@ TOO_MANY_ATTEMPTS = ('Too many failed attempts from this address. Please wait a 
                      'and try again.')
 
 
+def registration_token_attempt(username):
+    """The name a wrong registration token is recorded under. A username can never
+    contain ':', so no successful login carries it, and clear_login_failures - which
+    forgets only the failures under the name that just logged in - cannot reset the
+    token budget. Recording it under the typed name let anyone with an account guess
+    tokens without end, by typing their own name and logging in after every nine."""
+    return "register:" + (username or "")
+
+
+#: Longer than any account name can be (3 to 20 characters, see register() and
+#: change_username), so a real one is always logged whole.
+LOGGED_NAME_LENGTH = 32
+
+
+def _name_for_log(username):
+    """The typed name for the throttle's log line. It comes from the form as typed, up
+    to the form field limit, and a refused attempt is cheap to send: logged whole, every
+    one of them could add half a megabyte to the log."""
+    if len(username) <= LOGGED_NAME_LENGTH:
+        return repr(username)
+    return f"{username[:LOGGED_NAME_LENGTH]!r}... ({len(username)} characters)"
+
+
 def _throttled(username=None):
     """True if this caller has spent their attempts, having logged the fact.
 
@@ -53,8 +76,8 @@ def _throttled(username=None):
     if username:
         against = db.count_recent_login_failures(remote_addr, username)
         current_app.logger.warning(
-            "throttled %s after %d recent failures, %d of them against %r",
-            remote_addr, db.count_recent_login_failures(remote_addr), against, username)
+            "throttled %s after %d recent failures, %d of them against %s",
+            remote_addr, db.count_recent_login_failures(remote_addr), against, _name_for_log(username))
     else:
         current_app.logger.warning(
             "throttled %s after %d recent failures", remote_addr,
@@ -189,7 +212,7 @@ def register():
         # by the same counter as /login. Ordinary validation slips - a short username, a
         # password typed twice differently - deliberately do NOT record an attempt: they
         # are not guesses, and counting them would lock people out of their own signup.
-        if _throttled(username):
+        if _throttled(registration_token_attempt(username)):
             error = TOO_MANY_ATTEMPTS
         elif not username:
             error = 'Username is required.'
@@ -203,7 +226,7 @@ def register():
             error = 'The passwords do not match. No new user was created.'
         elif is_registration_token_required and server_info.registration_token != provided_registration_token:
             error = 'Invalid registration token provided. No new user was created.'
-            db.record_failed_login(request.remote_addr, username)
+            db.record_failed_login(request.remote_addr, registration_token_attempt(username))
         if error is None:
             user_info = UserInfo()
             user_info.username = username
@@ -285,7 +308,7 @@ def login():
             user_info.last_login = utc_now()
             rehashed = _rehash_if_stale(user_info, password)
             user_info.saveToDb(withPassword=rehashed)
-            db.clear_login_failures(request.remote_addr)
+            db.clear_login_failures(request.remote_addr, username)
             return redirect(url_for('index'))
         db.record_failed_login(request.remote_addr, username)
         flash(error, category='error')

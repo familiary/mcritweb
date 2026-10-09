@@ -99,6 +99,28 @@ def test_a_successful_login_forgets_the_failures(client, registered_user):
     assert "Too many failed attempts" not in page, "the count was not reset by the success"
 
 
+def test_logging_in_to_another_account_does_not_forget_the_failures(app, client, registered_user):
+    """The success used to clear every failure from the address, so anyone with an
+    account of their own - a self-registered `pending` one is enough, login checks no
+    role - could guess at `alice` without end, logging in to their own account after
+    every nine tries."""
+    with app.app_context():
+        user_info = UserInfo()
+        user_info.username = "mallory"
+        user_info.password = generate_password_hash(PASSWORD)
+        user_info.role = "pending"
+        user_info.saveToDb()
+    for _ in range(db.LOGIN_ATTEMPT_LIMIT - 1):
+        attempt(client, registered_user, "not the password")
+    attempt(client, "mallory", PASSWORD)
+
+    client.get("/logout", follow_redirects=True)
+    attempt(client, registered_user, "not the password")
+    page = attempt(client, registered_user, "not the password")
+
+    assert "Too many failed attempts" in page, "another account's login reset the count"
+
+
 def test_the_block_is_on_the_address_not_the_account(client, registered_user):
     """The design decision #101 asks to make, pinned.
 
@@ -164,6 +186,80 @@ def test_an_ordinary_registration_slip_is_not_counted_as_a_guess(client, app):
 
     with app.app_context():
         assert db.count_recent_login_failures("203.0.113.7") == 0
+
+
+def test_logging_in_does_not_forget_wrong_registration_tokens(app, client, registered_user):
+    """/register recorded a wrong token under whatever username was typed, so an
+    account holder typed their own name, and their next login cleared those rows -
+    guessing the registration token without end, nine guesses per login."""
+    with app.app_context():
+        server_info = db.get_server_info()
+        server_info.registration_token = "the real token"
+        server_info.saveToDb()
+    for _ in range(db.LOGIN_ATTEMPT_LIMIT - 1):
+        client.post("/register", data={
+            "username": registered_user, "inputPassword1": "pw-12345678", "inputPassword2": "pw-12345678",
+            "registrationToken": "a guess",
+        }, environ_base=HERE, follow_redirects=True)
+    attempt(client, registered_user, PASSWORD)
+    client.get("/logout", follow_redirects=True)
+
+    attempt(client, registered_user, "not the password")
+    page = attempt(client, registered_user, "not the password")
+
+    assert "Too many failed attempts" in page, "a login reset the registration-token count"
+
+
+def test_no_account_can_be_named_like_a_registration_token_counter(app, client, registered_user):
+    """Wrong registration tokens are counted under "register:<name>", apart from any
+    login's failures, only because no username can contain a colon. Pinned here, since
+    the username patterns that guarantee it live elsewhere."""
+    # registered_user makes this an ordinary signup, not the first (admin) one
+    client.post("/register", data={
+        "username": "register:alice", "inputPassword1": "pw-12345678", "inputPassword2": "pw-12345678",
+    }, environ_base=HERE, follow_redirects=True)
+
+    with app.app_context():
+        assert UserInfo.fromDb(username="register:alice") is None
+
+
+def _throttle_lines(caplog):
+    return [record.getMessage() for record in caplog.records if record.getMessage().startswith("throttled")]
+
+
+def test_a_refused_attempt_logs_a_bounded_name(client, registered_user, caplog):
+    """The name comes from the form as typed, up to the form field limit, and a refused
+    attempt is cheap to send; logged whole, each one added that much to the log."""
+    burn_the_budget(client)
+    long_name = "x" * 100_000
+    logging.disable(logging.NOTSET)
+    try:
+        with caplog.at_level(logging.WARNING):
+            attempt(client, long_name, "not the password")
+            client.post("/register", data={
+                "username": long_name, "inputPassword1": "pw-12345678", "inputPassword2": "pw-12345678",
+                "registrationToken": "a guess",
+            }, environ_base=HERE)
+    finally:
+        logging.disable(logging.CRITICAL)
+    lines = _throttle_lines(caplog)
+    assert len(lines) == 2
+    for line in lines:
+        assert len(line) < 200
+        # /register counts under "register:<name>", nine characters more
+        assert line.endswith(("... (100000 characters)", "... (100009 characters)"))
+
+
+def test_a_refused_attempt_still_names_a_real_account_whole(client, registered_user, caplog):
+    burn_the_budget(client)
+    name = "twenty.characters_ok"  # as long as a username can be
+    logging.disable(logging.NOTSET)
+    try:
+        with caplog.at_level(logging.WARNING):
+            attempt(client, name, "not the password")
+    finally:
+        logging.disable(logging.CRITICAL)
+    assert _throttle_lines(caplog) == [f"throttled 203.0.113.7 after {db.LOGIN_ATTEMPT_LIMIT} recent failures, 0 of them against {name!r}"]
 
 
 if __name__ == "__main__":

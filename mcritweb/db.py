@@ -798,12 +798,23 @@ def login_is_throttled(remote_addr):
     return count_recent_login_failures(remote_addr) >= LOGIN_ATTEMPT_LIMIT
 
 
-def clear_login_failures(remote_addr):
-    """Forget this address's failures. Called on a successful authentication, so an
-    ordinary person who mistyped their password a few times does not carry the count
-    around for the rest of the window."""
+def clear_login_failures(remote_addr, username):
+    """Forget this address's failed logins as `username`. Called on a successful
+    authentication, so an ordinary person who mistyped their password a few times does
+    not carry the count around for the rest of the window.
+
+    Only that name's: clearing every failure from the address let anyone with a working
+    account of their own reset the throttle between guesses at someone else's. /register
+    records a wrong token under a name no login can carry (see
+    authentication.registration_token_attempt), so a login never resets that budget
+    either. The cost: failures under a mistyped username stay counted until the window
+    ends, even once the right name has logged in.
+    """
     db = get_db()
-    db.execute("DELETE FROM login_attempt WHERE remote_addr = ?", (remote_addr or "",))
+    db.execute(
+        "DELETE FROM login_attempt WHERE remote_addr = ? AND username = ?",
+        (remote_addr or "", username or ""),
+    )
     db.commit()
 
 
