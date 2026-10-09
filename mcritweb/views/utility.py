@@ -6,6 +6,7 @@ lives in functiondiff.py. See issue #88.
 
 import collections
 import functools
+import json
 import math
 import os
 import re
@@ -15,9 +16,23 @@ import time
 
 import requests
 from flask import current_app, flash, g, redirect, session, url_for
+from smda.common.SmdaReport import SmdaReport
 
 from mcritweb import db
 from mcritweb.db import UserColumnSettings
+
+
+def read_smda_report(content):
+    """The SmdaReport an uploaded .smda file holds, or None if it does not hold one.
+
+    json.loads raises ValueError for text that is not JSON or not UTF-8 and
+    RecursionError for nesting deeper than it can follow. SmdaReport.fromDict raises
+    ValueError for anything that is not a report in current smda, but TypeError and
+    KeyError in the older ones mcrit still allows (smda>=4.2.13)."""
+    try:
+        return SmdaReport.fromDict(json.loads(content))
+    except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
+        return None
 
 
 def get_server_url():

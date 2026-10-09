@@ -245,8 +245,13 @@ def cross_compare():
     is_forcing_rematch = True if request.args.get('rematch', 'false').lower() == "true" else False
     is_only_selected = True if request.args.get('onlySelected', 'false').lower() == "true" else False
 
-    cached_list = [int(x) for x in cached.split(',') if x!='']
-    selected_list = [int(x) for x in selected.split(',') if x != '']
+    try:
+        cached_list = [int(x) for x in cached.split(',') if x!='']
+        selected_list = [int(x) for x in selected.split(',') if x != '']
+    except ValueError:
+        # a URL edited by hand; start_cross_compare answers the same list the same way
+        flash('The samples to cross compare were not a list of sample ids.', category='error')
+        cached_list, selected_list = [], []
 
     query = request.args.get('query', "")
     samples = []

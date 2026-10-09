@@ -1,11 +1,10 @@
 import re
 
 from flask import Blueprint, Response, abort, current_app, g, request
-from smda.common.SmdaReport import SmdaReport
 
 from mcritweb.views.authentication import token_required
 from mcritweb.views.client import get_client
-from mcritweb.views.utility import get_username, mcrit_server_required
+from mcritweb.views.utility import get_username, mcrit_server_required, read_smda_report
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -20,6 +19,23 @@ CONTRIBUTOR_ONLY = [
 
 def requires_contributor(api_path, method):
     return any(pattern.match(api_path) and method == verb for pattern, verb in CONTRIBUTOR_ONLY)
+
+def exceeds_query_upload_limit():
+    """The per-role cap `analyze.query` puts on what may be queried (#19). A token
+    carries the same authority as its owner's browser, so the API applies it too.
+
+    The declared Content-Length is checked first, so an oversized body is refused
+    without being read. The server hands the app no more than that many bytes, so a
+    body that claims less cannot be larger. A chunked body declares nothing, so it is
+    read with one byte more than the cap as this request's limit: Werkzeug then stops
+    reading there, and a body that fills that limit is over the cap."""
+    role_limit = current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.api_user.role)
+    if role_limit is None:
+        return False
+    if request.content_length is not None:
+        return request.content_length > role_limit
+    request.max_content_length = role_limit + 1
+    return len(request.get_data()) > role_limit
 
 def nullable_int(x):
     try:
@@ -97,8 +113,9 @@ def api_router(api_path):
                 pass
             return handle_raw_response(client.getSamples(forward_start, forward_limit))
         elif request.method == 'POST':
-            smda_report_body = request.get_json(force=True)
-            smda_report = SmdaReport.fromDict(smda_report_body)
+            smda_report = read_smda_report(request.get_data())
+            if smda_report is None:
+                return Response(status=400)
             return handle_raw_response(client.addReport(smda_report))
     # getFamily, isFamilyId
     elif re_match := re.match(r"families/(?P<family_id>\d+)$", api_path):
@@ -149,8 +166,14 @@ def api_router(api_path):
         return handle_raw_response(fetch_many(entry_ids))
     # getMatchesForSmdaFunction
     elif re_match := re.match(r"query/function$", api_path):
-        smda_report_body = request.get_json(force=True)
-        smda_report = SmdaReport.fromDict(smda_report_body)
+        if exceeds_query_upload_limit():
+            return Response(status=403)
+        # not a report, or nested deeper than json can follow: fromDict, or get_json
+        # on the nesting, raised and the router answered a 500. After the cap, which
+        # reads no further than it needs to
+        smda_report = read_smda_report(request.get_data())
+        if smda_report is None:
+            return Response(status=400)
         return handle_raw_response(client.getMatchesForSmdaFunction(smda_report))
     # getMatchesForPicHash
     elif re_match := re.match(r"query/pichash/(?P<pichash>[0-9a-fA-F]{16})(?P<as_summary>/summary)?$", api_path):
@@ -235,6 +258,8 @@ def api_router(api_path):
         return handle_raw_response(client.getVersion())
     # requestMatchesForMappedBinary, requestMatchesForUnmappedBinary
     elif re_match := re.match(r"query/binary(/mapped/\d+)?$", api_path):
+        if exceeds_query_upload_limit():
+            return Response(status=403)
         binary = request.get_data()
         request_args = request.args
         minhash_threshold = request_args.get("minhash_threshold", default=None, type=nullable_int)

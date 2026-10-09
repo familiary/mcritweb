@@ -441,6 +441,31 @@ def test_layer_4_tells_a_jz_from_a_jnz():
     assert _levenshtein_pairs(escaped_a, escaped_b, unmatched) == [(0x20, 0x120, 0), (0x10, 0x110, 1)]
 
 
+def test_more_than_223_distinct_instructions_are_compared():
+    """The symbols stopped at chr(0xff), so past 223 distinct unmatched instructions
+    across both functions layer 4 raised and the comparison page answered a 500."""
+    from mcritweb.views.functiondiff import _levenshtein_pairs
+
+    def blocks(base):
+        # 300 one-instruction blocks, each a different instruction; function B has
+        # the same ones at other addresses
+        return {base + i: [(f"op{i}", f"op{i}", "")] for i in range(300)}
+
+    escaped_a, escaped_b = blocks(0x1000), blocks(0x9000)
+    unmatched = {"a": list(escaped_a), "b": list(escaped_b)}
+    pairs = _levenshtein_pairs(escaped_a, escaped_b, unmatched)
+    assert sorted((a, b) for a, b, distance in pairs if distance == 0) == [(0x1000 + i, 0x9000 + i) for i in range(300)]
+
+
+def test_the_symbols_skip_the_surrogates():
+    """rapidfuzz takes any code point, but a surrogate is not a character."""
+    from mcritweb.views.functiondiff import _symbol
+
+    assert _symbol(0) == " "
+    assert _symbol(0xD800 - 0x20 - 1) == chr(0xD7FF)
+    assert _symbol(0xD800 - 0x20) == chr(0xE000)
+
+
 def test_the_cache_does_not_keep_the_function_names(client, as_role, fake_mcrit):
     """Names and labels can be changed in the backend, and the page shows them."""
     as_role("visitor")
