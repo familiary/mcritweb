@@ -638,7 +638,9 @@ def fetchDotGraph(function_id):
             return f',comment="{comment}"{match.group(0)}'
 
         dot_graph = BLOCK_LABEL_RX.sub(_add_block_comment, dot_graph)
-        return dot_graph
+        # plain text, not Flask's default text/html: the graph carries API names out of
+        # the sample's import table, and opened as a page one of those can be markup
+        return current_app.response_class(dot_graph, mimetype="text/plain")
     if function_entry:
         # the entry exists but carries no graph - say so, rather than rendering nothing
         return NO_XCFG_DOT_GRAPH
@@ -653,7 +655,8 @@ def fetchCombinedDotGraph(function_id_a, function_id_b):
     client = get_client()
     if client.isFunctionId(function_id_a) and client.isFunctionId(function_id_b):
         # a function without disassembly yields an empty graph
-        return get_combined_dot_graph(function_id_a, function_id_b)
+        # text/plain for the same reason as fetchDotGraph
+        return current_app.response_class(get_combined_dot_graph(function_id_a, function_id_b), mimetype="text/plain")
     return ""
 
 # helper for @bp.route('/functions/<int:function_id>')
