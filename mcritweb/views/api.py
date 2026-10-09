@@ -1,11 +1,10 @@
 import re
 
 from flask import Blueprint, Response, abort, current_app, g, request
-from smda.common.SmdaReport import SmdaReport
 
 from mcritweb.views.authentication import token_required
 from mcritweb.views.client import get_client
-from mcritweb.views.utility import get_username, mcrit_server_required
+from mcritweb.views.utility import get_username, mcrit_server_required, read_smda_report
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -114,8 +113,9 @@ def api_router(api_path):
                 pass
             return handle_raw_response(client.getSamples(forward_start, forward_limit))
         elif request.method == 'POST':
-            smda_report_body = request.get_json(force=True)
-            smda_report = SmdaReport.fromDict(smda_report_body)
+            smda_report = read_smda_report(request.get_data())
+            if smda_report is None:
+                return Response(status=400)
             return handle_raw_response(client.addReport(smda_report))
     # getFamily, isFamilyId
     elif re_match := re.match(r"families/(?P<family_id>\d+)$", api_path):
@@ -168,8 +168,12 @@ def api_router(api_path):
     elif re_match := re.match(r"query/function$", api_path):
         if exceeds_query_upload_limit():
             return Response(status=403)
-        smda_report_body = request.get_json(force=True)
-        smda_report = SmdaReport.fromDict(smda_report_body)
+        # not a report, or nested deeper than json can follow: fromDict, or get_json
+        # on the nesting, raised and the router answered a 500. After the cap, which
+        # reads no further than it needs to
+        smda_report = read_smda_report(request.get_data())
+        if smda_report is None:
+            return Response(status=400)
         return handle_raw_response(client.getMatchesForSmdaFunction(smda_report))
     # getMatchesForPicHash
     elif re_match := re.match(r"query/pichash/(?P<pichash>[0-9a-fA-F]{16})(?P<as_summary>/summary)?$", api_path):

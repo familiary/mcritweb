@@ -161,15 +161,25 @@ def _escaped_pairs(escaped_blocks_a, escaped_blocks_b):
     return _pair_by_hash(_escaped_hashes(escaped_blocks_a), _escaped_hashes(escaped_blocks_b))
 
 
+def _symbol(number):
+    """The character standing for the number-th distinct instruction of a comparison.
+
+    The symbols stopped at chr(0xff), so a pair of functions with more than 223
+    distinct unmatched instructions raised and the comparison page answered a 500.
+    rapidfuzz compares any code points, as fast as these; only the surrogates, which
+    are not characters, are skipped."""
+    code = 0x20 + number
+    return chr(code if code < 0xD800 else code + 0x800)
+
+
 def _levenshtein_pairs(escaped_blocks_a, escaped_blocks_b, unmatched_nodes):
     """(offset_a, offset_b, distance) for the still unmatched blocks, one-to-one."""
     # across all blocks in unmatched nodes, collect tokens and map to symbols
-    # token -> symbol, like "M REG, REG" -> 0
-    # we use symbols from chr(0x20) to chr(0x7e), i.e. up to 94 printables, which "should always be enough (TM)""
+    # token -> symbol, like "M REG, REG" -> chr(0x20)
     alphabet = {}
     num_symbols = 0
 
-    def symbolify(escaped_blocks, unmatched, side):
+    def symbolify(escaped_blocks, unmatched):
         nonlocal num_symbols
         # offset -> symbolified block
         candidate_blocks = {}
@@ -182,24 +192,14 @@ def _levenshtein_pairs(escaped_blocks_a, escaped_blocks_b, unmatched_nodes):
             for mnemonic, _, escaped_operands in escaped_block:
                 escaped_ins = mnemonic + " " + escaped_operands
                 if escaped_ins not in alphabet:
-                    alphabet[escaped_ins] = chr(0x20 + num_symbols)
+                    alphabet[escaped_ins] = _symbol(num_symbols)
                     num_symbols += 1
-                    if num_symbols > 0xff-0x20:
-                        # the alphabet was printed here before raising: on a request path,
-                        # dumping every distinct instruction in the function to stdout. The
-                        # size is the part that explains the failure, so it goes where a
-                        # reader of the traceback will actually see it. See #165 - #175's
-                        # deduplication of these two loops had restored the print.
-                        raise Exception(
-                            f"Too many distinct instructions to compare: {num_symbols} "
-                            f"across both functions, limit {0xff - 0x20}. Overflowed while "
-                            f"symbolifying function {side}.")
                 symbolified_block += alphabet[escaped_ins]
             candidate_blocks[offset] = symbolified_block
         return candidate_blocks
 
-    candidate_blocks_a = symbolify(escaped_blocks_a, unmatched_nodes["a"], "a")
-    candidate_blocks_b = symbolify(escaped_blocks_b, unmatched_nodes["b"], "b")
+    candidate_blocks_a = symbolify(escaped_blocks_a, unmatched_nodes["a"])
+    candidate_blocks_b = symbolify(escaped_blocks_b, unmatched_nodes["b"])
 
     by_score = {0: [], 1: [], 2: [], 3: []}
     for block_a, symbols_a in candidate_blocks_a.items():
