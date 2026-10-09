@@ -258,5 +258,155 @@ def test_an_empty_user_table_has_no_method_to_match(app):
     assert authentication._ABSENT_USER_PASSWORD_HASH is not None
 
 
+# --- an admin acting while a login is in flight ------------------------------------
+
+def admin_acts_during_the_password_check(app, monkeypatch, statement):
+    """login() reads the user's row, checks the password - the slow part - and then
+    saves the row back. Run an admin's change in exactly that gap."""
+    from mcritweb import db
+    from mcritweb.views import authentication
+    real_check = authentication.check_password_hash
+
+    def check_while_the_admin_acts(stored, password):
+        with app.app_context():
+            database = db.get_db()
+            database.execute(statement, ("alice",))
+            database.commit()
+        return real_check(stored, password)
+    monkeypatch.setattr(authentication, "check_password_hash", check_while_the_admin_acts)
+
+
+def roles_of_alice(app):
+    from mcritweb import db
+    with app.app_context():
+        return [row["role"] for row in db.get_db().execute("SELECT role FROM user WHERE username = ?", ("alice",))]
+
+
+def test_a_login_in_flight_does_not_undo_a_demotion(app, client, registered_user, monkeypatch):
+    """The save wrote back the role it had read, so a demoted user who kept logging in
+    got the old role back."""
+    admin_acts_during_the_password_check(app, monkeypatch, "UPDATE user SET role = 'pending' WHERE username = ?")
+    attempt(client, registered_user, PASSWORD)
+
+    assert roles_of_alice(app) == ["pending"]
+
+
+def test_a_login_in_flight_does_not_bring_back_a_deleted_user(app, client, registered_user, monkeypatch):
+    """The save fell through to an INSERT when the row was gone, re-creating the
+    account with the role it had before it was deleted."""
+    admin_acts_during_the_password_check(app, monkeypatch, "DELETE FROM user WHERE username = ?")
+    attempt(client, registered_user, PASSWORD)
+
+    assert roles_of_alice(app) == []
+
+
+@pytest.mark.parametrize("column, value", [
+    ("apitoken", "rotated-while-logging-in"),
+    ("username", "alice.renamed"),
+])
+def test_a_login_in_flight_does_not_undo_other_changes_to_the_row(app, client, registered_user, monkeypatch, column, value):
+    """Only the role was guarded at first; the save still wrote back the apitoken and
+    the name it had read, so a token rotated during someone's login came back."""
+    admin_acts_during_the_password_check(app, monkeypatch, f"UPDATE user SET {column} = '{value}' WHERE username = ?")
+    attempt(client, registered_user, PASSWORD)
+
+    from mcritweb import db
+    with app.app_context():
+        rows = db.get_db().execute(f"SELECT {column}, last_login FROM user").fetchall()
+    assert [row[column] for row in rows] == [value]
+    assert rows[0]["last_login"] != "no login", "the login itself was not recorded"
+
+
+def test_a_rehash_in_flight_does_not_undo_a_password_change(app, client, monkeypatch):
+    """A stale hash is rewritten on login - from the password just checked, so a
+    password changed during that check must not be replaced by a rehash of the old one."""
+    from werkzeug.security import check_password_hash
+    with app.app_context():
+        user_info = UserInfo()
+        user_info.username = "alice"
+        user_info.password = generate_password_hash(PASSWORD, method="pbkdf2:sha256:1000")
+        user_info.role = "visitor"
+        user_info.apitoken = "apitoken-alice"
+        user_info.saveToDb()
+    new_hash = generate_password_hash("a brand new password")
+    admin_acts_during_the_password_check(app, monkeypatch, f"UPDATE user SET password = '{new_hash}' WHERE username = ?")
+    attempt(client, "alice", PASSWORD)
+
+    with app.app_context():
+        stored = UserInfo.fromDb(username="alice").password
+    assert check_password_hash(stored, "a brand new password")
+
+
+def the_row_changes_while_the_hash_is_computed(app, monkeypatch, statement, user_id):
+    """The settings routes work on `g.user`, read at the start of the request; the slow
+    part of a password change is hashing the new one. Change the row in that gap."""
+    from mcritweb import db
+    from mcritweb.views import administration
+    real_hash = administration.generate_password_hash
+
+    def hash_while_the_row_changes(password):
+        with app.app_context():
+            database = db.get_db()
+            database.execute(statement, (user_id,))
+            database.commit()
+        return real_hash(password)
+    monkeypatch.setattr(administration, "generate_password_hash", hash_while_the_row_changes)
+
+
+@pytest.mark.parametrize("column, value", [
+    ("apitoken", "rotated-while-changing-the-password"),
+    ("username", "alice.renamed"),
+    ("role", "pending"),
+])
+def test_a_password_change_in_flight_does_not_undo_other_changes_to_the_row(app, client, as_role, monkeypatch, column, value):
+    """The settings routes saved the whole copy of `g.user`, so a password change wrote
+    its old apitoken back over a rotation made while it ran - and, once the token was
+    guarded, still its old name and role."""
+    user_id = as_role("visitor", username="alice")
+    the_row_changes_while_the_hash_is_computed(app, monkeypatch, f"UPDATE user SET {column} = '{value}' WHERE id = ?", user_id)
+    client.post("/admin/change_password", data={"inputPassword2": "password", "inputPassword3": "new-password", "inputPassword4": "new-password"})
+
+    from werkzeug.security import check_password_hash
+    with app.app_context():
+        user_info = UserInfo.fromDb(user_id=user_id)
+    assert getattr(user_info, column) == value
+    assert check_password_hash(user_info.password, "new-password"), "the change itself was not stored"
+
+
+def test_regenerating_the_token_of_a_user_deleted_meanwhile_brings_nobody_back(app, client, as_role, monkeypatch):
+    from mcritweb import db
+    from mcritweb.views import administration
+    user_id = as_role("visitor", username="alice")
+    real_generate = administration.generate_apitoken
+
+    def generate_while_the_user_is_deleted():
+        with app.app_context():
+            database = db.get_db()
+            database.execute("DELETE FROM user WHERE id = ?", (user_id,))
+            database.commit()
+        return real_generate()
+    monkeypatch.setattr(administration, "generate_apitoken", generate_while_the_user_is_deleted)
+    client.post("/admin/regenerate_apitoken")
+
+    assert roles_of_alice(app) == []
+
+
+def test_regenerating_the_token_still_stores_it(app, client, as_role):
+    user_id = as_role("visitor", username="alice")
+    client.post("/admin/regenerate_apitoken")
+
+    with app.app_context():
+        assert UserInfo.fromDb(user_id=user_id).apitoken not in (None, "apitoken-visitor")
+
+
+def test_an_admin_can_still_change_a_role(app, client, as_role, make_user):
+    # the admin first: user 1 is the root user, whose role the route never changes
+    as_role("admin")
+    alice = make_user(role="visitor", username="alice")
+    client.post(f"/admin/change_user_role/{alice}/contributor/all")
+
+    assert roles_of_alice(app) == ["contributor"]
+
+
 if __name__ == "__main__":
     unittest.main()

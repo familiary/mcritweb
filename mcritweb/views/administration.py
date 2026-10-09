@@ -55,7 +55,7 @@ def change_password():
         error_msg = 'Incorrect password!'
     if error_msg is None:
         user_info.password = generate_password_hash(new_password)
-        user_info.saveToDb(withPassword=True)
+        user_info.saveToDb()
         flash('Password successfully changed', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')
