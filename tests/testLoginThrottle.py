@@ -210,5 +210,18 @@ def test_logging_in_does_not_forget_wrong_registration_tokens(app, client, regis
     assert "Too many failed attempts" in page, "a login reset the registration-token count"
 
 
+def test_no_account_can_be_named_like_a_registration_token_counter(app, client, registered_user):
+    """Wrong registration tokens are counted under "register:<name>", apart from any
+    login's failures, only because no username can contain a colon. Pinned here, since
+    the username patterns that guarantee it live elsewhere."""
+    # registered_user makes this an ordinary signup, not the first (admin) one
+    client.post("/register", data={
+        "username": "register:alice", "inputPassword1": "pw-12345678", "inputPassword2": "pw-12345678",
+    }, environ_base=HERE, follow_redirects=True)
+
+    with app.app_context():
+        assert UserInfo.fromDb(username="register:alice") is None
+
+
 if __name__ == "__main__":
     unittest.main()
