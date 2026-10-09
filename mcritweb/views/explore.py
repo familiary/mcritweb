@@ -12,6 +12,7 @@ from mcritweb.autocomplete import autocomplete_items
 from mcritweb.views.authentication import contributor_required, visitor_required
 from mcritweb.views.client import get_client, get_sample_entries, remember_samples
 from mcritweb.views.cursor_pagination import CursorPagination
+from mcritweb.views.data import JOB_ID_PATTERN
 from mcritweb.views.functiondiff import get_combined_dot_graph
 from mcritweb.views.pagination import request_args_for_link_building
 from mcritweb.views.utility import get_user_column_setup, mcrit_server_required
@@ -373,7 +374,8 @@ def modifySample():
         client = get_client()
         sample_id = request.form.get("sample_id", None)
         redirection_job_id = request.form.get("redirection_job_id", None)
-        if redirection_job_id is not None and client.getJobData(redirection_job_id) is None: 
+        if redirection_job_id is not None and (
+                not JOB_ID_PATTERN.fullmatch(redirection_job_id) or client.getJobData(redirection_job_id) is None):
             flash("Trying to redirect from invalid job_Id.", category="error")
             return redirect(url_for('explore.samples'))
         sample_entry = None

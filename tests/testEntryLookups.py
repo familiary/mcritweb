@@ -41,6 +41,8 @@ def fake_mcrit(corpus_mcrit):
 
 #: the batch read that answers for each single lookup
 BATCHED = {"getSampleById": "getSamplesByIds", "getFamily": "getFamiliesByIds"}
+#: job ids are hex object ids; the job page refuses anything else
+PARENT_JOB_ID = "abababababababababababab"
 
 
 def lookups(fake_mcrit, name="getSampleById"):
@@ -271,7 +273,7 @@ def test_the_job_page_resolves_its_samples_through_the_request_lookup(client, as
     children = {job.job_id: job for job in (matching_job(3, 40), matching_job(3, 41), matching_job(5, 42))}
     parent_document["all_dependencies"] = list(children)
     parent = Job(parent_document, None)
-    monkeypatch.setattr(fake_mcrit, "getJobData", lambda job_id, *args, **kwargs: parent if job_id == "parent" else None, raising=False)
+    monkeypatch.setattr(fake_mcrit, "getJobData", lambda job_id, *args, **kwargs: parent if job_id == PARENT_JOB_ID else None, raising=False)
     monkeypatch.setattr(fake_mcrit, "getQueueData", dependency_reader(fake_mcrit, children), raising=False)
     helper = data_views.get_sample_entries
 
@@ -281,7 +283,7 @@ def test_the_job_page_resolves_its_samples_through_the_request_lookup(client, as
 
     monkeypatch.setattr(data_views, "get_sample_entries", remembering_first)
     as_role("visitor")
-    response = client.get("/data/jobs/parent")
+    response = client.get(f"/data/jobs/{PARENT_JOB_ID}")
 
     assert response.status_code == 200
     assert lookups(fake_mcrit) == {3: 1}
@@ -308,7 +310,7 @@ def parent_with_dependencies(fake_mcrit, monkeypatch, job_ids):
     parent_document = copy.deepcopy(load("cross_compare.job"))
     parent_document["all_dependencies"] = list(job_ids)
     parent = Job(parent_document, None)
-    monkeypatch.setattr(fake_mcrit, "getJobData", lambda job_id, *args, **kwargs: parent if job_id == "parent" else None, raising=False)
+    monkeypatch.setattr(fake_mcrit, "getJobData", lambda job_id, *args, **kwargs: parent if job_id == PARENT_JOB_ID else None, raising=False)
 
 
 def test_a_dependency_that_is_gone_is_counted_as_missing(client, as_role, fake_mcrit, monkeypatch):
@@ -316,7 +318,7 @@ def test_a_dependency_that_is_gone_is_counted_as_missing(client, as_role, fake_m
     parent_with_dependencies(fake_mcrit, monkeypatch, [present.job_id, "b" * 24, "c" * 24])
     monkeypatch.setattr(fake_mcrit, "getQueueData", dependency_reader(fake_mcrit, {present.job_id: present}), raising=False)
     as_role("visitor")
-    response = client.get("/data/jobs/parent")
+    response = client.get(f"/data/jobs/{PARENT_JOB_ID}")
 
     assert response.status_code == 200
     assert re.search(r"2 of this job(&#39;|')s 3 sub-jobs\s+are no longer in the system", response.get_data(as_text=True))
@@ -330,7 +332,7 @@ def test_a_backend_that_ignores_the_selector_does_not_add_jobs(client, as_role, 
     stranger = matching_job(12, 99)
     monkeypatch.setattr(fake_mcrit, "getQueueData", dependency_reader(fake_mcrit, {present.job_id: present}, extra=[stranger]), raising=False)
     as_role("visitor")
-    response = client.get("/data/jobs/parent")
+    response = client.get(f"/data/jobs/{PARENT_JOB_ID}")
 
     assert response.status_code == 200
     assert stranger.job_id not in response.get_data(as_text=True)
@@ -341,7 +343,7 @@ def test_a_failed_dependency_read_counts_every_dependency_as_missing(client, as_
     parent_with_dependencies(fake_mcrit, monkeypatch, ["a" * 24, "b" * 24])
     monkeypatch.setattr(fake_mcrit, "getQueueData", lambda *args, **kwargs: None, raising=False)
     as_role("visitor")
-    response = client.get("/data/jobs/parent")
+    response = client.get(f"/data/jobs/{PARENT_JOB_ID}")
 
     assert response.status_code == 200
     assert re.search(r"2 of this job(&#39;|')s 2 sub-jobs\s+are no longer in the system", response.get_data(as_text=True))
@@ -355,7 +357,7 @@ def test_many_dependencies_are_read_in_requests_of_a_hundred(client, as_role, fa
     parent_with_dependencies(fake_mcrit, monkeypatch, list(children))
     monkeypatch.setattr(fake_mcrit, "getQueueData", dependency_reader(fake_mcrit, children), raising=False)
     as_role("visitor")
-    response = client.get("/data/jobs/parent")
+    response = client.get(f"/data/jobs/{PARENT_JOB_ID}")
 
     assert response.status_code == 200
     reads = dependency_reads(fake_mcrit)
@@ -380,7 +382,7 @@ def test_a_failed_read_loses_only_its_own_dependencies(client, as_role, fake_mcr
 
     monkeypatch.setattr(fake_mcrit, "getQueueData", second_read_fails, raising=False)
     as_role("visitor")
-    response = client.get("/data/jobs/parent")
+    response = client.get(f"/data/jobs/{PARENT_JOB_ID}")
 
     assert response.status_code == 200
     assert re.search(r"50 of this job(&#39;|')s 150 sub-jobs\s+are no longer in the system", response.get_data(as_text=True))
@@ -399,7 +401,7 @@ def test_a_backend_that_ignores_the_selector_is_read_once(client, as_role, fake_
 
     monkeypatch.setattr(fake_mcrit, "getQueueData", whole_queue, raising=False)
     as_role("visitor")
-    response = client.get("/data/jobs/parent")
+    response = client.get(f"/data/jobs/{PARENT_JOB_ID}")
 
     assert response.status_code == 200
     assert len(dependency_reads(fake_mcrit)) == 1
@@ -424,7 +426,7 @@ def test_the_job_page_asks_for_its_families_in_one_request(client, as_role, fake
     parent_with_dependencies(fake_mcrit, monkeypatch, list(children))
     monkeypatch.setattr(fake_mcrit, "getQueueData", dependency_reader(fake_mcrit, children), raising=False)
     as_role("visitor")
-    response = client.get("/data/jobs/parent")
+    response = client.get(f"/data/jobs/{PARENT_JOB_ID}")
 
     assert response.status_code == 200
     assert batches(fake_mcrit, "getFamiliesByIds") == [[1, 2]]

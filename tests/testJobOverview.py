@@ -25,6 +25,8 @@ import pytest
 from mcrit.queue.LocalQueue import Job
 
 LOG = logging.getLogger(__name__)
+#: job ids are hex object ids; the job page refuses anything else
+PARENT_JOB_ID = "abababababababababababab"
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
 logging.disable(logging.CRITICAL)
 
@@ -90,7 +92,7 @@ def overview(app, client, as_role):
 
 
 def test_a_job_whose_dependencies_are_all_gone_still_renders(overview):
-    parent = job_data("parent", 10, "combineMatchesToCross", ["gone-a", "gone-b"])
+    parent = job_data(PARENT_JOB_ID, 10, "combineMatchesToCross", ["gone-a", "gone-b"])
     response = overview(parent, [])
     assert response.status_code == 200, "a deleted dependency should not 500 the page"
 
@@ -98,7 +100,7 @@ def test_a_job_whose_dependencies_are_all_gone_still_renders(overview):
 def test_the_page_says_that_children_are_missing(overview):
     """Silently rendering a shorter list would misreport the job: the overview would
     claim a cross compare combined nothing."""
-    parent = job_data("parent", 10, "combineMatchesToCross", ["gone-a", "gone-b"])
+    parent = job_data(PARENT_JOB_ID, 10, "combineMatchesToCross", ["gone-a", "gone-b"])
     response = overview(parent, [])
     assert b"2 of this job's 2 sub-jobs" in response.data, response.data[-2000:]
     assert response.data.count(b"no longer in the system") == 1, "said once. `in` is as true of two copies as of one, and a resolution that keeps both sides of this block has happened twice in the integration merges."
@@ -107,7 +109,7 @@ def test_the_page_says_that_children_are_missing(overview):
 def test_the_children_that_remain_are_still_listed_and_ordered(overview):
     """Ids chosen so that only sorting by job number gives this order - dependency
     order and alphabetical order both put aaa-job first."""
-    parent = job_data("parent", 10, "combineMatchesToCross", ["gone", "aaa-job", "zzz-job"])
+    parent = job_data(PARENT_JOB_ID, 10, "combineMatchesToCross", ["gone", "aaa-job", "zzz-job"])
     # a 1vN job carries its sample id as argument 0; the overview reads it to build the
     # sample lookup, so the children need a real one
     children = [job_data("aaa-job", 9, params='{"0": 7}'), job_data("zzz-job", 4, params='{"0": 8}')]
@@ -120,7 +122,7 @@ def test_the_children_that_remain_are_still_listed_and_ordered(overview):
 
 
 def test_a_job_without_dependencies_is_unaffected(overview):
-    parent = job_data("parent", 10, "getMatchesForSample", [])
+    parent = job_data(PARENT_JOB_ID, 10, "getMatchesForSample", [])
     response = overview(parent, [])
 
     assert response.status_code == 200
