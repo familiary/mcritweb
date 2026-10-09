@@ -11,7 +11,7 @@ Compare
 
 {% block style %}
 <script>
-var selected = '{{ selected or "" }}'
+var selected = {{ (selected or "")|tojson }}
 var selected_column = null;
 $(document).ready(function(){
   var table = document.getElementsByClassName("parent_table_sample");
