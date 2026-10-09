@@ -292,8 +292,9 @@ def login():
             session.clear()
             session['user_id'] = user_info.user_id
             user_info.last_login = utc_now()
+            verified_password = user_info.password
             rehashed = _rehash_if_stale(user_info, password)
-            user_info.saveToDb(withPassword=rehashed)
+            user_info.saveLogin(verified_password=verified_password if rehashed else None)
             db.clear_login_failures(request.remote_addr, username)
             return redirect(url_for('index'))
         db.record_failed_login(request.remote_addr, username)

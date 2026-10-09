@@ -67,6 +67,9 @@ def generate_apitoken():
 
 class UserInfo:
 
+    #: The columns of `user` a UserInfo carries besides its id, as attribute names.
+    COLUMNS = ("username", "password", "role", "registered", "last_login", "apitoken")
+
     def __init__(self) -> None:
         self.user_id = None
         self.username = None
@@ -76,6 +79,8 @@ class UserInfo:
         self.registered = None
         self.last_login = None
         self.apitoken = None
+        # the values the row had when it was read, see saveToDb
+        self._stored = {}
 
     @classmethod
     def fromDb(cls, user_id=None, username=None):
@@ -97,25 +102,25 @@ class UserInfo:
             if record["last_login"] != "no login":
                 user_info.last_login = parse_timestamp(record["last_login"])
             user_info.apitoken = record["apitoken"]
+            user_info._stored = {column: getattr(user_info, column) for column in cls.COLUMNS}
         else:
             user_info = None
         return user_info
-    
-    def saveToDb(self, withPassword=False):
+
+    def saveToDb(self):
+        """Add this user if it has no id yet; otherwise write back the columns that were
+        changed since the row was read, and nothing else.
+
+        Every caller works on a copy read earlier in its request, and writing the whole
+        copy back undid whatever had happened to the row in the meantime: a login in
+        flight restored a demotion, a token rotation or a rename, and - the row gone, so
+        the save fell through to an INSERT - re-created a deleted account. Writing only
+        the changed columns leaves the others as they are now, and an UPDATE for a row
+        deleted meanwhile matches nothing. The rehash on login has its own rule, see
+        saveLogin.
+        """
         database = get_db()
-        # query to see if row exists
-        record = database.execute("SELECT * FROM user WHERE id = ?;", (self.user_id,)).fetchone()
-        if record:
-            database.execute("UPDATE user SET username = ? WHERE id = ?;",(self.username, self.user_id,))
-            if withPassword:
-                database.execute("UPDATE user SET password = ? WHERE id = ?;",(self.password, self.user_id,))
-            database.execute("UPDATE user SET role = ? WHERE id = ?;",(self.role, self.user_id,))
-            if isinstance(self.registered, datetime.datetime):
-                database.execute("UPDATE user SET registered = ? WHERE id = ?;",(format_timestamp(self.registered), self.user_id,))
-            if isinstance(self.last_login, datetime.datetime):
-                database.execute("UPDATE user SET last_login = ? WHERE id = ?;",(format_timestamp(self.last_login), self.user_id,))
-            database.execute("UPDATE user SET apitoken = ? WHERE id = ?;",(self.apitoken, self.user_id,))
-        else:
+        if self.user_id is None:
             database.execute(
                 "INSERT INTO user (username, password, role, registered, last_login, apitoken) VALUES (?,?,?,?,?,?)",
                 # formatted here rather than handed over as a datetime: sqlite3's
@@ -123,6 +128,29 @@ class UserInfo:
                 # fromDb could not always read back. See issue #98.
                 (self.username, self.password, self.role, format_timestamp(utc_now()), 'no login', self.apitoken),
             )
+        else:
+            for column in self.COLUMNS:
+                value = getattr(self, column)
+                if column in self._stored and value == self._stored[column]:
+                    continue
+                if isinstance(value, datetime.datetime):
+                    value = format_timestamp(value)
+                database.execute(f"UPDATE user SET {column} = ? WHERE id = ?;", (value, self.user_id))
+        database.commit()
+
+    def saveLogin(self, verified_password=None):
+        """Record a successful login: last_login, and - when login() moved the password
+        onto the current hashing method - the new hash.
+
+        The rehash is written only while the stored hash is still the one that was
+        verified: login() holds this copy across a slow password check, and a password
+        changed in the meantime is newer than this rehash of the old one.
+        """
+        database = get_db()
+        database.execute("UPDATE user SET last_login = ? WHERE id = ?;", (format_timestamp(self.last_login), self.user_id))
+        if verified_password is not None:
+            database.execute("UPDATE user SET password = ? WHERE id = ? AND password = ?;",
+                             (self.password, self.user_id, verified_password))
         database.commit()
     
     @property
