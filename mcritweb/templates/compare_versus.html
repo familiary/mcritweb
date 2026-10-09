@@ -11,8 +11,8 @@ Compare
 {% endblock %}
 {% block style %}
 <script>
-var selected_a = '{{ selected_a or "" }}'
-var selected_b = '{{ selected_b or "" }}'
+var selected_a = {{ (selected_a or "")|tojson }}
+var selected_b = {{ (selected_b or "")|tojson }}
 var selected_column_a = null;
 var selected_column_b = null;
 $(document).ready(function(){
