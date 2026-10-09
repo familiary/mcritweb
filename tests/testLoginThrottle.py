@@ -99,6 +99,28 @@ def test_a_successful_login_forgets_the_failures(client, registered_user):
     assert "Too many failed attempts" not in page, "the count was not reset by the success"
 
 
+def test_logging_in_to_another_account_does_not_forget_the_failures(app, client, registered_user):
+    """The success used to clear every failure from the address, so anyone with an
+    account of their own - a self-registered `pending` one is enough, login checks no
+    role - could guess at `alice` without end, logging in to their own account after
+    every nine tries."""
+    with app.app_context():
+        user_info = UserInfo()
+        user_info.username = "mallory"
+        user_info.password = generate_password_hash(PASSWORD)
+        user_info.role = "pending"
+        user_info.saveToDb()
+    for _ in range(db.LOGIN_ATTEMPT_LIMIT - 1):
+        attempt(client, registered_user, "not the password")
+    attempt(client, "mallory", PASSWORD)
+
+    client.get("/logout", follow_redirects=True)
+    attempt(client, registered_user, "not the password")
+    page = attempt(client, registered_user, "not the password")
+
+    assert "Too many failed attempts" in page, "another account's login reset the count"
+
+
 def test_the_block_is_on_the_address_not_the_account(client, registered_user):
     """The design decision #101 asks to make, pinned.
 
@@ -164,6 +186,28 @@ def test_an_ordinary_registration_slip_is_not_counted_as_a_guess(client, app):
 
     with app.app_context():
         assert db.count_recent_login_failures("203.0.113.7") == 0
+
+
+def test_logging_in_does_not_forget_wrong_registration_tokens(app, client, registered_user):
+    """/register recorded a wrong token under whatever username was typed, so an
+    account holder typed their own name, and their next login cleared those rows -
+    guessing the registration token without end, nine guesses per login."""
+    with app.app_context():
+        server_info = db.get_server_info()
+        server_info.registration_token = "the real token"
+        server_info.saveToDb()
+    for _ in range(db.LOGIN_ATTEMPT_LIMIT - 1):
+        client.post("/register", data={
+            "username": registered_user, "inputPassword1": "pw-12345678", "inputPassword2": "pw-12345678",
+            "registrationToken": "a guess",
+        }, environ_base=HERE, follow_redirects=True)
+    attempt(client, registered_user, PASSWORD)
+    client.get("/logout", follow_redirects=True)
+
+    attempt(client, registered_user, "not the password")
+    page = attempt(client, registered_user, "not the password")
+
+    assert "Too many failed attempts" in page, "a login reset the registration-token count"
 
 
 if __name__ == "__main__":
