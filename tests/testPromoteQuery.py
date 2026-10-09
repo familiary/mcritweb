@@ -621,7 +621,8 @@ def test_a_report_without_a_usable_hash_promotes_nothing(client, as_role, fake_m
     It used to be the filename, and then it had to be checked to be a hash before it
     could become part of a path. It is not the filename any more - the job id is - so
     this now holds a narrower statement: whatever the report declares, it stays out of
-    the path entirely, and only the corpus is asked about it.
+    the path entirely. A value that is not a sha256 is refused before anything is
+    read, and the test below covers the corpus lookup it would otherwise reach.
 
     Asserting that nothing was submitted would not be enough. A path built from that
     field would traverse, the file would be read, and the promotion would then be
@@ -648,9 +649,22 @@ def test_a_report_without_a_usable_hash_promotes_nothing(client, as_role, fake_m
     assert response.status_code == 302
     assert wrote_nothing(fake_mcrit)
     assert not [path for path in opened if outside.name in str(path)], f"read outside the uploads folder: {opened}"
-    # and the file it did open is the one the job names, not one the report asked for
-    assert [path for path in opened if str(path).endswith(QUERY_JOB_ID)], \
-        f"the upload was not looked for under its job id: {opened}"
+
+
+@pytest.mark.parametrize("declared", ["../../rebuild_index", "../../../jobs?x=1", "a" * 64 + "/../../rebuild_index", "a" * 64 + "\n"])
+def test_a_declared_hash_that_is_not_a_sha256_never_reaches_the_backend(client, as_role, fake_mcrit, uploads, declared):
+    """`getSampleBySha256` puts its argument into the request path unquoted, so the
+    declared value of a visitor's .smda query, "../../rebuild_index", made the
+    contributor who promoted it send the backend an admin-only GET."""
+    as_role("contributor")
+    register_query(fake_mcrit, digest=declared)
+    store_upload(uploads, QUERIED_BYTES)
+
+    response = promote(client)
+
+    assert response.status_code == 302
+    assert not calls_to(fake_mcrit, "getSampleBySha256")
+    assert wrote_nothing(fake_mcrit)
 
 
 @pytest.mark.parametrize("job_id", ["None", "NUL", "job-1"])

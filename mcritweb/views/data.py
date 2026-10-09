@@ -1463,6 +1463,13 @@ def submit_or_query():
         # return redirect(url_for("data.submit"), code=307)
 
 
+#: The shape of the `sha256` an .smda report declares. smda copies that field as it
+#: finds it, and McritClient.getSampleBySha256 puts it into the request path unquoted,
+#: so "../../rebuild_index" asked the backend for an admin-only route instead.
+#: `\Z` rather than `$`, which would also match before a trailing newline.
+SMDA_SHA256 = re.compile(r"^[0-9a-fA-F]{64}\Z")
+
+
 @bp.route('/submit',methods=('GET', 'POST'))
 @contributor_required
 @mcrit_server_required
@@ -1489,6 +1496,11 @@ def submit():
             content_as_dict = json.loads(binary_content)
             smda_report = SmdaReport.fromDict(content_as_dict)
             upload_sha256 = smda_report.sha256
+            if not isinstance(upload_sha256, str) or not SMDA_SHA256.match(upload_sha256):
+                flash("The SMDA report does not carry a valid sha256.", category='error')
+                return "", 400 # Bad Request
+            # the corpus holds lowercase hashes and both lookups match exactly, as promote_query does
+            upload_sha256 = smda_report.sha256 = upload_sha256.lower()
         else:
             # check here if it is already part of corpus
             upload_sha256 = hashlib.sha256(binary_content).hexdigest()
@@ -1642,7 +1654,11 @@ def promote_query(job_id):
     # corpus is asked about below; what was actually resubmitted is checked against the
     # job descriptor further down instead.
     upload_sha256 = sample_info.get("sha256")
-    upload_sha256 = upload_sha256.lower() if isinstance(upload_sha256, str) else None
+    # an .smda query's report declares this value itself - see SMDA_SHA256
+    if isinstance(upload_sha256, str) and SMDA_SHA256.match(upload_sha256):
+        upload_sha256 = upload_sha256.lower()
+    else:
+        upload_sha256 = None
     if upload_sha256 is None:
         flash('The report of this query does not record which file it was run for, so it cannot be promoted.', category='error')
         return redirect(result_page)
