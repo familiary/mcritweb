@@ -21,6 +21,23 @@ CONTRIBUTOR_ONLY = [
 def requires_contributor(api_path, method):
     return any(pattern.match(api_path) and method == verb for pattern, verb in CONTRIBUTOR_ONLY)
 
+def exceeds_query_upload_limit():
+    """The per-role cap `analyze.query` puts on what may be queried (#19). A token
+    carries the same authority as its owner's browser, so the API applies it too.
+
+    The declared Content-Length is checked first, so an oversized body is refused
+    without being read. The server hands the app no more than that many bytes, so a
+    body that claims less cannot be larger. A chunked body declares nothing, so it is
+    read with one byte more than the cap as this request's limit: Werkzeug then stops
+    reading there, and a body that fills that limit is over the cap."""
+    role_limit = current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.api_user.role)
+    if role_limit is None:
+        return False
+    if request.content_length is not None:
+        return request.content_length > role_limit
+    request.max_content_length = role_limit + 1
+    return len(request.get_data()) > role_limit
+
 def nullable_int(x):
     try:
         casted = int(x)
@@ -149,6 +166,8 @@ def api_router(api_path):
         return handle_raw_response(fetch_many(entry_ids))
     # getMatchesForSmdaFunction
     elif re_match := re.match(r"query/function$", api_path):
+        if exceeds_query_upload_limit():
+            return Response(status=403)
         smda_report_body = request.get_json(force=True)
         smda_report = SmdaReport.fromDict(smda_report_body)
         return handle_raw_response(client.getMatchesForSmdaFunction(smda_report))
@@ -235,6 +254,8 @@ def api_router(api_path):
         return handle_raw_response(client.getVersion())
     # requestMatchesForMappedBinary, requestMatchesForUnmappedBinary
     elif re_match := re.match(r"query/binary(/mapped/\d+)?$", api_path):
+        if exceeds_query_upload_limit():
+            return Response(status=403)
         binary = request.get_data()
         request_args = request.args
         minhash_threshold = request_args.get("minhash_threshold", default=None, type=nullable_int)
