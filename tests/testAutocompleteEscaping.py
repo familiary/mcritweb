@@ -51,8 +51,9 @@ prefix is still highlighted, and selecting one puts the *unescaped* name in the 
 that runs the fetching partial twice since #192 - once for its edit modals, once for
 the drop overlay - and asserts every family field still carries exactly one widget.
 
-The browser tests need playwright with a chromium build; without either they skip
-rather than fail, so the offline pair is what CI is guaranteed to run.
+The browser tests need playwright with a chromium build - one it installed itself, or
+the one MCRITWEB_CHROMIUM names; without either they skip rather than fail, so the
+offline pair is what CI is guaranteed to run.
 """
 
 import json
@@ -449,7 +450,9 @@ def drive_type_ahead(sync_api, app, live_url, user_id, path, lookup, expected_it
     """Open `path` in a browser, type `lookup`, and report what the widget rendered."""
     with sync_api.sync_playwright() as playwright:
         try:
-            browser = playwright.chromium.launch()
+            # a Chromium that playwright did not install itself is named through MCRITWEB_CHROMIUM,
+            # as in testFunctionVsBrowser.py
+            browser = playwright.chromium.launch(executable_path=os.environ.get("MCRITWEB_CHROMIUM") or None)
         except Exception as exc:  # noqa: BLE001 - a missing browser is a skip, not a failure
             pytest.skip(f"playwright has no chromium installed: {exc}")
         try:
@@ -589,7 +592,9 @@ def test_the_drop_overlay_suggests_without_doubling_the_modal_widgets(app, poiso
     user_id = make_user("admin")
     with sync_api.sync_playwright() as playwright:
         try:
-            browser = playwright.chromium.launch()
+            # a Chromium that playwright did not install itself is named through MCRITWEB_CHROMIUM,
+            # as in testFunctionVsBrowser.py
+            browser = playwright.chromium.launch(executable_path=os.environ.get("MCRITWEB_CHROMIUM") or None)
         except Exception as exc:  # noqa: BLE001 - a missing browser is a skip, not a failure
             pytest.skip(f"playwright has no chromium installed: {exc}")
         try:
