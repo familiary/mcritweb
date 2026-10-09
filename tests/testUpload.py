@@ -17,6 +17,7 @@ import logging
 import random
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import quote
 
 import pytest
@@ -333,6 +334,38 @@ def test_submitting_a_binary_keeps_no_local_copy(client, app, as_role, fake_mcri
     assert len(queued) == 1
     assert queued[0][1][0] == binary
     assert list((Path(app.instance_path) / "temp" / "uploads").iterdir()) == []
+
+
+def submit_smda(client, fake_mcrit, sha256):
+    """The .smda branch, with `addReport` taught to answer the way the client does."""
+    fake_mcrit.addReport = lambda report: (fake_mcrit._record("addReport", report), (SimpleNamespace(sample_id=1), "job"))[1]
+    report = json.loads(smda_report_text())
+    report["sha256"] = sha256
+    return submit_binary(client, json.dumps(report).encode(), filename="sample.smda",
+                         options="smda", bitness="64", base_addr="0x400000")
+
+
+def test_an_smda_report_with_a_real_sha256_is_looked_up_and_added(client, as_role, fake_mcrit):
+    as_role("contributor")
+    response = submit_smda(client, fake_mcrit, "AB" * 32)
+
+    assert response.status_code == 202, response.get_data(as_text=True)[:200]
+    # the corpus holds lowercase hashes and matches them exactly, so an uppercase one is
+    # looked up, and added, in lowercase rather than missing the sample it names
+    assert [c[1][0] for c in fake_mcrit.calls if c[0] == "getSampleBySha256"] == ["ab" * 32]
+    assert [c[1][0].sha256 for c in fake_mcrit.calls if c[0] == "addReport"] == ["ab" * 32]
+
+
+@pytest.mark.parametrize("sha256", ["../../rebuild_index", "../../../jobs?x=1", "ab" * 32 + "/../../rebuild_index", "ab" * 32 + "\n", 1234, None])
+def test_an_smda_report_whose_sha256_is_not_one_never_reaches_the_backend(client, as_role, fake_mcrit, sha256):
+    """smda copies the report's `sha256` field verbatim and `getSampleBySha256` puts
+    it into the request path unquoted, so "../../rebuild_index" made a contributor's
+    upload send the backend an admin-only GET, with this server's token."""
+    as_role("contributor")
+    response = submit_smda(client, fake_mcrit, sha256)
+
+    assert response.status_code == 400
+    assert not [c for c in fake_mcrit.calls if c[0] in ("getSampleBySha256", "addReport")]
 
 
 # --- the filename probe the dropzone fires on drop ---------------------------------
