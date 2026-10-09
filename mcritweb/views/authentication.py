@@ -48,6 +48,20 @@ def registration_token_attempt(username):
     return "register:" + (username or "")
 
 
+#: Longer than any account name can be (3 to 20 characters, see register() and
+#: change_username), so a real one is always logged whole.
+LOGGED_NAME_LENGTH = 32
+
+
+def _name_for_log(username):
+    """The typed name for the throttle's log line. It comes from the form as typed, up
+    to the form field limit, and a refused attempt is cheap to send: logged whole, every
+    one of them could add half a megabyte to the log."""
+    if len(username) <= LOGGED_NAME_LENGTH:
+        return repr(username)
+    return f"{username[:LOGGED_NAME_LENGTH]!r}... ({len(username)} characters)"
+
+
 def _throttled(username=None):
     """True if this caller has spent their attempts, having logged the fact.
 
@@ -62,8 +76,8 @@ def _throttled(username=None):
     if username:
         against = db.count_recent_login_failures(remote_addr, username)
         current_app.logger.warning(
-            "throttled %s after %d recent failures, %d of them against %r",
-            remote_addr, db.count_recent_login_failures(remote_addr), against, username)
+            "throttled %s after %d recent failures, %d of them against %s",
+            remote_addr, db.count_recent_login_failures(remote_addr), against, _name_for_log(username))
     else:
         current_app.logger.warning(
             "throttled %s after %d recent failures", remote_addr,
