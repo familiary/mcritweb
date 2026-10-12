@@ -10,6 +10,7 @@ import datetime
 import re
 
 import pytest
+from mcrit.storage.SampleEntry import SampleEntry
 
 
 @pytest.fixture
@@ -45,6 +46,14 @@ def test_the_query_sample_page_leaves_a_missing_timestamp_blank(client, as_role,
 
 def test_the_latest_samples_leave_a_missing_timestamp_blank(client, as_role, fake_mcrit):
     # the start page's "latest samples" table is the one that shows a sample's timestamp
+    sample_dict = next(iter(fake_mcrit._samples.values())).toDict()
+    sample_dict["timestamp"] = None
+    try:
+        SampleEntry.fromDict(sample_dict)
+    except TypeError:
+        # the start page reads samples with mcrit's SampleEntry.fromDict, which fails on a missing
+        # timestamp in mcrit releases without familiary/mcrit#272; MCRITweb can't get past that
+        pytest.skip("the installed mcrit's SampleEntry.fromDict can't read a missing timestamp (familiary/mcrit#272)")
     as_role("visitor")
     for sample in fake_mcrit._samples.values():
         sample.timestamp = None
