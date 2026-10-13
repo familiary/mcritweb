@@ -210,7 +210,7 @@ class ServerInfo:
             server_info = None
         return server_info
     
-    def saveToDb(self):
+    def saveToDb(self, commit=True):
         # whatever get_server_info() handed out earlier in this request is about to be
         # out of date - dropped first, so a failed write cannot leave it believed either
         g.pop('server_info', None)
@@ -227,7 +227,10 @@ class ServerInfo:
                 "INSERT INTO server (url, operation_mode, registration_token, server_token, server_uuid, server_version) VALUES (?,?,?,?,?,?)",
                 (self.url, self.operation_mode, self.registration_token, self.server_token, self.server_uuid, self.server_version),
             )
-        database.commit()
+        # first-user registration leaves the commit to the user row that follows, so that
+        # both land together or not at all
+        if commit:
+            database.commit()
 
 
 def get_server_info():

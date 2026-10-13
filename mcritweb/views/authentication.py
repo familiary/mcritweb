@@ -38,6 +38,12 @@ REGISTRATION_SUBMITTED = ('Registration submitted. An administrator has to appro
 TOO_MANY_ATTEMPTS = ('Too many failed attempts from this address. Please wait a few minutes '
                      'and try again.')
 
+#: What the second of two simultaneous first registrations is told. The first one set
+#: the instance up, so this one is neither admin nor a pending account: the first-user
+#: form carries no registration token, and the instance may now require one.
+FIRST_USER_TAKEN = ('This instance was set up by another registration a moment ago. No new user was '
+                    'created - please register again.')
+
 
 def _throttled(username=None):
     """True if this caller has spent their attempts, having logged the fact.
@@ -219,8 +225,20 @@ def register():
                 server_info.server_token = request.form['mcritServerToken'] if request.form['mcritServerToken'] else ""
                 server_info.server_uuid = str(uuid.uuid4())
                 server_info.server_version = current_app.config['MCRITWEB_VERSION']
+                # g.first_user was decided before this view ran, and two registrations can
+                # both get here while the table is empty. Take the write lock and ask again,
+                # so only one of them becomes admin and sets the server settings. The lock
+                # is held until the user row below commits, or until the request ends and
+                # close_db() closes the connection, which discards whatever was not committed.
+                db.get_db().execute("BEGIN IMMEDIATE;")
+                if not db.is_first_user():
+                    # this request still has g.first_user set and would render the setup
+                    # form again; the next one sees the instance as it now is
+                    flash(FIRST_USER_TAKEN, category='error')
+                    return redirect(url_for('authentication.register'))
+            if g.first_user:
                 try:
-                    server_info.saveToDb()
+                    server_info.saveToDb(commit=False)
                 except Exception:
                     # never surface the exception text: /register is unauthenticated and the
                     # message can carry the database path or SQL fragments
