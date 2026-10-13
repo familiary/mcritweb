@@ -5,8 +5,13 @@
 {% macro family_row_std_js() %}
 <script>
   $(document).ready(function(){
-    var editFamilyModal = document.getElementById('editFamilyModal');
-    editFamilyModal.addEventListener('show.bs.modal', function (event) {
+    // delegated, so the listener holds whichever modal the page has, including one a
+    // live search (live_search.js) brings in; Bootstrap's modal events bubble
+    document.addEventListener('show.bs.modal', function (event) {
+    var editFamilyModal = event.target;
+    if (editFamilyModal.id !== 'editFamilyModal') {
+      return;
+    }
     // Button that triggered the modal
     var button = event.relatedTarget;
     // Extract info from data-bs-* attributes
@@ -31,7 +36,8 @@
     })
 
 
-    $("tr.family-row").click(function(e){
+    // delegated, so rows a live search swaps in follow too
+    $(document).on("click", "tr.family-row", function(e){
       console.log(e.target.name)
       if(event.target.id.includes("_edit")) {
       }

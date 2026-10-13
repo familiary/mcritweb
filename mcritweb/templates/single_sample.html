@@ -162,15 +162,19 @@ Sample: {{ entry.sample_id }}
   {% endif %}
 </div>
 <h3>Search</h3>
-  <form style="width:100%" method="GET" required action="#">
-    <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" autofocus autocomplete="on">
+  <form style="width:100%" method="GET" required action="#" data-live-search="sample-functions">
+    <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search by function name or offset (0x...)" aria-label="Search this sample's functions by name or offset" aria-controls="sample-functions" autofocus autocomplete="on">
     <input type='submit' hidden>
   </form>
+  <p id="sample-functions-status" class="visually-hidden" role="status"></p>
+  <div id="sample-functions">
   <h3>Functions</h3>
 {{ function_table(functions, for_sample_view=True, sort_pagination=pagination, column_setup=user_column_setup) }}
 {% if functions %}
 {{ pagination_widget(pagination) }}
 {% endif %}
+  </div>
+<script src="{{ url_for('static', filename='live_search.js') }}"></script>
 {% if job_collection.count %}
 <h3 id="jobs">Jobs</h3>
 {{ job_table(job_collection.getJobs(), samples_by_id=samples) }}

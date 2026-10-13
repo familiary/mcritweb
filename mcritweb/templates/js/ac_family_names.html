@@ -54,6 +54,13 @@
             });
         }
 
+        // an edit modal a live search (live_search.js) brings in later gets it on first focus
+        document.addEventListener('focusin', function (event) {
+            if (['sample_family_name', 'family_new_name', 'family'].indexOf(event.target.id) >= 0) {
+                attachFamilyAutocomplete(event.target);
+            }
+        });
+
         attachFamilyAutocomplete(document.getElementById('sample_family_name'));
         attachFamilyAutocomplete(document.getElementById('family_new_name'));
         attachFamilyAutocomplete(document.getElementById('family'));

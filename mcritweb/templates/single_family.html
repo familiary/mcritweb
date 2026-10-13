@@ -15,14 +15,18 @@ Family: {{ family.family }}
 {% block content %}
 <h1>Family: {{ family.family }}</h1>
 
-  <form style="width:100%" method="GET" required action="#">
-    <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" autofocus autocomplete="on">
+  <form style="width:100%" method="GET" required action="#" data-live-search="family-samples">
+    <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" aria-label="Search this family's samples" aria-controls="family-samples" autofocus autocomplete="on">
     <input type='submit' hidden>
   </form>
+  <p id="family-samples-status" class="visually-hidden" role="status"></p>
+  <div id="family-samples">
 
 {{ sample_table(samples, job_collection=job_collection, show_edit=True, no_family=True, sort_pagination=pagination, column_setup=user_column_setup) }}
 {% if samples %}
 {{ pagination_widget(pagination) }}
 {% endif %}
+  </div>
+<script src="{{ url_for('static', filename='live_search.js') }}"></script>
 {% include 'js/ac_family_names.html' %}
 {% endblock %}
