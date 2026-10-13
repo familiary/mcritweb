@@ -1,5 +1,4 @@
 import json
-import re
 import sqlite3
 
 import requests
@@ -26,8 +25,10 @@ def change_username():
     error_msg = None
     # cheapest check first, and the password before the lookup, so that whether a
     # name is taken is only ever answered to someone who proved who they are
-    if re.match(r"^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$", new_username) is None:
+    if not db.is_well_formed_username(new_username):
         error_msg = "Username has invalid format."
+    elif db.is_reserved_username(new_username):
+        error_msg = "Username is reserved."
     elif not check_password_hash(user_info.password, password):
         error_msg = 'Incorrect Password!'
     elif UserInfo.fromDb(username=new_username) is not None:

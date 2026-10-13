@@ -1,5 +1,6 @@
 import datetime
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -105,6 +106,16 @@ class UserInfo:
         database = get_db()
         # query to see if row exists
         record = database.execute("SELECT * FROM user WHERE id = ?;", (self.user_id,)).fetchone()
+        if record is None or record["username"] != self.username:
+            # the UNIQUE column compares exactly, so "Alice" could sit next to "alice" in
+            # the approval list and on labels. A new name is refused the same way when it
+            # differs from someone else's only in case; names already stored are left alone
+            clash = database.execute(
+                "SELECT 1 FROM user WHERE username = ? COLLATE NOCASE AND id IS NOT ? LIMIT 1;",
+                (self.username, self.user_id),
+            ).fetchone()
+            if clash:
+                raise sqlite3.IntegrityError("UNIQUE constraint failed: user.username (ignoring case)")
         if record:
             database.execute("UPDATE user SET username = ? WHERE id = ?;",(self.username, self.user_id,))
             if withPassword:
@@ -129,6 +140,26 @@ class UserInfo:
     def registration_date(self):
         return self.registered.strftime("%Y-%m-%d")
     
+
+#: 3 to 20 letters, digits, dots and underscores, not starting or ending with a dot or an
+#: underscore, and no two of those in a row. Used with fullmatch, and anchored with \Z
+#: rather than $: in Python $ also matches before a final newline, which let "admin\n"
+#: through as a name of its own.
+USERNAME_PATTERN = re.compile(r"(?=[a-zA-Z0-9._]{3,20}\Z)(?!.*[_.]{2})[^_.].*[^_.]")
+
+#: Names no account may take, in any case.
+RESERVED_USERNAMES = ("guest", "mcritweb", "mcrit", "admin", "root", "system", "test", "demo")
+
+
+def is_well_formed_username(username):
+    """The format registration and rename both require."""
+    return USERNAME_PATTERN.fullmatch(username) is not None
+
+
+def is_reserved_username(username):
+    return username.lower() in RESERVED_USERNAMES
+
+
 def get_stored_password_hash_method():
     """The hashing method the user table's passwords were made with, or None.
 
