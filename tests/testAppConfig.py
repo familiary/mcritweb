@@ -212,29 +212,49 @@ def test_an_oversized_declared_body_is_refused_without_being_read(client, make_u
     assert not reads, "the body was read before the cap was applied"
 
 
-def test_a_body_with_no_declared_length_is_measured_by_reading_it(client, make_user):
-    """A chunked body declares nothing, so there is no header to go by. The test client
-    always declares a length, so the declaration is blanked in the environ."""
-    make_user("visitor")
-    chunked = {"CONTENT_LENGTH": "", "HTTP_TRANSFER_ENCODING": "chunked", "wsgi.input_terminated": True}
-
-    over = client.post("/api/query/binary", data=b"M" * (VISITOR_LIMIT + 1),
-                       headers={"apitoken": "apitoken-visitor"}, environ_overrides=chunked)
-
-    assert over.status_code == 403
+#: A chunked body: the test client always declares a length, so the declaration is
+#: blanked in the environ and the body is marked as framed by the server.
+CHUNKED = {"CONTENT_LENGTH": "", "HTTP_TRANSFER_ENCODING": "chunked", "wsgi.input_terminated": True}
 
 
-def test_a_body_with_no_declared_length_is_not_read_past_the_cap(client, make_user):
-    """Measuring a chunked body must not mean reading all of it: up to MAX_CONTENT_LENGTH
-    would land in memory before the answer. Where the stream stops is how far it was read."""
+@pytest.mark.parametrize("size", [128, 8 * VISITOR_LIMIT])
+def test_a_capped_body_with_no_declared_length_is_refused_unread(client, make_user, size):
+    """Only reading it would tell how large it is, and McritClient always declares a
+    length. Where the stream stands afterwards is how far it was read."""
     import io
 
     make_user("visitor")
-    body = io.BytesIO(b"M" * (8 * VISITOR_LIMIT))
-    chunked = {"CONTENT_LENGTH": "", "HTTP_TRANSFER_ENCODING": "chunked", "wsgi.input_terminated": True,
-               "wsgi.input": body}
+    body = io.BytesIO(b"M" * size)
 
-    over = client.post("/api/query/binary", headers={"apitoken": "apitoken-visitor"}, environ_overrides=chunked)
+    response = client.post("/api/query/binary", headers={"apitoken": "apitoken-visitor"},
+                           environ_overrides=dict(CHUNKED, **{"wsgi.input": body}))
 
-    assert over.status_code == 403
-    assert body.tell() <= 2 * VISITOR_LIMIT, f"read {body.tell()} bytes of a capped body"
+    assert response.status_code == 403
+    assert body.tell() == 0
+
+
+def test_the_cap_holds_where_flask_has_no_per_request_limit(client, make_user, monkeypatch):
+    """requirements.txt allows Flask 3.0, whose `request.max_content_length` is
+    read-only; setting it there raised AttributeError, a 500."""
+    import flask
+
+    monkeypatch.setattr(flask.Request, "max_content_length",
+                        property(lambda self: flask.current_app.config["MAX_CONTENT_LENGTH"]))
+    make_user("visitor")
+
+    response = client.post("/api/query/binary", data=b"M" * 128, headers={"apitoken": "apitoken-visitor"},
+                           environ_overrides=CHUNKED)
+
+    assert response.status_code == 403
+
+
+def test_an_uncapped_role_may_still_send_a_chunked_body(client, make_user, fake_mcrit):
+    make_user("contributor")
+
+    try:
+        client.post("/api/query/binary", data=b"M" * 128, headers={"apitoken": "apitoken-contributor"},
+                    environ_overrides=CHUNKED)
+    except Exception:
+        pass  # past the gate the strict fake answers values handle_raw_response cannot read
+
+    assert [call for call in fake_mcrit.calls if "Matches" in call[0]], "the query did not reach the backend"
