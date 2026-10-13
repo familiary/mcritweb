@@ -89,10 +89,14 @@
 
   var isTraceSupplied = false;
 
-  // mcritweb, issue #267: above this many blocks, dagre's layout freezes the page for
-  // seconds (measured on a real backend: about 1 s at 250 blocks, 19 s at 971), so the
-  // graph waits for a click
-  var CFG_DEFERRED_LAYOUT_BLOCKS = 250;
+  // mcritweb, issue #267: above this many blocks the code panel is shown first and the graph
+  // follows once it is laid out (on a real backend about 1 s at 250 blocks, 22 s at 971)
+  var CFG_CODE_FIRST_BLOCKS = 250;
+  // and above this many, the graph waits for a click. The layout runs in a worker
+  // (layOutInWorker()), but drawing it takes the page's main thread, 1 to 2 s at 971 blocks
+  var CFG_DEFERRED_LAYOUT_BLOCKS = 1000;
+  // set by a click on "Draw the graph", after which focus follows the graph
+  var isGraphRequested = false;
   // set when the code panel was built before the graph, so showGraph() leaves it be
   var isCodeShownWithoutGraph = false;
   // set once getCodefromGraph() has started: it renders after its lookups, so the panel's
@@ -1263,12 +1267,17 @@ function highlightUERs(UERtype){
         dot_graph = result.responseText;
         dotFile = dot_graph.replace(/\\l/g, "\n");
         g = graphlibDot.parse(dotFile);
-        // mcritweb, issue #267: a large graph shows its code at once and waits for a click to be laid out
+        // mcritweb, issue #267: a large graph shows its code at once, and is laid out in the
+        // background or, above CFG_DEFERRED_LAYOUT_BLOCKS, when asked
         var num_blocks = g.nodes().length;
-        if (num_blocks > CFG_DEFERRED_LAYOUT_BLOCKS) {
+        // either threshold alone may be the lower one; tests lower each in turn
+        if (num_blocks > CFG_CODE_FIRST_BLOCKS || num_blocks > CFG_DEFERRED_LAYOUT_BLOCKS) {
           isCodeShownWithoutGraph = true;
           getCodefromGraph();
           offerDeferredGraph(num_blocks);
+          if (num_blocks <= CFG_DEFERRED_LAYOUT_BLOCKS) {
+            drawDeferredGraph(num_blocks);
+          }
         } else {
           findLoopsAndShowGraph();
         }
@@ -1289,7 +1298,8 @@ function highlightUERs(UERtype){
             graphNotDrawn("the loop detection request failed" + (err && err.status ? " (HTTP " + err.status + ")" : ""), err);
             return;
           }
-          var isDeferred = isCodeShownWithoutGraph;
+          // focus moves with the graph only when it was asked for
+          var isDeferred = isGraphRequested;
           try {
             // console.log("Response: ", result.responseText);
             loopsObj = JSON.parse(result.responseText);
@@ -1303,26 +1313,116 @@ function highlightUERs(UERtype){
             var modifiedDotFile = loopify_dagre.modifiedDotFile;
             // console.log(modifiedDotFile);
             graph_to_display = graphlibDot.parse(modifiedDotFile);
-
-            // hidden before the layout, so the graph is fitted to the same space as one drawn on
-            // load; the note painted on the click stays on screen until the layout is done
-            d3.select("#cfgDeferred").classed("hidden", true);
-            showGraph(isTraceSupplied);
+            var measured = measureGraph(graph_to_display);
           } catch (error) {
             graphNotDrawn("the graph could not be laid out", error, isDeferred);
             return;
           }
+          layOutInWorker(measured, function(laidOut) {
+            try {
+              // hidden before the graph is drawn, so it is fitted to the same space as one drawn on
+              // load; the note painted on the click stays on screen until the layout is done
+              d3.select("#cfgDeferred").classed("hidden", true);
+              showGraph(isTraceSupplied, laidOut);
+            } catch (error) {
+              graphNotDrawn("the graph could not be laid out", error, isDeferred);
+              return;
+            }
 
-          d3.selectAll(".cfg-graph-control").property("disabled", false);
-          if (isDeferred) {
-            // the focused note is gone with the prompt; keep keyboard users in the graph's controls
-            d3.select("#showCycles").node().focus();
-          }
-          loopify_dagre.addBackground();
+            d3.selectAll(".cfg-graph-control").property("disabled", false);
+            if (isDeferred) {
+              // the focused note is gone with the prompt; keep keyboard users in the graph's controls
+              d3.select("#showCycles").node().focus();
+            }
+            loopify_dagre.addBackground();
 
-          fnManip.init();
-          loopCollapser.init();
+            fnManip.init();
+            loopCollapser.init();
+          }, function(reason, error) {
+            graphNotDrawn(reason, error, isDeferred);
+          });
         });
+  }
+
+  // mcritweb: dagre's layout takes seconds on a large graph, so it runs in a worker
+  // (layout_worker.js) and the page keeps responding meanwhile. Sizing the blocks needs the
+  // DOM, so they are measured here first, by a renderer whose layout keeps the graph it is
+  // handed instead of laying it out: that is the graph, sized by dagre-d3's own code, that
+  // the renderer would have laid out.
+  function measureGraph(graph) {
+    var measured;
+    var measuredOnly = {};
+    var renderer = new dagreD3.Renderer().layout({ run: function(sized) { measured = sized; throw measuredOnly; } });
+    // the renderer writes the sizes into the node and edge values it is given, and draws a
+    // block that already has one at that size; showGraph() must start from unsized values
+    var unsized = graph.copy();
+    unsized.eachNode(function(id, value) { unsized.node(id, Object.assign({}, value)); });
+    unsized.eachEdge(function(id, u, v, value) { unsized.edge(id, Object.assign({}, value)); });
+    try {
+      renderer.run(unsized, d3.select("#graphContainer g"));
+    } catch (error) {
+      if (error !== measuredOnly) {
+        throw error;
+      }
+    } finally {
+      // what the renderer set up to draw the graph, so showGraph() starts from the same page
+      d3.select("#graphContainer g").selectAll("*").remove();
+      d3.select("#graphContainer rect.overlay").remove();
+      d3.select("#graphContainer").on(".zoom", null);
+    }
+    return measured;
+  }
+
+  // Calls back with the layout of a measured graph, as dagre-d3's renderer takes it from its
+  // layout. A browser that cannot start the worker gets undefined, and showGraph() lays the
+  // graph out itself, as it did before.
+  function layOutInWorker(measured, laidOut, notLaidOut) {
+    var worker;
+    try {
+      worker = new Worker(d3.select("#graphContainer").attr("data-layout-worker"));
+    } catch (error) {
+      console.warn("laying the graph out on the page, the layout worker did not start", error);
+      laidOut(undefined);
+      return;
+    }
+    worker.onmessage = function(event) {
+      worker.terminate();
+      if (event.data.error) {
+        notLaidOut("the graph could not be laid out", event.data.error);
+        return;
+      }
+      var answer = event.data.graph;
+      var layout = dagreD3.json.decode(answer.nodes, answer.edges, answer.type);
+      layout.graph(answer.value);
+      laidOut(layout);
+    };
+    worker.onerror = function(event) {
+      // the script did not load or run: the layout itself reports through onmessage
+      event.preventDefault();
+      worker.terminate();
+      console.warn("laying the graph out on the page, the layout worker failed", event.message);
+      laidOut(undefined);
+    };
+    worker.postMessage(graphAsJson(measured));
+  }
+
+  // A graph as dagreD3.json.decode() takes it. dagreD3.json.encode() does the same, but only
+  // for the graph classes bundled with dagre-d3, and the page's graphs come from graphlib-dot.
+  function graphAsJson(graph) {
+    var nodes = [];
+    var edges = [];
+    graph.eachNode(function(id, value) {
+      var node = { id: id, value: value };
+      var children = graph.children ? graph.children(id) : [];
+      if (children.length) {
+        node.children = children;
+      }
+      nodes.push(node);
+    });
+    graph.eachEdge(function(id, u, v, value) {
+      edges.push({ id: id, u: u, v: v, value: value });
+    });
+    return { nodes: nodes, edges: edges, type: graph.children ? "cdigraph" : "digraph", value: graph.graph() };
   }
 
   // mcritweb, issue #267: any failure to draw the graph ends here, whether it was deferred
@@ -1354,14 +1454,17 @@ function highlightUERs(UERtype){
     d3.select("#cfgDeferredBlocks").text(num_blocks);
     d3.select("#cfgDeferred").classed("hidden", false);
     d3.select("#drawGraph").on("click", function(){
-      d3.select(this).property("disabled", true);
-      // the note is painted while the loop detection request is out, before the layout
-      // takes over the main thread; focus follows it rather than the disabled button
-      d3.select("#cfgDeferredNote")
-        .text("Laying out " + num_blocks + " blocks. The page may stop responding until the graph appears.")
-        .node().focus();
-      findLoopsAndShowGraph();
+      isGraphRequested = true;
+      drawDeferredGraph(num_blocks);
+      // focus follows the note rather than the disabled button
+      d3.select("#cfgDeferredNote").node().focus();
     });
+  }
+
+  function drawDeferredGraph(num_blocks) {
+    d3.select("#drawGraph").property("disabled", true);
+    d3.select("#cfgDeferredNote").text("Laying out " + num_blocks + " blocks. The graph appears here when it is ready.");
+    findLoopsAndShowGraph();
   }
 
   // loads the dot and trace files one after the other
@@ -1469,6 +1572,7 @@ function highlightUERs(UERtype){
   // Reset on loading new files
   function initialize() {
     isCodeShownWithoutGraph = false;  // mcritweb, issue #267
+    isGraphRequested = false;
     isCodePanelRequested = false;
     currentNode = null;
     g = null;
@@ -2156,13 +2260,17 @@ function highlightUERs(UERtype){
 
   // The main function that sets up the graph, initializes all variables and 
   // sets up event listeners
-  function showGraph(isTraceSupplied) {
+  function showGraph(isTraceSupplied, laidOut) {
 
     var svg = d3.select("#graphContainer");
     var inner = d3.select("#graphContainer g");
 
     // Render the graphlib object using d3.
     var renderer = new dagreD3.Renderer();
+    // mcritweb: a graph laid out by layOutInWorker() is drawn with that layout
+    if (laidOut) {
+      renderer.layout({ run: function() { return laidOut; } });
+    }
     // renderer.run(g, d3.select("#graphContainer g"));
 
     //Render the modified file (output from loopified code) i.e. the file with invisible edges, ports etc.
