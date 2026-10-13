@@ -229,6 +229,16 @@ def create_app(test_config=None, instance_path=None):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         return response
 
+    @app.after_request
+    def no_framing_by_other_sites(response):
+        # a page of ours inside another site's frame can be dressed up to make a logged-in
+        # user click something they cannot see. SameSite=Lax already keeps the session
+        # cookie out of a cross-site frame in current browsers; these say it outright, the
+        # CSP for browsers that read it and X-Frame-Options for those that do not
+        response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'self'")
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        return response
+
     @app.template_filter('silent')
     def silent(input):
         return ""
