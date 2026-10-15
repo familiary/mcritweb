@@ -13,6 +13,7 @@ import hashlib
 import pytest
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from mcritweb import db
 from mcritweb.db import UserInfo
 
 OLD_PASSWORD = "old password, long enough"
@@ -113,3 +114,28 @@ def test_the_cookie_carries_nothing_to_test_password_guesses_against(app, carol)
     assert mark
     assert stored_hash not in mark
     assert mark != hashlib.sha256(stored_hash.encode()).hexdigest()
+
+
+def test_the_api_token_is_replaced_with_the_password(app, carol):
+    """The token is shown on /settings, so a stolen session could have copied it; it is
+    replaced along with the password, and the old one is refused."""
+    owner = logged_in(app)
+
+    change_password(owner)
+
+    assert owner.get("/api/version", headers={"apitoken": "apitoken-carol"}).status_code == 403
+    with app.app_context():
+        token = UserInfo.fromDb(username="carol").apitoken
+        assert token != "apitoken-carol"
+        assert db.get_user_by_apitoken(token) == carol
+
+
+def test_a_failed_password_change_keeps_the_api_token(app, carol):
+    owner = logged_in(app)
+
+    owner.post("/admin/change_password", data={
+        "inputPassword2": "not the password", "inputPassword3": NEW_PASSWORD, "inputPassword4": NEW_PASSWORD,
+    })
+
+    with app.app_context():
+        assert UserInfo.fromDb(username="carol").apitoken == "apitoken-carol"

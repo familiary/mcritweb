@@ -191,7 +191,8 @@ def test_changing_the_password(app, client, as_role):
                            data={"inputPassword2": "password", "inputPassword3": "new-one", "inputPassword4": "new-one"})
 
     assert response.status_code == 302
-    assert _flashes(client) == ["Password successfully changed"]
+    assert _flashes(client) == ["Password successfully changed. Your API token was replaced too; "
+                                "anything using the old one has to be updated."]
     with app.app_context():
         assert check_password_hash(UserInfo.fromDb(user_id=user_id).password, "new-one")
 
