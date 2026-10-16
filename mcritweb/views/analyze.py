@@ -22,6 +22,18 @@ bp = Blueprint('analyze', __name__, url_prefix='/analyze')
 #: `blocks_family` already asks that one by id.
 MAX_SELECTED_SAMPLES = 250
 
+#: The hash list costs one backend request per hash (there is no batch lookup by
+#: sha256), so it is bounded like the selections above.
+MAX_HASH_LIST_LENGTH = MAX_SELECTED_SAMPLES
+#: How many of the ignored lines a warning names. One flash per line went into the
+#: cookie session, which outgrew what a browser stores at about 70 lines.
+MAX_NAMED_IN_FLASH = 5
+
+
+def _some_of(lines):
+    named = ", ".join(f"'{line[:64]}'" for line in lines[:MAX_NAMED_IN_FLASH])
+    return named + (", ..." if len(lines) > MAX_NAMED_IN_FLASH else "")
+
 
 def get_unique_samples_from_search_result(search_result):
     samples = []
@@ -195,26 +207,35 @@ def cross_compare_from_hash_list():
     is_forcing_rematch = True if request.args.get('rematch', 'false').lower() == "true" else False
     is_only_selected = True if request.args.get('onlySelected', 'false').lower() == "true" else False
     if request.method == 'POST':
-        hash_list = request.form.get('hashlist', '').strip().splitlines()
-        # sanitize to sha256 hashes
-        sanitized_hashes = []
+        hash_list = [line.strip() for line in request.form.get('hashlist', '').splitlines()]
+        # sanitize to sha256 hashes, each once: the corpus stores them in lowercase
+        valid_hashes = []
+        invalid_lines = []
         for h in hash_list:
-            h = h.strip()
-            if re.match(r'^[a-fA-F0-9]{64}$', h):
-                sanitized_hashes.append(h)
-            else:
-                flash(f"Hash '{h}' is not a valid SHA256 hash and was ignored", category="warning")
+            if re.fullmatch(r'[a-fA-F0-9]{64}', h):
+                valid_hashes.append(h.lower())
+            elif h:
+                invalid_lines.append(h)
+        sanitized_hashes = list(dict.fromkeys(valid_hashes))
+        if invalid_lines:
+            flash(f"{len(invalid_lines)} line(s) are not SHA256 hashes and were ignored: {_some_of(invalid_lines)}", category="warning")
         if not sanitized_hashes:
             flash("No valid hashes provided", category="error")
             return redirect(url_for('analyze.cross_compare_from_hash_list'))
+        if len(sanitized_hashes) > MAX_HASH_LIST_LENGTH:
+            flash(f"A hash list can name at most {MAX_HASH_LIST_LENGTH} samples, the {len(sanitized_hashes) - MAX_HASH_LIST_LENGTH} after that were ignored.", category="warning")
+            sanitized_hashes = sanitized_hashes[:MAX_HASH_LIST_LENGTH]
         # get sample ids from hashes
         selected_samples = []
+        unknown_hashes = []
         for h in sanitized_hashes:
             sample_entry = client.getSampleBySha256(h)
             if sample_entry is not None:
                 selected_samples.append(sample_entry)
             else:
-                flash(f"Hash '{h}' does not correspond to any sample in the database and was ignored", category="warning")
+                unknown_hashes.append(h)
+        if unknown_hashes:
+            flash(f"{len(unknown_hashes)} hash(es) do not correspond to any sample in the database and were ignored: {_some_of(unknown_hashes)}", category="warning")
         if not selected_samples:
             flash("No valid samples found for the provided hashes", category="error")
             return redirect(url_for('analyze.cross_compare_from_hash_list'))
@@ -232,7 +253,7 @@ def cross_compare_from_hash_list():
             onlySelected = "true" if is_only_selected else "false",
         ))
     else:
-        return render_template("cross_compare_from_hash_list.html")
+        return render_template("cross_compare_from_hash_list.html", max_hashes=MAX_HASH_LIST_LENGTH)
 
 @bp.route('/cross_compare', methods=['GET','POST'])
 @visitor_required
