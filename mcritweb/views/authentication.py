@@ -199,9 +199,9 @@ def register():
             error = TOO_MANY_ATTEMPTS
         elif not username:
             error = 'Username is required.'
-        elif re.match(r"^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$", username) is None:
+        elif not db.is_well_formed_username(username):
             error = "Username has wrong format. Must be 3-20 characters, alphanumeric with dots and underscores allowed, but cannot start or end with dots/underscores, nor contain two of them in a row."
-        elif username.lower() in ["guest", "mcritweb", "mcrit", "admin", "root", "system", "test", "demo"]:
+        elif db.is_reserved_username(username):
             error = "Username is reserved."
         elif not password:
             error = 'Password is required.'

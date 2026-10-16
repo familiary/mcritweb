@@ -16,7 +16,7 @@ import logging
 import unittest
 
 import pytest
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb.db import UserInfo, get_db
 
@@ -181,6 +181,67 @@ def test_changing_the_username(app, client, as_role):
     assert _flashes(client) == ["Username successfully changed"]
     with app.app_context():
         assert UserInfo.fromDb(user_id=user_id).username == "renamed.user"
+
+
+# --- what a rename may not take -----------------------------------------------------
+#
+# Registration refused the reserved names; a rename did not ask. And the format check
+# ended in $, which in Python also matches before a final newline.
+
+@pytest.mark.parametrize("new_username,refusal", [
+    ("admin", "Username is reserved."),
+    ("Root", "Username is reserved."),
+    ("renamed\n", "Username has invalid format."),
+    ("admin\n", "Username has invalid format."),
+])
+def test_a_rename_cannot_take_a_reserved_or_malformed_name(app, client, as_role, new_username, refusal):
+    user_id = as_role("pending")
+
+    client.post("/admin/change_username", data={"username": new_username, "inputPassword1": "password"})
+
+    assert _flashes(client) == [refusal]
+    with app.app_context():
+        assert UserInfo.fromDb(user_id=user_id).username == "pendinguser"
+
+
+def test_a_rename_cannot_take_a_name_that_differs_only_in_case(app, client, as_role, make_user):
+    user_id = as_role("contributor")
+    make_user(role="visitor", username="taken_name")
+
+    client.post("/admin/change_username", data={"username": "Taken_Name", "inputPassword1": "password"})
+
+    assert _flashes(client) == ["Username is already taken!"]
+    with app.app_context():
+        assert UserInfo.fromDb(user_id=user_id).username == "contributoruser"
+
+
+def test_a_user_can_still_change_the_case_of_their_own_name(app, client, as_role):
+    user_id = as_role("contributor")
+
+    client.post("/admin/change_username", data={"username": "ContributorUser", "inputPassword1": "password"})
+
+    assert _flashes(client) == ["Username successfully changed"]
+    with app.app_context():
+        assert UserInfo.fromDb(user_id=user_id).username == "ContributorUser"
+
+
+def test_names_that_already_differ_only_in_case_keep_working(app, client):
+    """Instances may already hold such pairs, written before this check existed. Saving
+    one of them without renaming it - every login does - must not trip over the other."""
+    with app.app_context():
+        for username in ("eve", "Eve"):
+            get_db().execute(
+                "INSERT INTO user (username, password, role, registered, last_login, apitoken) VALUES (?,?,?,?,?,?)",
+                (username, generate_password_hash("password"), "visitor", "2026-01-01 00:00:00", "no login",
+                 f"apitoken-{username}"),
+            )
+        get_db().commit()
+
+    for username in ("eve", "Eve"):
+        response = app.test_client().post("/login", data={"username": username, "inputPassword": "password"})
+        assert response.status_code == 302 and "/login" not in response.headers["Location"]
+        with app.app_context():
+            assert UserInfo.fromDb(username=username).last_login != "no login"
 
 
 def test_mismatched_new_passwords_are_refused_before_the_password_check(app, client, as_role, monkeypatch):
