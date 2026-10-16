@@ -50,7 +50,7 @@
 
   {%- macro _get_href_or_onclick(page, _js_argument_provider=none) -%}
     {% if _js_argument_provider is not none %}
-      onclick="pagination_js_helper('{{ pagination.get_link(page, **kwargs)}}', {{ _js_argument_provider }}() )"
+      onclick="pagination_js_helper('{{ pagination.get_link(page, **kwargs).replace("'", "\\'") }}', {{ _js_argument_provider }}() )"
     {% else %}
       href="{{ pagination.get_link(page, **kwargs) }}"
     {% endif %}
@@ -58,9 +58,9 @@
 
   {%- macro _get_limit_onchange(_js_argument_provider=none) -%}
     {% if _js_argument_provider is not none %}
-      onchange="pagination_js_helper('{{ pagination.get_link(1, **kwargs)}}', Object.assign({{ _js_argument_provider }}(), { {{ pagination.limit_param }}: this.value}) )"
+      onchange="pagination_js_helper('{{ pagination.get_link(1, **kwargs).replace("'", "\\'") }}', Object.assign({{ _js_argument_provider }}(), { {{ pagination.limit_param }}: this.value}) )"
     {% else %}
-      onchange="pagination_js_helper('{{ pagination.get_link(1, **kwargs)}}', { {{ pagination.limit_param }}: this.value} )"
+      onchange="pagination_js_helper('{{ pagination.get_link(1, **kwargs).replace("'", "\\'") }}', { {{ pagination.limit_param }}: this.value} )"
     {% endif %}
   {%- endmacro -%}
 
@@ -169,22 +169,26 @@
   {% endif %}
 {%- endmacro -%}
 
+{# Only used inside the single-quoted JS strings of sortable_header_col, so the quote
+    is escaped here, on the plain URL. Escaping the macro's output instead does nothing:
+    it is markup by then, with every quote already turned into &#39;, which the HTML
+    parser turns back into a quote before the handler runs. #}
 {%- macro cursor_pagination_sort_link(pagination, sort_by) -%}
   {% if not pagination is none %}
     {% if pagination.sort_by is none %}
       {# we do not know the search order #}
-      {{ pagination.get_sort_link(sort_by, True, **kwargs) }}
+      {{ pagination.get_sort_link(sort_by, True, **kwargs).replace("'", "\\'") }}
     {% else %}
       {% if pagination.sort_by == sort_by %}
         {# we are considering the column that is sorted by #}
         {% if pagination.is_ascending %}
-          {{ pagination.get_sort_link(sort_by, False, **kwargs) }}
+          {{ pagination.get_sort_link(sort_by, False, **kwargs).replace("'", "\\'") }}
         {% else %}
-          {{ pagination.get_sort_link(sort_by, True, **kwargs) }}
+          {{ pagination.get_sort_link(sort_by, True, **kwargs).replace("'", "\\'") }}
         {% endif %}
       {% else %}
         {# a column not used for sort right now #}
-        {{ pagination.get_sort_link(sort_by, True, **kwargs) }}
+        {{ pagination.get_sort_link(sort_by, True, **kwargs).replace("'", "\\'") }}
       {% endif %}
     {% endif %}
   {% endif %}
@@ -194,9 +198,9 @@
 
   {%- macro _get_onclick(_js_argument_provider=none) -%}
     {% if _js_argument_provider is not none %}
-      pagination_js_helper('{{ cursor_pagination_sort_link(pagination, sort_by, **kwargs).strip().replace("'", "\\'") }}', {{ _js_argument_provider }}() )
+      pagination_js_helper('{{ cursor_pagination_sort_link(pagination, sort_by, **kwargs).strip() }}', {{ _js_argument_provider }}() )
     {% else %}
-      window.location.href='{{ cursor_pagination_sort_link(pagination, sort_by, **kwargs).strip().replace("'", "\\'") }}'
+      window.location.href='{{ cursor_pagination_sort_link(pagination, sort_by, **kwargs).strip() }}'
     {% endif %}
   {%- endmacro -%}
 
