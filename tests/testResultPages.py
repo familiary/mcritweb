@@ -630,8 +630,8 @@ def test_raw_result_download_prefers_the_cache_over_a_second_fetch(client, as_ro
 
 def test_raw_result_download_serves_the_job_that_was_asked_for(client, as_role):
     """Two reports in the cache, each download its own. The cache is a flat directory
-    that `load_cached_result` searches by substring, so selecting the wrong file in
-    it is a real way to hand one caller another caller's report."""
+    searched by filename, so selecting the wrong file in it is a real way to hand one
+    caller another caller's report."""
     as_role("visitor")
     for report in ("matches_for_sample", "cross_compare"):
         client.get(f"/data/result/{job_id_of(report)}")
@@ -668,8 +668,8 @@ def test_raw_result_download_of_an_unknown_job_is_reported_not_served(client, as
 @pytest.mark.parametrize(
     "crafted",
     [
-        # substrings of a real job id: `load_cached_result` matches cache filenames by
-        # substring, so a partial id must not be able to select the report it names
+        # substrings of a real job id: cache filenames contain the id, so a partial
+        # id must not be able to select the report it names
         "f8b8d2c6f836649a",
         "6a74",
         # none of these may reach the cache directory or the response headers
@@ -722,8 +722,8 @@ def test_cached_result_lookup_matches_whole_job_ids_only(app):
     """The cache lookup behind the download, on its own.
 
     Same reason as above: every route-level test is already satisfied by the "no
-    such job" gate, so none of them would notice this widening back into the
-    substring match `load_cached_result` uses.
+    such job" gate, so none of them would notice this widening back into a
+    substring match.
     """
     from mcritweb.views.data import find_cached_result_filename
 
@@ -737,6 +737,85 @@ def test_cached_result_lookup_matches_whole_job_ids_only(app):
     assert find_cached_result_filename(app, "6a7464") is None
     assert find_cached_result_filename(app, "f8b8d2c6f836649a") is None
     assert find_cached_result_filename(app, "") is None
+
+
+def test_the_report_cache_is_read_by_whole_job_id(app):
+    """load_cached_result used to match cache filenames by substring and parse every
+    match, so a short id read through the whole cache on each request."""
+    from mcritweb.views.data import load_cached_result
+
+    cache_path = pathlib.Path(app.instance_path) / "cache" / "results"
+    (cache_path / "20260806-104636-6a7464faf8b8d2c6f836649a.json").write_text('{"capture": 1}')
+    (cache_path / "20260807-104636-6a7464faf8b8d2c6f836649a.json").write_text('{"capture": 2}')
+
+    assert load_cached_result(app, "6a7464faf8b8d2c6f836649a") == {"capture": 2}
+    assert load_cached_result(app, "6a7464") == {}
+    assert load_cached_result(app, "2026") == {}
+
+
+#: Not job ids. The backend client puts the id into its request path unquoted, so
+#: ".." asks for the backend's root, and its answer was read as a job (a 500 on the
+#: live testbed for each route below); "?" and "#" cut the path short the same way.
+CRAFTED_JOB_IDS = ["%2E%2E", "%2E%2E%3Fx%3D1", "6a74%23", "-"]
+
+
+def _job_calls(corpus_mcrit):
+    return [call for call in corpus_mcrit.calls if call[0] in ("getJobData", "getResultForJob")]
+
+
+@pytest.mark.parametrize("crafted", CRAFTED_JOB_IDS)
+@pytest.mark.parametrize("route", ["/data/result/{}", "/data/linkhunt/{}", "/data/jobs/{}"])
+def test_a_job_id_that_is_not_one_never_reaches_the_backend(client, as_role, corpus_mcrit, route, crafted):
+    as_role("visitor")
+
+    response = client.get(route.format(crafted))
+
+    assert response.status_code == 200
+    assert b"not found" in response.data
+    assert _job_calls(corpus_mcrit) == []
+
+
+@pytest.mark.parametrize("crafted", CRAFTED_JOB_IDS)
+def test_a_crafted_job_id_deletes_nothing(client, as_role, corpus_mcrit, monkeypatch, crafted):
+    as_role("contributor")
+    deleted = []
+    monkeypatch.setattr(corpus_mcrit, "deleteJob", deleted.append, raising=False)
+
+    response = client.post(f"/data/jobs/{crafted}/delete")
+
+    assert response.status_code == 302
+    assert deleted == []
+
+
+def test_a_job_is_still_deleted_by_its_id(client, as_role, corpus_mcrit, monkeypatch):
+    as_role("contributor")
+    deleted = []
+    monkeypatch.setattr(corpus_mcrit, "deleteJob", deleted.append, raising=False)
+
+    client.post(f"/data/jobs/{job_id_of('cross_compare')}/delete")
+
+    assert deleted == [job_id_of("cross_compare")]
+
+
+@pytest.mark.parametrize("crafted", CRAFTED_JOB_IDS)
+def test_a_crafted_job_id_promotes_nothing(client, as_role, corpus_mcrit, crafted):
+    as_role("contributor")
+
+    response = client.post(f"/data/promote_query/{crafted}", data={"family": "f", "version": "1"})
+
+    assert response.status_code == 302
+    assert _job_calls(corpus_mcrit) == []
+
+
+@pytest.mark.parametrize("crafted", ["..", "..?x=1", "6a74#", ""])
+def test_a_sample_edit_does_not_look_up_a_crafted_redirect_job(client, as_role, corpus_mcrit, crafted):
+    as_role("contributor")
+
+    response = client.post("/explore/modifySample", data={"sample_id": "1", "redirection_job_id": crafted})
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/explore/samples")
+    assert _job_calls(corpus_mcrit) == []
 
 #: One function from each reference sample - the only pool that keeps a control flow
 #: graph, so the only one the comparison page can build its two panels from.
