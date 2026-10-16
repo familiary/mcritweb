@@ -243,6 +243,27 @@ def test_the_single_graph_route_still_serves_dot(client, as_role):
     assert response.data.startswith(b'digraph "CFG')
 
 
+@pytest.mark.parametrize("path", ["/explore/fetchDotGraph/84", "/explore/fetchCombinedDotGraph/84/943"])
+def test_a_graph_carrying_markup_is_not_served_as_a_page(client, as_role, corpus_mcrit, path):
+    """An API name is copied out of the sample's import table into the dot text, so a
+    sample can name an import `<img src=x onerror=...>`. Served as Flask's default
+    text/html, opening the route as a page ran it; the CFG viewers read it with d3.xhr
+    and do not care about the type."""
+    corpus_mcrit._functions[84].xcfg["apirefs"]["4257248"] = "gdi32.dll!<img src=x onerror=alert(1)>"
+    as_role("visitor")
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert b"<img src=x onerror=alert(1)>" in response.data, "the fixture no longer reaches the graph"
+    assert response.mimetype == "text/plain"
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+
+
+@pytest.mark.parametrize("path", ["/login", "/static/autocomplete.js"])
+def test_every_response_forbids_content_sniffing(client, path):
+    assert client.get(path).headers["X-Content-Type-Options"] == "nosniff"
+
+
 
 # --- the guarantees the review asked for ---------------------------------------------
 
