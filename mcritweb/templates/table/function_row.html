@@ -1,5 +1,5 @@
 {% from 'table/pagination_widget.html' import sortable_header_col %}
-{% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
+{% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id, mark %}
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro function_row_std_js() %}
@@ -63,7 +63,7 @@
 {% endmacro %}
       
       
-{% macro function_row(function, for_sample_view=False, column_setup=None, row_decorations=None) %}
+{% macro function_row(function, for_sample_view=False, column_setup=None, row_decorations=None, highlight_terms=None) %}
   {% if column_setup is none %}
     {% set column_setup = ["function_id", "family_id", "sample_id", "pic_hash", "has_minhash", "offset", "function_name", "num_instructions", "num_blocks"] %}
   {% endif %}
@@ -83,7 +83,7 @@
       {% elif column_type == "offset" %}
         <td align="right" valign="middle" class="font-monospace">{{ format_offset(function.offset) }}</td>
       {% elif column_type == "function_name" %}
-        <td valign="middle">{{ function.function_name }}</td>
+        <td valign="middle">{{ mark(function.function_name, highlight_terms, "function_name") }}</td>
       {% elif column_type == "num_instructions" %}
         <td align="right" valign="middle" class="font-monospace">{{ "%d"|format(function.num_instructions) }}</td>
       {% elif column_type == "num_blocks" %}
