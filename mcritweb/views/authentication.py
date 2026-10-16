@@ -1,4 +1,6 @@
 import functools
+import hashlib
+import hmac
 import os
 import re
 import secrets
@@ -302,12 +304,36 @@ def login():
             session['user_id'] = user_info.user_id
             user_info.last_login = utc_now()
             rehashed = _rehash_if_stale(user_info, password)
+            # after the rehash, which puts a new hash for the same password in user_info
+            session[PASSWORD_MARK] = password_mark(user_info)
             user_info.saveToDb(withPassword=rehashed)
             db.clear_login_failures(request.remote_addr)
             return redirect(url_for('index'))
         db.record_failed_login(request.remote_addr, username)
         flash(error, category='error')
     return render_template('login.html')
+
+
+#: The session key holding `password_mark()` of the password the session logged in with.
+PASSWORD_MARK = 'password_mark'
+
+
+def password_mark(user_info):
+    """A digest of the account's stored password hash, keyed with SECRET_KEY.
+
+    The session is a signed cookie, not a server-side record, so logging out elsewhere
+    cannot reach a copy of it. What can be checked is whether the password it was issued
+    for is still the account's password: the session carries this mark, and a password
+    change makes every mark issued before it stop matching. Keyed, because the cookie is
+    signed but readable, and an unkeyed digest of the hash would be something to test
+    password guesses against. It names the account it was issued for, so a session whose
+    user_id was set without logging in - the test suite does that - is not taken for one
+    whose password changed.
+    """
+    key = current_app.secret_key
+    if isinstance(key, str):
+        key = key.encode()
+    return f"{user_info.user_id}:" + hmac.new(key, user_info.password.encode(), hashlib.sha256).hexdigest()
 
 
 @bp.before_app_request
@@ -317,7 +343,30 @@ def load_logged_in_user():
         g.user = None
     else:
         user_info = UserInfo.fromDb(user_id=user_id)
+        mark = session.get(PASSWORD_MARK)
+        # a session from before marks existed has none, and gets one at the end of this
+        # request; it cannot have had one removed, since the cookie is signed
+        if user_info is not None and isinstance(mark, str) and mark.startswith(f"{user_id}:") \
+                and not hmac.compare_digest(mark, password_mark(user_info)):
+            # the password was changed after this session logged in
+            session.clear()
+            user_info = None
         g.user = user_info
+
+
+@bp.after_app_request
+def mark_the_session_with_the_current_password(response):
+    """Give a session that got this far the mark of the account's current password.
+
+    That covers two cases. A session from before marks existed is marked on its first
+    request, so a later password change ends it too. And a request that changed the
+    account's own password - /admin/change_password - keeps its own session, while every
+    other session of the account still carries the old mark and ends on its next request.
+    """
+    user_info = g.get('user')
+    if user_info is not None and session.get(PASSWORD_MARK) != password_mark(user_info):
+        session[PASSWORD_MARK] = password_mark(user_info)
+    return response
 
 
 def login_required(view):
