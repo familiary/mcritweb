@@ -106,7 +106,7 @@ Jobs
     <div class="collapse navbar-collapse" id="first_level_navbar">
       <ul class="navbar-nav">
         <li class="nav-item  px-2">
-          <a class="btn btn-outline-dark btn-sm" href="{{ url_for('data.jobs') }}"  role="button" target="_self"><i class="fa-solid fa-house"></i></a>
+          <a aria-label="All jobs" title="All jobs" class="btn btn-outline-dark btn-sm" href="{{ url_for('data.jobs') }}"  role="button" target="_self"><i class="fa-solid fa-house"></i></a>
         {% for entry in menu_configuration["menu"] %}
         {% if entry['available'] %}
           {% if 'submenu' in entry %}
@@ -149,12 +149,12 @@ Jobs
 
   {% if active %}
 <p>
-  Showing jobs for category: {{active}} <button type="button" id="job_id_category_{{active}}" class="confirm-delete btn btn-outline-dark btn-sm"><i class="fa-solid fa-trash"></i></button>
+  Showing jobs for category: {{active}} <button aria-label="Delete these jobs" title="Delete these jobs" type="button" id="job_id_category_{{active}}" class="confirm-delete btn btn-outline-dark btn-sm"><i class="fa-solid fa-trash"></i></button>
 </p>
 {% endif %}
 {% if state %}
 <p>
-  Showing jobs for state: {{state}} <button type="button" id="job_id_state_{{state}}" class="confirm-delete btn btn-outline-dark btn-sm"><i class="fa-solid fa-trash"></i></button>
+  Showing jobs for state: {{state}} <button aria-label="Delete these jobs" title="Delete these jobs" type="button" id="job_id_state_{{state}}" class="confirm-delete btn btn-outline-dark btn-sm"><i class="fa-solid fa-trash"></i></button>
 </p>
 {% endif %}
 
@@ -168,7 +168,7 @@ Jobs
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="myModalLabel">Delete Job(s)</h3>
+                <h2 class="h3" id="jobDeleteModalLabel">Delete Job(s)</h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">

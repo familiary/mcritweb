@@ -17,13 +17,13 @@ Home
       {% endif %}
     </p>
   {% if g.user.role == 'pending' %}
-    <h4>Please wait for an admin to assign you a role</h4>
+    <h2 class="h4">Please wait for an admin to assign you a role</h2>
   {% else %}
   <br />
-  <h3>Latest Sample Additions</h3>
+  <h2 class="h3">Latest Sample Additions</h2>
   {{ minisample_table(latest_samples) }}
   <br /><br />
-  <h3>Latest Matching Jobs</h3>
+  <h2 class="h3">Latest Matching Jobs</h2>
   {{ minijob_table(jobs, table_id="matching_jobs", families_by_id=families, samples_by_id=samples) }}
   {% endif %}
 {% endif %}
