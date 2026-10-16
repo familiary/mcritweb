@@ -68,7 +68,7 @@ def change_password():
         # the token is on /settings, so whoever could read that page with a stolen session
         # could have copied it; it must not outlast the password change that ends the session
         user_info.apitoken = generate_apitoken()
-        user_info.saveToDb(withPassword=True)
+        user_info.saveToDb()
         flash('Password successfully changed. Your API token was replaced too; anything using the old one has to be updated.', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')

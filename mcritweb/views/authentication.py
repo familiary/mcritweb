@@ -47,6 +47,15 @@ FIRST_USER_TAKEN = ('This instance was set up by another registration a moment a
                     'created - please register again.')
 
 
+def registration_token_attempt(username):
+    """The name a wrong registration token is recorded under. A username can never
+    contain ':', so no successful login carries it, and clear_login_failures - which
+    forgets only the failures under the name that just logged in - cannot reset the
+    token budget. Recording it under the typed name let anyone with an account guess
+    tokens without end, by typing their own name and logging in after every nine."""
+    return "register:" + (username or "")
+
+
 def _throttled(username=None):
     """True if this caller has spent their attempts, having logged the fact.
 
@@ -197,7 +206,7 @@ def register():
         # by the same counter as /login. Ordinary validation slips - a short username, a
         # password typed twice differently - deliberately do NOT record an attempt: they
         # are not guesses, and counting them would lock people out of their own signup.
-        if _throttled(username):
+        if _throttled(registration_token_attempt(username)):
             error = TOO_MANY_ATTEMPTS
         elif not username:
             error = 'Username is required.'
@@ -211,7 +220,7 @@ def register():
             error = 'The passwords do not match. No new user was created.'
         elif is_registration_token_required and server_info.registration_token != provided_registration_token:
             error = 'Invalid registration token provided. No new user was created.'
-            db.record_failed_login(request.remote_addr, username)
+            db.record_failed_login(request.remote_addr, registration_token_attempt(username))
         if error is None:
             user_info = UserInfo()
             user_info.username = username
@@ -303,11 +312,12 @@ def login():
             session.clear()
             session['user_id'] = user_info.user_id
             user_info.last_login = utc_now()
+            verified_password = user_info.password
             rehashed = _rehash_if_stale(user_info, password)
             # after the rehash, which puts a new hash for the same password in user_info
             session[PASSWORD_MARK] = password_mark(user_info)
-            user_info.saveToDb(withPassword=rehashed)
-            db.clear_login_failures(request.remote_addr)
+            user_info.saveLogin(verified_password=verified_password if rehashed else None)
+            db.clear_login_failures(request.remote_addr, username)
             return redirect(url_for('index'))
         db.record_failed_login(request.remote_addr, username)
         flash(error, category='error')
