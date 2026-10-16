@@ -5,7 +5,12 @@
   <title>{% block title %}{% endblock %} - MCRIT Web</title>
   {# how scripts reach the CSRF token - forms carry it as a hidden input instead #}
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  {# the icon font is discovered only after all.css is parsed and laid out, so it arrives
+  {# the minified Bootstrap build and a Font Awesome subset holding only the icons the
+     templates use (scripts/subset_fontawesome.py regenerates it); together 336 KB of
+     render-blocking CSS less than the unminified full builds. See issue #63. #}
+  <link href="{{ url_for('static', filename='bootstrap-5.0.2-dist/css/bootstrap.min.css') }}" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/fontawesome-subset.css') }}" rel="stylesheet">
+  {# the icon font is discovered only after the Font Awesome stylesheet is parsed and laid out, so it arrives
      a render-blocking round after everything else and every fa- icon - the navbar's Explore
      entries among them - is a blank box until then. Solid only: the regular and brands faces
      are page-specific, and preloading a face a page never draws with is pure waste.
@@ -20,31 +25,43 @@
   {% if g.user %}
   <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ url_for('static', filename='webfonts/fa-solid-900.woff2') }}">
   {% endif %}
-  <link href="{{ url_for('static', filename='bootstrap-5.0.2-dist/css/bootstrap.css') }}" rel="stylesheet">
-  <link href="{{ url_for('static', filename='css/all.css') }}" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="icon" type="image/png" href=" {{ url_for('static',filename='d20_mcrit_cabaret_small.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='navbar.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='hint.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='jquery-ui.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='dataTables.bootstrap5.min.css') }}">
   <script src="{{ url_for('static', filename='jquery.js') }}"></script>
-  <script src="{{ url_for('static', filename='jquery.dataTables.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='dataTables.bootstrap5.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='jquery-ui.js') }}"></script>
-  <script src="{{ url_for('static', filename='autocomplete.js') }}"></script>
-  <script src="{{ url_for('static', filename='bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='post_action.js') }}"></script>
-  <script src="{{ url_for('static', filename='page_loading.js') }}"></script>
+  {# DataTables and jQuery UI used to be here: 623 KB of render-blocking JavaScript and
+     41 KB of CSS, on every page, for two calls.
+
+     DataTables is gone entirely - its one initialiser lived on the jobs page, against a
+     selector that page never renders, so it did nothing anywhere. jQuery UI loads from
+     result_cross.html, the only page that calls `.sortable()`; {% block style %} runs
+     after this block, so jQuery is in place before it. See issue #63.
+
+     That ordering is load-bearing and not only for jQuery UI: Bootstrap 5.0.2 defines
+     its jQuery plugins on DOMContentLoaded, so it wins `$.fn.tooltip` over jQuery UI as
+     long as jQuery UI is a plain `<script>`. Load a library from here *lazily* and that
+     flips. See ADR-0015. #}
+  {# `defer`: nothing below is called while the page parses. Bootstrap's declarative
+     behaviour and its jQuery plugins register when it executes, which with defer is
+     after every plain script (so still after jQuery UI on the cross compare page) and
+     before DOMContentLoaded (so before every $(document).ready block); post_action.js
+     and page_loading.js only listen for events, and every `new Autocomplete` waits for
+     DOMContentLoaded. jQuery stays plain: inline blocks call `$` while parsing. See issue #63. #}
+  <script defer src="{{ url_for('static', filename='bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='post_action.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='page_loading.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='autocomplete.js') }}"></script>
 
   {% if not suppress_dropzone_overlay %}
-    {{ submit_or_query_dropzone_js(select_form_type=True) }}
+    {{ submit_or_query_dropzone_js(select_form_type=True, lazy=True) }}
     <script>
     $(document).ready(function(){
       function showDropModal() {
         $("#submitFileModal").modal("show");
       }
       function clearDropzone(e) {
+        if (!window.Dropzone) { return; }
         const myDropzone = Dropzone.forElement("#myDropzone");
         myDropzone.removeAllFiles();
       }
@@ -53,10 +70,12 @@
           clearDropzone();
       });
 
+      // the drop overlay is on every page, but Dropzone itself (its script and
+      // stylesheet) is only fetched once a file is actually dragged in - issue #63
       window.addEventListener('dragover', function(e) {
         var dt = e.dataTransfer;
         if (dt.effectAllowed == "copy" || dt.dropEffect == "copy"){
-          showDropModal();
+          mcritLoadDropzone(showDropModal);
         }
       });
     });
@@ -178,7 +197,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="close-submit-modal"></button>
               </div>
               <div class="modal-body">
-                {{ submit_or_query_dropzone(show_submit_fields=False, select_form_type=True) }}
+                {{ submit_or_query_dropzone(show_submit_fields=False, select_form_type=True, lazy=True) }}
               </div>
             </div>
           </div>

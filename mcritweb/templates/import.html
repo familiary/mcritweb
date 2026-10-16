@@ -15,7 +15,7 @@ Import
       <span id="import-status-text"></span>
     </div>
 </center>
-<script src="{{ url_for('static', filename='dropzone.js') }}"></script>
+<script src="{{ url_for('static', filename='dropzone.min.js') }}"></script>
 {% set import_status_js %}
     // An import is one blocking request: MCRIT's /import is not queued and returns no
     // job_id, so there is no job for job_in_progress.html to draw a real percentage
