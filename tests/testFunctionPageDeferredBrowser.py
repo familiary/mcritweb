@@ -28,7 +28,7 @@ FUNCTION_A = harness.FUNCTION_A
 THRESHOLD_RE = re.compile(r"var CFG_DEFERRED_LAYOUT_BLOCKS = \d+;")
 # where a failing layout is injected: the start of showGraph(), and a line it runs after it has
 # built the code panel - which it skips when the panel came first
-SHOW_GRAPH_START = "function showGraph(isTraceSupplied) {"
+SHOW_GRAPH_START = "function showGraph(isTraceSupplied, laidOut) {"
 AFTER_CODE_PANEL = "var bBox = svg.node().getBBox();"
 CONTROLS = "#showCycles, #showLoops, #loopBgFill, #enableTooltip"
 
