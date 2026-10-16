@@ -76,6 +76,19 @@ def test_a_contributor_token_may_add_a_report(client, make_user, role):
     assert _verdict(lambda: client.post("/api/samples", headers=token_for(role), json={})) == ALLOWED
 
 
+def test_a_visitor_token_cannot_rename_a_function(client, make_user):
+    """PUT /api/functions/<id> reaches modifyFunction, which explore.modifyFunction puts
+    behind contributor_required (fkie-cad/mcritweb#72)."""
+    make_user("visitor")
+    assert _verdict(lambda: client.put("/api/functions/1", headers=token_for("visitor"), json={"function_name": "x"})) == 403
+
+
+@pytest.mark.parametrize("role", ["contributor", "admin"])
+def test_a_contributor_token_may_rename_a_function(client, make_user, role):
+    make_user(role)
+    assert _verdict(lambda: client.put("/api/functions/1", headers=token_for(role), json={"function_name": "x"})) == ALLOWED
+
+
 def test_a_visitor_token_can_still_read_samples(client, make_user):
     """The same path by GET is a read, and stays visitor-level."""
     make_user("visitor")
