@@ -1,8 +1,13 @@
 
 {% set minhash_slider_mapping = ["Off", "Fast", "Standard", "Complete"] %} 
 
-{% macro submit_or_query_dropzone_js(select_form_type=False) %}
+{# `lazy`: the overlay of base.html uses it. The stylesheet and the library are then
+   fetched by mcritLoadDropzone() on the first drag instead of with every page, and the
+   handlers below wait in mcritInitDropzone() until it has. Issue #63. #}
+{% macro submit_or_query_dropzone_js(select_form_type=False, lazy=False) %}
+{% if not lazy %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
+{% endif %}
 {{ dropzone.style('border: 2px dashed black; margin: 30%; min-height: 200px;border-radius: 25px; background: rgb(240, 240, 240);') }}
 <script>
   function show_extended(x) {
@@ -71,7 +76,7 @@
   }
 
 
-  $(document).ready(function(){
+  function mcritInitDropzone(){
     const myDropzone = Dropzone.forElement("#myDropzone");
 
     myDropzone.on("removedfile", function(file) {
@@ -142,7 +147,10 @@
       window.location.href=response;
     });
 
-  });
+  }
+  {% if not lazy %}
+  $(document).ready(mcritInitDropzone);
+  {% endif %}
 
 function handleSliderChange_dropzone(val) {
   const mapping = {{ minhash_slider_mapping|tojson }};
@@ -153,7 +161,7 @@ function handleSliderChange_dropzone(val) {
 </script>
 {% endmacro %}
 
-{% macro submit_or_query_dropzone(select_form_type=False, show_submit_fields=False) %}
+{% macro submit_or_query_dropzone(select_form_type=False, show_submit_fields=False, lazy=False) %}
 {% set show_query_fields = not show_submit_fields %}
 <center>
 
@@ -164,9 +172,47 @@ function handleSliderChange_dropzone(val) {
 {% else %}
   {% set target_link = url_for('analyze.query') %}
 {% endif %}
+{% if lazy %}
+  {# without the `dropzone` class Dropzone's auto-discovery leaves the form alone even if
+     the library arrives before the page has finished loading; mcritLoadDropzone attaches
+     it by hand, with these options, once the script is in #}
+  {# |safe on the needles: with autoescaping on, `replace` escapes them otherwise, and a
+     quote turns into &#34; that matches nothing #}
+  {{ dropzone.create(action=target_link)|replace('class="dropzone"'|safe, 'class="dropzone-pending"'|safe) }}
+  {{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_options='autoProcessQueue: false')|replace('Dropzone.options.myDropzone ='|safe, 'window.mcritDropzoneOptions ='|safe) }}
+  <script>
+  function mcritLoadDropzone(done) {
+    if (window.mcritDropzoneReady) { done(); return; }
+    if (window.mcritDropzoneLoading) { window.mcritDropzoneLoading.push(done); return; }
+    window.mcritDropzoneLoading = [done];
+    var css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = "{{ url_for('static', filename='dropzone.min.css') }}";
+    document.head.appendChild(css);
+    var script = document.createElement("script");
+    script.src = "{{ url_for('static', filename='dropzone.min.js') }}";
+    script.onload = function () {
+      Dropzone.autoDiscover = false;
+      Dropzone.options.myDropzone = window.mcritDropzoneOptions;
+      var element = document.getElementById("myDropzone");
+      element.classList.add("dropzone");
+      if (!element.dropzone) {
+        new Dropzone(element, window.mcritDropzoneOptions);
+      }
+      mcritInitDropzone();
+      window.mcritDropzoneReady = true;
+      var waiting = window.mcritDropzoneLoading;
+      window.mcritDropzoneLoading = null;
+      waiting.forEach(function (callback) { callback(); });
+    };
+    document.head.appendChild(script);
+  }
+  </script>
+{% else %}
   {{ dropzone.create(action=target_link) }}
-  <script src="{{ url_for('static', filename='dropzone.js') }}"></script>
+  <script src="{{ url_for('static', filename='dropzone.min.js') }}"></script>
   {{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_options='autoProcessQueue: false') }}
+{% endif %}
   <form id="dropzone-additional-fields-form">
   {% if select_form_type %}
     <div class="container-fluid">
