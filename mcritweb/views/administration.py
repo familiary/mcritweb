@@ -1,5 +1,6 @@
 import json
 import re
+import sqlite3
 
 import requests
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
@@ -32,8 +33,16 @@ def change_username():
     elif UserInfo.fromDb(username=new_username) is not None:
         error_msg = 'Username is already taken!'
     if error_msg is None:
+        old_username = user_info.username
         user_info.username = new_username
-        user_info.saveToDb()
+        try:
+            user_info.saveToDb()
+        except sqlite3.IntegrityError:
+            # the lookup above is not a lock: a registration or another rename can
+            # take the name before this write, and the UNIQUE column refuses it
+            user_info.username = old_username
+            error_msg = 'Username is already taken!'
+    if error_msg is None:
         flash('Username successfully changed', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')
