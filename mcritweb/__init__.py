@@ -257,6 +257,8 @@ def create_app(test_config=None, instance_path=None):
             return input.strftime("%Y-%m-%d")
         elif isinstance(input, str):
             return input[:10]
+        # a sample submitted without a timestamp has none, which would print as "None"
+        return ""
 
     @app.template_filter('time')
     def time(input):
