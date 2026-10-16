@@ -79,7 +79,18 @@ One rough edge, noted rather than fixed: Werkzeug parses `X-Forwarded-For` as a 
 
 Every call MCRITweb makes to the MCRIT backend is bounded by `MCRIT_CLIENT_TIMEOUT`, a `(connect, read)` pair in seconds that defaults to `(10, 280)`. Without it a backend that is down or hung held a gunicorn request thread indefinitely, since gunicorn's own timeout does not reclaim a thread under the `gthread` worker. The read bound sits under the 300 s that docker-mcrit's NGINX waits, so a slow backend ends in MCRITweb's error page rather than a proxy 504. Raise both together if long synchronous calls - a whole-corpus import or export through the API passthrough - need more, or set the read to `None` in `instance/config.py` to wait indefinitely. It takes effect with an MCRIT release whose `McritClient` supports a timeout; an older one ignores it.
 
+### SQLite database
+
+MCRITweb keeps its users, their settings and the backend address in `instance/mcritweb.sqlite`. The file runs in SQLite's WAL mode, which MCRITweb switches on at startup and SQLite then keeps in the file, so the two gunicorn workers docker-mcrit starts can read while the other writes. In WAL mode two more files live next to it, `mcritweb.sqlite-wal` and `mcritweb.sqlite-shm`, and recent changes can sit in the `-wal` file until SQLite folds them in. So back the database up through SQLite's backup API, which is safe while MCRITweb runs - the docker-mcrit image has Python but no `sqlite3` shell:
+
+```
+python3 -c "import sqlite3; sqlite3.connect('instance/mcritweb.sqlite').backup(sqlite3.connect('mcritweb-backup.sqlite'))"
+```
+
+or stop MCRITweb and copy all three files together. WAL needs `instance/` on a local filesystem, as docker-mcrit's bind mount is; it does not work on a network share.
+
 ## Version History
+ * unreleased: The SQLite database runs in WAL mode, switched on at the first start after upgrading and then kept in the file, so a write in one gunicorn worker no longer holds up reads in the other, nor a read a write. **Backups of `instance/` change:** `mcritweb.sqlite-wal` and `mcritweb.sqlite-shm` now sit next to `mcritweb.sqlite`, and copying `mcritweb.sqlite` alone while MCRITweb runs can miss the latest changes; see "SQLite database" above.
  * unreleased: jQuery UI goes from 1.13.1 to 1.13.3, which fixes CVE-2022-31160: a `checkboxradio` widget re-read its label's escaped text as HTML on refresh. MCRITweb creates no checkboxradio, so no page of its own reached the flaw, but the library is loaded on every page. The only jQuery UI widget MCRITweb uses, the sortable sample order on cross compare results, behaves as before. Static files only; nothing to do beyond deploying the new code.
  * unreleased: Fix two fallback request paths that could raise an unbound-name error: malformed function-ID posts to the API now reach the backend response, and hash-list cross comparison no longer runs an unused sample search (#201). A function-ID list posted to `/api/functions` with a form content type - what `curl --data` sends - is read as the list it is, not as a malformed body.
  * unreleased: Submitting a binary no longer leaves an unused SHA-256 named copy in `instance/temp/uploads/`; the bytes go to the backend. Existing MCRITweb uploads there whose names are 64 hex digits are orphaned and can be removed. Query uploads kept for promotion use backend job IDs instead.
