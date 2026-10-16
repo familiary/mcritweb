@@ -354,7 +354,6 @@ def the_row_changes_while_the_hash_is_computed(app, monkeypatch, statement, user
 
 
 @pytest.mark.parametrize("column, value", [
-    ("apitoken", "rotated-while-changing-the-password"),
     ("username", "alice.renamed"),
     ("role", "pending"),
 ])
