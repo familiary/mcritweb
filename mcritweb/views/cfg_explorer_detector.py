@@ -121,9 +121,13 @@ def get_roots(graph):
     roots = list(set(graph.nodes()) -
                  set(map(lambda twople: twople[1], graph.edges())))
     if len(roots) > 1:
-        graph.add_node("my_super_root", _name="my_super_root")
+        # a block of that name would be one more root's parent instead of a new root
+        super_root = "my_super_root"
+        while super_root in graph:
+            super_root += "_"
+        graph.add_node(super_root, _name=super_root)
         for r in roots:
-            graph.add_edge("my_super_root", r)
+            graph.add_edge(super_root, r)
     # only ever case we noted like this so far is if we somehow loop to our entry block
     # in that case, we return the block with lowest address as entry node
     elif len(roots) == 0:
@@ -239,6 +243,9 @@ def addParentInfo(loopsObj):
 def run(dot_content):
     # print(dot_content)
     graph = parse_dot_to_graph(dot_content)
+    # a graph without blocks has no loops, and get_roots() cannot take min() of no nodes
+    if graph.number_of_nodes() == 0:
+        return "[]"
     roots = get_roots(graph)
     assert len(roots) == 1, "Must have exactly one root to perform analysis: {}".format(str(roots))
     root = roots[0]
@@ -250,19 +257,4 @@ def run(dot_content):
 
 
 def main(file_path):
-    dot_content = load_dot_file(file_path)
-    # print("dot_content", dot_content)
-    graph = parse_dot_to_graph(dot_content)
-    # print("graph", graph)
-    roots = get_roots(graph)
-    assert len(roots) == 1, "Must have exactly one root to perform analysis: {}".format(str(roots))
-    root = roots[0]
-    # print("root", root)
-    dominanator_dict = dominanators(graph, root)
-    # print("dominanator_dict", dominanator_dict)
-    backedges = compute_backedges(graph, dominanator_dict)
-    # print("backedges", backedges)
-    loops = collect_loops(graph, backedges, dominanator_dict)
-    # print("loops", loops)
-    addParentInfo(loops)
-    return json.dumps(loops)
+    return run(load_dot_file(file_path))
