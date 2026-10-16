@@ -11,7 +11,7 @@ Results for Job: {{ job_info.job_id }}
 {{ pagination_js() }}
 {% endblock %}
 {% block content %}
-<h1>Results for Job: {{ matching_result.method }}</h1>
+<h1>Results for Job: {{ job_info.method|job_name }}</h1>
 
 <p>Showing matches against sample: {{ matching_result.other_sample_entry.sample_id }} {% if matching_result.other_sample_entry.family %} (family: {{ matching_result.other_sample_entry.family }}) {% else %} {% endif %}</p>
 
