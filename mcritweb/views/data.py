@@ -214,7 +214,7 @@ def import_view():
         # instead of letting json.load or the client's own type check raise a 500
         try:
             import_data = json.load(request.files['file'])
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, RecursionError):
             import_data = None
         if not isinstance(import_data, dict):
             return _refuse_import(NOT_MCRIT_DATA)
@@ -1293,14 +1293,9 @@ def job_by_id(job_id):
     auto_forward = 0
     client = get_client()
     suppress_processing_message = False
-    try:
-        auto_refresh = int(request.args.get("refresh"))
-    except TypeError:
-        pass
-    try:
-        auto_forward = int(request.args.get("forward"))
-    except TypeError:
-        pass
+    # absent or not a number reads as 0, rather than a 500 for a hand-edited URL
+    auto_refresh = parse_integer_query_param(request, "refresh") or 0
+    auto_forward = parse_integer_query_param(request, "forward") or 0
 
     job_info = client.getJobData(job_id)
     if auto_refresh and job_info and job_info.is_failed:
@@ -1418,6 +1413,10 @@ def request_filename_info():
     except Exception:
         filename = ""
         file_header = ""
+    # a client of this endpoint other than the dropzone can send any JSON value here
+    if not isinstance(filename, str) or not isinstance(file_header, str):
+        filename = ""
+        file_header = ""
     result = {}
     if filename.endswith(".smda"):
         result = {
@@ -1437,7 +1436,9 @@ def request_filename_info():
         match_bitness = re.search('"bitness": (?P<bitness>(16|32|64))', file_header)
         if match_bitness:
             result['bitness'] = int(match_bitness.group('bitness'))
-        match_baseaddr = re.search(r'"base_addr": (?P<base_addr>\d+)', file_header)
+        # at most 20 digits, a 64-bit address: hex() of a longer int is fine, but int()
+        # of more than 4300 digits raised here
+        match_baseaddr = re.search(r'"base_addr": (?P<base_addr>\d{1,20})(?!\d)', file_header)
         if match_baseaddr:
             result['base_addr'] = hex(int(match_baseaddr.group('base_addr')))
     elif 'dump' in filename:
@@ -1461,6 +1462,8 @@ def submit_or_query():
     elif form_type == "submit_form":
         return submit()
         # return redirect(url_for("data.submit"), code=307)
+    # the view returned nothing for any other form_type, which Flask turns into a 500
+    return "", 400 # Bad Request
 
 
 @bp.route('/submit',methods=('GET', 'POST'))

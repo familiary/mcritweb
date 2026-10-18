@@ -35,7 +35,7 @@ Query Sample: *{{ entry.sample_id|abs }}
         {% endfor %}
         <tr>
           <th class="align-middle">Timestamp</th>
-          <td class="align-middle">{{ entry.timestamp }}</td>
+          <td class="align-middle">{{ entry.timestamp if entry.timestamp is not none else "" }}</td>
         </tr>
         <tr>
           <th class="align-middle">Version</th>
