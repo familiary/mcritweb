@@ -30,6 +30,7 @@ from flask import current_app
 from rapidfuzz.distance import Levenshtein
 from smda.intel.IntelInstructionEscaper import IntelInstructionEscaper
 
+from mcritweb.backend_errors import require_result, with_server_errors
 from mcritweb.views.client import get_client
 from mcritweb.views.memo import app_memo
 from mcritweb.views.utility import get_server_url
@@ -126,8 +127,10 @@ def _adhoc_picblock_hashes(smda_function, sample_entry):
 
 def _adhoc_picblock_pairs(function_a, function_b, smda_function_a, smda_function_b):
     client = get_client()
-    sample_a = client.getSampleById(function_a.sample_id)
-    sample_b = client.getSampleById(function_b.sample_id)
+    # needed, not a label: the escaping reads each sample's address range, and the diff
+    # this feeds is memoized, so a diff drawn without this layer would be kept
+    sample_a = require_result(with_server_errors(client).getSampleById(function_a.sample_id), "the sample of the first function")
+    sample_b = require_result(with_server_errors(client).getSampleById(function_b.sample_id), "the sample of the second function")
     return _pair_by_hash(_adhoc_picblock_hashes(smda_function_a, sample_a), _adhoc_picblock_hashes(smda_function_b, sample_b))
 
 
