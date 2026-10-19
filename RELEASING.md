@@ -14,8 +14,32 @@ deployment sees - the routes, the configuration keys and the SQLite schema; see 
 of `CHANGELOG.md`. MCRITweb is deployed from a checkout and is not published to PyPI, so the
 release is the tag and the GitHub release page.
 
-The version is declared in `pyproject.toml` (`[project].version`, read at runtime by `get_mcritweb_version()`). The release workflow refuses a tag that does not
-match every one of them, so a bump that misses one fails before anything is published.
+The version is declared in one place, `pyproject.toml` (`[project].version`), and read at runtime
+by `get_mcritweb_version()`. The release workflow refuses a tag that does not match it, so a tag
+cut before the bump fails before anything is published.
+
+## What differs from the shared process
+
+| | MCRITweb |
+|---|---|
+| Version scheme | Semantic Versioning over the routes, the `instance/config.py` keys and the SQLite schema |
+| Where the version lives | `pyproject.toml` only |
+| Changelog heading | `## [X.Y.Z] - YYYY-MM-DD`, without the `v` (`## [vX.Y.Z]` is accepted too) |
+| Release workflow | `.github/workflows/release.yml`, on a pushed `v*` tag |
+| CI gate | the `test.yml` workflow (*CI*) has to have passed on the tagged commit |
+| Package index | none: no PyPI, no trusted publishing, no `pypi` environment, no TestPyPI rehearsal |
+| Build check | the wheel is installed into a clean environment to prove the templates, static assets and SQL schema ship with it |
+| Milestones | not used; the release does not check or close one |
+| Python | 3.12 to 3.14, all in CI; the release builds on 3.12 |
+| Backend floor | `mcrit>=1.12.0`, in `pyproject.toml` and `requirements.txt` |
+
+## Supported Python versions
+
+MCRITweb supports Python 3.12 through 3.14, and CI runs every one of them. The floor is inherited
+from mcrit, which has declared `>=3.12` since v1.10.0; nothing in MCRITweb's own source needs it.
+`tests/testPythonFloor.py` holds `requires-python`, the ruff `target-version`, the README,
+the CI matrix and the installed mcrit's own metadata to the same floor, so raising it means moving all of them in one
+change, with a `Removed` entry in the changelog.
 
 ## Changelog
 
@@ -93,7 +117,7 @@ Done once, by a repository owner; the workflow cannot create these for itself.
 
 ## Release order across the ecosystem
 
-MCRITweb depends on `mcrit` (`>=1.5.3`) and consumes its data classes directly, and
+MCRITweb depends on `mcrit` (`>=1.12.0`) and consumes its data classes directly, and
 `docker-mcrit` pins an exact MCRIT and MCRITweb version in its `.env`. When a change here needs
 new backend behaviour, release MCRIT first, raise the floor in `pyproject.toml` and
 `requirements.txt`, release MCRITweb, then bump `docker-mcrit`.
