@@ -46,13 +46,47 @@ def _trusted_proxy_count(configured, logger):
     return value
 
 
+#: What RESULT_CACHE_MAX_BYTES and RESULT_CACHE_MAX_FILES fall back to when the
+#: configured value is not a bound.
+RESULT_CACHE_DEFAULTS = {'RESULT_CACHE_MAX_BYTES': 1024 * 2**20, 'RESULT_CACHE_MAX_FILES': 1000}
+
+
+def _result_cache_bound(name, configured, logger):
+    """Validate one result cache bound: a non-negative int, a string of digits, or None.
+
+    The bound is compared on every cache write, so a value that is not a number would
+    fail there instead - after the report is written, turning every first view of a
+    result into a 500 and leaving the cache untrimmed. Anything else is refused with a
+    warning and the default is used, the same leniency and the same refusals as
+    _trusted_proxy_count: a bool is not a size, and a float is not a count.
+    """
+    if configured is None:
+        return None
+    if isinstance(configured, bool):
+        value = None
+    elif isinstance(configured, int):
+        value = configured
+    elif isinstance(configured, str):
+        try:
+            value = int(configured.strip())
+        except ValueError:
+            value = None
+    else:
+        value = None
+    if value is None or value < 0:
+        logger.warning(
+            "%s=%r is not a non-negative whole number or None; using the default of %d",
+            name, configured, RESULT_CACHE_DEFAULTS[name])
+        return RESULT_CACHE_DEFAULTS[name]
+    return value
+
+
 def create_app(test_config=None, instance_path=None):
     # NOTE: these are imported here rather than at module scope on purpose. Importing any
     # mcritweb submodule executes this file first, so module-level blueprint imports would
     # drag the entire application stack (mcrit, smda, numpy, PIL, networkx) into every
     # import - including a test that only wants a pure-python helper. See issue #88.
     from flask_dropzone import Dropzone
-    from mcrit.storage.SampleEntry import SampleEntry
 
     from . import compression, db, manual
     from .csrf import CsrfProtect
@@ -61,8 +95,16 @@ def create_app(test_config=None, instance_path=None):
     from .secret_key import INSECURE_DEFAULT, load_or_create_secret_key
     from .views import administration, analyze, api, authentication, data, explore
     from .views.client import get_client, get_family_entries, get_sample_entries, remember_samples
+    from .views.matching_statistics import matching_statistics
     from .views.params import get_minhash_matching_label
-    from .views.utility import ensure_local_data_paths, forget_server_probe, get_mcritweb_version_from_setup
+    from .views.search import search_page
+    from .views.utility import (
+        describable_jobs,
+        ensure_local_data_paths,
+        forget_server_probe,
+        get_mcritweb_version_from_setup,
+        job_is_describable,
+    )
 
     # create and configure the app
     # instance_path is overridable so tests get their own cache/temp/uploads tree
@@ -98,6 +140,12 @@ def create_app(test_config=None, instance_path=None):
         # enough that a backend going down is noticed almost at once; 0 disables the
         # cache and probes every time, which is what versions before this one did.
         MCRIT_SERVER_PROBE_TTL=5,
+        # Bounds on instance/cache/results/, enforced whenever a report is added to it by
+        # evicting the oldest reports first. An evicted report is simply fetched from the
+        # backend again the next time it is viewed. The byte bound is the disk budget; the
+        # file bound caps how many reports the directory holds whatever their size.
+        # None lifts either bound. Issue #202.
+        **RESULT_CACHE_DEFAULTS,
         # How many reverse proxies sit in front of this app, all of which append to
         # X-Forwarded-For. 0 means "served directly": nothing about the request is
         # taken from a header. See the block below create_app's config load.
@@ -118,6 +166,11 @@ def create_app(test_config=None, instance_path=None):
     else:
         # load the test config if passed in
         app.config.from_mapping(test_config)
+
+    # checked here rather than on use, where a value that is not a number would fail
+    # every cache write - see _result_cache_bound
+    for name in RESULT_CACHE_DEFAULTS:
+        app.config[name] = _result_cache_bound(name, app.config.get(name), app.logger)
 
     # Behind a reverse proxy - and the recommended deployment, docker-mcrit, terminates
     # TLS in NGINX in front of this app - the only peer the WSGI server ever sees is the
@@ -292,6 +345,18 @@ def create_app(test_config=None, instance_path=None):
     app.add_template_filter(get_highlight_terms, 'search_terms')
     app.add_template_global(split_search_matches, 'split_search_matches')
 
+    # the backend's match_aggregation describes the whole job and is never revised by
+    # filtering, so a result page narrowed to one family or sample has to recompute it
+    # over the matches it is showing - see the module docstring and issue #38
+    app.add_template_global(matching_statistics, "matching_statistics")
+
+    # Nothing job_row prints about a job is stored: parameters, arguments, sample_ids,
+    # family_id, sample_id, sha256 and the rest are all rebuilt from the payload on
+    # access and raise for one it cannot be rebuilt from. The macro has to ask before
+    # it tries, because a template has no try/except: without this, one bad job takes
+    # down whichever listing shows it rather than just its own row.
+    app.add_template_global(job_is_describable)
+
     # a global rather than a template variable: the job table macro is reached from a
     # dozen templates, all of which would otherwise have to pass this through
     @app.template_global()
@@ -329,13 +394,16 @@ def create_app(test_config=None, instance_path=None):
             # already the bounded way to ask: one query, sorted by the sample_id index and
             # cut at five. Asked before the job rows are filled, since a sample that was
             # just submitted is often the one that was just matched.
-            sample_results = client.search_samples("", is_ascending=False, cursor=None, sort_by="sample_id", limit=5)
+            sample_results = search_page(client, "samples", "", is_ascending=False, cursor=None, sort_by="sample_id", limit=5)
             if sample_results:
-                for sample_dict in sample_results['search_results'].values():
-                    latest_samples.append(SampleEntry.fromDict(sample_dict))
+                latest_samples = sample_results.entries
             remember_samples(latest_samples)
-            samples_by_id = get_sample_entries(sample_id for job in jobs or [] for sample_id in job.sample_ids or [])
-            families_by_id = get_family_entries(job.family_id for job in jobs or [] if job.family_id is not None)
+            # One job among the five newest finished matches that cannot supply these
+            # took the index down for every logged-in user - this is the page they all
+            # land on. The row macro still lists it; only the lookups skip it (#115).
+            described_jobs = describable_jobs(jobs or [])
+            samples_by_id = get_sample_entries(sample_id for job in described_jobs for sample_id in job.sample_ids or [])
+            families_by_id = get_family_entries(job.family_id for job in described_jobs if job.family_id is not None)
             return render_template("index.html", samples=samples_by_id, families=families_by_id, latest_samples=latest_samples, jobs=jobs)
 
     return app
