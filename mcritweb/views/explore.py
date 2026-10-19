@@ -16,7 +16,7 @@ from mcritweb.views.client import get_client, get_sample_entries, remember_sampl
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.functiondiff import get_combined_dot_graph
 from mcritweb.views.pagination import request_args_for_link_building
-from mcritweb.views.utility import get_user_column_setup, mcrit_server_required
+from mcritweb.views.utility import describable_jobs, get_user_column_setup, mcrit_server_required
 
 bp = Blueprint('explore', __name__, url_prefix='/explore')
 
@@ -238,7 +238,10 @@ def sample_row_job_collection(client, samples):
             return JobCollection([])
         jobs.extend(jobs_for_method)
     jobs.sort(key=lambda job: job.number if isinstance(job.number, int) else -1, reverse=True)
-    job_collection = JobCollection(jobs)
+    # filterToSampleIds reads each job's sample_id, which mcrit rebuilds from the payload
+    # and raises on for one it cannot read - so a single such job would take the whole
+    # listing down rather than its own annotation (#51)
+    job_collection = JobCollection(describable_jobs(jobs))
     job_collection.filterToSampleIds(sample_ids)
     return job_collection
 
@@ -653,9 +656,17 @@ def sample_by_id(sample_id):
             # a superset of what `filterToSampleIds` keeps below. See #77.
             jobs = client.getQueueData(filter=str(sample_id))
             if jobs is None:
+                # the backend tests `filter` against every job's rendered parameters, so a
+                # single job whose payload cannot be read fails the whole narrowed request.
+                # The unfiltered queue renders nothing and survives it; narrowed here
+                # instead, that job costs only itself (#51). Slower, so only taken when the
+                # narrow request has already failed.
+                jobs = client.getQueueData()
+            if jobs is None:
                 flash("Ups, reading MCRIT's job queue failed - this sample's jobs are not shown.", category="error")
             else:
-                job_collection = JobCollection(jobs)
+                # a job whose payload cannot be read raises on the sample_id this filters by
+                job_collection = JobCollection(describable_jobs(jobs))
                 job_collection.filterToSampleIds([sample_id])
             for function_dict in results['search_results'].values():
                 functions.append(FunctionEntry.fromDict(function_dict))

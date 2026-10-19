@@ -98,7 +98,13 @@ def create_app(test_config=None, instance_path=None):
     from .views.client import get_client, get_family_entries, get_sample_entries, remember_samples
     from .views.matching_statistics import matching_statistics
     from .views.params import get_minhash_matching_label
-    from .views.utility import ensure_local_data_paths, forget_server_probe, get_mcritweb_version_from_setup
+    from .views.utility import (
+        describable_jobs,
+        ensure_local_data_paths,
+        forget_server_probe,
+        get_mcritweb_version_from_setup,
+        job_is_describable,
+    )
 
     # create and configure the app
     # instance_path is overridable so tests get their own cache/temp/uploads tree
@@ -341,6 +347,14 @@ def create_app(test_config=None, instance_path=None):
     # filtering, so a result page narrowed to one family or sample has to recompute it
     # over the matches it is showing - see the module docstring and issue #38
     app.add_template_global(matching_statistics, "matching_statistics")
+
+    # Nothing job_row prints about a job is stored: parameters, arguments, sample_ids,
+    # family_id, sample_id, sha256 and the rest are all rebuilt from the payload on
+    # access and raise for one it cannot be rebuilt from. The macro has to ask before
+    # it tries, because a template has no try/except: without this, one bad job takes
+    # down whichever listing shows it rather than just its own row.
+    app.add_template_global(job_is_describable)
+
     # a global rather than a template variable: the job table macro is reached from a
     # dozen templates, all of which would otherwise have to pass this through
     @app.template_global()
@@ -383,8 +397,12 @@ def create_app(test_config=None, instance_path=None):
                 for sample_dict in sample_results['search_results'].values():
                     latest_samples.append(SampleEntry.fromDict(sample_dict))
             remember_samples(latest_samples)
-            samples_by_id = get_sample_entries(sample_id for job in jobs or [] for sample_id in job.sample_ids or [])
-            families_by_id = get_family_entries(job.family_id for job in jobs or [] if job.family_id is not None)
+            # One job among the five newest finished matches that cannot supply these
+            # took the index down for every logged-in user - this is the page they all
+            # land on. The row macro still lists it; only the lookups skip it (#115).
+            described_jobs = describable_jobs(jobs or [])
+            samples_by_id = get_sample_entries(sample_id for job in described_jobs for sample_id in job.sample_ids or [])
+            families_by_id = get_family_entries(job.family_id for job in described_jobs if job.family_id is not None)
             return render_template("index.html", samples=samples_by_id, families=families_by_id, latest_samples=latest_samples, jobs=jobs)
 
     return app
