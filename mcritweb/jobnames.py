@@ -38,7 +38,7 @@ JOB_METHOD_NAMES = {
     "rebuildPicBlockHashIndex": "Rebuild PicBlockHash Index",
     "recalculatePicHashes": "Recalculate PicHashes",
     "recalculateMinHashes": "Recalculate MinHashes and Index",
-    "repairMinHashes": "Repair MinHashes",
+    "repairMinHashes": "Repair stale MinHashes",
     "recomputeFamilyStats": "Recompute Family Statistics",
     "rebuildBandDfIndex": "Rebuild Band DF Index",
     "rebuildFunctionRangeIndex": "Rebuild Function Range Index",
