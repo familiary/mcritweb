@@ -1,15 +1,15 @@
 import re
 
 from flask import Blueprint, current_app, flash, g, json, redirect, render_template, request, url_for
-from mcrit.storage.SampleEntry import SampleEntry
 from smda.common.SmdaReport import SmdaReport
 
 from mcritweb.db import remember_query_filename
 from mcritweb.views.authentication import visitor_required
-from mcritweb.views.client import get_client
+from mcritweb.views.client import get_client, get_sample_entries, remember_samples
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.pagination import Pagination
 from mcritweb.views.params import parse_band_range, parse_checkbox_query_param, parse_integer_list_query_param
+from mcritweb.views.search import search_page
 from mcritweb.views.utility import mcrit_server_required, query_upload_path
 
 bp = Blueprint('analyze', __name__, url_prefix='/analyze')
@@ -24,23 +24,11 @@ MAX_SELECTED_SAMPLES = 250
 
 
 def get_unique_samples_from_search_result(search_result):
-    samples = []
-    sample_ids = set()
-    for sample_dict in search_result['search_results'].values():
-        sample_entry = SampleEntry.fromDict(sample_dict)
-        if sample_entry.sample_id not in sample_ids:
-            samples.append(sample_entry)
-            sample_ids.add(sample_entry.sample_id)
-    id_match = search_result['id_match']
-    if id_match is not None:
-        # deserialize before reading the id, as the loop above does and as
-        # explore.search does with the same value. `id_match` is a wire dict, and its
-        # keys equalling the entry's attribute names is a coincidence this repository
-        # does not control. See issue #64.
-        id_match_entry = SampleEntry.fromDict(id_match)
-        if id_match_entry.sample_id not in sample_ids:
-            samples.append(id_match_entry)
-    return samples
+    """the page's samples, then the id / sha256 direct matches not already among them"""
+    unique = {sample_entry.sample_id: sample_entry for sample_entry in search_result.entries}
+    for direct_match in search_result.direct_matches:
+        unique.setdefault(direct_match.sample_id, direct_match)
+    return list(unique.values())
 
 
 @bp.route('/blocks/family/<int:family_id>')
@@ -89,12 +77,22 @@ def unique_blocks():
         flash(f'A unique blocks request can name at most {MAX_SELECTED_SAMPLES} samples, the rest of the selection was dropped.', category='warning')
         selected_list = selected_list[:MAX_SELECTED_SAMPLES]
 
+    query = request.args.get('query', "")
+    samples = []
+    pagination = CursorPagination(request, default_sort="sample_id")
+    results = search_page(client, "samples", query, **pagination.getSearchParams(), limit=pagination.limit)
+    pagination.read_cursor_from_result(results)
+    if results is not None:
+        samples = get_unique_samples_from_search_result(results)
+        # a selected sample listed in the search below needs no lookup of its own
+        remember_samples(samples)
+
     pagination_selected = Pagination(request, len(selected_list), limit=10, query_param="ps", limit_param="psl")
     # id -> entry, or None for one the backend would not resolve. Only the page being
     # rendered is looked up: McritClient has no batched sample lookup, so resolving the
     # whole selection here would cost one round trip per selected sample on every page
     # view. start_unique_blocks checks the rest, once, on a deliberate submit.
-    selected_dict = {x: client.getSampleById(x) for x in selected_list[pagination_selected.start_index:pagination_selected.start_index + pagination_selected.limit]}
+    selected_dict = get_sample_entries(selected_list[pagination_selected.start_index:pagination_selected.start_index + pagination_selected.limit])
     unresolved_ids = [sample_id for sample_id, sample in selected_dict.items() if sample is None]
     if unresolved_ids:
         # kept in the selection, not dropped. `handle_response` answers None for a 500 as
@@ -108,16 +106,8 @@ def unique_blocks():
         # ten at a time, which is 25 redirect hops. Browsers stop following around 20, so
         # the selection that most needed cleaning was the one that could not load at all.
         flash(f"MCRIT did not confirm sample id {', '.join(str(sample_id) for sample_id in unresolved_ids)} - they may have been deleted, or the backend may be unavailable.", category="warning")
-
-    query = request.args.get('query', "")
-    samples = []
-    pagination = CursorPagination(request, default_sort="sample_id")
-    results = client.search_samples(query, **pagination.getSearchParams(), limit=pagination.limit)
-    pagination.read_cursor_from_result(results)
     if results is None:
         flash(f"Ups, search for {query} in MCRIT's samples failed!", category="error")
-    else:
-        samples = get_unique_samples_from_search_result(results)
 
     return render_template(
         "unique_blocks.html",
@@ -222,15 +212,6 @@ def cross_compare_from_hash_list():
         selected_list = [int(x) for x in selected.split(',') if x != '']
 
 
-        # fill up search part with all samples
-        pagination = CursorPagination(request, default_sort="sample_id")
-        results = client.search_samples("", **pagination.getSearchParams(), limit=pagination.limit)
-        pagination.read_cursor_from_result(results)
-        if results is None:
-            flash(f"Ups, search for {query} in MCRIT's samples failed!", category="error")
-            
-        # unused? -> pagination_selected = Pagination(request, len(selected_list), limit=25, query_param="ps")
-
         return redirect(url_for(
             "analyze.cross_compare",
             samples = ",".join([str(id) for id in selected_list]),
@@ -252,11 +233,26 @@ def cross_compare():
     is_forcing_rematch = True if request.args.get('rematch', 'false').lower() == "true" else False
     is_only_selected = True if request.args.get('onlySelected', 'false').lower() == "true" else False
 
-    cached_list = [int(x) for x in cached.split(',') if x!='']
-    selected_list = [int(x) for x in selected.split(',') if x != '']
+    try:
+        cached_list = [int(x) for x in cached.split(',') if x!='']
+        selected_list = [int(x) for x in selected.split(',') if x != '']
+    except ValueError:
+        # a URL edited by hand; start_cross_compare answers the same list the same way
+        flash('The samples to cross compare were not a list of sample ids.', category='error')
+        cached_list, selected_list = [], []
+
+    query = request.args.get('query', "")
+    samples = []
+    pagination = CursorPagination(request, default_sort="sample_id")
+    results = search_page(client, "samples", query, **pagination.getSearchParams(), limit=pagination.limit)
+    pagination.read_cursor_from_result(results)
+    if results is not None:
+        samples = get_unique_samples_from_search_result(results)
+        # a selected sample listed in the search below needs no lookup of its own
+        remember_samples(samples)
 
     pagination_selected = Pagination(request, len(selected_list), limit=10, query_param="ps", limit_param="psl")
-    selected_dict = {x: client.getSampleById(x) for x in sorted(selected_list)[pagination_selected.start_index:pagination_selected.start_index+pagination_selected.limit]}
+    selected_dict = get_sample_entries(sorted(selected_list)[pagination_selected.start_index:pagination_selected.start_index+pagination_selected.limit])
     invalid_ids = []
     for id, sample in selected_dict.items():
         if sample is None:
@@ -273,16 +269,8 @@ def cross_compare():
             cache = ",".join([str(id) for id in cached_list]),
             rematch = "true" if is_forcing_rematch else "false",
         ))
-
-    query = request.args.get('query', "")
-    samples = []
-    pagination = CursorPagination(request, default_sort="sample_id")
-    results = client.search_samples(query, **pagination.getSearchParams(), limit=pagination.limit)
-    pagination.read_cursor_from_result(results)
     if results is None:
         flash(f"Ups, search for {query} in MCRIT's samples failed!", category="error")
-    else:
-        samples = get_unique_samples_from_search_result(results)
 
     # #53: the tint the search table used to hand-roll as two inline style attributes.
     # A sample already in the selection wins over one merely clicked on this page,
@@ -344,7 +332,7 @@ def compare():
     query = request.args.get('query', "")
     samples = []
     pagination = CursorPagination(request, default_sort="sample_id")
-    results = client.search_samples(query, **pagination.getSearchParams(), limit=pagination.limit)
+    results = search_page(client, "samples", query, **pagination.getSearchParams(), limit=pagination.limit)
     pagination.read_cursor_from_result(results)
     if results is None:
         flash(f"Ups, search for {query} in MCRIT's samples failed!", category="error")
@@ -371,9 +359,9 @@ def compare_versus():
     parameters = {}
     for a_or_b in "ab":
         query = request.args.get(f'query_{a_or_b}', "")
-        samples = {}
+        samples = []
         pagination = CursorPagination(request, default_sort="sample_id", query_param_prefix=a_or_b)
-        results = client.search_samples(query, **pagination.getSearchParams(), limit=pagination.limit)
+        results = search_page(client, "samples", query, **pagination.getSearchParams(), limit=pagination.limit)
         pagination.read_cursor_from_result(results)
         if results is None:
             flash(f"Ups, search for {query} in MCRIT's samples failed!", category="error")
@@ -459,12 +447,28 @@ def compare_vs(sample_id_a, sample_id_b):
     job_id = client.requestMatchesForSampleVs(sample_id_a, sample_id_b, force_recalculation=rematch, band_matches_required=minhash_band_range)
     return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
 
+#: What a query upload may declare beyond the role's cap on the file itself: the other
+#: form fields and the multipart boundaries and headers. The dropzone's fields come to
+#: about 1.5 KB; the rest leaves room for long values typed into its free-text fields.
+QUERY_FORM_ALLOWANCE = 64 * 2**10
+
+
 @bp.route('/query',methods=('GET', 'POST'))
 @visitor_required
 @mcrit_server_required
 def query():
     client = get_client()
     if request.method == 'POST':
+        role_limit = current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.user.role)
+        # touching request.files reads and parses the whole body, up to the app-wide
+        # MAX_CONTENT_LENGTH, so an upload over this role's cap is refused before that.
+        # The declared length covers the form fields and multipart boundaries as well as
+        # the file, hence the allowance; the exact cap is checked on the file below. A body
+        # that declares no length could only be measured by reading it, and browsers
+        # always declare one for a form upload.
+        if role_limit is not None and (request.content_length is None or request.content_length > role_limit + QUERY_FORM_ALLOWANCE):
+            flash(f'Your account may only upload files for query that are up to {role_limit} bytes in size.', category='error')
+            return "", 403
         f = request.files.get('file')
         if f is None:
             flash("Please upload a file", category='error')
@@ -479,7 +483,6 @@ def query():
             base_address = int(request.form['base_addr'], 16)
 
         binary_content = f.read()
-        role_limit = current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.user.role)
         if role_limit is not None and len(binary_content) > role_limit:
             flash(f'Your account may only upload files for query that are up to {role_limit} bytes in size.', category='error')
             return "", 403 # Bad Request
@@ -528,4 +531,4 @@ def query():
         else:
             flash('Sample could not be parsed / disassembled!', category='error')
             return "", 400 # Bad Request
-    return render_template('query.html', families=[], show_submit_fields=False)
+    return render_template('query.html', show_submit_fields=False)

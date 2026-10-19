@@ -153,7 +153,7 @@ function handleSliderChange_dropzone(val) {
 </script>
 {% endmacro %}
 
-{% macro submit_or_query_dropzone(families=[], select_form_type=False, show_submit_fields=False) %}
+{% macro submit_or_query_dropzone(select_form_type=False, show_submit_fields=False) %}
 {% set show_query_fields = not show_submit_fields %}
 <center>
 
@@ -188,11 +188,11 @@ function handleSliderChange_dropzone(val) {
         <input name='base_addr' class="form-control" id="base_addr" aria-describedby="baseAddressHelp" placeholder="Enter base address">
         <div class="form-check form-check-inline submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
           <input class="form-check-input" type="radio" name="bitness" id="bitness32" value="32">
-          <label class="form-check-label" for="inlineRadio1">32bit</label>
+          <label class="form-check-label" for="bitness32">32bit</label>
         </div>
         <div class="form-check form-check-inline submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
           <input class="form-check-input" type="radio" name="bitness" id="bitness64" value="64">
-          <label class="form-check-label" for="inlineRadio2">64bit</label>
+          <label class="form-check-label" for="bitness64">64bit</label>
         </div>
       </div>
 
@@ -225,21 +225,6 @@ function handleSliderChange_dropzone(val) {
     <button type="submit" class="btn btn-primary" id="submit-dropzone" disabled>Submit <span id="submit-spinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display:none"></span></button>
 </form>
 </center>
-<script>
-    // Escaped by |autocomplete_items (see mcritweb/__init__.py) before |tojson turns it
-    // into a JS literal. autocomplete.js renders each suggestion through innerHTML and
-    // into a data-label attribute, so a family name is markup there, not text - and a
-    // family name is chosen by whoever submits or renames a family. |tojson only gets
-    // the value safely into the script; the escaping is what keeps it from executing
-    // once the widget renders it. Known cost, since it is not free: the widget slices
-    // the escaped label, so a lookup landing inside an entity renders it literally.
-    var families_ac = {{ families|autocomplete_items|tojson }};
-    const field = document.getElementById('family');
-        const ac = new Autocomplete(field, {
-            data: families_ac,
-            maximumItems: 5,
-            threshold: 1,
-        });
-</script>
+{% include 'js/ac_family_names.html' %}
 {% endmacro %}
 

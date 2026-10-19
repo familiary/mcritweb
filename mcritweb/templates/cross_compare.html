@@ -2,6 +2,7 @@
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% from 'table/sample_row.html' import sample_header %}
 {% from 'table/row_decoration.html' import row_tint %}
+{% from 'table/table.html' import empty_state %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -144,7 +145,7 @@ function handleSliderChange(val) {
         <td valign="middle">{{ sample.getShortFilename() }}</td>
         <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
         <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
-        <td valign="middle"><a style="color: black;" onclick="deleteSample(this)"><i class="fa-solid fa-xmark"></i></a></td>
+        <td valign="middle"><button type="button" class="btn btn-link p-0 text-dark" aria-label="Remove sample" title="Remove sample" onclick="deleteSample(this)"><i class="fa-solid fa-xmark"></i></button></td>
 
       </tr>
       {% endfor %}
@@ -153,7 +154,7 @@ function handleSliderChange(val) {
   </table>
   {% if not selected_ids %}
   <center>
-  <h4>Selected samples will show here</h4>
+  <h2 class="h4">Selected samples will show here</h2>
   </center>
   {% else %}
   {{ pagination_widget(pagination_selected, _js_argument_provider="fetchState") }}
@@ -180,7 +181,7 @@ function handleSliderChange(val) {
           <td valign="middle">{{ sample.getShortFilename() }}</td>
           <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
           <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
-          <td align="center" valign="middle"><i {% if sample.is_library %} class="fa-solid fa-square-check" {% else %} class="fa-solid fa-times-circle"> {% endif %}</i></td>
+          <td align="center" valign="middle"><i {% if sample.is_library %} class="fa-solid fa-square-check" {% else %} class="fa-solid fa-times-circle" {% endif %}></i></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -191,13 +192,13 @@ function handleSliderChange(val) {
       <div class="col-sm-6 d-inline-flex justify-content-center">
         <div class="col-sm-4 d-inline-flex justify-content-center">
           <input class="form-check-input shadow-none" type="checkbox" name="input_rematch" value="true" id="force_rematch" {% if rematch %}checked{% else %}{% endif %}>
-          <label class="form-check-label" for="flexCheckChecked">
+          <label class="form-check-label" for="force_rematch">
             &nbsp;Force rematch    
           </label>
         </div>
           <div class="col-sm-4 d-inline-flex justify-content-center">
           <input class="form-check-input shadow-none" type="checkbox" name="input_only_selected" value="true" id="only_selected" {% if only_selected %}checked{% else %}{% endif %}>
-          <label class="form-check-label" for="flexCheckChecked">
+          <label class="form-check-label" for="only_selected">
             &nbsp;Compare only selected samples
           </label>
         </div>
@@ -222,7 +223,14 @@ function handleSliderChange(val) {
       {% endif %}
   </center>
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  {# a search box sits directly above this table, so "upload your first sample" is
+     almost never what happened - the collection is full and the term missed. Routed
+     through the shared macro so this picker gets the same wording *and* the same
+     contributor-only link rule as every other table: data.submit is contributor-only,
+     and an empty state that invites a visitor to upload answers 403. Issue #65. #}
+  {{ empty_state("No sample matches \"" ~ query ~ "\"." if query
+                  else "No samples available. Click here to upload your first sample",
+                  none if query else url_for("data.submit")) }}
 {% endif %}
 </div>
 {% endblock %}

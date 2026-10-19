@@ -6,11 +6,48 @@ import sys
 from collections import defaultdict
 
 from mcrit.storage.MatchingResult import MatchingResult
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from mcritweb.views.client import get_client
 
 LOG = logging.getLogger(__name__)
+
+#: Geometry of the stacked diagram. renderStackedDiagram draws one block per
+#: `instruction_block_size` instructions of every matchable function, in three stacked
+#: bands, and derives everything else - including the image size - from that count.
+DIAGRAM_WIDTH = 2400
+NUM_DIAGRAMS = 3
+BLOCK_SIZE = 9
+STACK_INTERVAL = 1
+#: Below this many instructions a function is not matched at all, so it contributes no
+#: blocks. Same threshold _calculateOutputMap sets "is_matchable" by.
+MIN_MATCHABLE_INSTRUCTIONS = 10
+
+
+def count_diagram_blocks(num_instructions_per_function, instruction_block_size=10):
+    """How many blocks renderStackedDiagram lays out for functions of these sizes.
+
+    One block per `instruction_block_size` instructions of every matchable function,
+    plus a separator block between consecutive functions.
+    """
+    blocks_per_function = [round(num_instructions / instruction_block_size) for num_instructions in num_instructions_per_function if num_instructions >= MIN_MATCHABLE_INSTRUCTIONS]
+    return sum(blocks_per_function) + len(blocks_per_function) - 1
+
+
+def stacked_diagram_stack_size(num_blocks):
+    """How many blocks tall each of the three bands is."""
+    return (math.ceil(int(num_blocks / (DIAGRAM_WIDTH / (BLOCK_SIZE + 1))) / STACK_INTERVAL) + 1) * STACK_INTERVAL
+
+
+def stacked_diagram_size(num_blocks):
+    """The (width, height) in pixels renderStackedDiagram produces for `num_blocks`.
+
+    Split out from the renderer so that a page can reserve the box its diagram will
+    land in without rendering it first - the image is fetched separately now, see
+    data.match_diagram_size and issue #68.
+    """
+    stack_size = stacked_diagram_stack_size(num_blocks)
+    return (40 + DIAGRAM_WIDTH, 40 + NUM_DIAGRAMS * stack_size * BLOCK_SIZE + 20 * (NUM_DIAGRAMS - 1))
 
 
 def load_cached_result(result_filepath):
@@ -85,8 +122,10 @@ class MatchReportRenderer:
         client = get_client()
         self.sample_info = self.match_report.reference_sample_entry
         self.sample_infos = {matched_sample.sample_id: matched_sample for matched_sample in self.match_report.getSampleMatches()}
-        if client.isSampleId(self.sample_info.sample_id):
-            self.function_infos = {function_info.function_id: function_info for function_info in client.getFunctionsBySampleId(self.match_report.reference_sample_entry.sample_id)}
+        # None is an unknown id (or a failed request), so this needs no isSampleId first
+        sample_functions = client.getFunctionsBySampleId(self.sample_info.sample_id)
+        if sample_functions is not None:
+            self.function_infos = {function_info.function_id: function_info for function_info in sample_functions}
         else:
             # TODO: find a way to get function_infos
             self.function_infos = {}
@@ -118,14 +157,16 @@ class MatchReportRenderer:
             if lib_mapping:
                 self.function_library_global_map[function_id] = len(set([tup[0] for tup in lib_mapping]))
         # output stats
-        num_matchable_functions = sum([1 for _, function_info in self.function_infos.items() if function_info.num_instructions >= 10])
-        num_matched_functions = len(set([match.function_id for match in self.match_report.function_matches]))
         # `processReport` is on the request path - data.py calls it to draw the match
         # diagram - so this cannot be a print. It stays as a debug record because it is
         # genuinely useful when a diagram comes out wrong, and it is the only place the
-        # matchable/matched counts are computed together.
-        LOG.debug("Sample has %d functions, %d matchable and %d with matches.",
-                  len(self.function_infos), num_matchable_functions, num_matched_functions)
+        # matchable/matched counts are computed together. Both counts walk the whole
+        # report, so only pay for them when the record is actually going to be written.
+        if LOG.isEnabledFor(logging.DEBUG):
+            num_matchable_functions = sum([1 for _, function_info in self.function_infos.items() if function_info.num_instructions >= 10])
+            num_matched_functions = len(set([match.function_id for match in self.match_report.function_matches]))
+            LOG.debug("Sample has %d functions, %d matchable and %d with matches.",
+                      len(self.function_infos), num_matchable_functions, num_matched_functions)
 
     def __init__(self):
         self._function_visualization_width = 1
@@ -176,6 +217,9 @@ class MatchReportRenderer:
         }
         cluster_by_family_id = defaultdict(set)
         this_family_id = self.sample_info.family_id
+        # the reference sample and its family are excluded from every function's clusters
+        own_sample_ids = {self.sample_info.sample_id}
+        own_family_ids = {this_family_id}
         for function_id, function_info in self.function_infos.items():
             family_matches_log_score = 0
             sample_matches_log_score = 0
@@ -183,21 +227,22 @@ class MatchReportRenderer:
             best_target_family_score = 0
             best_target_sample_score = 0
             best_score = 0
-            is_matchable = function_info.num_instructions >= 10
+            is_matchable = function_info.num_instructions >= MIN_MATCHABLE_INSTRUCTIONS
             library_match_class = " "
             num_library_families_matched = 0
             # sample match info
             if function_id in self.function_sample_match_map:
-                reduced_cluster = sorted(list(self.function_sample_match_map[function_id].difference(set([self.sample_info.sample_id]))))
-                sample_matches_log_score = self._calculateLogScore(len(reduced_cluster))
+                sample_matches_log_score = self._calculateLogScore(len(self.function_sample_match_map[function_id] - own_sample_ids))
             # library anf family match info
             if function_id in self.function_family_match_map:
-                reduced_cluster = sorted(list(self.function_family_match_map[function_id].difference(set([this_family_id]))))
+                reduced_cluster = self.function_family_match_map[function_id] - own_family_ids
                 family_matches_log_score = self._calculateLogScore(len(reduced_cluster))
                 library_match_class = " "
                 num_library_families_matched = len(self.function_library_match_map[function_id])
                 library_match_class = match_class_map[min(num_library_families_matched, 2)]
-                for family_id in reduced_cluster:
+                # sorted, because the order families are first seen in breaks ties between
+                # equally large clusters when the top ones are picked below
+                for family_id in sorted(reduced_cluster):
                     cluster_by_family_id[family_id].add(function_id)
             if num_library_families_matched == 0 and function_id in self.function_library_global_map:
                 library_match_class = match_class_map[min(self.function_library_global_map[function_id], 2) + 2]
@@ -312,54 +357,47 @@ class MatchReportRenderer:
         print(output_families)
         print(output_match_class)
 
-    def drawBlock(self, pixels, x1, y1, block_size, color):
-        for x in range(block_size):
-            for y in range(block_size):
-                pixels[x1 + x, y1 + y] = color
+    def drawBlock(self, draw, x1, y1, block_size, color):
+        # PIL fills the square in C rather than one pixel per Python iteration.
+        # ImageDraw's corners are inclusive, hence the -1 on the far ones.
+        draw.rectangle((x1, y1, x1 + block_size - 1, y1 + block_size - 1), fill=color)
 
-    def drawFrame(self, pixels, x1, y1, x2, y2, block_size, color):
-        for xpixel in range(x1 - block_size, x2 + block_size):
-            for ypixel in range(y1 - block_size, y2 + block_size):
-                pixels[xpixel, ypixel] = color
-                if xpixel < x1 or xpixel >= x2 or ypixel < y1 or ypixel >= y2:
-                    pixels[xpixel, ypixel] = color
+    def drawFrame(self, draw, x1, y1, x2, y2, block_size, color):
+        # a solid rectangle grown by block_size on every side: the blocks drawn over it
+        # later, and the one-pixel gaps between their columns, are what leave the border
+        draw.rectangle((x1 - block_size, y1 - block_size, x2 + block_size - 1, y2 + block_size - 1), fill=color)
 
     def drawFamilyLegend(self, image, x, y):
         # TODO we can use this to draw boxes and scores, via ImageDraw.Draw(image).text(...)
         border_color_tuple = (0x22, 0x22, 0x22)
-        pixels = image.load()
-        self.drawBlock(pixels, x, y, 13, border_color_tuple)
-        self.drawBlock(pixels, x + 1, y + 1, 11, self.frequency_color_map[0])
+        draw = ImageDraw.Draw(image)
+        self.drawBlock(draw, x, y, 13, border_color_tuple)
+        self.drawBlock(draw, x + 1, y + 1, 11, self.frequency_color_map[0])
 
     def renderStackedDiagram(self, filtered_family_id=None, filtered_sample_id=None, filtered_function_id=None):
         background_color_tuple = (0xff, 0xff, 0xff)
         border_color_tuple = (0x22, 0x22, 0x22)
         # additional line where top X families or family clusters are highlighted in flavors of the same color?
         output_map = self._calculateOutputMap(filtered_family_id=filtered_family_id, filtered_sample_id=filtered_sample_id, filtered_function_id=filtered_function_id)
-        num_matchable = sum([1 for fid, item in output_map.items() if item["is_matchable"]])
-        num_blocks = sum([item["num_instruction_blocks"] for fid, item in output_map.items() if item["is_matchable"]]) + num_matchable - 1
+        num_blocks = count_diagram_blocks([item["num_instructions"] for item in output_map.values()])
         # determine best fitting multiple of a selected number for stack size.
-        diagram_width = 2400
-        num_diagrams = 3
-        block_size = 9
-        stack_interval = 1
-        stack_size = (math.ceil(int(num_blocks / (diagram_width / (block_size + 1))) / stack_interval) + 1) * stack_interval
+        block_size = BLOCK_SIZE
+        stack_size = stacked_diagram_stack_size(num_blocks)
         num_columns = int(num_blocks / stack_size) if num_blocks % stack_size == 0 else int(num_blocks / stack_size) + 1
         LOG.debug("stack size: %s, num columns: %s", stack_size, num_columns)
-        window_size_x = 40 + diagram_width
-        window_size_y = 40 + num_diagrams * stack_size * block_size + 20 * (num_diagrams - 1)
+        window_size_x, window_size_y = stacked_diagram_size(num_blocks)
 
         image = Image.new("RGB", (window_size_x, window_size_y), background_color_tuple)
-        pixels = image.load()
+        draw = ImageDraw.Draw(image)
         LOG.debug("drawing diagram for %s blocks, with stack size %s in %sx%s pixels.",
                   num_blocks, stack_size, window_size_x, window_size_y)
         diagram_x = 20
         diagram_y = 20
         diagram_2_y = 20 + stack_size * block_size + 20
         diagram_3_y = 20 + stack_size * block_size + 20 + stack_size * block_size + 20
-        self.drawFrame(pixels, diagram_x - 1, diagram_y - 1, diagram_x + num_columns * (block_size + 1), 1 + diagram_y + stack_size * block_size, block_size, border_color_tuple)
-        self.drawFrame(pixels, diagram_x - 1, diagram_2_y - 1, diagram_x + num_columns * (block_size + 1), 1 + diagram_2_y + stack_size * block_size, block_size, border_color_tuple)
-        self.drawFrame(pixels, diagram_x - 1, diagram_3_y - 1, diagram_x + num_columns * (block_size + 1), 1 + diagram_3_y + stack_size * block_size, block_size, border_color_tuple)
+        self.drawFrame(draw, diagram_x - 1, diagram_y - 1, diagram_x + num_columns * (block_size + 1), 1 + diagram_y + stack_size * block_size, block_size, border_color_tuple)
+        self.drawFrame(draw, diagram_x - 1, diagram_2_y - 1, diagram_x + num_columns * (block_size + 1), 1 + diagram_2_y + stack_size * block_size, block_size, border_color_tuple)
+        self.drawFrame(draw, diagram_x - 1, diagram_3_y - 1, diagram_x + num_columns * (block_size + 1), 1 + diagram_3_y + stack_size * block_size, block_size, border_color_tuple)
         block_index = 0
         function_index = 0
         for function_id, function_output in sorted(output_map.items()):
@@ -404,9 +442,9 @@ class MatchReportRenderer:
                     y1 = diagram_y + yindex * block_size
                     y2 = diagram_2_y + yindex * block_size
                     y3 =  diagram_3_y + yindex * block_size
-                    self.drawBlock(pixels, x1, y1, block_size, border_color_tuple)
-                    self.drawBlock(pixels, x1, y2, block_size, border_color_tuple)
-                    self.drawBlock(pixels, x1, y3, block_size, border_color_tuple)
+                    self.drawBlock(draw, x1, y1, block_size, border_color_tuple)
+                    self.drawBlock(draw, x1, y2, block_size, border_color_tuple)
+                    self.drawBlock(draw, x1, y3, block_size, border_color_tuple)
                     block_index += 1
                 for index in range(function_output["num_instruction_blocks"]):
                     xindex = int(block_index / stack_size)
@@ -415,9 +453,9 @@ class MatchReportRenderer:
                     y1 = diagram_y + yindex * block_size
                     y2 = diagram_2_y + yindex * block_size
                     y3 = diagram_3_y + yindex * block_size
-                    self.drawBlock(pixels, x1, y1, block_size, top_color_tuple)
-                    self.drawBlock(pixels, x1, y2, block_size, library_color_tuple)
-                    self.drawBlock(pixels, x1, y3, block_size, bottom_color_tuple)
+                    self.drawBlock(draw, x1, y1, block_size, top_color_tuple)
+                    self.drawBlock(draw, x1, y2, block_size, library_color_tuple)
+                    self.drawBlock(draw, x1, y3, block_size, bottom_color_tuple)
                     block_index += 1
                 function_index += 1
         for _ in range(num_blocks % stack_size):
@@ -425,7 +463,7 @@ class MatchReportRenderer:
             yindex = block_index % stack_size
             x1 = diagram_x + xindex * (block_size + 1)
             y1 = diagram_y + yindex * block_size
-            self.drawBlock(pixels, x1, y1, block_size, border_color_tuple)
+            self.drawBlock(draw, x1, y1, block_size, border_color_tuple)
             block_index += 1
         return image
 

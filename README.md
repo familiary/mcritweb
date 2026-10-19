@@ -9,7 +9,7 @@ MCRITweb has been developed by Daniel Enders, Manuel Blatt, and Daniel Plohmann.
 We highly recommend using the dockerized deployment available at [docker-mcrit](https://github.com/danielplohmann/docker-mcrit).
 
 If you instead want to go for a direct installation, a few dependencies have to be installed.  
-First, ensure that Python 3.11+ is available, then install MCRITweb with its dependencies:
+First, ensure that Python 3.12+ is available, then install MCRITweb with its dependencies:
 ```bash
 # install python, then MCRITweb and its dependencies
 $ sudo apt install python3 python3-pip
@@ -74,6 +74,10 @@ The hop count applies to `X-Forwarded-For` only. `X-Forwarded-Proto` is always r
 
 One rough edge, noted rather than fixed: Werkzeug parses `X-Forwarded-For` as a list header, so a client sending something unparseable - an unterminated quote, say - produces no usable address and MCRITweb falls back to the proxy's. Those attempts are then metered against the proxy. It costs the sender their own attempts and nobody else's, since a well-formed request still resolves to its own address, so the fix would be re-parsing the header in front of Werkzeug for no gain.
 
+
+### Backend timeout
+
+Every call MCRITweb makes to the MCRIT backend is bounded by `MCRIT_CLIENT_TIMEOUT`, a `(connect, read)` pair in seconds that defaults to `(10, 280)`. Without it a backend that is down or hung held a gunicorn request thread indefinitely, since gunicorn's own timeout does not reclaim a thread under the `gthread` worker. The read bound sits under the 300 s that docker-mcrit's NGINX waits, so a slow backend ends in MCRITweb's error page rather than a proxy 504. Raise both together if long synchronous calls - a whole-corpus import or export through the API passthrough - need more, or set the read to `None` in `instance/config.py` to wait indefinitely. It takes effect with an MCRIT release whose `McritClient` supports a timeout; an older one ignores it.
 
 ## Version History
 

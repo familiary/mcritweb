@@ -63,6 +63,7 @@ MUTATING_CLIENT_CALLS = {
     "deleteJob",
     "deleteSample",
     "modifyFamily",
+    "modifyFunction",
     "modifySample",
     "rebuildIndex",
     "recalculateMinHashes",
@@ -117,8 +118,8 @@ ROUTE_POLICY = {
     # --- authenticated, any role including 'pending' -----------------------------
     "authentication.logout": (LOGGED_IN, WRITES_ON_GET),   # session teardown, by design
     "authentication.settings": (LOGGED_IN, READ_ONLY),
-    "admin.change_username": (LOGGED_IN, WRITES_ON_POST),   # GET raises 400 on request.form
-    "admin.change_password": (LOGGED_IN, WRITES_ON_POST),   # GET raises 400 on request.form
+    "admin.change_username": (LOGGED_IN, WRITES_ON_POST),
+    "admin.change_password": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_default_filter": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_column_settings": (LOGGED_IN, WRITES_ON_POST),
     "admin.reset_column_settings": (LOGGED_IN, WRITES_ON_POST),
@@ -126,8 +127,9 @@ ROUTE_POLICY = {
 
     # --- visitor and above -------------------------------------------------------
     "explore.families": (VISITOR, READ_ONLY),
-    # the family type-ahead behind the edit modals (#77). Visitors already read every
-    # family name off explore.families, so this exposes nothing the listing does not.
+    # the family type-ahead behind the edit modals (#77), and since #192 behind the
+    # submit form and the drop overlay too. Visitors already read every family name
+    # off explore.families, so this exposes nothing the listing does not.
     "explore.family_names": (VISITOR, READ_ONLY),
     "explore.family_by_id": (VISITOR, READ_ONLY),
     "explore.samples": (VISITOR, READ_ONLY),
@@ -177,15 +179,19 @@ ROUTE_POLICY = {
     "analyze.query": (VISITOR, WRITES_ON_POST),
     "data.jobs": (VISITOR, READ_ONLY),
     "data.job_by_id": (VISITOR, READ_ONLY),
+    "data.job_status": (VISITOR, READ_ONLY),
     "data.result": (VISITOR, READ_ONLY),
     # writes the report to instance/cache/results on a cache miss, exactly as
     # data.result does, which is local caching rather than a state change
     "data.download_result": (VISITOR, READ_ONLY),
     "data.linkhunt": (VISITOR, READ_ONLY),
     "data.match_functions": (VISITOR, READ_ONLY),
-    # serves instance/cache/diagrams; the <img> tags on the result pages carry the
-    # session cookie, so gating it costs nothing and stops a cached diagram being
-    # fetchable by anyone who knows a job_id
+    # serves instance/cache/diagrams, and since issue #68 renders the diagram when it
+    # is not cached yet - which reads the report and draws it, so the visitor gate now
+    # also keeps that work behind a session rather than only keeping a cached diagram
+    # from being fetchable by anyone who knows a job_id. The <img> tags on the result
+    # pages carry the session cookie, so gating it costs nothing. Still read-only:
+    # what it writes is the local image cache, not the database or the backend.
     "data.diagram_file": (VISITOR, READ_ONLY),
 
     # --- contributor and above ---------------------------------------------------
@@ -201,6 +207,7 @@ ROUTE_POLICY = {
     "data.request_filename_info": (CONTRIBUTOR, READ_ONLY),   # classifies a posted filename
     "data.delete_job_by_id": (CONTRIBUTOR, WRITES_ON_POST),
     "explore.modifyFamily": (CONTRIBUTOR, WRITES_ON_POST),
+    "explore.modifyFunction": (CONTRIBUTOR, WRITES_ON_POST),
     "explore.modifySample": (CONTRIBUTOR, WRITES_ON_POST),
 
     # --- admin only --------------------------------------------------------------
@@ -213,6 +220,9 @@ ROUTE_POLICY = {
     "admin.schedule_rebuild_index": (ADMIN, WRITES_ON_POST),
     "admin.schedule_recalc_minhashes": (ADMIN, WRITES_ON_POST),
     "admin.schedule_recalc_pichashes": (ADMIN, WRITES_ON_POST),
+    "admin.schedule_repair_minhashes": (ADMIN, WRITES_ON_POST),
+    "admin.schedule_recompute_family_stats": (ADMIN, WRITES_ON_POST),
+    "admin.schedule_rebuild_picblockhash_index": (ADMIN, WRITES_ON_POST),
 
     # --- token authenticated -----------------------------------------------------
     # Dispatches an allowlist of ~18 path patterns to the backend. The gate is the

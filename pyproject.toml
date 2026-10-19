@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcritweb"
-version = "1.5.0"
+version = "1.6.0"
 description = "Web frontend for the MinHash-based Code Relationship & Investigation Toolkit (MCRIT)"
 readme = "README.md"
-# inherited, not intrinsic: nothing in mcritweb's own source needs 3.11, but mcrit has
-# declared ">=3.11" since v1.5.0 and the dependency below is >=1.5.3, so no satisfiable
-# mcrit exists any lower. Undeclared, an install on 3.10 fails with a resolver error
+# inherited, not intrinsic: nothing in mcritweb's own source needs 3.12, but mcrit has
+# declared ">=3.12" since v1.10.0 and the dependency below is >=1.12.0, so no satisfiable
+# mcrit exists any lower. Undeclared, an install on 3.11 fails with a resolver error
 # about mcrit that names neither Python nor the version the reader needs (#166).
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
 authors = [
@@ -25,7 +25,6 @@ classifiers = [
     "Framework :: Flask",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
@@ -44,7 +43,7 @@ dependencies = [
     "scipy",
     "fastcluster",
     "networkx",
-    "mcrit>=1.5.3",
+    "mcrit>=1.12.0",
     "levenshtein",
     "markdown",
 ]
@@ -80,7 +79,7 @@ python_files = ["test*.py"]
 
 [tool.ruff]
 # the declared floor - see requires-python above and tests/testPythonFloor.py
-target-version = "py311"
+target-version = "py312"
 line-length = 180
 
 [tool.ruff.lint]

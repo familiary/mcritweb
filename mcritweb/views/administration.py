@@ -1,43 +1,49 @@
 import json
-import re
+import sqlite3
 
 import requests
-from flask import Blueprint, current_app, flash, g, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken
+from mcritweb.db import UserColumnSettings, UserFilters, UserInfo, generate_apitoken
 from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
 from mcritweb.views.client import get_client
+from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
-from mcritweb.views.utility import get_mcritweb_version, get_session_user_id
+from mcritweb.views.utility import forget_server_probe, get_session_user_id, mcrit_server_required
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
-@bp.route('/change_username' , methods=('GET', 'POST'))
+@bp.route('/change_username' , methods=('POST',))
 @login_required
 def change_username():
-    # validate user_id:
-    try:
-        user_id = int(session['user_id'])
-        if user_id < 1:
-            raise ValueError
-    except Exception:
-        return redirect(url_for('index'))
     new_username = request.form['username']
     password = request.form['inputPassword1']
+    # g.user is the caller's row, read fresh for this request by load_logged_in_user
+    user_info = g.user
     error_msg = None
-    user_info = UserInfo.fromDb(user_id=session['user_id'])
-    if re.match(r"^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$", new_username) is None:
+    # cheapest check first, and the password before the lookup, so that whether a
+    # name is taken is only ever answered to someone who proved who they are
+    if not db.is_well_formed_username(new_username):
         error_msg = "Username has invalid format."
-    if  not check_password_hash(user_info.password, password):
+    elif db.is_reserved_username(new_username):
+        error_msg = "Username is reserved."
+    elif not check_password_hash(user_info.password, password):
         error_msg = 'Incorrect Password!'
-    user_with_name = UserInfo.fromDb(username=new_username)
-    if user_with_name is not None:
+    elif UserInfo.fromDb(username=new_username) is not None:
         error_msg = 'Username is already taken!'
     if error_msg is None:
+        old_username = user_info.username
         user_info.username = new_username
-        user_info.saveToDb()
+        try:
+            user_info.saveToDb()
+        except sqlite3.IntegrityError:
+            # the lookup above is not a lock: a registration or another rename can
+            # take the name before this write, and the UNIQUE column refuses it
+            user_info.username = old_username
+            error_msg = 'Username is already taken!'
+    if error_msg is None:
         flash('Username successfully changed', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')
@@ -46,28 +52,24 @@ def change_username():
     return redirect(url_for('authentication.settings'))
 
 
-@bp.route('/change_password' , methods=('GET', 'POST'))
+@bp.route('/change_password' , methods=('POST',))
 @login_required
 def change_password():
-    # validate user_id:
-    try:
-        user_id = int(session['user_id'])
-        if user_id < 1:
-            raise ValueError
-    except Exception:
-        return redirect(url_for('index'))
     new_password = request.form['inputPassword3']
     old_password = request.form['inputPassword2']
+    user_info = g.user
     error_msg = None
-    user_info = UserInfo.fromDb(user_id=session['user_id'])
-    if not check_password_hash(user_info.password, old_password):
-        error_msg = 'Incorrect password!'
     if not new_password == request.form['inputPassword4']:
         error_msg = 'The entered passwords do not match!'
+    elif not check_password_hash(user_info.password, old_password):
+        error_msg = 'Incorrect password!'
     if error_msg is None:
         user_info.password = generate_password_hash(new_password)
-        user_info.saveToDb(withPassword=True)
-        flash('Password successfully changed', category='success')
+        # the token is on /settings, so whoever could read that page with a stolen session
+        # could have copied it; it must not outlast the password change that ends the session
+        user_info.apitoken = generate_apitoken()
+        user_info.saveToDb()
+        flash('Password successfully changed. Your API token was replaced too; anything using the old one has to be updated.', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')
     return redirect(url_for('authentication.settings'))
@@ -168,14 +170,7 @@ def regenerate_apitoken():
     not be replaced at all: deleting the account was the only way to retire one, which
     is not a thing you can ask of someone whose token has leaked. See issue #100.
     """
-    user_id = get_session_user_id()
-    if user_id is None:
-        flash('User ID was not recognized', category='error')
-        return redirect(url_for('index'))
-    user_info = UserInfo.fromDb(user_id=user_id)
-    if user_info is None:
-        flash('User ID was not recognized', category='error')
-        return redirect(url_for('index'))
+    user_info = g.user
     user_info.apitoken = generate_apitoken()
     user_info.saveToDb()
     flash('A new API token was generated. Anything using the old one has to be updated.', category='success')
@@ -187,6 +182,7 @@ def regenerate_apitoken():
 @multi_user
 def users(tab = None):
     g.all_users = get_users()
+    g.users_by_role = group_users_by_role(g.all_users)
     if tab is None:
         return render_template("users.html", active='all')    
     return render_template("users.html", active=tab)
@@ -195,6 +191,16 @@ def users(tab = None):
 def get_users():
     user_infos = db.get_all_user_info()
     return user_infos
+
+
+def group_users_by_role(user_infos):
+    """One list per role in KNOWN_ROLES, each in the order given, for the role tabs of
+    users.html. A user with any other role is only listed under "all" (#95)."""
+    grouped = {role: [] for role in KNOWN_ROLES}
+    for user_info in user_infos:
+        if user_info.role in grouped:
+            grouped[user_info.role].append(user_info)
+    return grouped
 
 
 @bp.route('/change_user_role/<int:user_id>/<role>/<tab>', methods=('POST',))
@@ -260,9 +266,9 @@ def backend_version(client):
 @bp.route('/server')
 @admin_required
 def server():
-    server_info = ServerInfo.fromDb()
+    server_info = db.get_server_info()
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
-    running_server_version = get_mcritweb_version()
+    running_server_version = current_app.config['MCRITWEB_VERSION']
     client = get_client()
     mcrit_version = backend_version(client)
     return render_template('admin_server.html', operation_mode=operation_mode_str, server_info=server_info, running_version=running_server_version, mcrit_version=mcrit_version)
@@ -271,18 +277,24 @@ def server():
 @bp.route('/change_server' , methods=('POST',))
 @admin_required
 def change_server():
-    server_info = ServerInfo.fromDb()
+    server_info = db.get_server_info()
     new_url = request.form.get('mcrit_server_url', '')
     new_token = request.form.get('mcrit_server_token', '')
     if server_info.url != new_url or server_info.server_token != new_token:
         server_info.url = new_url
         server_info.server_token = new_token
         server_info.saveToDb()
+        # an operator who has just corrected the URL or token should not have to wait
+        # out the reachability TTL to find out whether it worked - see issue #89. The
+        # cache is a module global, so this clears the worker that handled this request;
+        # with N gunicorn workers the other N-1 still answer from their own entry until
+        # it lapses, which the default 5s TTL bounds.
+        forget_server_probe()
         flash('Server information successfully changed', category='success')
     else:
         flash('No information needed change', category='success')
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
-    running_server_version = get_mcritweb_version()
+    running_server_version = current_app.config['MCRITWEB_VERSION']
     client = get_client()
     mcrit_version = backend_version(client)
     return render_template('admin_server.html', operation_mode=operation_mode_str, server_info=server_info, running_version=running_server_version, mcrit_version=mcrit_version)
@@ -297,35 +309,80 @@ def reset_server():
         return redirect(url_for('admin.server'))
     client = get_client()
     client.respawn()
+    forget_server_probe()
     from mcritweb.views.utility import ensure_local_data_paths
     ensure_local_data_paths(current_app, clear_data=True)
-    # TODO also clean all locally cached data.
+    # the reset restarts the backend's id counters, so anything memoized by id is stale
+    clear_app_memos(current_app)
     flash('A reset of MCRIT was successfully performed.', category='success')
     return redirect(url_for('index'))
 
 
+def _redirect_to_scheduled_job(job_id, scheduled_message):
+    """Send the admin to the job they just scheduled, or say it was not scheduled.
+
+    A backend that refuses the request - out of workers, or simply older than the route -
+    answers None through McritClient, and url_for then raises a BuildError for the missing
+    job_id: a 500 on the admin page, where a message belongs. One that cannot be reached at
+    all raises instead, which `mcrit_server_required` on each route turns into its usual
+    message before the request is made. testRoutePolicy caught
+    it on the three routes below that mcrit 1.9.0 made possible; the three older ones had the
+    same hole and only ever avoided it because the backend answered.
+    """
+    if job_id is None:
+        flash('The backend did not accept the job, so nothing was scheduled.', category='error')
+        return redirect(url_for('admin.server'))
+    flash(scheduled_message, category='success')
+    return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
+
+
 @bp.route('/schedule_rebuild_index' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_rebuild_index():
     client = get_client()
-    job_id = client.rebuildIndex()
-    flash('A job for rebuilding the MinHash Index has been scheduled.', category='success')
-    return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
+    return _redirect_to_scheduled_job(client.rebuildIndex(), 'A job for rebuilding the MinHash Index has been scheduled.')
 
 
 @bp.route('/schedule_recalc_pichashes' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_recalc_pichashes():
     client = get_client()
-    job_id = client.recalculatePicHashes()
-    flash('A job for recalculating all PicHashes has been scheduled.', category='success')
-    return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
+    return _redirect_to_scheduled_job(client.recalculatePicHashes(), 'A job for recalculating all PicHashes has been scheduled.')
 
 
 @bp.route('/schedule_recalc_minhashes' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_recalc_minhashes():
     client = get_client()
-    job_id = client.recalculateMinHashes()
-    flash('A job for recalculating and indexing all MinHashes has been scheduled.', category='success')
-    return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
+    return _redirect_to_scheduled_job(client.recalculateMinHashes(), 'A job for recalculating and indexing all MinHashes has been scheduled.')
+
+
+# The three below arrived with mcrit 1.9.0. Until now they could only be started against the
+# backend directly, so an operator running MCRITweb had no way to repair a corpus from the
+# interface that told them it needed repairing - /status reports stale minhashes, the family
+# counters and the picblockhash index, and every one of the repairs was out of reach.
+@bp.route('/schedule_repair_minhashes' , methods=('POST',))
+@admin_required
+@mcrit_server_required
+def schedule_repair_minhashes():
+    client = get_client()
+    return _redirect_to_scheduled_job(client.repairMinHashes(), 'A job for repairing the MinHashes of samples hashed by an older smda has been scheduled.')
+
+
+@bp.route('/schedule_recompute_family_stats' , methods=('POST',))
+@admin_required
+@mcrit_server_required
+def schedule_recompute_family_stats():
+    client = get_client()
+    return _redirect_to_scheduled_job(client.recomputeFamilyStats(), 'A job for recomputing the family statistics has been scheduled.')
+
+
+@bp.route('/schedule_rebuild_picblockhash_index' , methods=('POST',))
+@admin_required
+@mcrit_server_required
+def schedule_rebuild_picblockhash_index():
+    client = get_client()
+    return _redirect_to_scheduled_job(client.rebuildPicBlockHashIndex(), 'A job for rebuilding the PicBlockHash index has been scheduled.')

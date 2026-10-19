@@ -1,7 +1,7 @@
 # Function labels cannot be edited from MCRITweb
 
 ---
-status: accepted — blocked upstream, re-check when mcrit exposes a write path
+status: superseded — mcrit 1.10.0 added the write path (`McritClient.modifyFunction`, `PUT /functions/{id}`); MCRITweb uses it since #173
 ---
 
 Issue #72 asks for a way to modify functions — renaming them, or editing their labels —
@@ -47,3 +47,7 @@ follows the shape `modifySample` already uses.
 
 Not yet. Re-check `McritClient`'s `### Functions ###` section on the next dependency
 bump; if it grows a mutating verb, this decision is stale.
+
+**Re-checked for #173:** mcrit 1.10.0 added `McritClient.modifyFunction` and
+`FunctionResource.on_put`, and the backend records each name as a label by the requesting
+user. MCRITweb enables renaming only against a backend that reports 1.10.0 or newer.

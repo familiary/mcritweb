@@ -86,10 +86,13 @@ def wire(monkeypatch):
         sent.urls.append(url)
         return CannedResponse({"status": "successful", "data": "0123456789abcdef01234567"})
 
-    monkeypatch.setattr(
-        "mcrit.client.McritClient.requests", SimpleNamespace(get=_get, post=_post)
-    )
+    fake_requests = SimpleNamespace(get=_get, post=_post)
+    fake_requests.Session = lambda: fake_requests
+    monkeypatch.setattr("mcrit.client.McritClient.requests", fake_requests)
     sent.client = McritClient(mcrit_server=BACKEND)
+    # the client sends through the session it opened in __init__: `requests.Session()`
+    # up to mcrit 1.15.0, a subclass bound to the real `requests` from 1.16.0 on
+    sent.client._session = fake_requests
     return sent
 
 
@@ -145,7 +148,7 @@ def test_the_client_still_leaves_the_query_string_to_us(wire):
     concatenates its query string by hand. If a future mcrit hands requests `params=`
     instead - the durable fix, and one this repository cannot ship - requests would
     encode the already-encoded values a second time and every family would be stored
-    as "R%26D". `pyproject.toml` pins `mcrit>=1.5.3` with no ceiling, so a deployment that
+    as "R%26D". `pyproject.toml` pins `mcrit>=1.12.0` with no ceiling, so a deployment that
     merely pip-upgrades would corrupt metadata quietly. This fails first, and loudly.
 
     Measured against mcrit 1.8.1: a raw '&' reaches the URL untouched, which is only

@@ -2,14 +2,17 @@
     // The names are fetched as they are typed rather than shipped with the page: mcrit
     // answers "all families" with one storage lookup per family, so every listing that
     // carries an edit modal used to pay for the whole family table whether or not
-    // anyone opened one. See issue #77.
+    // anyone opened one. See issue #77. The submit dropzone includes this as well, for
+    // its own family field (#192), so a listing page runs it twice: once for its edit
+    // modals, once for the drop overlay's form.
     (function () {
         const familyNamesUrl = {{ url_for('explore.family_names')|tojson }};
 
         function attachFamilyAutocomplete(field) {
-            if (!field) {
+            if (!field || field.dataset.familyAutocomplete) {
                 return;
             }
+            field.dataset.familyAutocomplete = "attached";
             let pending = null;
             let debounce = null;
             const completer = new Autocomplete(field, {
@@ -37,9 +40,9 @@
                                     return;
                                 }
                                 // already {label, value}, and already escaped: the
-                                // endpoint builds them with the same function behind
-                                // |autocomplete_items, because this widget renders a
-                                // suggestion through innerHTML. See #168.
+                                // endpoint builds them with mcritweb.autocomplete,
+                                // because this widget renders a suggestion through
+                                // innerHTML. See #168.
                                 completer.setData(data.suggestions || []);
                             })
                             // an aborted request, an expired session answering with the
@@ -53,5 +56,6 @@
 
         attachFamilyAutocomplete(document.getElementById('sample_family_name'));
         attachFamilyAutocomplete(document.getElementById('family_new_name'));
+        attachFamilyAutocomplete(document.getElementById('family'));
     })();
 </script>
