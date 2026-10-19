@@ -87,10 +87,12 @@ def wire(monkeypatch):
         return CannedResponse({"status": "successful", "data": "0123456789abcdef01234567"})
 
     fake_requests = SimpleNamespace(get=_get, post=_post)
-    # mcrit 1.15.0's client sends through a `requests.Session()` it opens itself
     fake_requests.Session = lambda: fake_requests
     monkeypatch.setattr("mcrit.client.McritClient.requests", fake_requests)
     sent.client = McritClient(mcrit_server=BACKEND)
+    # the client sends through the session it opened in __init__: `requests.Session()`
+    # up to mcrit 1.15.0, a subclass bound to the real `requests` from 1.16.0 on
+    sent.client._session = fake_requests
     return sent
 
 
