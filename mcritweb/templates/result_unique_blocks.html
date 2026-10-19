@@ -98,7 +98,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
 
 <div class="tab-content" id="pills-tabContent">
   <div class="tab-pane fade {% if active_tab=='stats' %}show active{%endif%}" id="pills-statistics" role="tabpanel" aria-labelledby="pills-statistics-tab">
-    <h3 id="block-statistics">Block Statistics across Samples</h3>
+    <h2 class="h3" id="block-statistics">Block Statistics across Samples</h2>
     <p>
       Characteristic blocks are basic blocks only found in this collection of samples (versus rest of the whole data set), unique blocks are only found in the specific sample.
     </p>
@@ -124,10 +124,10 @@ Unique Blocks for {{ sample_ids|length }} Samples
       </table>
   </div>
   <div class="tab-pane fade {% if active_tab=='blocks' %}show active{%endif%}" id="pills-blocks" role="tabpanel" aria-labelledby="pills-blocks-tab">
-    <h3 id="unique-blocks">Explore Unique Blocks</h3>
+    <h2 class="h3" id="unique-blocks">Explore Unique Blocks</h2>
     <form class="form-inline" action ="{{ url_for('data.result', job_id=job_info.job_id) }}" method='GET'>
         <div class="form-group row">
-          <label class="col-3" for="block_count">Filter blocks to</label>
+          <label class="col-3" for="min_score">Filter blocks to</label>
           {# prefilled, so that the filter is not silently reset by using it twice - the
              rule form below carries these across for the same reason #}
           <input class="col-3" type="text" name='min_score' id="min_score" aria-describedby="min_score" placeholder="min score (0-100)" value="{{ request.args.get('min_score', '') }}">
@@ -168,7 +168,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
       {{ pagination_widget(blkp, _anchor="unique-blocks")}}
   </div>
   <div class="tab-pane fade {% if active_tab=='yara' %}show active{%endif%}" id="pills-yara" role="tabpanel" aria-labelledby="pills-yara-tab">
-    <h3 id="yara">Proposed YARA rule</h3>
+    <h2 class="h3" id="yara">Proposed YARA rule</h2>
     <p>
       The rule is composed from this report every time the page is rendered, so these parameters
       change it without running the analysis again. Instruction and byte bounds decide which blocks
@@ -196,7 +196,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
     {% else %}
     <p>Copy rule to clipboard!&nbsp;<i class="fa-regular fa-copy" onclick="copyElementToClipboard('#yara_text')"></i>
     </p>
-    <textarea style="font-family:monospace; min-width: 100%" id="yara_text" name="yara_text" 
+    <textarea aria-label="YARA rule" style="font-family:monospace; min-width: 100%" id="yara_text" name="yara_text" 
         rows="50">{{yara_rule}}</textarea>
     {% endif %}
   </div>
