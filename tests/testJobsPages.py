@@ -4,7 +4,8 @@
 Both listings build a lookup of the families and samples their jobs name. The
 sample loop has always skipped ids it already holds; the family loop did not, so a
 page of jobs all belonging to one family fetched that family once per job. See
-issue #68.
+issue #68. Since #191 both go through one getFamiliesByIds batch per request, so
+what is checked is that each family is asked for once, in that batch.
 """
 
 import copy
@@ -50,16 +51,24 @@ def calls_to(backend, name):
     return [args for called, args, _kwargs in backend.calls if called == name]
 
 
+def families_asked_for(backend):
+    """Every family id the page asked for, singly or in a batch."""
+    single = [args[0] for args in calls_to(backend, "getFamily")]
+    batched = [family_id for args in calls_to(backend, "getFamiliesByIds") for family_id in args[0]]
+    return single + batched
+
+
 def test_the_jobs_page_asks_for_each_family_once(client, as_role, corpus_mcrit, monkeypatch):
     jobs = unique_blocks_jobs(8, family_ids=[1])
     monkeypatch.setattr(corpus_mcrit, "getQueueData", lambda *args, **kwargs: jobs)
     as_role("visitor")
     corpus_mcrit.calls.clear()
 
-    response = client.get("/data/jobs")
+    # the bare list redirects to the URL naming its tab (#132)
+    response = client.get("/data/jobs", follow_redirects=True)
 
     assert response.status_code == 200
-    assert calls_to(corpus_mcrit, "getFamily") == [(1,)], calls_to(corpus_mcrit, "getFamily")
+    assert families_asked_for(corpus_mcrit) == [1], corpus_mcrit.calls
 
 
 def test_the_jobs_page_still_resolves_every_distinct_family(client, as_role, corpus_mcrit, monkeypatch):
@@ -68,10 +77,10 @@ def test_the_jobs_page_still_resolves_every_distinct_family(client, as_role, cor
     as_role("visitor")
     corpus_mcrit.calls.clear()
 
-    response = client.get("/data/jobs")
+    response = client.get("/data/jobs", follow_redirects=True)
 
     assert response.status_code == 200
-    assert sorted(calls_to(corpus_mcrit, "getFamily")) == [(1,), (2,), (3,)]
+    assert sorted(families_asked_for(corpus_mcrit)) == [1, 2, 3]
 
 
 def test_a_job_page_asks_for_each_child_jobs_family_once(client, as_role, corpus_mcrit, monkeypatch):
@@ -86,13 +95,18 @@ def test_a_job_page_asks_for_each_child_jobs_family_once(client, as_role, corpus
         corpus_mcrit, "getJobData",
         lambda job_id, *args, **kwargs: by_id.get(job_id, parent_job if job_id == parent_job.job_id else None),
     )
+    # the overview reads the children in batches (dependency_jobs)
+    monkeypatch.setattr(
+        corpus_mcrit, "getQueueData",
+        lambda *args, job_ids=None, **kwargs: [by_id[job_id] for job_id in job_ids or [] if job_id in by_id],
+    )
     as_role("visitor")
     corpus_mcrit.calls.clear()
 
     response = client.get(f"/data/jobs/{parent_job.job_id}")
 
     assert response.status_code == 200
-    assert calls_to(corpus_mcrit, "getFamily") == [(1,)], calls_to(corpus_mcrit, "getFamily")
+    assert families_asked_for(corpus_mcrit) == [1], corpus_mcrit.calls
 
 
 def test_a_job_page_still_renders_from_the_captured_queue(client, as_role):

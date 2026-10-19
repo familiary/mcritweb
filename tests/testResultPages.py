@@ -546,8 +546,9 @@ def test_the_sample_filter_looks_the_sample_up_once(client, as_role, widened_cor
     response = client.get(f"/data/result/{job_id_of(report)}?samid={sample_id}")
     assert response.status_code == 200
     assert b"are corrupted" not in response.data and b"Offset B" in response.data
-    # the diagram was drawn on this request, off the reference sample's functions
-    assert any(name == "getFunctionsBySampleId" for name, _, _ in widened_corpus_mcrit.calls)
+    # the diagram is drawn by its own request now (#145), so the page reads no
+    # functions of the reference sample for it
+    assert not any(name == "getFunctionsBySampleId" for name, _, _ in widened_corpus_mcrit.calls)
     assert _sample_lookups(widened_corpus_mcrit) == [("getSampleById", (sample_id,))]
 
 
