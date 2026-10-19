@@ -243,6 +243,27 @@ def test_the_single_graph_route_still_serves_dot(client, as_role):
     assert response.data.startswith(b'digraph "CFG')
 
 
+@pytest.mark.parametrize("path", ["/explore/fetchDotGraph/84", "/explore/fetchCombinedDotGraph/84/943"])
+def test_a_graph_carrying_markup_is_not_served_as_a_page(client, as_role, corpus_mcrit, path):
+    """An API name is copied out of the sample's import table into the dot text, so a
+    sample can name an import `<img src=x onerror=...>`. Served as Flask's default
+    text/html, opening the route as a page ran it; the CFG viewers read it with d3.xhr
+    and do not care about the type."""
+    corpus_mcrit._functions[84].xcfg["apirefs"]["4257248"] = "gdi32.dll!<img src=x onerror=alert(1)>"
+    as_role("visitor")
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert b"<img src=x onerror=alert(1)>" in response.data, "the fixture no longer reaches the graph"
+    assert response.mimetype == "text/plain"
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+
+
+@pytest.mark.parametrize("path", ["/login", "/static/autocomplete.js"])
+def test_every_response_forbids_content_sniffing(client, path):
+    assert client.get(path).headers["X-Content-Type-Options"] == "nosniff"
+
+
 
 # --- the guarantees the review asked for ---------------------------------------------
 
@@ -439,6 +460,31 @@ def test_layer_4_tells_a_jz_from_a_jnz():
     assert (0x10, 0x110) in _escaped_pairs(escaped_a, escaped_b)
     unmatched = {"a": [0x10, 0x20], "b": [0x110, 0x120]}
     assert _levenshtein_pairs(escaped_a, escaped_b, unmatched) == [(0x20, 0x120, 0), (0x10, 0x110, 1)]
+
+
+def test_more_than_223_distinct_instructions_are_compared():
+    """The symbols stopped at chr(0xff), so past 223 distinct unmatched instructions
+    across both functions layer 4 raised and the comparison page answered a 500."""
+    from mcritweb.views.functiondiff import _levenshtein_pairs
+
+    def blocks(base):
+        # 300 one-instruction blocks, each a different instruction; function B has
+        # the same ones at other addresses
+        return {base + i: [(f"op{i}", f"op{i}", "")] for i in range(300)}
+
+    escaped_a, escaped_b = blocks(0x1000), blocks(0x9000)
+    unmatched = {"a": list(escaped_a), "b": list(escaped_b)}
+    pairs = _levenshtein_pairs(escaped_a, escaped_b, unmatched)
+    assert sorted((a, b) for a, b, distance in pairs if distance == 0) == [(0x1000 + i, 0x9000 + i) for i in range(300)]
+
+
+def test_the_symbols_skip_the_surrogates():
+    """rapidfuzz takes any code point, but a surrogate is not a character."""
+    from mcritweb.views.functiondiff import _symbol
+
+    assert _symbol(0) == " "
+    assert _symbol(0xD800 - 0x20 - 1) == chr(0xD7FF)
+    assert _symbol(0xD800 - 0x20) == chr(0xE000)
 
 
 def test_the_cache_does_not_keep_the_function_names(client, as_role, fake_mcrit):

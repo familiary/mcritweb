@@ -56,6 +56,8 @@ def create_app(test_config=None, instance_path=None):
 
     from . import db, manual
     from .csrf import CsrfProtect
+    from .jobnames import job_method_name, job_task
+    from .search_highlighting import get_highlight_terms, split_search_matches
     from .secret_key import INSECURE_DEFAULT, load_or_create_secret_key
     from .views import administration, analyze, api, authentication, data, explore
     from .views.client import get_client, get_family_entries, get_sample_entries, remember_samples
@@ -222,6 +224,23 @@ def create_app(test_config=None, instance_path=None):
     app.config['DROPZONE_ENABLE_CSRF'] = True
     Dropzone(app)
 
+    @app.after_request
+    def no_content_sniffing(response):
+        # nothing we serve relies on the browser guessing a type; without this a
+        # response with a wrong or missing Content-Type can still be read as HTML
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        return response
+
+    @app.after_request
+    def no_framing_by_other_sites(response):
+        # a page of ours inside another site's frame can be dressed up to make a logged-in
+        # user click something they cannot see. SameSite=Lax already keeps the session
+        # cookie out of a cross-site frame in current browsers; these say it outright, the
+        # CSP for browsers that read it and X-Frame-Options for those that do not
+        response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'self'")
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        return response
+
     @app.template_filter('silent')
     def silent(input):
         return ""
@@ -234,12 +253,22 @@ def create_app(test_config=None, instance_path=None):
     def _getattr(obj, attr, default):
         return getattr(obj, attr, default)
 
+    @app.template_filter('job_name')
+    def job_name(method):
+        return job_method_name(method)
+
+    @app.template_filter('job_task')
+    def job_task_filter(job):
+        return job_task(job)
+
     @app.template_filter('date')
     def date(input):
         if isinstance(input, datetime.datetime):
             return input.strftime("%Y-%m-%d")
         elif isinstance(input, str):
             return input[:10]
+        # a sample submitted without a timestamp has none, which would print as "None"
+        return ""
 
     @app.template_filter('time')
     def time(input):
@@ -253,6 +282,13 @@ def create_app(test_config=None, instance_path=None):
     @app.template_global()
     def join_hint_strings(list_of_strings):
         return "\n".join(sorted(list_of_strings))
+
+    # marking the search term in the rows it matched (issue #45). Both hand out plain
+    # strings and never markup - the <mark> element is written by the mark() macro in
+    # templates/table/links.html, so autoescaping still covers the term and the name
+    # it was found in. See mcritweb/search_highlighting.py.
+    app.add_template_filter(get_highlight_terms, 'search_terms')
+    app.add_template_global(split_search_matches, 'split_search_matches')
 
     # a global rather than a template variable: the job table macro is reached from a
     # dozen templates, all of which would otherwise have to pass this through
