@@ -1,4 +1,6 @@
 import functools
+import hashlib
+import hmac
 import os
 import re
 import secrets
@@ -37,6 +39,21 @@ REGISTRATION_SUBMITTED = ('Registration submitted. An administrator has to appro
 #: that collapsing the two login errors was meant to close.
 TOO_MANY_ATTEMPTS = ('Too many failed attempts from this address. Please wait a few minutes '
                      'and try again.')
+
+#: What the second of two simultaneous first registrations is told. The first one set
+#: the instance up, so this one is neither admin nor a pending account: the first-user
+#: form carries no registration token, and the instance may now require one.
+FIRST_USER_TAKEN = ('This instance was set up by another registration a moment ago. No new user was '
+                    'created - please register again.')
+
+
+def registration_token_attempt(username):
+    """The name a wrong registration token is recorded under. A username can never
+    contain ':', so no successful login carries it, and clear_login_failures - which
+    forgets only the failures under the name that just logged in - cannot reset the
+    token budget. Recording it under the typed name let anyone with an account guess
+    tokens without end, by typing their own name and logging in after every nine."""
+    return "register:" + (username or "")
 
 
 def _throttled(username=None):
@@ -189,13 +206,13 @@ def register():
         # by the same counter as /login. Ordinary validation slips - a short username, a
         # password typed twice differently - deliberately do NOT record an attempt: they
         # are not guesses, and counting them would lock people out of their own signup.
-        if _throttled(username):
+        if _throttled(registration_token_attempt(username)):
             error = TOO_MANY_ATTEMPTS
         elif not username:
             error = 'Username is required.'
-        elif re.match(r"^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$", username) is None:
+        elif not db.is_well_formed_username(username):
             error = "Username has wrong format. Must be 3-20 characters, alphanumeric with dots and underscores allowed, but cannot start or end with dots/underscores, nor contain two of them in a row."
-        elif username.lower() in ["guest", "mcritweb", "mcrit", "admin", "root", "system", "test", "demo"]:
+        elif db.is_reserved_username(username):
             error = "Username is reserved."
         elif not password:
             error = 'Password is required.'
@@ -203,7 +220,7 @@ def register():
             error = 'The passwords do not match. No new user was created.'
         elif is_registration_token_required and server_info.registration_token != provided_registration_token:
             error = 'Invalid registration token provided. No new user was created.'
-            db.record_failed_login(request.remote_addr, username)
+            db.record_failed_login(request.remote_addr, registration_token_attempt(username))
         if error is None:
             user_info = UserInfo()
             user_info.username = username
@@ -219,8 +236,20 @@ def register():
                 server_info.server_token = request.form['mcritServerToken'] if request.form['mcritServerToken'] else ""
                 server_info.server_uuid = str(uuid.uuid4())
                 server_info.server_version = current_app.config['MCRITWEB_VERSION']
+                # g.first_user was decided before this view ran, and two registrations can
+                # both get here while the table is empty. Take the write lock and ask again,
+                # so only one of them becomes admin and sets the server settings. The lock
+                # is held until the user row below commits, or until the request ends and
+                # close_db() closes the connection, which discards whatever was not committed.
+                db.get_db().execute("BEGIN IMMEDIATE;")
+                if not db.is_first_user():
+                    # this request still has g.first_user set and would render the setup
+                    # form again; the next one sees the instance as it now is
+                    flash(FIRST_USER_TAKEN, category='error')
+                    return redirect(url_for('authentication.register'))
+            if g.first_user:
                 try:
-                    server_info.saveToDb()
+                    server_info.saveToDb(commit=False)
                 except Exception:
                     # never surface the exception text: /register is unauthenticated and the
                     # message can carry the database path or SQL fragments
@@ -283,13 +312,38 @@ def login():
             session.clear()
             session['user_id'] = user_info.user_id
             user_info.last_login = utc_now()
+            verified_password = user_info.password
             rehashed = _rehash_if_stale(user_info, password)
-            user_info.saveToDb(withPassword=rehashed)
-            db.clear_login_failures(request.remote_addr)
+            # after the rehash, which puts a new hash for the same password in user_info
+            session[PASSWORD_MARK] = password_mark(user_info)
+            user_info.saveLogin(verified_password=verified_password if rehashed else None)
+            db.clear_login_failures(request.remote_addr, username)
             return redirect(url_for('index'))
         db.record_failed_login(request.remote_addr, username)
         flash(error, category='error')
     return render_template('login.html')
+
+
+#: The session key holding `password_mark()` of the password the session logged in with.
+PASSWORD_MARK = 'password_mark'
+
+
+def password_mark(user_info):
+    """A digest of the account's stored password hash, keyed with SECRET_KEY.
+
+    The session is a signed cookie, not a server-side record, so logging out elsewhere
+    cannot reach a copy of it. What can be checked is whether the password it was issued
+    for is still the account's password: the session carries this mark, and a password
+    change makes every mark issued before it stop matching. Keyed, because the cookie is
+    signed but readable, and an unkeyed digest of the hash would be something to test
+    password guesses against. It names the account it was issued for, so a session whose
+    user_id was set without logging in - the test suite does that - is not taken for one
+    whose password changed.
+    """
+    key = current_app.secret_key
+    if isinstance(key, str):
+        key = key.encode()
+    return f"{user_info.user_id}:" + hmac.new(key, user_info.password.encode(), hashlib.sha256).hexdigest()
 
 
 @bp.before_app_request
@@ -299,7 +353,30 @@ def load_logged_in_user():
         g.user = None
     else:
         user_info = UserInfo.fromDb(user_id=user_id)
+        mark = session.get(PASSWORD_MARK)
+        # a session from before marks existed has none, and gets one at the end of this
+        # request; it cannot have had one removed, since the cookie is signed
+        if user_info is not None and isinstance(mark, str) and mark.startswith(f"{user_id}:") \
+                and not hmac.compare_digest(mark, password_mark(user_info)):
+            # the password was changed after this session logged in
+            session.clear()
+            user_info = None
         g.user = user_info
+
+
+@bp.after_app_request
+def mark_the_session_with_the_current_password(response):
+    """Give a session that got this far the mark of the account's current password.
+
+    That covers two cases. A session from before marks existed is marked on its first
+    request, so a later password change ends it too. And a request that changed the
+    account's own password - /admin/change_password - keeps its own session, while every
+    other session of the account still carries the old mark and ends on its next request.
+    """
+    user_info = g.get('user')
+    if user_info is not None and session.get(PASSWORD_MARK) != password_mark(user_info):
+        session[PASSWORD_MARK] = password_mark(user_info)
+    return response
 
 
 def login_required(view):

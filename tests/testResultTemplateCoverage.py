@@ -160,8 +160,11 @@ def test_job_deleted_really_is_unreachable():
 
 def test_a_cross_compare_with_a_bad_custom_order_names_the_job(client, as_role):
     """result_corrupted.html was handed the result dict instead of the Job, so it
-    rendered an empty job id and a "Delete job data" link with nothing in it."""
-    as_role("visitor")
+    rendered an empty job id and a "Delete job data" link with nothing in it.
+
+    As a contributor: the button is only offered to the roles delete_job_by_id admits,
+    since a visitor pressing it would get a 403 (#51)."""
+    as_role("contributor")
     job_id = job_id_of("cross_compare")
 
     page = client.get(f"/data/result/{job_id}?custom=999").get_data(as_text=True)
