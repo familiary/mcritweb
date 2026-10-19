@@ -24,7 +24,6 @@ from fixtureData import CorpusMcritClient, job_id_of, load
 from mcrit.queue.LocalQueue import Job
 
 from mcritweb.views import data
-from mcritweb.views.data import dependency_progress, total_duration
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -233,7 +232,7 @@ def job_with(created_at, finished_at, dependencies=("6a7465f2f8b8d2c6f83664c8",)
     ],
 )
 def test_total_duration_reads_every_timestamp_shape(created_at, finished_at):
-    assert total_duration(job_with(created_at, finished_at)).total_seconds() == pytest.approx(8, abs=1)
+    assert data.total_duration(job_with(created_at, finished_at)).total_seconds() == pytest.approx(8, abs=1)
 
 
 @pytest.mark.parametrize(
@@ -252,13 +251,13 @@ def test_total_duration_of_a_running_job_counts_to_the_backend_s_latest_stamp(cr
     update, 90 seconds in."""
     running_child = Job({"created_at": "2026-08-06T10:46:10.480Z", "started_at": "2026-08-06T10:46:10.565Z",
                          "finished_at": None, "locked_at": {"$date": "2026-08-06T10:47:40.100Z"}}, None)
-    assert str(total_duration(job_with(created_at, None), [running_child])) == "0:01:30"
+    assert str(data.total_duration(job_with(created_at, None), [running_child])) == "0:01:30"
 
 
 def test_a_running_job_without_its_dependencies_has_no_total():
     """The parent's own stamps alone would give the time between its children's
     creation and its own, a few milliseconds."""
-    assert total_duration(job_with("2026-08-06T10:46:10.490Z", None)) is None
+    assert data.total_duration(job_with("2026-08-06T10:46:10.490Z", None)) is None
 
 
 @pytest.mark.parametrize(
@@ -287,7 +286,7 @@ def test_a_running_job_without_its_dependencies_has_no_total():
 )
 def test_total_duration_has_nothing_to_show(job):
     """Every shape that cannot produce a number renders as no row rather than a 500."""
-    assert total_duration(job, []) is None
+    assert data.total_duration(job, []) is None
 
 
 def test_latest_job_timestamp_reads_every_field_and_shape():
@@ -309,31 +308,31 @@ class _Child:
 
 
 def test_dependency_progress_averages_the_children():
-    assert dependency_progress([_Child(0.0), _Child(0.5), _Child(1.0)]) == pytest.approx(0.5)
+    assert data.dependency_progress([_Child(0.0), _Child(0.5), _Child(1.0)]) == pytest.approx(0.5)
 
 
 def test_a_finished_child_counts_as_done_whatever_its_counter_says():
     """A worker that finishes without ticking progress to 1.0 must not hold the parent
     below 100% forever."""
-    assert dependency_progress([_Child(0.0, finished=True)]) == 1.0
+    assert data.dependency_progress([_Child(0.0, finished=True)]) == 1.0
 
 
 def test_a_deleted_dependency_is_skipped_not_counted_as_zero():
     """Counting it as zero would make the number go *backwards* when a dependency is
     cleaned up, which is worse than the 0% this row replaces."""
-    assert dependency_progress([_Child(1.0, finished=True), None]) == 1.0
+    assert data.dependency_progress([_Child(1.0, finished=True), None]) == 1.0
 
 
 def test_no_knowable_children_means_no_number():
-    assert dependency_progress([]) is None
-    assert dependency_progress([None]) is None
-    assert dependency_progress(None) is None
+    assert data.dependency_progress([]) is None
+    assert data.dependency_progress([None]) is None
+    assert data.dependency_progress(None) is None
 
 
 def test_a_counter_outside_zero_to_one_is_clamped():
     """The counter is written by a worker; the row must not render -300% or 4200%."""
-    assert dependency_progress([_Child(5.0)]) == 1.0
-    assert dependency_progress([_Child(-2.0)]) == 0.0
+    assert data.dependency_progress([_Child(5.0)]) == 1.0
+    assert data.dependency_progress([_Child(-2.0)]) == 0.0
 
 
 if __name__ == "__main__":
