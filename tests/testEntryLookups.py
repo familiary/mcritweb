@@ -139,7 +139,10 @@ def test_a_backend_without_the_family_batch_is_asked_per_id_without_sample_lists
     with app.test_request_context():
         families = get_family_entries([1, 2])
 
-    assert families == {1: fake_mcrit._families[1], 2: fake_mcrit._families[2]}
+    # compared by content: the fake answers with_samples=False with a copy that has no
+    # sample list (#147), as the backend does, so it is not the stored entry itself
+    assert {family_id: (entry.family_id, entry.family_name, entry.samples) for family_id, entry in families.items()} == {
+        family_id: (family_id, fake_mcrit._families[family_id].family_name, None) for family_id in (1, 2)}
     singles = [(args[0], kwargs) for called, args, kwargs in fake_mcrit.calls if called == "getFamily"]
     assert singles == [(1, {"with_samples": False}), (2, {"with_samples": False})]
 
