@@ -16,7 +16,7 @@ Results for Job: {{ job_info.job_id }}
 {{ matching_result_job_column_table(job_info) }}
 
 
-<h3>Input Sample</h3>
+<h2 class="h3">Input Sample</h2>
 {{ sample_column_table(("Reference Sample", matching_result.reference_sample_entry)) }}
 
 <p><a href="{{ url_for('data.linkhunt', job_id=job_info.job_id) }}">Go to linkhunt report</a></p>
@@ -24,12 +24,12 @@ Results for Job: {{ job_info.job_id }}
 <p><a href="{{ url_for(request.endpoint, **request.view_args) }}#family-matches">back to all family overview</a></p>
 
 {% if not matching_result.is_query %}
-<h3>MCRIT Diagram</h3>
+<h2 class="h3">MCRIT Diagram</h2>
 <p>Showing: foreign family match frequency, library matches, best foreign family match scores.</p>
-<img src="{{ url_for('data.diagram_file', filename=job_info.job_id + '-funid_%d' % funid + '.png') }}" class="img-fluid" />
+<img src="{{ url_for('data.diagram_file', filename=job_info.job_id + '-funid_%d' % funid + '.png') }}" class="img-fluid" alt="MCRIT match diagram" />
 {% endif %}
 
-<h3 id="function-matches">Matches for Function: {{ funid }}</h3>
+<h2 class="h3" id="function-matches">Matches for Function: {{ funid }}</h2>
 <p>selection: {{ funp.max_value }}, showing: {{ 1 + funp.start_index }} - {{ funp.end_index }} (filtered: {{ matching_result.num_original_function_matches - funp.max_value}})</p>
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#function-matches" method='GET'>
   <div class="form-group row">
@@ -39,7 +39,7 @@ Results for Job: {{ job_info.job_id }}
     <input class="col-3" type="text" name='filter_function_min_score' id="filter_function_min_score" aria-describedby="filter_function_min_score" placeholder="min score (0-100)" {% if matching_result.getFilterValue("filter_function_min_score") is not none %}value={{matching_result.getFilterValue("filter_function_min_score")}}{% endif %}>
     <input class="col-3" type="text" name='filter_function_max_score' id="filter_function_max_score" aria-describedby="filter_function_max_score" placeholder="max score (0-100)" {% if matching_result.getFilterValue("filter_function_max_score") is not none %}value={{matching_result.getFilterValue("filter_function_max_score")}}{% endif %}>
     <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" aria-describedby="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>
-    <label class="col-3" for="block_count">exclude PIC hits</label>
+    <label class="col-3" for="filter_exclude_pic">exclude PIC hits</label>
     <button type="submit" class="btn btn-primary">filter</button>
   </div>
 </form>
@@ -81,13 +81,13 @@ Results for Job: {{ job_info.job_id }}
     <tr style="background-color:#{{ scp.getMatchHexColorFromResult(matched_function, 'matched_score', scale=50) }}">
       {% for column_type in ucs_functions %}
       {% if column_type == "function_id_a" %}
-      <td valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.function_id * -1 if matching_result.is_query else matched_function.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ matched_function.function_id }}</a>&nbsp;<a href="{{ url_for(request.endpoint, funid=matched_function.function_id, samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
+      <td valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.function_id * -1 if matching_result.is_query else matched_function.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ matched_function.function_id }}</a>&nbsp;<a aria-label="Filter by this function" title="Filter by this function" href="{{ url_for(request.endpoint, funid=matched_function.function_id, samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
       {% elif column_type == "offset_a" %}
       <td style="text-align: right;" valign="middle">0x{{ "%x"|format(matched_function.offset) }}</td>
       {% elif column_type == "offset_b" %}
       <td style="text-align: right;" valign="middle">0x{{ "%x"|format(matched_function.matched_offset) }}</td>
       {% elif column_type == "function_id_b" %}
-      <td style="text-align: right;" valign="middle"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.matched_function_id) }}">{{ matched_function.matched_function_id }}</a>{% if not matching_result.is_query %}&nbsp;<a target="_blank" href="{{ url_for('data.match_functions', function_id_a=matched_function.function_id, function_id_b=matched_function.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>{% endif %}</td>
+      <td style="text-align: right;" valign="middle"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.matched_function_id) }}">{{ matched_function.matched_function_id }}</a>{% if not matching_result.is_query %}&nbsp;<a aria-label="Compare the two functions" title="Compare the two functions" target="_blank" href="{{ url_for('data.match_functions', function_id_a=matched_function.function_id, function_id_b=matched_function.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>{% endif %}</td>
       {% elif column_type == "family_name_b" %}
       <td style="text-align: right;" valign="middle">{{ format_family_name(matching_result.getFamilyNameByFamilyId(matched_function.matched_family_id), matched_function.matched_family_id) }}</td>
       {% elif column_type == "sample_id_b" %}
@@ -111,7 +111,7 @@ Results for Job: {{ job_info.job_id }}
 
   {{ pagination_widget(funp, _anchor="function-matches")}}
 
-<h3>Matching Method Statistics </h3>
+<h2 class="h3">Matching Method Statistics </h2>
 {{ matching_statistics_table(matching_result.match_aggregation) }}
 
 {% endblock %}
