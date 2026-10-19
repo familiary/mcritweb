@@ -245,8 +245,13 @@ def cross_compare():
     is_forcing_rematch = True if request.args.get('rematch', 'false').lower() == "true" else False
     is_only_selected = True if request.args.get('onlySelected', 'false').lower() == "true" else False
 
-    cached_list = [int(x) for x in cached.split(',') if x!='']
-    selected_list = [int(x) for x in selected.split(',') if x != '']
+    try:
+        cached_list = [int(x) for x in cached.split(',') if x!='']
+        selected_list = [int(x) for x in selected.split(',') if x != '']
+    except ValueError:
+        # a URL edited by hand; start_cross_compare answers the same list the same way
+        flash('The samples to cross compare were not a list of sample ids.', category='error')
+        cached_list, selected_list = [], []
 
     query = request.args.get('query', "")
     samples = []
@@ -454,12 +459,28 @@ def compare_vs(sample_id_a, sample_id_b):
     job_id = client.requestMatchesForSampleVs(sample_id_a, sample_id_b, force_recalculation=rematch, band_matches_required=minhash_band_range)
     return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
 
+#: What a query upload may declare beyond the role's cap on the file itself: the other
+#: form fields and the multipart boundaries and headers. The dropzone's fields come to
+#: about 1.5 KB; the rest leaves room for long values typed into its free-text fields.
+QUERY_FORM_ALLOWANCE = 64 * 2**10
+
+
 @bp.route('/query',methods=('GET', 'POST'))
 @visitor_required
 @mcrit_server_required
 def query():
     client = get_client()
     if request.method == 'POST':
+        role_limit = current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.user.role)
+        # touching request.files reads and parses the whole body, up to the app-wide
+        # MAX_CONTENT_LENGTH, so an upload over this role's cap is refused before that.
+        # The declared length covers the form fields and multipart boundaries as well as
+        # the file, hence the allowance; the exact cap is checked on the file below. A body
+        # that declares no length could only be measured by reading it, and browsers
+        # always declare one for a form upload.
+        if role_limit is not None and (request.content_length is None or request.content_length > role_limit + QUERY_FORM_ALLOWANCE):
+            flash(f'Your account may only upload files for query that are up to {role_limit} bytes in size.', category='error')
+            return "", 403
         f = request.files.get('file')
         if f is None:
             flash("Please upload a file", category='error')
@@ -478,7 +499,6 @@ def query():
                 return "", 400 # Bad Request
 
         binary_content = f.read()
-        role_limit = current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.user.role)
         if role_limit is not None and len(binary_content) > role_limit:
             flash(f'Your account may only upload files for query that are up to {role_limit} bytes in size.', category='error')
             return "", 403 # Bad Request
