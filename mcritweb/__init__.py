@@ -87,7 +87,6 @@ def create_app(test_config=None, instance_path=None):
     # drag the entire application stack (mcrit, smda, numpy, PIL, networkx) into every
     # import - including a test that only wants a pure-python helper. See issue #88.
     from flask_dropzone import Dropzone
-    from mcrit.storage.SampleEntry import SampleEntry
 
     from . import db, manual
     from .csrf import CsrfProtect
@@ -98,6 +97,7 @@ def create_app(test_config=None, instance_path=None):
     from .views.client import get_client, get_family_entries, get_sample_entries, remember_samples
     from .views.matching_statistics import matching_statistics
     from .views.params import get_minhash_matching_label
+    from .views.search import search_page
     from .views.utility import (
         describable_jobs,
         ensure_local_data_paths,
@@ -392,10 +392,9 @@ def create_app(test_config=None, instance_path=None):
             # already the bounded way to ask: one query, sorted by the sample_id index and
             # cut at five. Asked before the job rows are filled, since a sample that was
             # just submitted is often the one that was just matched.
-            sample_results = client.search_samples("", is_ascending=False, cursor=None, sort_by="sample_id", limit=5)
+            sample_results = search_page(client, "samples", "", is_ascending=False, cursor=None, sort_by="sample_id", limit=5)
             if sample_results:
-                for sample_dict in sample_results['search_results'].values():
-                    latest_samples.append(SampleEntry.fromDict(sample_dict))
+                latest_samples = sample_results.entries
             remember_samples(latest_samples)
             # One job among the five newest finished matches that cannot supply these
             # took the index down for every logged-in user - this is the page they all
