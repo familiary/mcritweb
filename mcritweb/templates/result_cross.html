@@ -31,7 +31,7 @@
 
     {% for sample in samples %}
       {% set outer_loop = loop %}
-      <tr class="sample-row" style="border: 0px solid black; line-height: 0.7em;">
+      <tr class="sample-row" style="border: 0px solid black; line-height: 0.7em;" data-hint-sample="{{ sample.sample_id }}: {{sample.sha256[:8]}} -- {{ sample.family }} {{ sample.version }} -- ({{sample.statistics['num_functions']}} func)">
         <td class="result clickable" style="display: none;">{{ sample_to_job_id[sample.sample_id|string] }}</td>
         <td class="sha256" style="font-size: 13px; min-width: 100px;">{{ format_sha_short_clipboard(sample.sha256) }}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.family}}</td>
@@ -40,12 +40,9 @@
         <td class="id clickable" style="padding: 0 5px; font-size: 13px;color: black">{{ sample.sample_id }}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.bitness}}</td>
         <td class="" style="padding: 0 5px; font-size: 13px;color: black">{{sample.statistics['num_functions']}}</td>
-      {# a pane filled in the browser rewrites the first line of data-hint, see the script at the end #}
+      {# a pane filled in the browser writes its own score line into data-hint, see the script at the end #}
       {% for sample2 in samples %}
-        <td><span onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}'";" class="hint--top" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) &#10;
-            {{ sample.sample_id }}: {{sample.sha256[:8]}} -- {{ sample.family }} {{ sample.version }} -- ({{sample.statistics['num_functions']}} func)
-            &#10;vs.&#10;
-            {{ sample2.sample_id }}: {{sample2.sha256[:8]}} -- {{ sample2.family }} {{ sample2.version }} -- ({{sample2.statistics['num_functions']}} func)" 
+        <td><span onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}'";" class="hint--top" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
             style="background-color: #{{ score_to_color(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }}; width: 25px; height: 25px; "></span>
         </td>
       {% endfor %}
@@ -83,6 +80,26 @@ Results for Job: {{ job_info.job_id }}
     window.location.href="/data/result/"+result+"?custom="+array2;
 
   }
+</script>
+<script>
+  // A matrix cell's tooltip names both of its samples. That part is the same along a whole
+  // row and down a whole column, so it is no longer written into every cell of every matrix
+  // (issue #198): a cell carries its score line, a row the line naming its sample, and the
+  // two are put together when the pointer first reaches the cell. The cell's own row names
+  // the first sample and the row at the cell's column the second - rows and columns come in
+  // the same order. hint.css shows the text as it is (white-space: pre), so the line breaks
+  // and indentation are the ones the template used to write into the attribute.
+  $(document).on("mouseover", "#pills-tabContent tr.sample-row span[data-hint]", function(){
+    var hint = this.getAttribute("data-hint");
+    if (hint.indexOf("\n") >= 0) {
+      return;
+    }
+    var row = this.closest("tr");
+    var sampleRows = this.closest("table").querySelectorAll("tr.sample-row");
+    var column = sampleRows[this.parentNode.cellIndex - (row.cells.length - sampleRows.length)];
+    var indent = "\n            ";
+    this.setAttribute("data-hint", hint + "\n" + indent + row.getAttribute("data-hint-sample") + indent + "\nvs.\n" + indent + column.getAttribute("data-hint-sample"));
+  });
 </script>
 {% endblock %} 
 {% block content %}
@@ -275,9 +292,9 @@ Results for Job: {{ job_info.job_id }}
         data.order.forEach(function(otherId, j){
           var cell = row.appendChild(sourceCells[numLeading + sourceIndex[otherId]].cloneNode(true));
           var span = cell.querySelector("span[data-hint]");
-          var hint = span.getAttribute("data-hint");
-          // the first line of the hint, as cross_table writes it
-          span.setAttribute("data-hint", "MCRIT: " + data.percent[i][j].toFixed(2) + "% (" + data.matches[i][j] + " matches) " + hint.slice(hint.indexOf("\n")));
+          // the score line, all of the hint cross_table writes - the samples' part is added
+          // on hover, from the rows, which are cloned with the line naming their sample
+          span.setAttribute("data-hint", "MCRIT: " + data.percent[i][j].toFixed(2) + "% (" + data.matches[i][j] + " matches) ");
           span.style.backgroundColor = "#" + lazy.palette[data.color[i][j]];
         });
         row.querySelector("a[data-bs-target='#editSampleModal']").id = method + "_sample_" + sampleId + "_edit";

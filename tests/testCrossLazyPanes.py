@@ -223,6 +223,5 @@ def test_the_rendered_matrix_has_the_shape_the_script_clones_from(client, as_rol
         assert all(cell["hint"] is None for cell in row["cells"][:num_leading])
         assert sum(cell["edit"] for cell in row["cells"][:num_leading]) == 1
         for col_id, cell in zip(order, row["cells"][num_leading:]):
-            # the script replaces the hint up to its first newline and keeps the rest
-            first_line = cell["hint"][:cell["hint"].index("\n")]
-            assert first_line == "MCRIT: %.2f%% (%d matches) " % (percent[row_id][col_id], matches[row_id][col_id])
+            # the script replaces the hint, which is the score line alone (issue #198)
+            assert cell["hint"] == "MCRIT: %.2f%% (%d matches) " % (percent[row_id][col_id], matches[row_id][col_id])
