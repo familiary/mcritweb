@@ -40,10 +40,10 @@ def live_search_forms(page):
 # substring, so it finds nothing for the `sample_id:` and `family_id:` queries these two
 # pages compose, and they show their empty tables
 @pytest.mark.parametrize("url, region, rows", [
-    (f"/explore/samples/{SAMPLE_ID}", "sample-functions", "No functions available"),
+    (f"/explore/samples/{SAMPLE_ID}", "sample-functions", "This sample has no functions on record."),
     ("/explore/samples", "sample-list", 'id="sample-table"'),
     ("/explore/families", "family-list", 'id="family-table"'),
-    ("/explore/families/3", "family-samples", "No samples available"),
+    ("/explore/families/3", "family-samples", "This family has no samples."),
 ])
 def test_the_cheap_searches_filter_as_they_are_typed(client, as_role, url, region, rows):
     as_role("visitor")

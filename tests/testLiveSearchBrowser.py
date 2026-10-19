@@ -93,6 +93,18 @@ def test_the_sample_list_follows_the_typed_term_without_a_page_load(page, live_s
     assert page.locator("#sample-list-status").inner_text() == f"{len(narrowed)} rows on this page"
 
 
+def test_the_rows_a_search_swaps_in_mark_the_term(page, live_server):
+    """The marks come with the page the search fetches, inside the region it swaps."""
+    open_page(page, f"{live_server}/explore/samples")
+    assert page.locator("#sample-list mark").count() == 0
+
+    type_term(page, "dridex")
+
+    marks = page.locator("#sample-list tr.sample-row mark").all_inner_texts()
+    assert marks and all(text.lower() == "dridex" for text in marks)
+    assert page.evaluate("window.loadedOnce") is True
+
+
 def test_an_answer_for_a_term_no_longer_typed_is_not_shown(page, live_server):
     """Typed, then put back to what is on screen while the answer was on its way."""
     open_page(page, f"{live_server}/explore/samples")
