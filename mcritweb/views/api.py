@@ -84,6 +84,10 @@ def handle_raw_response(response):
 @mcrit_server_required
 def api_router(api_path):
     api_path = api_path.rstrip("/")
+    # PUT is routed here for modifyFunction only; every other branch below reads or
+    # submits and ignores the method, so a PUT to it would be answered as a GET
+    if request.method == "PUT" and not re.match(r"functions/\d+$", api_path):
+        abort(405)
     if requires_contributor(api_path, request.method) and g.api_user.role not in ('contributor', 'admin'):
         abort(403)
     username = get_username(request)
