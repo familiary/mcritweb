@@ -20,7 +20,7 @@ import re
 import unittest
 
 import pytest
-from fixtureData import job_id_of
+from fixtureData import job_id_of, load
 from mcrit.storage.MatchingResult import MatchingResult
 from PIL import Image
 
@@ -241,6 +241,27 @@ def test_a_filter_the_page_would_have_rejected_draws_nothing(client, as_role, ap
     diagrams of families and samples that do not exist."""
     as_role("visitor")
     response = client.get(f"/data/diagrams/{job_id_of('matches_for_sample')}{suffix}.png")
+
+    assert response.status_code == 404
+    assert cached_diagrams(app) == []
+
+
+@pytest.mark.parametrize("kind", ["famid", "samid"])
+def test_an_existing_family_or_sample_the_report_did_not_match_draws_nothing(client, as_role, app, corpus_mcrit, kind):
+    """Existing is not enough: every job would otherwise render one diagram per family
+    and per sample in the corpus, each one GET, into a cache nothing bounds. The page
+    only links filters for what the report matched, so that is what the route renders."""
+    report = MatchingResult.fromDict(load("matches_for_sample.result"))
+    if kind == "famid":
+        matched = {sample_match.family_id for sample_match in report.sample_matches}
+        unmatched = sorted(set(corpus_mcrit._families) - matched)
+    else:
+        matched = {sample_match.sample_id for sample_match in report.sample_matches}
+        unmatched = sorted(set(corpus_mcrit._samples) - matched)
+    assert unmatched, "the corpus holds nothing the report did not match"
+    as_role("visitor")
+
+    response = client.get(f"/data/diagrams/{job_id_of('matches_for_sample')}-{kind}_{unmatched[0]}.png")
 
     assert response.status_code == 404
     assert cached_diagrams(app) == []

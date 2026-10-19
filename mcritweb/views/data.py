@@ -361,19 +361,20 @@ def render_missing_match_diagram(app, filename_match):
     filter_kind = filename_match.group("filter_kind")
     filter_id = int(filename_match.group("filter_id")) if filter_kind else None
     client = get_client()
-    # the result page only ever linked to a diagram for a filter it had checked -
-    # keep that, so a hand-written URL cannot fill the cache with diagrams of
-    # families and samples that do not exist
-    if filter_kind == "famid" and not client.isFamilyId(filter_id):
-        return
-    if filter_kind == "samid" and not client.isSampleId(filter_id):
-        return
     result_json = load_cached_result(app, job_id)
     if not result_json:
         result_json = client.getResultForJob(job_id)
     if not isinstance(result_json, dict) or not result_json:
         return
     matching_result = MatchingResult.fromDict(result_json)
+    # only a family or sample this report matched, which is every filter the result
+    # page offers a link for - so a hand-written URL cannot fill the unbounded diagram
+    # cache with one render per family or sample in the corpus for each job. The
+    # report answers it without the isFamilyId/isSampleId round trips this replaced.
+    if filter_kind == "famid" and filter_id not in {sample_match.family_id for sample_match in matching_result.sample_matches}:
+        return
+    if filter_kind == "samid" and filter_id not in {sample_match.sample_id for sample_match in matching_result.sample_matches}:
+        return
     # the same for a function id, which the report can answer by itself. A query
     # report additionally has no stored functions to lay a diagram out over, so the
     # function-filtered variant was never generated for one and still is not
