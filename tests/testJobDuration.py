@@ -174,7 +174,7 @@ class TestWhileTheDependenciesAreStillRunning:
         as_role("visitor")
         page = client.get(f"/data/jobs/{job_id_of('cross_compare')}").data.decode()
 
-        assert re.search(r'<td valign="middle" data-progress-of="dependencies">\s*100\.00%', page)
+        assert re.search(r'<td valign="middle"[^>]* data-progress-of="dependencies">\s*100\.00%', page)
 
     def test_the_in_progress_page_reports_it_too(self, client, as_role, server_clock):
         """`/data/result` of an unfinished job renders job_in_progress.html, which

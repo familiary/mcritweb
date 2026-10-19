@@ -201,7 +201,7 @@
 
 
 
-{% macro job_column_table(job_info, show_created=True, show_started=True, show_finished=True, show_progress=False, show_duration=True, child_progress=None, child_jobs=None) %}
+{% macro job_column_table(job_info, show_created=True, show_started=True, show_finished=True, show_progress=False, show_duration=True, child_progress=None, child_jobs=None, progress_id=None) %}
   <table class="table table-hover">
     <tbody>
       <tr>
@@ -325,7 +325,7 @@
           <td valign="middle">Progress: </td>
           {# the flag tells a script that updates this cell from the job's own
              progress that the number here is the dependencies' #}
-          <td valign="middle"{% if child_progress is not none and not job_info.finished_at %} data-progress-of="dependencies"{% endif %}>
+          <td valign="middle"{% if progress_id %} id="{{ progress_id }}"{% endif %}{% if child_progress is not none and not job_info.finished_at %} data-progress-of="dependencies"{% endif %}>
             {% if job_info.finished_at %}
               <a href="{{ url_for('data.result', job_id=job_info.job_id ) }}">Results available</a>
             {% else %}

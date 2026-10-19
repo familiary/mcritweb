@@ -17,7 +17,16 @@
    to resolve, which of them may be deleted, how to word the count. #}
 {% macro job_description(job, families_by_id, samples_by_id) %}
 
-{% if job.method == "getMatchesForSample" %}
+{# Every branch below rebuilds something from the job's payload - the sample ids, the
+   family, the hash, the argument list - so this has to come first: for a job whose
+   payload cannot supply them there is nothing to describe, and reaching for it would
+   take down the whole listing rather than this one row. The method is a plain
+   dictionary read and is safe to name. The rest of the row - number, timestamps,
+   progress, the job id it links to - does not touch the payload and still renders. #}
+{% if not job_is_describable(job) %}
+  <span class="text-muted" title="This job's stored request cannot be read back, so there is nothing to show about it.">{{ job.method or "Job" }} | details unavailable</span>
+
+{% elif job.method == "getMatchesForSample" %}
   {% set sample_entry = samples_by_id.get(job.sample_id) %}
   {{ job.method|job_name }} | 
   {% if sample_entry %}
@@ -65,15 +74,13 @@
           {# Check if family_id exists before grouping #}
           {% if sample_entry.family_id is not none %}
               {# Create a dictionary to group sample_ids by family_id #}
-              {% set _ = grouped_samples.update({sample_entry.family_id: (grouped_samples.get(sample_entry.family_id, []) + [target_sample_id|int])}) %}
+              {% set _ = grouped_samples.setdefault(sample_entry.family_id, []).append(target_sample_id|int) %}
           {% endif %}
       {% endif %}
   {% endfor %}
   {# Print the grouped samples #}
   {% for family_id, sample_ids in grouped_samples.items() %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(samples_by_id[sample_ids[0]].family, family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> 
-    {% for family_id, sample_ids in grouped_samples.items() %}
-    {% endfor %}
     {{ sample_ids|join(', ') }}<br />
   {% endfor %}
 
@@ -138,6 +145,15 @@
 {% elif job.method == "recalculateMinHashes" %}
   {{ job.method|job_name }}
 
+{% elif job.method == "repairMinHashes" %}
+  {{ job.method|job_name }}
+
+{% elif job.method == "recomputeFamilyStats" %}
+  {{ job.method|job_name }}
+
+{% elif job.method == "rebuildPicBlockHashIndex" %}
+  {{ job.method|job_name }}
+
 {% elif job.method == "addBinarySample" %}
   {{ job.method|job_name }} | <i class="fa-solid fa-bug " title="Family ID"></i> {{ job.family }}<br />
   {{ format_monospace(job.sha256[:8]) }} | {{ job.filename }}
@@ -178,12 +194,17 @@
 {% endmacro %}
 
 
-{% macro job_header(families_by_id, samples_by_id) %}
+{% macro job_header(families_by_id, samples_by_id, order_toggle=None, order_ascending=False) %}
   {# accept but discard additional kwargs - see _table_base in table.html, which
      forwards the caller's kwargs to the header as well as to the row macro #}
   {% if False %}{{ kwargs }}{% endif %}
   <tr>
-    <th scope="col">#</th>
+    {% if order_toggle %}
+      {# job number is the one order mcrit can apply to a whole queue - see data.jobs() #}
+      <th scope="col"><a href="{{ order_toggle }}" title="Order the whole queue by job number">#</a>&nbsp;<i class="fa fa-sort-{{ 'up' if order_ascending else 'down' }}"></i></th>
+    {% else %}
+      <th scope="col">#</th>
+    {% endif %}
     <th scope="col">Type</th>
     <th scope="col">User</th>
     <th style="text-align: right;" scope="col">Started</th>
