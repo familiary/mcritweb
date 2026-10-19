@@ -1,6 +1,6 @@
 """Renaming a function from its page (fkie-cad/mcritweb#72).
 
-The route posts to McritClient.modifyFunction, which mcrit gained after 1.8.1; against
+The route posts to McritClient.modifyFunction, which mcrit gained in 1.10.0; against
 an older backend the button is disabled and the route refuses with a flash instead of
 an AttributeError.
 """
@@ -11,8 +11,9 @@ from testFunctionPages import MULTI_BLOCK_FUNCTION
 @pytest.fixture
 def fake_mcrit(corpus_mcrit):
     # the captured corpus answers the version of the backend it was captured from;
-    # renaming needs the release after 1.8.1, so the fake reports one
-    corpus_mcrit.getVersion = lambda *args, **kwargs: "1.9.0"
+    # renaming needs mcrit 1.10.0, so the fake reports it - in the dict shape the real
+    # McritClient.getVersion answers with
+    corpus_mcrit.getVersion = lambda *args, **kwargs: {"version": "1.10.0"}
     return corpus_mcrit
 
 
@@ -85,10 +86,10 @@ class _OlderBackend:
 
 def test_an_older_server_behind_a_new_client_disables_the_button(client, as_role, fake_mcrit, app):
     # the installed McritClient has modifyFunction, the server it talks to does not serve it
-    fake_mcrit.getVersion = lambda *args, **kwargs: "1.8.1"
+    fake_mcrit.getVersion = lambda *args, **kwargs: {"version": "1.9.0"}
     as_role("contributor")
     page = client.get(f"/explore/functions/{MULTI_BLOCK_FUNCTION}").data.decode()
-    assert "needs an MCRIT backend newer than 1.8.1" in page
+    assert "needs an MCRIT backend of version 1.10.0 or newer" in page
     response = client.post("/explore/modifyFunction", data={"function_id": MULTI_BLOCK_FUNCTION, "function_name": "x"}, follow_redirects=True)
     assert "cannot rename functions" in response.data.decode()
     assert not _calls(fake_mcrit, "modifyFunction")
@@ -98,8 +99,32 @@ def test_an_older_backend_disables_the_button_and_refuses_the_post(client, as_ro
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: _OlderBackend(fake_mcrit)
     as_role("contributor")
     page = client.get(f"/explore/functions/{MULTI_BLOCK_FUNCTION}").data.decode()
-    assert "needs an MCRIT backend newer than 1.8.1" in page
+    assert "needs an MCRIT backend of version 1.10.0 or newer" in page
     response = client.post("/explore/modifyFunction", data={"function_id": MULTI_BLOCK_FUNCTION, "function_name": "x"}, follow_redirects=True)
     assert response.status_code == 200
     assert "cannot rename functions" in response.data.decode()
     assert not _calls(fake_mcrit, "modifyFunction")
+
+
+def test_the_version_gate_reads_the_backend_answer_shape():
+    """McritClient.getVersion answers `{"version": ...}`. The gate used to parse the
+    dict's repr, found no version in it, and disabled renaming on every real backend
+    while the tests, stubbing a bare string, passed."""
+    from mcritweb.views.explore import can_modify_functions
+
+    class Client:
+        def __init__(self, answer):
+            self.answer = answer
+
+        def modifyFunction(self, *args):
+            pass
+
+        def getVersion(self):
+            return self.answer
+
+    assert can_modify_functions(Client({"version": "1.10.0"}))
+    assert can_modify_functions(Client({"version": "1.16.0"}))
+    assert can_modify_functions(Client("1.10.0"))
+    assert not can_modify_functions(Client({"version": "1.9.2"}))
+    assert not can_modify_functions(Client(None))
+    assert not can_modify_functions(Client({}))

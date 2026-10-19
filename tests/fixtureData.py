@@ -309,7 +309,7 @@ class CorpusMcritClient:
         return int(function_id) in self._functions
 
     def modifyFunction(self, function_id, function_name, *args, **kwargs):
-        # McritClient.modifyFunction (mcrit > 1.8.1): the backend sets the name and records
+        # McritClient.modifyFunction (mcrit >= 1.10.0): the backend sets the name and records
         # it as a label by the requesting user
         self._record("modifyFunction", function_id, function_name, *args, **kwargs)
         function_entry = self._functions.get(int(function_id))

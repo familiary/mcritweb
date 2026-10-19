@@ -146,7 +146,7 @@ The page is organized in collapsible sections:
 
 The buttons in the top right corner open the analyze menu, lead to the function's sample and family, rename the function, show the API usage and jump to the CFG.
 
-Contributors can rename a function; the MCRIT backend records every name as a label by the user who set it, so the *Function Labels* row keeps who named the function when (this needs an MCRIT backend newer than 1.8.1, which MCRITweb checks through the backend's version, otherwise the button is disabled).
+Contributors can rename a function; the MCRIT backend records every name as a label by the user who set it, so the *Function Labels* row keeps who named the function when (this needs an MCRIT backend of version 1.10.0 or newer, which MCRITweb checks through the backend's version, otherwise the button is disabled).
 The same operation is available to API tokens with the contributor role as `PUT /api/functions/<function_id>` with a `function_name` field:
 
 ![Renaming a function](images/function_rename.png "Renaming a function")
