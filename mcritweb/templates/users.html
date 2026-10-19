@@ -35,8 +35,7 @@ Users
         </tr>
       </thead>
       <tbody>
-        {% for user in g.all_users %}
-        {% if user.role == 'pending' %}
+        {% for user in g.users_by_role['pending'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
           <td valign="middle">{{ user.username }}</td>
@@ -55,7 +54,6 @@ Users
           </div>
         </td>
         </tr>
-        {% endif %}
         {% endfor %}
       </tbody>
     </table>
@@ -73,8 +71,7 @@ Users
         </tr>
       </thead>
       <tbody>
-        {% for user in g.all_users %}
-        {% if user.role == 'contributor' %}
+        {% for user in g.users_by_role['contributor'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
           <td valign="middle">{{ user.username }}</td>
@@ -92,7 +89,6 @@ Users
           </div>
         </td>
         </tr>
-        {% endif %}
         {% endfor %}
       </tbody>
     </table>
@@ -110,8 +106,7 @@ Users
         </tr>
       </thead>
       <tbody>
-        {% for user in g.all_users %}
-        {% if user.role == 'admin' %}
+        {% for user in g.users_by_role['admin'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
           <td valign="middle">{{ user.username }}</td>
@@ -129,7 +124,6 @@ Users
           </div>
         </td>
         </tr>
-        {% endif %}
         {% endfor %}
       </tbody>
     </table>
@@ -197,8 +191,7 @@ Users
         </tr>
       </thead>
       <tbody>
-        {% for user in g.all_users %}
-        {% if user.role == 'visitor' %}
+        {% for user in g.users_by_role['visitor'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
           <td valign="middle">{{ user.username }}</td>
@@ -216,7 +209,6 @@ Users
           </div>
         </td>
         </tr>
-        {% endif %}
         {% endfor %}
       </tbody>
     </table>

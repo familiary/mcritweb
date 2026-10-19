@@ -61,3 +61,11 @@ tolerating a miss.
 
 Widen the pools when a test needs the filtered result views (`?funid=`, `?samid=`,
 `?famid=`), which reach for matched entries beyond what is captured here.
+
+## `cfg_loop_functions.json`
+
+Not part of the corpus above, and not touched by `regenerate.py`: five real
+functions (with `xcfg` and `picblockhashes` intact) captured by hand from a
+different live instance for issue #204's CFG dot-graph/loop-detection equivalence
+tests. See the module docstring of `tests/testCfgLoopDetection.py`, which loads it
+directly rather than through `CorpusMcritClient`.

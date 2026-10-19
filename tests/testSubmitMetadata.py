@@ -86,9 +86,10 @@ def wire(monkeypatch):
         sent.urls.append(url)
         return CannedResponse({"status": "successful", "data": "0123456789abcdef01234567"})
 
-    monkeypatch.setattr(
-        "mcrit.client.McritClient.requests", SimpleNamespace(get=_get, post=_post)
-    )
+    fake_requests = SimpleNamespace(get=_get, post=_post)
+    # mcrit 1.15.0's client sends through a `requests.Session()` it opens itself
+    fake_requests.Session = lambda: fake_requests
+    monkeypatch.setattr("mcrit.client.McritClient.requests", fake_requests)
     sent.client = McritClient(mcrit_server=BACKEND)
     return sent
 
