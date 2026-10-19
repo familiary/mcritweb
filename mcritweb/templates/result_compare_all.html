@@ -72,14 +72,15 @@ Results for Job: {{ job_info.job_id }}
     </div>
   </div>
 </form>
+{{ set_pagination_params(famp, _anchor="family-matches") }}
 <table class="table table-hover">
   <thead class="thead-light">
     <tr>
-      {{ famlib_header(ucs_famlib) }}
+      {{ famlib_header(ucs_famlib, sort_pagination=famp) }}
     </tr>
   </thead>
   <tbody>
-    {% for matched_sample in matching_result.getBestSampleMatchesPerFamily(famp.start_index, famp.limit, malware_only=True) %}
+    {% for matched_sample in family_rows %}
       <tr style="background-color:#{{ scp.getMatchHexColorFromResult(matched_sample, 'matched_percent_score_weighted') }}">
         {{ famlib_row(matched_sample, matching_result, scp, funp, divisors, ucs_famlib) }}
       </tr>
@@ -91,14 +92,15 @@ Results for Job: {{ job_info.job_id }}
 
   <h2 class="h3" id="library-matches">Best Library Matches</h2>
 <p>total: {{ libp.max_value }}{% if libp.max_value > 0 %}, showing: {{ 1 + libp.start_index }} - {{ libp.end_index }}{% endif %} (filtered: {{ matching_result.num_original_library_matches - libp.max_value}})</p>
+{{ set_pagination_params(libp, _anchor="library-matches") }}
 <table class="table table-hover">
   <thead class="thead-light">
     <tr>
-      {{ famlib_header(ucs_famlib) }}
+      {{ famlib_header(ucs_famlib, sort_pagination=libp) }}
     </tr>
   </thead>
   <tbody>
-    {% for matched_sample in matching_result.getBestSampleMatchesPerFamily(libp.start_index, libp.limit, library_only=True) %}
+    {% for matched_sample in library_rows %}
     <tr style="background-color:#{{ scp.getMatchHexColorFromResult(matched_sample, 'matched_percent_score_weighted') }}"></tr>
         {{ famlib_row(matched_sample, matching_result, scp, funp, divisors, ucs_famlib) }}
       </tr>
@@ -134,10 +136,11 @@ Results for Job: {{ job_info.job_id }}
       </div>
     </div>
 </form>
+{{ set_pagination_params(funp, _anchor="function-matches") }}
 <table class="table table-hover">
   <thead class="thead-light">
     <tr>
-      {{ aggregated_function_header(ucs_functions) }}
+      {{ aggregated_function_header(ucs_functions, sort_pagination=funp) }}
     </tr>
   </thead>
   <tbody>

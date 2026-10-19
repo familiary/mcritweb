@@ -247,3 +247,160 @@ def test_the_score_tooltips_divide_by_the_page_s_divisors(client, as_role, monke
                 assert "/ 1234.25 " in tooltip, f"{context}: {tooltip}"
             elif "Unique Matching" not in tooltip:
                 assert "/ 4321.50 " in tooltip, f"{context}: {tooltip}"
+
+
+class _TableRows(HTMLParser):
+    """The header texts and the text of every body cell of the first table fed to it.
+    Cells are collected per table rather than per `<tr>`, as in `_MatchTableAudit`, and
+    cut into rows by the header width."""
+
+    def __init__(self):
+        super().__init__()
+        self.headers, self.cells = [], []
+        self._depth, self._done, self._cell, self._header = 0, False, None, None
+
+    def handle_starttag(self, tag, attrs):
+        if self._done:
+            return
+        if tag == "table":
+            self._depth += 1
+        elif self._depth == 1 and tag == "th":
+            self._header = []
+            # a header spanning two columns owns two cells per row; the second one has
+            # no header of its own and is named after the first with a "+"
+            self._span = int(dict(attrs).get("colspan") or 1)
+        elif self._depth == 1 and tag == "td":
+            self._cell = []
+
+    def handle_data(self, data):
+        for bucket in (self._header, self._cell):
+            if bucket is not None:
+                bucket.append(data)
+
+    def handle_endtag(self, tag):
+        if self._done:
+            return
+        if tag == "table":
+            self._depth -= 1
+            self._done = self._depth == 0
+        elif tag == "th" and self._header is not None:
+            name = " ".join("".join(self._header).split())
+            self.headers.append(name)
+            self.headers.extend([name + "+"] * (self._span - 1))
+            self._header = None
+        elif tag == "td" and self._cell is not None:
+            self.cells.append(" ".join("".join(self._cell).split()))
+            self._cell = None
+
+
+def column(response, anchor, header):
+    """One column of the match table below `id="<anchor>"`, top to bottom."""
+    markup = response.get_data(as_text=True).partition(f'id="{anchor}"')[2]
+    parser = _TableRows()
+    parser.feed(markup[markup.index("<table"):])
+    width = len(parser.headers)
+    assert width and len(parser.cells) % width == 0, f"the table below {anchor} is not rectangular"
+    index = parser.headers.index(header)
+    return [parser.cells[row + index] for row in range(0, len(parser.cells), width)]
+
+
+def offsets(response, anchor="function-matches", header="offset"):
+    return [int(value, 16) for value in column(response, anchor, header)]
+
+
+def test_no_icon_in_a_match_header_is_left_open(client, as_role):
+    """The family and sample headers opened their icon's `<i>` and never closed it."""
+    as_role("visitor")
+    for context, response in every_view(client):
+        for table in match_tables(response.get_data(as_text=True)):
+            assert "th" not in table["unclosed"], f"{context} leaves an <i> open in a header cell"
+
+
+def test_a_sorted_function_table_is_sorted_across_its_pages(client, as_role):
+    """The aggregated function table is paginated by the server. A sort that ran on the
+    page would order each page by itself; this one has to order the list, so page two
+    starts where page one ended and the pages together are the sorted list."""
+    as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+
+    def rows(query):
+        response = client.get(f"/data/result/{job_id}?{query}")
+        sizes = [int(value) for value in column(response, "function-matches", "num_bytes")]
+        return list(zip(sizes, column(response, "function-matches", "Function ID")))
+
+    unsorted = [row for page in range(1, 5) for row in rows(f"funl=250&funp={page}")]
+    assert [size for size, _ in unsorted] != sorted(size for size, _ in unsorted), (
+        "the captured report is in size order already, so this proves nothing"
+    )
+
+    ascending = [row for page in range(1, 5) for row in rows(f"funl=250&funp={page}&funpsort=num_bytes&funpasc=true")]
+    assert sorted(function_id for _, function_id in ascending) == sorted(function_id for _, function_id in unsorted), (
+        "the sorted pages do not hold every row exactly once"
+    )
+    assert [size for size, _ in ascending] == sorted(size for size, _ in unsorted)
+
+    descending = rows("funl=10&funp=2&funpsort=num_bytes&funpasc=false")
+    assert [size for size, _ in descending] == sorted((size for size, _ in unsorted), reverse=True)[10:20]
+
+
+def test_an_unknown_sort_column_leaves_the_page_as_it_is(client, as_role):
+    as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+    plain = client.get(f"/data/result/{job_id}?funl=10&funp=2")
+    bogus = client.get(f"/data/result/{job_id}?funl=10&funp=2&funpsort=no_such_column&funpasc=false")
+    assert offsets(bogus) == offsets(plain)
+
+
+def test_an_unsorted_page_aggregates_only_its_own_functions(client, as_role, monkeypatch):
+    """Without a sort the aggregated table keeps #194's page-only aggregation; only a
+    sort, which has to see every row, aggregates the whole report."""
+    from mcrit.storage.MatchingResult import MatchingResult
+
+    aggregated = []
+    original = MatchingResult.getAggregatedFunctionMatches
+
+    def spy(self, *args, **kwargs):
+        rows = original(self, *args, **kwargs)
+        aggregated.append(len(rows))
+        return rows
+
+    monkeypatch.setattr(MatchingResult, "getAggregatedFunctionMatches", spy)
+    as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+
+    client.get(f"/data/result/{job_id}?funl=10&funp=2")
+    assert aggregated and max(aggregated) <= 10, f"an unsorted page aggregated {aggregated} functions"
+
+    aggregated.clear()
+    client.get(f"/data/result/{job_id}?funl=10&funp=2&funpsort=offset")
+    assert max(aggregated) > 10, "a sorted page did not see the whole report"
+
+
+def test_the_family_table_sorts_on_its_own(client, as_role):
+    """`result_compare_all.html` has three paginated tables; each sorts through its own
+    parameters, so sorting the families leaves the function table alone."""
+    as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+    plain = client.get(f"/data/result/{job_id}")
+    ascending = client.get(f"/data/result/{job_id}?fampsort=family_name&fampasc=true")
+    descending = client.get(f"/data/result/{job_id}?fampsort=family_name&fampasc=false")
+
+    names = column(ascending, "family-matches", "")
+    assert len(names) > 1
+    assert [name.lower() for name in names] == sorted(name.lower() for name in names)
+    assert column(descending, "family-matches", "") == names[::-1]
+    assert offsets(ascending) == offsets(plain)
+
+
+def test_a_sort_link_starts_again_at_page_one_and_keeps_the_rest(client, as_role):
+    """The sort link of a header goes back to page 1 - the row at the top of page 3 is
+    somewhere else once the order changes - and keeps the other tables' state."""
+    as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+    page = client.get(f"/data/result/{job_id}?famp=1&funl=10&funp=3&filter_function_min_score=50").get_data(as_text=True)
+    links = re.findall(r"window\.location\.href='([^']*funpsort=offset[^']*)'", page)
+    assert links, "the offset header carries no sort link"
+    link = links[0].replace("&amp;", "&")
+    assert "funp=1" in link and "funp=3" not in link
+    assert "funpasc=true" in link and "funl=10" in link
+    assert "#function-matches" in link
