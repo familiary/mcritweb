@@ -186,11 +186,12 @@ def parse_bitness_form_param(request):
 
     Neither bitness radio is checked until the user - or the filename probe - picks one,
     and an unchecked radio is simply absent from the serialised form, so a missing value
-    is ordinary user input as well. Returns None for anything that is not a bitness MCRIT
-    knows.
+    is ordinary user input as well. Returns None for anything but 32 and 64:
+    McritClient.addBinarySample() leaves any other bitness out of the request, and the
+    server then disassembles the dump as 32 bit.
     """
     value = request.form.get('bitness', '').strip()
-    return int(value) if value in ('16', '32', '64') else None
+    return int(value) if value in ('32', '64') else None
 
 
 #: A sample that was dumped and then *un*mapped again is not a dump, however its name

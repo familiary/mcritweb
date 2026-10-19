@@ -690,7 +690,7 @@ def test_a_dump_submit_without_any_base_address_field_is_refused(client, as_role
     assert response.status_code == 400
 
 
-@pytest.mark.parametrize("bitness", ["", "0", "48", "thirtytwo", "32.0", "0x20"])
+@pytest.mark.parametrize("bitness", ["", "0", "16", "48", "thirtytwo", "32.0", "0x20"])
 def test_a_dump_submit_without_a_usable_bitness_is_refused(client, as_role, fake_mcrit, bitness):
     """An unchecked radio is simply absent from the serialised form, and `int()` on
     whatever else arrives is the same unguarded crash."""
