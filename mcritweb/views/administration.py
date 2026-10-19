@@ -1,5 +1,5 @@
 import json
-import re
+import sqlite3
 
 import requests
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
@@ -25,15 +25,25 @@ def change_username():
     error_msg = None
     # cheapest check first, and the password before the lookup, so that whether a
     # name is taken is only ever answered to someone who proved who they are
-    if re.match(r"^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$", new_username) is None:
+    if not db.is_well_formed_username(new_username):
         error_msg = "Username has invalid format."
+    elif db.is_reserved_username(new_username):
+        error_msg = "Username is reserved."
     elif not check_password_hash(user_info.password, password):
         error_msg = 'Incorrect Password!'
     elif UserInfo.fromDb(username=new_username) is not None:
         error_msg = 'Username is already taken!'
     if error_msg is None:
+        old_username = user_info.username
         user_info.username = new_username
-        user_info.saveToDb()
+        try:
+            user_info.saveToDb()
+        except sqlite3.IntegrityError:
+            # the lookup above is not a lock: a registration or another rename can
+            # take the name before this write, and the UNIQUE column refuses it
+            user_info.username = old_username
+            error_msg = 'Username is already taken!'
+    if error_msg is None:
         flash('Username successfully changed', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')
@@ -55,8 +65,11 @@ def change_password():
         error_msg = 'Incorrect password!'
     if error_msg is None:
         user_info.password = generate_password_hash(new_password)
-        user_info.saveToDb(withPassword=True)
-        flash('Password successfully changed', category='success')
+        # the token is on /settings, so whoever could read that page with a stolen session
+        # could have copied it; it must not outlast the password change that ends the session
+        user_info.apitoken = generate_apitoken()
+        user_info.saveToDb()
+        flash('Password successfully changed. Your API token was replaced too; anything using the old one has to be updated.', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')
     return redirect(url_for('authentication.settings'))
