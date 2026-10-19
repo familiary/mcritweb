@@ -1,3 +1,4 @@
+{% from 'table/match_diagram.html' import match_diagram %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% from 'table/column_table.html' import sample_column_table, matching_result_job_column_table %}
 {% from 'table/matching_statistics_table.html' import matching_statistics_table %}
@@ -26,7 +27,7 @@ Results for Job: {{ job_info.job_id }}
 {% if not matching_result.is_query %}
 <h2 class="h3">MCRIT Diagram</h2>
 <p>Showing: foreign family match frequency, library matches, best foreign family match scores.</p>
-<img src="{{ url_for('data.diagram_file', filename=job_info.job_id + '-funid_%d' % funid + '.png') }}" class="img-fluid" alt="MCRIT match diagram" />
+{{ match_diagram(job_info.job_id + '-funid_%d' % funid + '.png', diagram_size) }}
 {% endif %}
 
 <h2 class="h3" id="function-matches">Matches for Function: {{ funid }}</h2>
@@ -93,7 +94,7 @@ Results for Job: {{ job_info.job_id }}
       {% elif column_type == "sample_id_b" %}
       <td style="text-align: right;" valign="middle"><a href="{{ url_for('explore.sample_by_id', sample_id=matched_function.matched_sample_id) }}">{{ matched_function.matched_sample_id }}</a></td>
       {% elif column_type == "best_score" %}
-      <td style="text-align: right;" valign="middle">{{ "%d"|format(matched_function.matched_score) }}</td>
+      <td style="text-align: right;" valign="middle">{{ "%3.0f"|format(matched_function.matched_score) }}</td>
       {% elif column_type == "is_minhash_match" %}
       <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_minhash %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
       {% elif column_type == "is_pichash_match" %}
@@ -112,6 +113,6 @@ Results for Job: {{ job_info.job_id }}
   {{ pagination_widget(funp, _anchor="function-matches")}}
 
 <h2 class="h3">Matching Method Statistics </h2>
-{{ matching_statistics_table(matching_result.match_aggregation) }}
+{{ matching_statistics_table(matching_statistics(matching_result)) }}
 
 {% endblock %}

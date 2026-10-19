@@ -337,9 +337,12 @@ def test_a_category_the_backend_has_never_run_is_not_a_server_error(client, as_r
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: every_kind_of_job
     as_role("visitor")
 
-    response = client.get("/data/jobs?active=nosuchmethod")
+    # the unknown tab falls back to the default one, and #132 then redirects to the
+    # URL naming it; the flash survives the redirect and says what happened
+    response = client.get("/data/jobs?active=nosuchmethod", follow_redirects=True)
 
     assert response.status_code == 200
+    assert "is not a job type" in response.get_data(as_text=True)
 
 
 @pytest.mark.parametrize("category,expected", [
