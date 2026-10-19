@@ -1,11 +1,15 @@
 import copy
 import hashlib
+import inspect
 import os
 import re
 import types
 from urllib.parse import quote
 
 from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
+from mcrit.client.McritClient import McritClient
+from mcrit.config.MinHashConfig import MinHashConfig
+from mcrit.config.StorageConfig import StorageConfig
 from mcrit.libs.utility import decode_two_complement
 from mcrit.queue.LocalQueue import Job
 from mcrit.queue.QueueRemoteCalls import to_binary as canonicalise_queue_json
@@ -1432,7 +1436,40 @@ RERUNNABLE_METHODS = {
 #: takes them back as keywords of the same name. force_recalculation is deliberately
 #: not among them - QueueRemoteCalls consumes it before the payload is written, so no
 #: job records whether it was forced.
-RERUN_MATCHING_PARAMS = ("minhash_threshold", "pichash_size", "band_matches_required")
+#:
+#: Since mcrit 1.13 a job carries every one of these that applies to it, not only the
+#: ones its request named: the backend fills in the rest from its configuration before
+#: queueing (`resolveMatchingParams` in mcrit/index/MatchingParameters.py, called from
+#: `MinHashIndex._submitMatchingJob` and `server/utils.py` `getMatchingParams`). A
+#: match restricted to the samples it names (1 vs 1, 1 vs group) takes no shortlist and
+#: carries none, hence the two lists.
+RERUN_MATCHING_PARAMS = ("minhash_threshold", "pichash_size", "band_matches_required", "band_df_cutoff", "shortlist_size")
+RESTRICTED_MATCHING_PARAMS = ("minhash_threshold", "pichash_size", "band_matches_required", "band_df_cutoff")
+
+#: The matching parameters each method takes back. McritClient's requestMatchesForSample
+#: takes all of them; requestMatchesForSampleVs and requestMatchesCross take no
+#: shortlist_size (mcrit 1.16 McritClient.py:811-875).
+METHOD_MATCHING_PARAMS = {
+    "getMatchesForSample": RERUN_MATCHING_PARAMS,
+    "getMatchesForSampleVs": RESTRICTED_MATCHING_PARAMS,
+    "getMatchesForSampleVsGroup": RESTRICTED_MATCHING_PARAMS,
+}
+
+#: Recorded on a job but never sent: the backend marks a job whose shortlist it could
+#: not apply when it was queued (`shortlist_unavailable`), and no client call takes
+#: it. A rerun leaves it out, and the backend marks the new job again if the shortlist
+#: still cannot be applied.
+DERIVED_MATCHING_PARAMS = ("shortlist_unavailable",)
+
+#: The value a backend gives the knobs the analyze forms have no control for, unless
+#: its deployment configures another: mcrit's own defaults, unchanged from 1.12 to
+#: 1.16 (MinHashConfig.py:23, :32, :82, StorageConfig.py STORAGE_BAND_DF_CUTOFF).
+FORM_DEFAULT_MATCHING_PARAMS = {
+    "minhash_threshold": MinHashConfig.MINHASH_MATCHING_THRESHOLD,
+    "pichash_size": MinHashConfig.PICHASH_SIZE,
+    "band_df_cutoff": StorageConfig.STORAGE_BAND_DF_CUTOFF,
+    "shortlist_size": MinHashConfig.MINHASH_MATCHING_SHORTLIST_SIZE,
+}
 
 #: The two child methods a cross compare is built from, and what each one means for
 #: `sample_group_only` - the only place that choice survives.
@@ -1440,9 +1477,11 @@ CROSS_CHILD_METHODS = {"getMatchesForSample": False, "getMatchesForSampleVsGroup
 
 #: How many positional arguments each of those backend methods takes, so that a
 #: payload carrying one this does not know about can be recognised as such. Together
-#: with RERUN_MATCHING_PARAMS this is the complete parameter list of each method as of
-#: mcrit 1.5 - a version that records a further one has to be handled here, and until
-#: it is, the rerun is withheld rather than submitted without it.
+#: with METHOD_MATCHING_PARAMS and DERIVED_MATCHING_PARAMS this is the complete
+#: parameter list of each method as of mcrit 1.16 (MATCHING_KNOBS in
+#: mcrit/index/MatchingParameters.py) - a version that records a further one has to
+#: be handled here, and until it is, the rerun is withheld rather than submitted
+#: without it.
 METHOD_ARITY = {
     "getMatchesForSample": 1,
     "getMatchesForSampleVs": 2,
@@ -1486,11 +1525,12 @@ def matching_kwargs(params, method):
     resubmitted call, which is how a rerun ends up being a *different* comparison than
     the one on screen - so either disqualifies the job instead.
     """
-    known = set(RERUN_MATCHING_PARAMS) | {str(position) for position in range(METHOD_ARITY[method])}
+    accepted = METHOD_MATCHING_PARAMS[method]
+    known = set(accepted) | set(DERIVED_MATCHING_PARAMS) | {str(position) for position in range(METHOD_ARITY[method])}
     if set(params) - known:
         return None
     kwargs = {}
-    for name in RERUN_MATCHING_PARAMS:
+    for name in accepted:
         if name in params:
             value = as_job_int(params[name])
             if value is None:
@@ -1536,11 +1576,34 @@ def cross_rerun_request(params, child_jobs):
         kwargs = matching_kwargs(child_params, child.method)
         if kwargs is None:
             return None
+        # mcrit's getMatchesCross asks its 1-vs-corpus children for no shortlist, as
+        # shortlist_size=0 (MinHashIndex.py:562-573 in 1.16), and requestMatchesCross
+        # takes none. Any other size is not a child a cross compare makes.
+        if kwargs.pop("shortlist_size", 0) != 0:
+            return None
         child_kwargs.append(kwargs)
     if len(methods) != 1 or any(kwargs != child_kwargs[0] for kwargs in child_kwargs):
         return None
     sample_group_only = CROSS_CHILD_METHODS[methods.pop()]
-    return RERUNNABLE_METHODS["combineMatchesToCross"], (sample_ids,), dict(child_kwargs[0], sample_group_only=sample_group_only)
+    return client_takes(RERUNNABLE_METHODS["combineMatchesToCross"], (sample_ids,), dict(child_kwargs[0], sample_group_only=sample_group_only))
+
+
+def client_takes(method_name, args, kwargs):
+    """(method_name, args, kwargs) if the installed McritClient takes these keywords, else None.
+
+    requirements.txt allows mcrit 1.12, whose request methods take neither
+    band_df_cutoff nor shortlist_size, and a 1.13 or later backend records both. That
+    client would raise a TypeError on the rerun; leaving a knob out instead would run
+    another comparison than the one on screen.
+    """
+    try:
+        parameters = inspect.signature(getattr(McritClient, method_name)).parameters
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if not any(parameter.kind is parameter.VAR_KEYWORD for parameter in parameters.values()):
+        if not set(kwargs) | {"force_recalculation"} <= set(parameters):
+            return None
+    return method_name, args, kwargs
 
 
 def rerun_request(job_info, child_jobs=None):
@@ -1562,7 +1625,7 @@ def rerun_request(job_info, child_jobs=None):
     sample_ids = [as_job_int(params.get(str(position))) for position in range(METHOD_ARITY[job_info.method])]
     if any(sample_id is None for sample_id in sample_ids):
         return None
-    return RERUNNABLE_METHODS[job_info.method], tuple(sample_ids), kwargs
+    return client_takes(RERUNNABLE_METHODS[job_info.method], tuple(sample_ids), kwargs)
 
 
 def has_run_its_course(job_info):
@@ -1619,10 +1682,17 @@ def configuration_url(job_info, child_jobs=None):
     kwargs = dict(kwargs)
     sample_group_only = kwargs.pop("sample_group_only", False)
     # `band_matches_required` is the only matching parameter these forms have a
-    # control for. A job carrying another one cannot be shown on them, and one
-    # carrying none took the backend's own default rather than a slider position,
-    # which the slider - which always submits one - cannot reproduce either.
-    if set(kwargs) != {"band_matches_required"}:
+    # control for (analyze.py `start_cross_compare`, `compare_all` and `compare_vs`
+    # send only it). Submitting one leaves the others to the backend, which from
+    # mcrit 1.13 on records them on every job, filled in from its configuration
+    # (`resolveMatchingParams`). So a job may carry them at mcrit's defaults, which
+    # is what the form gets again; one that ran with another value cannot be shown
+    # on the form. A job carrying no band_matches_required took the backend's own
+    # default rather than a slider position, which the slider - which always submits
+    # one - cannot reproduce either.
+    if "band_matches_required" not in kwargs:
+        return None
+    if any(kwargs[name] != FORM_DEFAULT_MATCHING_PARAMS[name] for name in kwargs if name != "band_matches_required"):
         return None
     slider_position = slider_position_for_band_range(kwargs["band_matches_required"])
     if slider_position is None:
@@ -1675,12 +1745,14 @@ def rerun_job_by_id(job_id):
     if job_info.method == "combineMatchesToCross":
         # only this one method needs them, so the round trips are not spent on the
         # other two. `all_dependencies` is a bare lookup in mcrit's Job and raises for
-        # a record that does not carry the field.
+        # a record that does not carry the field. Read in batches, as `job_by_id`
+        # reads them; a child that is gone is missing from the answer, and
+        # `cross_rerun_request` refuses a mapping that names it.
         try:
             dependencies = job_info.all_dependencies
         except (KeyError, TypeError):
             dependencies = None
-        child_jobs = [client.getJobData(child_id) for child_id in dependencies] if isinstance(dependencies, list) else []
+        child_jobs = dependency_jobs(client, list(dict.fromkeys(dependencies))) if isinstance(dependencies, list) else []
     request_to_repeat = rerun_request(job_info, child_jobs)
     if request_to_repeat is None:
         flash('This job cannot be rerun: its original request is not fully recorded.', category='error')

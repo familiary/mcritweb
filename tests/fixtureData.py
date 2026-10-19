@@ -75,6 +75,33 @@ def remove_job(fake, job_id):
     fake._queue[:] = [entry for entry in fake._queue if _job_id(entry) != job_id]
 
 
+# mcrit 1.4.3, which the fixtures were captured from, records only the knobs a request
+# named. From 1.13 on the backend fills in every matching knob before it queues a job
+# (`resolveMatchingParams` in mcrit/index/MatchingParameters.py), so a job records all
+# of them.
+
+#: The knobs of a 1-vs-N job queued by mcrit 1.16 on its default configuration.
+CURRENT_KNOBS = {"minhash_threshold": 50, "pichash_size": 10, "band_matches_required": 2, "band_df_cutoff": 0, "shortlist_size": 0}
+#: A match restricted to the samples it names records no shortlist.
+CURRENT_RESTRICTED_KNOBS = {name: value for name, value in CURRENT_KNOBS.items() if name != "shortlist_size"}
+
+
+def make_cross_children_current(fake, group_only):
+    """Give the captured cross compare's children the params mcrit 1.16 records.
+
+    getMatchesCross asks a 1-vs-corpus child for shortlist_size=0, and a vs-group child
+    takes no shortlist (MinHashIndex.py:562-573 in 1.16)."""
+    for child_id in fake.getJobData(job_id_of("cross_compare")).all_dependencies:
+        child = fake._queued_by_id[child_id]
+        params = json.loads(child["payload"]["params"])
+        if group_only:
+            params = dict(CURRENT_RESTRICTED_KNOBS, **{"0": params["0"], "1": params["1"]})
+        else:
+            child["payload"]["method"] = "getMatchesForSample"
+            params = dict(CURRENT_KNOBS, **{"0": params["0"]})
+        child["payload"]["params"] = json.dumps(params)
+
+
 #: The sample the captured 1-vs-N report (`matches_for_sample`) was produced for, and
 #: the sample the reference functions belong to.
 MATCHED_SAMPLE_ID = 0

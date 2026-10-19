@@ -21,7 +21,9 @@ link either. What is extra here is that the *form* has to be able to show them:
     pins down.
   * The "Minhash Matching" slider is the only matching control any of them has, so a
     job carrying a parameter it cannot express - or a band value the slider has no
-    position for - gets no link rather than a form that misdescribes it.
+    position for - gets no link rather than a form that misdescribes it. A backend
+    from mcrit 1.13 on records every knob on every job; one at mcrit's default is
+    what the form, which leaves it to the backend, gets again.
 
 `force_recalculation` is deliberately not preselected: it is consumed before a job's
 payload is written, so no job records whether it was forced and either choice would
@@ -29,12 +31,21 @@ be an invention.
 """
 
 import copy
+import json
 import logging
 import re
 import unittest
 
 import pytest
-from fixtureData import altered_job, inject_job, job_id_of, remove_job
+from fixtureData import (
+    CURRENT_KNOBS,
+    CURRENT_RESTRICTED_KNOBS,
+    altered_job,
+    inject_job,
+    job_id_of,
+    make_cross_children_current,
+    remove_job,
+)
 
 from mcritweb.views.params import parse_band_range
 
@@ -270,6 +281,53 @@ def test_a_cross_compare_missing_a_child_is_not_linked(client, as_role, fake_mcr
     as_role("visitor")
     job_id = job_id_of("cross_compare")
     remove_job(fake_mcrit, fake_mcrit.getJobData(job_id).all_dependencies[0])
+
+    assert link_for(client, job_id) is None
+
+
+# --- a job from a current backend --------------------------------------------------
+#
+# From mcrit 1.13 on every job records every matching knob, filled in from the
+# backend's configuration (CURRENT_KNOBS in fixtureData.py). The form sets only the
+# slider and leaves the rest to that configuration, so knobs at mcrit's defaults are
+# what the form gets again.
+
+@pytest.mark.parametrize(
+    "report, params, expected",
+    [
+        ("matches_for_sample", dict(CURRENT_KNOBS, **{"0": 0}),
+         "/analyze/compare?query=0&selected=0&minhashBandRange=2"),
+        ("matches_for_sample_vs", dict(CURRENT_RESTRICTED_KNOBS, **{"0": 1, "1": 3}),
+         "/analyze/compare_versus?query_a=1&selected_a=1&query_b=3&selected_b=3&minhashBandRange=2"),
+    ],
+    ids=["1-vs-N", "1-vs-1"],
+)
+def test_a_job_of_a_current_backend_links_to_its_form(client, as_role, fake_mcrit, report, params, expected):
+    as_role("visitor")
+    job_id = inject_job(fake_mcrit, altered_job(report, "ddddddddddddddddddddddd1", params=json.dumps(params)))
+
+    assert link_for(client, job_id) == expected
+
+
+@pytest.mark.parametrize("group_only", [False, True], ids=["1-vs-corpus children", "vs-group children"])
+def test_a_cross_compare_of_a_current_backend_links_to_its_form(client, as_role, fake_mcrit, group_only):
+    as_role("visitor")
+    make_cross_children_current(fake_mcrit, group_only)
+
+    assert link_for(client, job_id_of("cross_compare")) == (
+        f"/analyze/cross_compare?samples=0,2,4,6,1&onlySelected={'true' if group_only else 'false'}&minhashBandRange=2"
+    )
+
+
+@pytest.mark.parametrize(
+    "knob, value",
+    [("minhash_threshold", 40), ("pichash_size", 8), ("band_df_cutoff", 500), ("shortlist_size", 100)],
+)
+def test_no_link_for_a_current_backend_job_off_the_defaults(client, as_role, fake_mcrit, knob, value):
+    """The form cannot set these, so it would resubmit the job without them."""
+    as_role("visitor")
+    params = dict(CURRENT_KNOBS, **{knob: value, "0": 0})
+    job_id = inject_job(fake_mcrit, altered_job("matches_for_sample", "ddddddddddddddddddddddd2", params=json.dumps(params)))
 
     assert link_for(client, job_id) is None
 

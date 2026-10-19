@@ -29,11 +29,21 @@ answers from its descriptor cache and returns the *same job id*, so "Rerun" woul
 redirect back to the page it was clicked on and change nothing.
 """
 
+import json
 import logging
 import unittest
 
 import pytest
-from fixtureData import altered_job, inject_job, job_id_of, load, remove_job
+from fixtureData import (
+    CURRENT_KNOBS,
+    CURRENT_RESTRICTED_KNOBS,
+    altered_job,
+    inject_job,
+    job_id_of,
+    load,
+    make_cross_children_current,
+    remove_job,
+)
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -374,6 +384,135 @@ def test_a_rerun_cannot_be_fired_by_get(client, as_role):
     be able to start it - issue #84."""
     as_role("visitor")
     assert client.get(f"/data/jobs/{job_id_of('matches_for_sample')}/rerun").status_code == 405
+
+
+# --- a job from a current backend --------------------------------------------------
+#
+# The captured fixtures come from mcrit 1.4.3 and record only band_matches_required;
+# a job of mcrit 1.13 or later records every matching knob (CURRENT_KNOBS in
+# fixtureData.py).
+
+
+def current_job(fake, report, job_id, params):
+    return inject_job(fake, altered_job(report, job_id, params=json.dumps(params)))
+
+
+def test_a_1vsn_job_of_a_current_backend_is_rerun_with_every_knob(client, as_role, fake_mcrit):
+    as_role("visitor")
+    job_id = current_job(fake_mcrit, "matches_for_sample", "ccccccccccccccccccccccc1", dict(CURRENT_KNOBS, **{"0": 0}))
+
+    page = client.get(f"/data/jobs/{job_id}").get_data(as_text=True)
+    client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert rerun_button_for(page, job_id)
+    assert queued_calls(fake_mcrit) == [
+        ("requestMatchesForSample", (0,), dict(CURRENT_KNOBS, force_recalculation=True))
+    ]
+
+
+def test_a_1vs1_job_of_a_current_backend_is_rerun_with_every_knob(client, as_role, fake_mcrit):
+    as_role("visitor")
+    job_id = current_job(fake_mcrit, "matches_for_sample_vs", "ccccccccccccccccccccccc2", dict(CURRENT_RESTRICTED_KNOBS, **{"0": 1, "1": 3}))
+
+    client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert queued_calls(fake_mcrit) == [
+        ("requestMatchesForSampleVs", (1, 3), dict(CURRENT_RESTRICTED_KNOBS, force_recalculation=True))
+    ]
+
+
+def test_the_shortlist_unavailable_mark_is_left_to_the_backend(client, as_role, fake_mcrit):
+    """The backend marks a job whose shortlist it could not apply, and no client call
+    takes the mark. The rerun asks for the same shortlist; the backend marks the new
+    job again if it still cannot apply it."""
+    as_role("visitor")
+    params = dict(CURRENT_KNOBS, shortlist_size=100, shortlist_unavailable="no band df index", **{"0": 0})
+    job_id = current_job(fake_mcrit, "matches_for_sample", "ccccccccccccccccccccccc3", params)
+
+    client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert queued_calls(fake_mcrit) == [
+        ("requestMatchesForSample", (0,), dict(CURRENT_KNOBS, shortlist_size=100, force_recalculation=True))
+    ]
+
+
+def test_a_1vs1_job_carrying_a_shortlist_is_not_rerun(client, as_role, fake_mcrit):
+    """requestMatchesForSampleVs takes no shortlist_size, and mcrit records none on such
+    a job. One that carries it is not a job this rerun can repeat."""
+    as_role("visitor")
+    job_id = current_job(fake_mcrit, "matches_for_sample_vs", "ccccccccccccccccccccccc4", dict(CURRENT_KNOBS, **{"0": 1, "1": 3}))
+
+    client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert queued_calls(fake_mcrit) == []
+
+
+@pytest.mark.parametrize("group_only", [False, True], ids=["1-vs-corpus children", "vs-group children"])
+def test_a_cross_compare_of_a_current_backend_is_rerun_without_a_shortlist(client, as_role, fake_mcrit, group_only):
+    """requestMatchesCross takes no shortlist_size and refuses one, so the
+    shortlist_size=0 that getMatchesCross gives its 1-vs-corpus children stays out."""
+    as_role("visitor")
+    make_cross_children_current(fake_mcrit, group_only)
+    job_id = job_id_of("cross_compare")
+
+    page = client.get(f"/data/jobs/{job_id}").get_data(as_text=True)
+    client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert rerun_button_for(page, job_id)
+    assert queued_calls(fake_mcrit) == [
+        ("requestMatchesCross", ([0, 2, 4, 6, 1],),
+         dict(CURRENT_RESTRICTED_KNOBS, sample_group_only=group_only, force_recalculation=True))
+    ]
+
+
+def test_a_cross_compare_whose_children_ran_with_a_shortlist_is_not_rerun(client, as_role, fake_mcrit):
+    """getMatchesCross never gives its children one, and requestMatchesCross cannot ask
+    for one, so a rerun would run without it."""
+    as_role("visitor")
+    make_cross_children_current(fake_mcrit, group_only=False)
+    for child_id in fake_mcrit.getJobData(job_id_of("cross_compare")).all_dependencies:
+        child = fake_mcrit._queued_by_id[child_id]
+        child["payload"]["params"] = json.dumps(dict(json.loads(child["payload"]["params"]), shortlist_size=100))
+
+    client.post(f"/data/jobs/{job_id_of('cross_compare')}/rerun")
+
+    assert queued_calls(fake_mcrit) == []
+
+
+def test_a_cross_compare_rerun_reads_its_children_in_one_batch(client, as_role, fake_mcrit):
+    """As the job page does (`dependency_jobs`), rather than one getJobData per child,
+    of which a cross compare can have 250."""
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+
+    client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert [call[1] for call in fake_mcrit.calls if call[0] == "getJobData"] == [(job_id,)]
+    assert len([call for call in fake_mcrit.calls if call[0] == "getQueueData"]) == 1
+    assert len(queued_calls(fake_mcrit)) == 1
+
+
+class McritClient112:
+    """The request methods of mcrit 1.12's McritClient, which take neither
+    band_df_cutoff nor shortlist_size."""
+
+    def requestMatchesForSample(self, sample_id, minhash_threshold=None, pichash_size=None, band_matches_required=None, force_recalculation=False):
+        raise AssertionError("not to be called")
+
+
+def test_an_older_client_is_not_asked_for_knobs_it_does_not_take(client, as_role, fake_mcrit, monkeypatch):
+    """requirements.txt allows mcrit 1.12. Its client would raise a TypeError on these
+    knobs, and leaving them out would run another comparison."""
+    import mcritweb.views.data
+    monkeypatch.setattr(mcritweb.views.data, "McritClient", McritClient112)
+    as_role("visitor")
+    job_id = current_job(fake_mcrit, "matches_for_sample", "ccccccccccccccccccccccc5", dict(CURRENT_KNOBS, **{"0": 0}))
+
+    page = client.get(f"/data/jobs/{job_id}").get_data(as_text=True)
+    client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert not rerun_button_for(page, job_id)
+    assert queued_calls(fake_mcrit) == []
 
 
 if __name__ == "__main__":
