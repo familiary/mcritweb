@@ -3,6 +3,7 @@
 import logging
 import re
 import unittest
+from html import unescape
 
 import pytest
 from fixtureData import job_id_of
@@ -181,6 +182,29 @@ def test_an_anchor_from_the_query_string_does_not_reach_the_links(client, as_rol
 
     assert response.status_code == 200
     assert not [link for link in pagination_links(response, path) if "#evil" in link]
+
+
+#: Every single-quoted URL the pagination macros hand to script - the paging links'
+#: `pagination_js_helper('...')` and the sort headers' `window.location.href='...'` -
+#: read as the JavaScript string literal it is meant to be.
+JS_LINK_LITERAL = re.compile(r"""(?:pagination_js_helper\(|window\.location\.href=)'((?:[^'\\]|\\.)*)'""")
+
+
+@pytest.mark.parametrize("path", ["/data/jobs?", "/explore/samples?", "/analyze/cross_compare?samples=0,1,2&"])
+def test_a_quote_in_the_query_string_stays_inside_the_handler_url(client, as_role, path):
+    """The std widget put `get_link()` into `onchange="pagination_js_helper('...')"`
+    unescaped. Werkzeug leaves `'` unencoded in a query value and the HTML parser
+    decodes Jinja's `&#39;` before the handler is compiled, so a quote in a query
+    value closed the string and the rest of the value ran as script. The sort headers
+    did escape, but on the output of a macro - markup by then, holding `&#39;` and
+    no quote to replace."""
+    as_role("visitor")
+    response = client.get(path + "zz=%27%2Calert(1)%2C%27")
+
+    assert response.status_code == 200
+    urls = [url for url in JS_LINK_LITERAL.findall(unescape(response.get_data(as_text=True))) if "zz=" in url]
+    assert urls, "no inline pagination handler to check"
+    assert all("alert(1)" in url for url in urls), [url for url in urls if "alert(1)" not in url]
 
 
 @pytest.mark.parametrize("path, param, value", [
