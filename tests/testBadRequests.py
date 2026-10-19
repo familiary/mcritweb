@@ -9,6 +9,8 @@ last one just needs two admins with the user list open at the same time.
 Issues #94, #95, #96.
 """
 
+import io
+import json
 import logging
 import unittest
 
@@ -199,6 +201,98 @@ def test_a_backend_answering_nothing_is_reported_rather_than_raising():
             return None
 
     assert assign_matched_offsets(SilentClient(), [FunctionMatch(1)]) is False
+
+
+# --- input the UI never sends: answered, not a 500 -----------------------------------
+# Found in a security review as robustness findings. None of them leaked anything or
+# wrote state; each was an unhandled exception and a traceback in the log.
+
+#: JSON nested deeper than json.loads can follow raises RecursionError, not ValueError
+DEEP_JSON = b"[" * 100000
+
+
+def _upload(content, name, **fields):
+    return {"file": (io.BytesIO(content), name), **fields}
+
+
+BAD_INPUT = [
+    ("visitor", "get", "/analyze/cross_compare?samples=abc", {}),
+    ("visitor", "get", "/analyze/cross_compare?cache=1,x", {}),
+    ("contributor", "post", "/data/import", {"data": _upload(DEEP_JSON, "a.json")}),
+    ("contributor", "post", "/data/request_filename_info", {"data": json.dumps({"filename": 5, "file_header": ""})}),
+    ("contributor", "post", "/data/request_filename_info", {"data": json.dumps({"filename": None, "file_header": None})}),
+    ("contributor", "post", "/data/request_filename_info", {"data": json.dumps({"filename": "a.smda", "file_header": '"base_addr": ' + "9" * 5000})}),
+    ("contributor", "post", "/data/submit_or_query", {"data": {"form_type": "other"}}),
+    ("visitor", "post", "/api/query/function", {"data": "[]", "headers": {"apitoken": "apitoken-visitor"}}),
+    ("visitor", "post", "/api/query/function", {"data": "null", "headers": {"apitoken": "apitoken-visitor"}}),
+    ("visitor", "post", "/api/query/function", {"data": DEEP_JSON, "headers": {"apitoken": "apitoken-visitor"}}),
+    ("contributor", "post", "/api/samples", {"data": '{"a": 1}', "headers": {"apitoken": "apitoken-contributor"}}),
+]
+
+
+@pytest.mark.parametrize(("role", "method", "url", "kwargs"), BAD_INPUT,
+                         ids=[f"{method} {url[:40]} {i}" for i, (_, method, url, _) in enumerate(BAD_INPUT)])
+def test_input_the_ui_never_sends_is_answered_not_raised(client, as_role, role, method, url, kwargs):
+    as_role(role)
+    response = getattr(client, method)(url, **kwargs)
+    assert response.status_code < 500
+
+
+@pytest.mark.parametrize("url", ["/api/query/function", "/api/samples"])
+def test_the_api_answers_a_body_that_is_not_a_report_with_400(client, as_role, url):
+    as_role("contributor")
+    response = client.post(url, data="[]", headers={"apitoken": "apitoken-contributor"})
+    assert response.status_code == 400
+
+
+class TestJobPageParameters:
+    """On a job still running, refresh sets the page's auto-refresh."""
+
+    @pytest.fixture
+    def fake_mcrit(self, corpus_mcrit, monkeypatch):
+        finished = corpus_mcrit.getJobData
+
+        def running(job_id, *args, **kwargs):
+            job = finished(job_id, *args, **kwargs)
+            if job is not None:
+                job._data = {**job._data, "finished_at": None}
+            return job
+
+        monkeypatch.setattr(corpus_mcrit, "getJobData", running)
+        return corpus_mcrit
+
+    @pytest.mark.parametrize("query", ["?refresh=abc", "?forward=x", "?refresh=1.5&forward="])
+    def test_a_parameter_that_is_not_a_number_reads_as_absent(self, client, as_role, query):
+        as_role("visitor")
+        response = client.get(f"/data/jobs/{job_id_of('cross_compare')}{query}")
+        assert response.status_code == 200
+        assert b'http-equiv="refresh"' not in response.data
+
+    def test_a_number_still_sets_the_refresh(self, client, as_role):
+        as_role("visitor")
+        response = client.get(f"/data/jobs/{job_id_of('cross_compare')}?refresh=3")
+        assert response.status_code == 200
+        assert b'<meta http-equiv="refresh" content="3">' in response.data
+
+
+def test_a_hand_edited_sample_list_is_reported(client, as_role):
+    as_role("visitor")
+    response = client.get("/analyze/cross_compare?samples=1,x", follow_redirects=True)
+    assert response.status_code == 200
+    assert b"not a list of sample ids" in response.data
+
+
+@pytest.mark.parametrize("raised", [ValueError, TypeError, KeyError, AttributeError])
+def test_a_report_that_older_smda_cannot_read_is_none(monkeypatch, raised):
+    """Current smda raises ValueError for anything that is not a report; the older ones
+    mcrit still allows raise TypeError or KeyError for some of the same input."""
+    from mcritweb.views import utility
+
+    def refuse(_):
+        raise raised("not a report")
+
+    monkeypatch.setattr(utility.SmdaReport, "fromDict", refuse)
+    assert utility.read_smda_report(b"{}") is None
 
 
 if __name__ == "__main__":

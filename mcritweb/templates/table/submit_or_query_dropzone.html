@@ -72,7 +72,7 @@
 
 
   $(document).ready(function(){
-    myDropzone = Dropzone.forElement("#myDropzone");
+    const myDropzone = Dropzone.forElement("#myDropzone");
 
     myDropzone.on("removedfile", function(file) {
       if (this.files.length == 0) {
@@ -90,7 +90,7 @@
       $("#submit-dropzone").prop("disabled", false);
 
       // fill form with data derived from file name
-      filename = file.name
+      const filename = file.name
 
       let xhr = new XMLHttpRequest();
       xhr.open("POST", "{{ url_for('data.request_filename_info') }}" );
@@ -153,7 +153,7 @@ function handleSliderChange_dropzone(val) {
 </script>
 {% endmacro %}
 
-{% macro submit_or_query_dropzone(families=[], select_form_type=False, show_submit_fields=False) %}
+{% macro submit_or_query_dropzone(select_form_type=False, show_submit_fields=False) %}
 {% set show_query_fields = not show_submit_fields %}
 <center>
 
@@ -225,22 +225,6 @@ function handleSliderChange_dropzone(val) {
     <button type="submit" class="btn btn-primary" id="submit-dropzone" disabled>Submit <span id="submit-spinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display:none"></span></button>
 </form>
 </center>
-<script>
-    // |tojson emits a real array, so the repr-parsing this used to do - strip the
-    // brackets, split on ", ", shave a quote off each end - is gone with it. A family
-    // name is chosen by whoever submits or renames a family, and one containing a quote
-    // used to escape the string literal entirely.
-    var families = {{ families|tojson }};
-    families_ac = [];
-    for (let i in families) {
-        families_ac.push({label:families[i], value:families[i]})
-    }
-    const field = document.getElementById('family');
-        const ac = new Autocomplete(field, {
-            data: families_ac,
-            maximumItems: 5,
-            threshold: 1,
-        });
-</script>
+{% include 'js/ac_family_names.html' %}
 {% endmacro %}
 

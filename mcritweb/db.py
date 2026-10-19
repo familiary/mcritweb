@@ -1,15 +1,75 @@
 import datetime
-import hashlib
 import os
+import re
+import secrets
 import sqlite3
-import uuid
+import time
 
 import click
 from flask import current_app, g
 from flask.cli import with_appcontext
 
+#: How the two `user` timestamps are written into their VARCHAR columns. Used on the
+#: way in and on the way out, because the two have to agree: this is what sqlite3's
+#: implicit datetime adapter used to produce, and it is what existing databases hold.
+TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
+
+#: What that adapter produced when the microsecond happened to be exactly 0 -
+#: `datetime.isoformat(" ")` drops the fractional part. A row written on that
+#: microsecond cannot be read back with TIMESTAMP_FORMAT, so accept it too.
+TIMESTAMP_FORMAT_WITHOUT_MICROSECONDS = "%Y-%m-%d %H:%M:%S"
+
+
+def utc_now():
+    """The current time as a timezone-aware UTC datetime.
+
+    `datetime.utcnow()` is deprecated since 3.12 (and returned a *naive* datetime that
+    merely happened to hold UTC, which is what made it a trap). See issue #98.
+    """
+    return datetime.datetime.now(datetime.UTC)
+
+
+def format_timestamp(value):
+    """A datetime as it is stored. Explicit, so sqlite3 never has to adapt one."""
+    return value.strftime(TIMESTAMP_FORMAT)
+
+
+def parse_timestamp(value):
+    """A stored timestamp back as a timezone-aware UTC datetime.
+
+    Everything ever written here has been UTC, so the offset is knowledge we have and
+    the column does not carry - attach it rather than handing back a naive datetime
+    that the next caller has to guess about.
+    """
+    for timestamp_format in (TIMESTAMP_FORMAT, TIMESTAMP_FORMAT_WITHOUT_MICROSECONDS):
+        try:
+            parsed = datetime.datetime.strptime(value, timestamp_format)
+        except ValueError:
+            continue
+        return parsed.replace(tzinfo=datetime.UTC)
+    raise ValueError(f"Not a stored timestamp: {value!r}")
+
+#: Bytes of entropy behind a per-user API token. 32 gives a 64-character hex string.
+APITOKEN_BYTES = 32
+
+
+def generate_apitoken():
+    """A fresh API token.
+
+    This used to be `md5(uuid4().bytes)`. The entropy was always UUID4's rather than
+    MD5's, so the tokens were never weak - but MD5 in an authentication path is a
+    finding every auditor writes up, and there is no reason to keep it. See issue #100.
+
+    Tokens already issued stay valid: nothing validates their shape, and
+    `get_user_by_apitoken` matches on equality.
+    """
+    return secrets.token_hex(APITOKEN_BYTES)
+
 
 class UserInfo:
+
+    #: The columns of `user` a UserInfo carries besides its id, as attribute names.
+    COLUMNS = ("username", "password", "role", "registered", "last_login", "apitoken")
 
     def __init__(self) -> None:
         self.user_id = None
@@ -20,6 +80,8 @@ class UserInfo:
         self.registered = None
         self.last_login = None
         self.apitoken = None
+        # the values the row had when it was read, see saveToDb
+        self._stored = {}
 
     @classmethod
     def fromDb(cls, user_id=None, username=None):
@@ -36,40 +98,139 @@ class UserInfo:
             user_info.username = record["username"]
             user_info.password = record["password"]
             user_info.role = record["role"]
-            user_info.registered = datetime.datetime.strptime(record["registered"], "%Y-%m-%d %H:%M:%S.%f")
+            user_info.registered = parse_timestamp(record["registered"])
             user_info.last_login = "no login"
             if record["last_login"] != "no login":
-                user_info.last_login = datetime.datetime.strptime(record["last_login"], "%Y-%m-%d %H:%M:%S.%f")
+                user_info.last_login = parse_timestamp(record["last_login"])
             user_info.apitoken = record["apitoken"]
+            user_info._stored = {column: getattr(user_info, column) for column in cls.COLUMNS}
         else:
             user_info = None
         return user_info
-    
-    def saveToDb(self, withPassword=False):
+
+    def saveToDb(self):
+        """Add this user if it has no id yet; otherwise write back the columns that were
+        changed since the row was read, and nothing else.
+
+        Every caller works on a copy read earlier in its request, and writing the whole
+        copy back undid whatever had happened to the row in the meantime: a login in
+        flight restored a demotion, a token rotation or a rename, and - the row gone, so
+        the save fell through to an INSERT - re-created a deleted account. Writing only
+        the changed columns leaves the others as they are now, and an UPDATE for a row
+        deleted meanwhile matches nothing. The rehash on login has its own rule, see
+        saveLogin.
+        """
         database = get_db()
-        # query to see if row exists
-        record = database.execute("SELECT * FROM user WHERE id = ?;", (self.user_id,)).fetchone()
-        if record:
-            database.execute("UPDATE user SET username = ? WHERE id = ?;",(self.username, self.user_id,))
-            if withPassword:
-                database.execute("UPDATE user SET password = ? WHERE id = ?;",(self.password, self.user_id,))
-            database.execute("UPDATE user SET role = ? WHERE id = ?;",(self.role, self.user_id,))
-            if isinstance(self.registered, datetime.datetime):
-                database.execute("UPDATE user SET registered = ? WHERE id = ?;",(self.registered.strftime("%Y-%m-%d %H:%M:%S.%f"), self.user_id,))
-            if isinstance(self.last_login, datetime.datetime):
-                database.execute("UPDATE user SET last_login = ? WHERE id = ?;",(self.last_login.strftime("%Y-%m-%d %H:%M:%S.%f"), self.user_id,))
-            database.execute("UPDATE user SET apitoken = ? WHERE id = ?;",(self.apitoken, self.user_id,))
-        else:
+        if self.user_id is None or self.username != self._stored.get("username"):
+            # the UNIQUE column compares exactly, so "Alice" could sit next to "alice" in
+            # the approval list and on labels. A new name is refused the same way when it
+            # differs from someone else's only in case; names already stored are left alone
+            clash = database.execute(
+                "SELECT 1 FROM user WHERE username = ? COLLATE NOCASE AND id IS NOT ? LIMIT 1;",
+                (self.username, self.user_id),
+            ).fetchone()
+            if clash:
+                raise sqlite3.IntegrityError("UNIQUE constraint failed: user.username (ignoring case)")
+        if self.user_id is None:
             database.execute(
                 "INSERT INTO user (username, password, role, registered, last_login, apitoken) VALUES (?,?,?,?,?,?)",
-                (self.username, self.password, self.role, datetime.datetime.utcnow(), 'no login', self.apitoken),
+                # formatted here rather than handed over as a datetime: sqlite3's
+                # implicit adapter is deprecated as of 3.12, and it wrote a value
+                # fromDb could not always read back. See issue #98.
+                (self.username, self.password, self.role, format_timestamp(utc_now()), 'no login', self.apitoken),
             )
+        else:
+            for column in self.COLUMNS:
+                value = getattr(self, column)
+                if column in self._stored and value == self._stored[column]:
+                    continue
+                if isinstance(value, datetime.datetime):
+                    value = format_timestamp(value)
+                database.execute(f"UPDATE user SET {column} = ? WHERE id = ?;", (value, self.user_id))
+        database.commit()
+
+    def saveLogin(self, verified_password=None):
+        """Record a successful login: last_login, and - when login() moved the password
+        onto the current hashing method - the new hash.
+
+        The rehash is written only while the stored hash is still the one that was
+        verified: login() holds this copy across a slow password check, and a password
+        changed in the meantime is newer than this rehash of the old one.
+        """
+        database = get_db()
+        database.execute("UPDATE user SET last_login = ? WHERE id = ?;", (format_timestamp(self.last_login), self.user_id))
+        if verified_password is not None:
+            database.execute("UPDATE user SET password = ? WHERE id = ? AND password = ?;",
+                             (self.password, self.user_id, verified_password))
         database.commit()
     
     @property
     def registration_date(self):
         return self.registered.strftime("%Y-%m-%d")
     
+
+#: 3 to 20 letters, digits, dots and underscores, not starting or ending with a dot or an
+#: underscore, and no two of those in a row. Used with fullmatch, and anchored with \Z
+#: rather than $: in Python $ also matches before a final newline, which let "admin\n"
+#: through as a name of its own.
+USERNAME_PATTERN = re.compile(r"(?=[a-zA-Z0-9._]{3,20}\Z)(?!.*[_.]{2})[^_.].*[^_.]")
+
+#: Names no account may take, in any case.
+RESERVED_USERNAMES = ("guest", "mcritweb", "mcrit", "admin", "root", "system", "test", "demo")
+
+
+def is_well_formed_username(username):
+    """The format registration and rename both require."""
+    return USERNAME_PATTERN.fullmatch(username) is not None
+
+
+def is_reserved_username(username):
+    return username.lower() in RESERVED_USERNAMES
+
+
+def get_stored_password_hash_method():
+    """The hashing method the user table's passwords were made with, or None.
+
+    check_password_hash costs whatever the *stored* hash asks for, not whatever
+    generate_password_hash would pick today, and werkzeug's default has moved
+    (pbkdf2:sha256:260000 -> 600000 -> scrypt) across the versions this app has been
+    pinned to. Werkzeug writes the method into the hash ahead of the first '$', so the
+    answer can simply be read off a row. See issue #101 and _spend_a_password_check.
+
+    The *most common* method, not the first row's. A table carrying a mix - accounts
+    from before a werkzeug upgrade alongside accounts registered after it - has no
+    single right answer, and one dummy cannot match two methods. Picking the majority
+    leaves the smallest set of accounts distinguishable; picking an arbitrary row (a
+    bare LIMIT 1) leaves whichever set that row does not belong to, which on an upgraded
+    instance is every account created since the upgrade.
+
+    Read afresh on every call, deliberately. A cached answer would have to be dropped
+    by every write to the password column - registration, the rehash on login, a
+    password change, deleting a user - and by the ones this process never sees: a
+    second worker, `flask init-db`, a restored database file. A stale answer reopens
+    the timing gap without anything failing.
+
+    The price is paid on exactly the path this disguises: the query runs only when
+    the username is absent, so on a large user table it adds a small, repeatable delay
+    that a wrong password does not have - about 2 ms at 5,000 users. That is still far
+    below the hash check it precedes (66-150 ms), and the login throttle meters how
+    often anyone can ask. See issue #190.
+    """
+    record = get_db().execute(
+        """
+        SELECT substr(password, 1, instr(password, '$') - 1) AS method, COUNT(*) AS rows_with_it
+        FROM user
+        WHERE instr(password, '$') > 1
+        GROUP BY method
+        ORDER BY rows_with_it DESC
+        LIMIT 1;
+        """
+    ).fetchone()
+    if record is None or not record["method"]:
+        return None
+    return record["method"]
+
+
 def get_all_user_info():
     all_user_infos = []
     database = get_db() 
@@ -108,7 +269,10 @@ class ServerInfo:
             server_info = None
         return server_info
     
-    def saveToDb(self):
+    def saveToDb(self, commit=True):
+        # whatever get_server_info() handed out earlier in this request is about to be
+        # out of date - dropped first, so a failed write cannot leave it believed either
+        g.pop('server_info', None)
         database = get_db()
         # query to see if row exists
         record = database.execute("SELECT rowid FROM server LIMIT 1;").fetchone()
@@ -122,7 +286,24 @@ class ServerInfo:
                 "INSERT INTO server (url, operation_mode, registration_token, server_token, server_uuid, server_version) VALUES (?,?,?,?,?,?)",
                 (self.url, self.operation_mode, self.registration_token, self.server_token, self.server_uuid, self.server_version),
             )
-        database.commit()
+        # first-user registration leaves the commit to the user row that follows, so that
+        # both land together or not at all
+        if commit:
+            database.commit()
+
+
+def get_server_info():
+    """The server row, read once per request.
+
+    The operation-mode hook reads it, and so do get_server_url and get_server_token,
+    which the reachability probe and the client factory each call - five reads of the
+    same row on a page that probes the backend and builds a client. Kept on `g`, so it
+    lives no longer than the request; ServerInfo.saveToDb drops it, so a request that
+    changes the settings reads its own write. See issue #190.
+    """
+    if 'server_info' not in g:
+        g.server_info = ServerInfo.fromDb()
+    return g.server_info
 
 
 class UserFilters:
@@ -524,6 +705,10 @@ def init_db():
         db.executescript(f.read().decode('utf8'))
     with current_app.open_resource('sql' + os.sep + 'create_table_server.sql') as f:
         db.executescript(f.read().decode('utf8'))
+    with current_app.open_resource('sql' + os.sep + 'create_table_login_attempt.sql') as f:
+        db.executescript(f.read().decode('utf8'))
+    with current_app.open_resource('sql' + os.sep + 'create_table_query_upload.sql') as f:
+        db.executescript(f.read().decode('utf8'))
 
 @click.command('init-db')
 @with_appcontext
@@ -572,9 +757,11 @@ def migrate(app_context):
             for record in cursor.execute("select * from user;").fetchall():
                 user_ids.append(record[0])
             for user_id in user_ids:
-                generated_apitoken = hashlib.md5(uuid.uuid4().bytes).hexdigest()
+                generated_apitoken = generate_apitoken()
                 db.execute("UPDATE user SET apitoken = ? WHERE id = ?", (generated_apitoken, user_id))
-                print(f"EXECUTED MIGRATION: ADD APITOKEN {generated_apitoken} TO USER_ID {user_id} FROM TABLE USER")
+                # the token itself is deliberately not printed: it authenticates its
+                # owner to /api, and this line goes to the container log
+                print(f"EXECUTED MIGRATION: ADD APITOKEN TO USER_ID {user_id} FROM TABLE USER")
         # since version v1.2.10, we have an additional server_token field, ensure it exists (empty)
         server_table_columns = list(map(lambda x: x[0], db.execute('SELECT * FROM server').description))
         if "server_token" not in server_table_columns:
@@ -588,19 +775,115 @@ def migrate(app_context):
             with app_context.open_resource('sql' + os.sep + 'create_table_user_column_settings.sql') as f:
                 db.executescript(f.read().decode('utf8'))
             print("EXECUTED MIGRATION: CREATED TABLE USER_COLUMN_SETTINGS")
+        # since v1.4.9, failed logins are metered, ensure the table exists
+        attempt_table_needs_creation = False
+        try:
+            db.execute('SELECT * FROM login_attempt').fetchone()
+        except sqlite3.OperationalError:
+            attempt_table_needs_creation = True
+        if attempt_table_needs_creation:
+            with app_context.open_resource('sql' + os.sep + 'create_table_login_attempt.sql') as f:
+                db.executescript(f.read().decode('utf8'))
+            print("EXECUTED MIGRATION: CREATED TABLE LOGIN_ATTEMPT")
+        # since query results name the file they were uploaded as (#40), ensure the table exists
+        try:
+            db.execute('SELECT * FROM query_upload').fetchone()
+        except sqlite3.OperationalError:
+            with app_context.open_resource('sql' + os.sep + 'create_table_query_upload.sql') as f:
+                db.executescript(f.read().decode('utf8'))
+            print("EXECUTED MIGRATION: CREATED TABLE QUERY_UPLOAD")
 
         db.commit()
     finally:
         db.close()
 
 
-def is_first_user():
+#: How many failed attempts one address may make inside LOGIN_ATTEMPT_WINDOW before it
+#: is refused. Deliberately generous: a person who has forgotten which of two passwords
+#: they used should never meet this, and an attacker is not meaningfully inconvenienced
+#: by 10 versus 5 - what stops unmetered guessing is the window, not the count.
+LOGIN_ATTEMPT_LIMIT = 10
+
+#: Seconds. Also how long a blocked address stays blocked, since the count is always
+#: taken over the trailing window rather than held as a lockout flag - so a block
+#: expires on its own and there is no state to clear or unlock.
+LOGIN_ATTEMPT_WINDOW = 900
+
+
+def record_failed_login(remote_addr, username):
+    """Record one failed attempt, and drop attempts that have aged out of the window.
+
+    Pruning here rather than on a timer keeps the table bounded without a scheduler:
+    the only thing that grows it is the same call that trims it.
+    """
+    now = int(time.time())
     db = get_db()
-    cursor = db.cursor()
-    if len(cursor.execute("select * from user;").fetchall()) > 0:
-        return False
+    db.execute(
+        "INSERT INTO login_attempt (remote_addr, username, attempted_at) VALUES (?, ?, ?)",
+        (remote_addr or "", username or "", now),
+    )
+    db.execute("DELETE FROM login_attempt WHERE attempted_at < ?", (now - LOGIN_ATTEMPT_WINDOW,))
+    db.commit()
+
+
+def count_recent_login_failures(remote_addr, username=None):
+    """Failures from this address in the trailing window; optionally for one username."""
+    since = int(time.time()) - LOGIN_ATTEMPT_WINDOW
+    db = get_db()
+    if username is None:
+        row = db.execute(
+            "SELECT COUNT(*) AS n FROM login_attempt WHERE remote_addr = ? AND attempted_at >= ?",
+            (remote_addr or "", since),
+        ).fetchone()
     else:
-        return True
+        row = db.execute(
+            "SELECT COUNT(*) AS n FROM login_attempt "
+            "WHERE remote_addr = ? AND username = ? AND attempted_at >= ?",
+            (remote_addr or "", username or "", since),
+        ).fetchone()
+    return row["n"] if row else 0
+
+
+def login_is_throttled(remote_addr):
+    """Whether this address has spent its attempts for the current window.
+
+    Keyed on the address only, never on the username, and that is the whole design
+    decision issue #101 asks to make explicit. A per-account lockout hands an attacker
+    a denial of service against any account whose name they know: fail four times
+    against `admin` and the real admin is locked out. Metering the *source* costs an
+    attacker their own budget instead.
+
+    The username is still counted - see `count_recent_login_failures` - but only so the
+    log can say that attempts are aimed at one account, which is what an operator needs
+    to see. It never blocks.
+    """
+    return count_recent_login_failures(remote_addr) >= LOGIN_ATTEMPT_LIMIT
+
+
+def clear_login_failures(remote_addr, username):
+    """Forget this address's failed logins as `username`. Called on a successful
+    authentication, so an ordinary person who mistyped their password a few times does
+    not carry the count around for the rest of the window.
+
+    Only that name's: clearing every failure from the address let anyone with a working
+    account of their own reset the throttle between guesses at someone else's. /register
+    records a wrong token under a name no login can carry (see
+    authentication.registration_token_attempt), so a login never resets that budget
+    either. The cost: failures under a mistyped username stay counted until the window
+    ends, even once the right name has logged in.
+    """
+    db = get_db()
+    db.execute(
+        "DELETE FROM login_attempt WHERE remote_addr = ? AND username = ?",
+        (remote_addr or "", username or ""),
+    )
+    db.commit()
+
+
+def is_first_user():
+    """True while the user table is empty. Asked on every request, so it only asks
+    whether a row exists rather than reading them all - see issue #190."""
+    return get_db().execute("SELECT 1 FROM user LIMIT 1;").fetchone() is None
 
 def get_registration_token():
     registration_token = None
@@ -637,3 +920,42 @@ def get_username_by_apitoken(apitoken):
     if record is not None:
         username = record["username"]
     return username
+
+#: A query filename is display metadata, never a path. Cap it so a hostile upload can
+#: neither bloat the table nor push everything else off the result page.
+MAX_QUERY_FILENAME_LENGTH = 255
+
+def _displayable_filename(filename):
+    """Reduce an uploaded filename to what may be shown to another user.
+
+    `isprintable()` drops control characters and the invisible formatting characters
+    that let one name be dressed as another. Path separators are kept - the value is
+    never used to build a path here, and mangling them would show the uploader a name
+    they do not recognize.
+    """
+    if not filename or not isinstance(filename, str):
+        return ""
+    return "".join(character for character in filename if character.isprintable()).strip()[:MAX_QUERY_FILENAME_LENGTH]
+
+def remember_query_filename(job_id, filename):
+    """Record the name a query was uploaded under, so its result page can show it.
+
+    None of the backend's query endpoints accepts a filename, so this is the only
+    place the name is ever kept. Keyed by job id: the backend deduplicates a repeated
+    query onto the job it already has, and the name kept is the first one seen for it.
+    """
+    filename = _displayable_filename(filename)
+    if not job_id or not filename:
+        return
+    db = get_db()
+    db.execute("INSERT OR IGNORE INTO query_upload (job_id, filename) VALUES (?, ?);", (str(job_id), filename))
+    db.commit()
+
+def get_query_filename(job_id):
+    """The name a query job's upload carried, or None if this instance never saw it."""
+    if not job_id:
+        return None
+    db = get_db()
+    cursor = db.cursor()
+    record = cursor.execute("SELECT filename FROM query_upload WHERE job_id = ?;", (str(job_id),)).fetchone()
+    return record["filename"] if record is not None else None

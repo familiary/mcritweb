@@ -1,0 +1,17 @@
+{% from 'table/column_table.html' import job_column_table %}
+
+{% extends 'base.html' %}
+{% block title%}
+Job {{ job_info.job_id }} did not finish
+{% endblock %}
+{% block content %}
+
+<h1>Job {{ job_info.job_id }} did not finish</h1>
+
+<p>{{ reason }}</p>
+
+{{ job_column_table(job_info, show_progress=False) }}
+
+<p>back to <a href="{{ url_for('data.jobs') }}">Jobs and Results</a></p>
+
+{% endblock %}

@@ -1,12 +1,10 @@
-import json
 import re
 
 from flask import Blueprint, Response, abort, current_app, g, request
-from smda.common.SmdaReport import SmdaReport
 
 from mcritweb.views.authentication import token_required
 from mcritweb.views.client import get_client
-from mcritweb.views.utility import get_username, mcrit_server_required
+from mcritweb.views.utility import get_username, mcrit_server_required, read_smda_report
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -22,12 +20,41 @@ CONTRIBUTOR_ONLY = [
 def requires_contributor(api_path, method):
     return any(pattern.match(api_path) and method == verb for pattern, verb in CONTRIBUTOR_ONLY)
 
+def exceeds_query_upload_limit():
+    """The per-role cap `analyze.query` puts on what may be queried (#19). A token
+    carries the same authority as its owner's browser, so the API applies it too.
+
+    The declared Content-Length is checked, so an oversized body is refused without
+    being read. The server hands the app no more than that many bytes, so a body that
+    claims less cannot be larger. A chunked body declares nothing, and only reading it
+    would tell its size, so a capped role is refused one. McritClient always declares a
+    length: it sends bytes through `requests`. (Reading it up to the cap would need
+    `request.max_content_length` set per request, which Flask allows only from 3.1;
+    requirements.txt allows 3.0.)"""
+    role_limit = current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.api_user.role)
+    if role_limit is None:
+        return False
+    if request.content_length is None:
+        return True
+    return request.content_length > role_limit
+
 def nullable_int(x):
     try:
         casted = int(x)
         return casted
     except Exception:
         raise ValueError("Can't cast this to int")
+
+def int_list(x):
+    """Comma-separated ints, parsed the way the backend's /jobs parses them: an item
+    that isn't one is dropped."""
+    ids = []
+    for item in x.split(","):
+        try:
+            ids.append(int(item))
+        except ValueError:
+            pass
+    return ids
 
 def stringified_bool(x):
     if not isinstance(x, str):
@@ -39,8 +66,15 @@ def stringified_bool(x):
         return False
 
 def handle_raw_response(response):
+    # the backend's JSON goes out as the bytes it sent, error answers included; of its
+    # headers only the JSON content type crosses over. A success that is not JSON (a
+    # proxy's error page, an empty answer) is a bad gateway, an error keeps its status.
+    content_type = response.headers.get("Content-Type", "")
+    if content_type.split(";")[0].strip().lower() == "application/json" and response.content:
+        return Response(response=response.content, status=response.status_code, content_type=content_type)
     if response.status_code in [200, 202]:
-        return Response(response=json.dumps(response.json()), status=response.status_code)
+        current_app.logger.warning("api passthrough: backend answered %d with %r, %d bytes", response.status_code, content_type, len(response.content))
+        return Response(status=502)
     return Response(status=response.status_code)
 
 
@@ -80,8 +114,9 @@ def api_router(api_path):
                 pass
             return handle_raw_response(client.getSamples(forward_start, forward_limit))
         elif request.method == 'POST':
-            smda_report_body = request.get_json(force=True)
-            smda_report = SmdaReport.fromDict(smda_report_body)
+            smda_report = read_smda_report(request.get_data())
+            if smda_report is None:
+                return Response(status=400)
             return handle_raw_response(client.addReport(smda_report))
     # getFamily, isFamilyId
     elif re_match := re.match(r"families/(?P<family_id>\d+)$", api_path):
@@ -108,15 +143,38 @@ def api_router(api_path):
                 pass
             return handle_raw_response(client.getFunctions(forward_start, forward_limit))
         elif request.method == 'POST':
-            if re.match(rb"^\d+(?:[\s]*,[\s]*\d+)*$", request.data):
-                forward_with_label_only = request.args.get("with_label_only", "").lower() in ["1", "true"]
-                target_function_ids = [int(function_id) for function_id in request.data.split(b",")]
+            forward_with_label_only = request.args.get("with_label_only", "").lower() in ["1", "true"]
+            # the raw body, whatever its content type, as the backend reads it: `request.data`
+            # is empty for a form body, which is what `curl --data` sends by default
+            function_id_list = request.get_data()
+            if re.match(rb"^\d+(?:[\s]*,[\s]*\d+)*$", function_id_list):
+                target_function_ids = [int(function_id) for function_id in function_id_list.split(b",")]
                 return handle_raw_response(client.getFunctionsByIds(target_function_ids, with_label_only=forward_with_label_only))
             return handle_raw_response(client.getFunctionsByIds([], with_label_only=forward_with_label_only))
+    # getSamplesByIds, getFamiliesByIds: a comma-separated id list as the body, as for
+    # functions; sample ids may be negative, for query samples
+    elif re_match := re.match(r"(?P<collection>samples|families)/ids$", api_path):
+        if request.method != "POST":
+            return Response(status=405)
+        id_list = request.get_data()
+        id_pattern = rb"^-?\d+(?:[\s]*,[\s]*-?\d+)*$" if re_match.group("collection") == "samples" else rb"^\d+(?:[\s]*,[\s]*\d+)*$"
+        if not re.match(id_pattern, id_list):
+            # what the backend answers a body that isn't an id list; the client sends
+            # none it could answer that way
+            return Response(status=400)
+        entry_ids = [int(entry_id) for entry_id in id_list.split(b",")]
+        fetch_many = client.getSamplesByIds if re_match.group("collection") == "samples" else client.getFamiliesByIds
+        return handle_raw_response(fetch_many(entry_ids))
     # getMatchesForSmdaFunction
     elif re_match := re.match(r"query/function$", api_path):
-        smda_report_body = request.get_json(force=True)
-        smda_report = SmdaReport.fromDict(smda_report_body)
+        if exceeds_query_upload_limit():
+            return Response(status=403)
+        # not a report, or nested deeper than json can follow: fromDict, or get_json
+        # on the nesting, raised and the router answered a 500. After the cap, which
+        # reads no further than it needs to
+        smda_report = read_smda_report(request.get_data())
+        if smda_report is None:
+            return Response(status=400)
         return handle_raw_response(client.getMatchesForSmdaFunction(smda_report))
     # getMatchesForPicHash
     elif re_match := re.match(r"query/pichash/(?P<pichash>[0-9a-fA-F]{16})(?P<as_summary>/summary)?$", api_path):
@@ -145,6 +203,15 @@ def api_router(api_path):
             forward_ascending = request.args.get("ascending", False, stringified_bool)
         except Exception:
             pass
+        # the backend's selectors, passed on as lists; an item that isn't an id is
+        # dropped, as the backend drops it, and a present but empty list still selects
+        # nothing rather than everything
+        forward_sample_ids = None
+        forward_job_ids = None
+        if "sample_ids" in request.args:
+            forward_sample_ids = int_list(request.args["sample_ids"])
+        if "job_ids" in request.args:
+            forward_job_ids = [item.strip() for item in request.args["job_ids"].split(",") if item.strip()]
         return handle_raw_response(
             client.getQueueData(
                 start=forward_start, 
@@ -152,7 +219,9 @@ def api_router(api_path):
                 method=forward_method, 
                 filter=forward_filter, 
                 state=forward_state, 
-                ascending=forward_ascending
+                ascending=forward_ascending,
+                sample_ids=forward_sample_ids,
+                job_ids=forward_job_ids
             )
         )
     # getJobData, getResultForJob
@@ -190,6 +259,8 @@ def api_router(api_path):
         return handle_raw_response(client.getVersion())
     # requestMatchesForMappedBinary, requestMatchesForUnmappedBinary
     elif re_match := re.match(r"query/binary(/mapped/\d+)?$", api_path):
+        if exceeds_query_upload_limit():
+            return Response(status=403)
         binary = request.get_data()
         request_args = request.args
         minhash_threshold = request_args.get("minhash_threshold", default=None, type=nullable_int)

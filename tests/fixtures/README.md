@@ -35,6 +35,7 @@ captured.
 | `matches_for_query.*` | query report — `is_query`, negative sample id |
 | `cross_compare.*` | cross compare over five samples |
 | `unique_blocks.*` | unique blocks for a family, with its YARA rule |
+| `maintenance_*.*` | the three maintenance jobs (`rebuildIndex`, `recalculatePicHashes`, `recalculateMinHashes`) and their results, one per branch of `result_maintenance.html` |
 | `functions_reference_<id>` | first 100 functions of a reference sample, graphs intact |
 | `functions_matched` | every function the 1-vs-1 page resolves by id, graphs dropped |
 
@@ -60,3 +61,11 @@ tolerating a miss.
 
 Widen the pools when a test needs the filtered result views (`?funid=`, `?samid=`,
 `?famid=`), which reach for matched entries beyond what is captured here.
+
+## `cfg_loop_functions.json`
+
+Not part of the corpus above, and not touched by `regenerate.py`: five real
+functions (with `xcfg` and `picblockhashes` intact) captured by hand from a
+different live instance for issue #204's CFG dot-graph/loop-detection equivalence
+tests. See the module docstring of `tests/testCfgLoopDetection.py`, which loads it
+directly rather than through `CorpusMcritClient`.

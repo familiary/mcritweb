@@ -10,7 +10,105 @@ Import
 {% block content %}
 <center>
     {{ dropzone.create(action= url_for('data.import_view')) }}
+    <div id="import-status" class="alert alert-info" role="status" aria-live="polite" style="display:none; width:60%;">
+      <span id="import-status-spinner" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      <span id="import-status-text"></span>
+    </div>
 </center>
 <script src="{{ url_for('static', filename='dropzone.js') }}"></script>
-{{ dropzone.config(max_file_size=100000000) }}
+{% set import_status_js %}
+    // An import is one blocking request: MCRIT's /import is not queued and returns no
+    // job_id, so there is no job for job_in_progress.html to draw a real percentage
+    // from. Dropzone's own bar only covers the upload, and it is already at 100% when
+    // the server starts the actual import - which is the long part. So say which phase
+    // the request is in, and keep saying it until the request comes back.
+    var dz = this;
+    var statusBox = document.getElementById("import-status");
+    var statusText = document.getElementById("import-status-text");
+    var statusSpinner = document.getElementById("import-status-spinner");
+
+    var lastImportStatus = null;
+
+    function showImportStatus(message, busy, level) {
+      // uploadprogress fires per chunk, and this is an aria-live region - repeating an
+      // unchanged message would have a screen reader read it out again every time
+      var key = level + "|" + (busy ? "1" : "0") + "|" + message;
+      if (key === lastImportStatus) { return; }
+      lastImportStatus = key;
+      statusBox.className = "alert " + level;
+      statusBox.style.display = "";
+      statusSpinner.style.display = busy ? "" : "none";
+      // a file name is picked by whoever produced the file, so it is written as text
+      statusText.textContent = message;
+    }
+
+    function importFileLabel(file) {
+      var name = (file && typeof file.name === "string") ? file.name : "the file";
+      return name.length > 80 ? name.slice(0, 80) + "..." : name;
+    }
+
+    function importHasFailed() {
+      return dz.getFilesWithStatus(Dropzone.ERROR).length > 0;
+    }
+
+    dz.on("addedfile", function() {
+      // drop the leftovers of an earlier failed attempt, so its error state cannot
+      // hold the next upload in "uploading..." forever
+      dz.getFilesWithStatus(Dropzone.ERROR).forEach(function(failed) {
+        dz.removeFile(failed);
+      });
+    });
+
+    dz.on("sending", function(file) {
+      showImportStatus("Uploading " + importFileLabel(file) + " ...", true, "alert-info");
+    });
+
+    dz.on("uploadprogress", function(file, progress) {
+      if (importHasFailed()) { return; }
+      var percent = (typeof progress === "number" && isFinite(progress))
+        ? Math.max(0, Math.min(100, Math.floor(progress)))
+        : null;
+      if (percent === 100) {
+        showImportStatus("Upload complete - the MCRIT server is importing the data. A large export can take several minutes, please keep this page open.", true, "alert-info");
+      } else if (percent === null) {
+        showImportStatus("Uploading " + importFileLabel(file) + " ...", true, "alert-info");
+      } else {
+        showImportStatus("Uploading " + importFileLabel(file) + " ... " + percent + "%", true, "alert-info");
+      }
+    });
+
+    dz.on("error", function(file, message, xhr) {
+      // dropzone hands the raw response body through as the message, and an error page
+      // is not something to repeat back at the user - it is noise at best and internals
+      // at worst. A status code says as much and gives nothing away.
+      var reason;
+      if (xhr && xhr.status) {
+        reason = "the MCRIT web server answered " + xhr.status + ". The data was not imported.";
+      } else if (typeof message === "string" && message.length <= 200 && message.indexOf("<") === -1) {
+        reason = message;
+      } else {
+        reason = "the upload was not accepted.";
+      }
+      showImportStatus("Import failed: " + reason, false, "alert-danger");
+      // the file tile carries its own copy of the same message - replace that too
+      if (file && file.previewElement) {
+        var shown = file.previewElement.querySelectorAll("[data-dz-errormessage]");
+        for (var i = 0; i < shown.length; i++) {
+          shown[i].textContent = reason;
+        }
+      }
+    });
+
+    dz.on("queuecomplete", function() {
+      // this page owns the redirect instead of DROPZONE_REDIRECT_VIEW, whose handler
+      // fires whatever happened - it would replace a real error with import_complete's
+      // "not valid MCRIT data", which is the wrong story when the backend fell over
+      if (importHasFailed()) { return; }
+      // "accepted", not "imported" - a 200 also carries the "this is not MCRIT data"
+      // answer, and only import_complete knows which of the two came back
+      showImportStatus("Upload accepted - loading the import report ...", true, "alert-info");
+      window.location = {{ url_for('data.import_complete')|tojson }};
+    });
+{% endset %}
+{{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_init=import_status_js) }}
 {% endblock %}

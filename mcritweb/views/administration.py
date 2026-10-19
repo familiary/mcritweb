@@ -1,42 +1,49 @@
 import json
-import re
+import sqlite3
 
-from flask import Blueprint, current_app, flash, g, redirect, render_template, request, session, url_for
+import requests
+from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo
+from mcritweb.db import UserColumnSettings, UserFilters, UserInfo, generate_apitoken
 from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
 from mcritweb.views.client import get_client
+from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
-from mcritweb.views.utility import get_mcritweb_version_from_setup, get_session_user_id
+from mcritweb.views.utility import forget_server_probe, get_session_user_id
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
-@bp.route('/change_username' , methods=('GET', 'POST'))
+@bp.route('/change_username' , methods=('POST',))
 @login_required
 def change_username():
-    # validate user_id:
-    try:
-        user_id = int(session['user_id'])
-        if user_id < 1:
-            raise ValueError
-    except Exception:
-        return redirect(url_for('index'))
     new_username = request.form['username']
     password = request.form['inputPassword1']
+    # g.user is the caller's row, read fresh for this request by load_logged_in_user
+    user_info = g.user
     error_msg = None
-    user_info = UserInfo.fromDb(user_id=session['user_id'])
-    if re.match(r"^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$", new_username) is None:
+    # cheapest check first, and the password before the lookup, so that whether a
+    # name is taken is only ever answered to someone who proved who they are
+    if not db.is_well_formed_username(new_username):
         error_msg = "Username has invalid format."
-    if  not check_password_hash(user_info.password, password):
+    elif db.is_reserved_username(new_username):
+        error_msg = "Username is reserved."
+    elif not check_password_hash(user_info.password, password):
         error_msg = 'Incorrect Password!'
-    user_with_name = UserInfo.fromDb(username=new_username)
-    if user_with_name is not None:
+    elif UserInfo.fromDb(username=new_username) is not None:
         error_msg = 'Username is already taken!'
     if error_msg is None:
+        old_username = user_info.username
         user_info.username = new_username
-        user_info.saveToDb()
+        try:
+            user_info.saveToDb()
+        except sqlite3.IntegrityError:
+            # the lookup above is not a lock: a registration or another rename can
+            # take the name before this write, and the UNIQUE column refuses it
+            user_info.username = old_username
+            error_msg = 'Username is already taken!'
+    if error_msg is None:
         flash('Username successfully changed', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')
@@ -45,28 +52,24 @@ def change_username():
     return redirect(url_for('authentication.settings'))
 
 
-@bp.route('/change_password' , methods=('GET', 'POST'))
+@bp.route('/change_password' , methods=('POST',))
 @login_required
 def change_password():
-    # validate user_id:
-    try:
-        user_id = int(session['user_id'])
-        if user_id < 1:
-            raise ValueError
-    except Exception:
-        return redirect(url_for('index'))
     new_password = request.form['inputPassword3']
     old_password = request.form['inputPassword2']
+    user_info = g.user
     error_msg = None
-    user_info = UserInfo.fromDb(user_id=session['user_id'])
-    if not check_password_hash(user_info.password, old_password):
-        error_msg = 'Incorrect password!'
     if not new_password == request.form['inputPassword4']:
         error_msg = 'The entered passwords do not match!'
+    elif not check_password_hash(user_info.password, old_password):
+        error_msg = 'Incorrect password!'
     if error_msg is None:
         user_info.password = generate_password_hash(new_password)
-        user_info.saveToDb(withPassword=True)
-        flash('Password successfully changed', category='success')
+        # the token is on /settings, so whoever could read that page with a stolen session
+        # could have copied it; it must not outlast the password change that ends the session
+        user_info.apitoken = generate_apitoken()
+        user_info.saveToDb()
+        flash('Password successfully changed. Your API token was replaced too; anything using the old one has to be updated.', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')
     return redirect(url_for('authentication.settings'))
@@ -157,12 +160,29 @@ def reset_column_settings():
     
     return redirect(url_for('authentication.settings'))
 
+@bp.route('/regenerate_apitoken', methods=('POST',))
+@login_required
+def regenerate_apitoken():
+    """Issue the caller a new API token, replacing the one they have.
+
+    Only ever touches the caller's own row - the user id comes from the session, not
+    from the request - so this needs no more than a session. Until now a token could
+    not be replaced at all: deleting the account was the only way to retire one, which
+    is not a thing you can ask of someone whose token has leaked. See issue #100.
+    """
+    user_info = g.user
+    user_info.apitoken = generate_apitoken()
+    user_info.saveToDb()
+    flash('A new API token was generated. Anything using the old one has to be updated.', category='success')
+    return redirect(url_for('authentication.settings'))
+
 @bp.route('/users/')
 @bp.route('/users/<tab>')
 @admin_required
 @multi_user
 def users(tab = None):
     g.all_users = get_users()
+    g.users_by_role = group_users_by_role(g.all_users)
     if tab is None:
         return render_template("users.html", active='all')    
     return render_template("users.html", active=tab)
@@ -171,6 +191,16 @@ def users(tab = None):
 def get_users():
     user_infos = db.get_all_user_info()
     return user_infos
+
+
+def group_users_by_role(user_infos):
+    """One list per role in KNOWN_ROLES, each in the order given, for the role tabs of
+    users.html. A user with any other role is only listed under "all" (#95)."""
+    grouped = {role: [] for role in KNOWN_ROLES}
+    for user_info in user_infos:
+        if user_info.role in grouped:
+            grouped[user_info.role].append(user_info)
+    return grouped
 
 
 @bp.route('/change_user_role/<int:user_id>/<role>/<tab>', methods=('POST',))
@@ -211,34 +241,62 @@ def delete_user(user_id, tab = None):
     return redirect(url_for('admin.users', tab=tab))
 
 
+def backend_version(client):
+    """The MCRIT backend's version as a string, or "unknown".
+
+    `McritClient.getVersion()` answers with the dict mcrit's own
+    `MinHashIndex.getVersion` builds - `{"version": "1.4.3"}` - not a bare string, so
+    rendering it directly put `{'version': '1.4.3'}` on the page. It answers None when
+    the backend could not be reached or refused, which is not a version either.
+    """
+    try:
+        version = client.getVersion()
+    except requests.RequestException:
+        # An unreachable backend is exactly when an admin needs this page: it carries the
+        # form for correcting the server URL, and `backend_unavailable.html` sends them
+        # here to do it. Letting the transport failure out turns that instruction into a
+        # dead end - the one page that can fix the outage is the one the outage breaks.
+        # Only the transport family is caught; anything else here is our own bug.
+        return "unknown"
+    if isinstance(version, dict):
+        version = version.get("version")
+    return version if isinstance(version, str) and version else "unknown"
+
+
 @bp.route('/server')
 @admin_required
 def server():
-    server_info = ServerInfo.fromDb()
+    server_info = db.get_server_info()
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
-    running_server_version = get_mcritweb_version_from_setup()
+    running_server_version = current_app.config['MCRITWEB_VERSION']
     client = get_client()
-    mcrit_version = client.getVersion()
+    mcrit_version = backend_version(client)
     return render_template('admin_server.html', operation_mode=operation_mode_str, server_info=server_info, running_version=running_server_version, mcrit_version=mcrit_version)
 
 
 @bp.route('/change_server' , methods=('POST',))
 @admin_required
 def change_server():
-    server_info = ServerInfo.fromDb()
+    server_info = db.get_server_info()
     new_url = request.form.get('mcrit_server_url', '')
     new_token = request.form.get('mcrit_server_token', '')
     if server_info.url != new_url or server_info.server_token != new_token:
         server_info.url = new_url
         server_info.server_token = new_token
         server_info.saveToDb()
+        # an operator who has just corrected the URL or token should not have to wait
+        # out the reachability TTL to find out whether it worked - see issue #89. The
+        # cache is a module global, so this clears the worker that handled this request;
+        # with N gunicorn workers the other N-1 still answer from their own entry until
+        # it lapses, which the default 5s TTL bounds.
+        forget_server_probe()
         flash('Server information successfully changed', category='success')
     else:
         flash('No information needed change', category='success')
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
-    running_server_version = get_mcritweb_version_from_setup()
+    running_server_version = current_app.config['MCRITWEB_VERSION']
     client = get_client()
-    mcrit_version = client.getVersion()
+    mcrit_version = backend_version(client)
     return render_template('admin_server.html', operation_mode=operation_mode_str, server_info=server_info, running_version=running_server_version, mcrit_version=mcrit_version)
 
 
@@ -251,9 +309,11 @@ def reset_server():
         return redirect(url_for('admin.server'))
     client = get_client()
     client.respawn()
+    forget_server_probe()
     from mcritweb.views.utility import ensure_local_data_paths
     ensure_local_data_paths(current_app, clear_data=True)
-    # TODO also clean all locally cached data.
+    # the reset restarts the backend's id counters, so anything memoized by id is stale
+    clear_app_memos(current_app)
     flash('A reset of MCRIT was successfully performed.', category='success')
     return redirect(url_for('index'))
 

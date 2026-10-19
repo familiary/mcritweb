@@ -49,31 +49,69 @@ Search
      <input type='submit' hidden>
   </form>
 
+  {# tracked so a search that matched nothing can say so instead of rendering a
+     heading and then silence - see issue #54. Set inside the three blocks rather than
+     recomputed afterwards, so the conditions stay the single description of what
+     counts as a result.
+
+     Note it is set on row count alone, not on the condition that opens the block.
+     `hasCurrent` is true whenever the request carried a cursor parameter - which the
+     pagination links always supply - and says nothing about whether the page behind it
+     has rows. Setting the flag from it meant that paging past the last page of a search
+     rendered three headings over three empty tables and no explanation, which is the
+     exact symptom this is here to remove. #}
+  {% set rendered = namespace(anything=False) %}
+
   {% if families |length > 0 or (family_pagination and family_pagination.hasCurrent) %}
+    {% if families |length > 0 %}{% set rendered.anything = True %}{% endif %}
     <h3 id="family-results">Families</h3>
     {{ set_pagination_params(family_pagination, _anchor="family-results") }}
-    {{ family_table(families, sort_pagination=family_pagination, column_setup=family_column_setup) }}
+    {{ family_table(families, sort_pagination=family_pagination, column_setup=family_column_setup, row_decorations=family_decorations) }}
     {% if families %}
     {{ pagination_widget(family_pagination) }}
     {% endif %}
   {% endif %}
 
   {% if samples |length > 0 or (sample_pagination and sample_pagination.hasCurrent) %}
+    {% if samples |length > 0 %}{% set rendered.anything = True %}{% endif %}
     <h3 id="sample-results">Samples</h3>
     {{ set_pagination_params(sample_pagination, _anchor="sample-results") }}
-    {{ sample_table(samples, sort_pagination=sample_pagination, column_setup=sample_column_setup) }}
+    {{ sample_table(samples, sort_pagination=sample_pagination, column_setup=sample_column_setup, row_decorations=sample_decorations) }}
     {% if samples %}
     {{ pagination_widget(sample_pagination) }}
     {% endif %}
   {% endif %}
 
+  {% if query and not search_types.__contains__('function') %}
+    {# Never leave the omission silent: without this, a search for a function name
+       reads as "no such function" rather than "functions were not searched". #}
+    <h3 id="function-results">Functions</h3>
+    <p class="text-muted">
+      Not searched.
+      <a href="{{ url_for('explore.search', query=query, type=(search_types + ['function'])|join(',')) }}">Search functions too</a>
+      &ndash; on a large database this takes a while, longest when there is nothing to find.
+    </p>
+  {% endif %}
+
   {% if functions |length > 0 or (function_pagination and function_pagination.hasCurrent) %}
+    {% if functions |length > 0 %}{% set rendered.anything = True %}{% endif %}
     <h3 id="function-results">Functions</h3>
     {{ set_pagination_params(function_pagination, _anchor="function-results") }}
-    {{ function_table(functions, sort_pagination=function_pagination, column_setup=function_column_setup) }}
+    {{ function_table(functions, sort_pagination=function_pagination, column_setup=function_column_setup, row_decorations=function_decorations) }}
     {% if functions %}
     {{ pagination_widget(function_pagination) }}
     {% endif %}
+  {% endif %}
+
+  {# "nothing matched" is only a true statement about the categories that answered. A
+     category whose search failed has already flashed an error and is excluded here, so
+     a partial failure no longer silences the answer for the ones that worked. #}
+  {% if query and not rendered.anything and answered_types %}
+    <div class="alert alert-info mt-3" role="alert">
+      Nothing matched <strong>{{ query }}</strong>
+      {%- if search_failed %} in {{ answered_types|join(', ') }}{% else %} in the categories ticked above{% endif %}.
+      Check the <a class="alert-link" href="{{ url_for('help') }}#search">search syntax</a>, or try a different term.
+    </div>
   {% endif %}
 
 {% endblock %}

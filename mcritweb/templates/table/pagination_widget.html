@@ -19,6 +19,9 @@
         url.hash = kwargs["_anchor"];
       }
       var result = url.toString();
+      if (window.mcritwebPageLoading) {
+        window.mcritwebPageLoading.showFor(result);
+      }
       window.location.href=result;
     }
   </script>
