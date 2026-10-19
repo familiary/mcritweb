@@ -10,8 +10,8 @@ renderer that miscounts a filtered report, fails here rather than in a browser.
 The reports come from a live instance - see tests/fixtures/regenerate.py.
 """
 
-import copy
 import collections
+import copy
 import html
 import json
 import logging
