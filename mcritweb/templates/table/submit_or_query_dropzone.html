@@ -183,14 +183,26 @@ function handleSliderChange_dropzone(val) {
   <script>
   function mcritLoadDropzone(done) {
     if (window.mcritDropzoneReady) { done(); return; }
-    if (window.mcritDropzoneLoading) { window.mcritDropzoneLoading.push(done); return; }
+    if (window.mcritDropzoneLoading) {
+      // dragover fires every few milliseconds while a file is held over the page
+      if (window.mcritDropzoneLoading.indexOf(done) < 0) { window.mcritDropzoneLoading.push(done); }
+      return;
+    }
     window.mcritDropzoneLoading = [done];
-    var css = document.createElement("link");
-    css.rel = "stylesheet";
-    css.href = "{{ url_for('static', filename='dropzone.min.css') }}";
-    document.head.appendChild(css);
+    if (!document.getElementById("mcrit-dropzone-css")) {
+      var css = document.createElement("link");
+      css.id = "mcrit-dropzone-css";
+      css.rel = "stylesheet";
+      css.href = {{ url_for('static', filename='dropzone.min.css')|tojson }};
+      document.head.appendChild(css);
+    }
     var script = document.createElement("script");
-    script.src = "{{ url_for('static', filename='dropzone.min.js') }}";
+    // the project's patched build: it sends the head of the file the form is pre-filled from
+    script.src = {{ url_for('static', filename='dropzone.js')|tojson }};
+    script.onerror = function () {
+      // let the next drag try again
+      window.mcritDropzoneLoading = null;
+    };
     script.onload = function () {
       Dropzone.autoDiscover = false;
       Dropzone.options.myDropzone = window.mcritDropzoneOptions;
@@ -210,7 +222,7 @@ function handleSliderChange_dropzone(val) {
   </script>
 {% else %}
   {{ dropzone.create(action=target_link) }}
-  <script src="{{ url_for('static', filename='dropzone.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='dropzone.js') }}"></script>
   {{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_options='autoProcessQueue: false') }}
 {% endif %}
   <form id="dropzone-additional-fields-form">
