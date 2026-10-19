@@ -143,12 +143,13 @@ def test_an_empty_query_marks_nothing(query):
     assert get_highlight_terms(query) == {}
 
 
-@pytest.mark.parametrize("query", ["((", "a AND", "a " * 300])
+@pytest.mark.parametrize("query", ["((", "a AND", "(" * 2000 + "a" + ")" * 2000])
 def test_an_unparseable_query_marks_nothing_instead_of_raising(query):
     """Such a query fails in the backend too, so the page is already showing a search
     failure; marking is cosmetic and has no business turning that into a 500. The
-    third case is not a parse error but a RecursionError out of pyparsing, which is
-    why the guard catches Exception rather than ValueError."""
+    third case used to be `"a " * 300`, which raised a RecursionError out of pyparsing
+    until mcrit's parser stopped recursing on a flat query; nesting is what still
+    fails there, and the guard catches Exception rather than ValueError for that kind."""
     assert get_highlight_terms(query) == {}
 
 
