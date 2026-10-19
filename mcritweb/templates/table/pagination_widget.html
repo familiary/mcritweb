@@ -50,7 +50,8 @@
 
   {%- macro _get_href_or_onclick(page, _js_argument_provider=none) -%}
     {% if _js_argument_provider is not none %}
-      onclick="pagination_js_helper('{{ pagination.get_link(page, **kwargs)}}', {{ _js_argument_provider }}() )"
+      {# the href keeps the link crawlable and middle-clickable; the handler adds the other tables' state #}
+      href="{{ pagination.get_link(page, **kwargs) }}" onclick="pagination_js_helper('{{ pagination.get_link(page, **kwargs)}}', {{ _js_argument_provider }}() ); return false"
     {% else %}
       href="{{ pagination.get_link(page, **kwargs) }}"
     {% endif %}
@@ -66,22 +67,22 @@
 
   <ul class="pagination justify-content-center">
     <li class="page-item {% if pagination.page_index == 0 %}disabled{% endif %}">
-      <a class="page-link" {{ _get_href_or_onclick(1, **kwargs) }}><i class="fa-solid fa-angles-left"></i></a>
+      <a aria-label="First page" title="First page" class="page-link" {{ _get_href_or_onclick(1, **kwargs) }}><i class="fa-solid fa-angles-left"></i></a>
     </li>
     <li class="page-item {% if pagination.page_index == 0 %}disabled{% endif %}">
-      <a class="page-link" {{ _get_href_or_onclick(pagination.page - 1, **kwargs) }}><i class="fa-solid fa-angle-left"></i></a>
+      <a aria-label="Previous page" title="Previous page" class="page-link" {{ _get_href_or_onclick(pagination.page - 1, **kwargs) }}><i class="fa-solid fa-angle-left"></i></a>
     </li>
     {% for item in pagination.pages %}
       <li class="page-item {% if loop.index == pagination.page_index + 1 %}active{% endif %}"><a class="page-link" {{ _get_href_or_onclick(item, **kwargs) }}>{{ item }}</a></li>
     {% endfor %}
     <li class="page-item {% if pagination.pages[pagination.page_index] == pagination.max_page %}disabled{% endif %}">
-      <a class="page-link" {{ _get_href_or_onclick(pagination.page + 1, **kwargs) }}><i class="fa-solid fa-angle-right "></i></a>
+      <a aria-label="Next page" title="Next page" class="page-link" {{ _get_href_or_onclick(pagination.page + 1, **kwargs) }}><i class="fa-solid fa-angle-right "></i></a>
     </li>
     <li class="page-item {% if pagination.pages[pagination.page_index] == pagination.max_page %}disabled{% endif %}">
-      <a class="page-link" {{ _get_href_or_onclick(pagination.max_page, **kwargs) }}><i class="fa-solid fa-angles-right "></i></a>
+      <a aria-label="Last page" title="Last page" class="page-link" {{ _get_href_or_onclick(pagination.max_page, **kwargs) }}><i class="fa-solid fa-angles-right "></i></a>
     </li>
     <li class="page-item">
-      <select class="form-select page-link" {{ _get_limit_onchange(**kwargs) }} style="border: none; background: transparent;">
+      <select aria-label="Rows per page" class="form-select page-link" {{ _get_limit_onchange(**kwargs) }} style="border: none; background: transparent;">
         {% for limit_option in [10, 25, 50, 100, 250] %}
           <option value="{{ limit_option }}" {% if pagination.limit == limit_option %}selected{% endif %}>{{ limit_option }}</option>
         {% endfor %}
@@ -96,7 +97,7 @@
 {% macro cursor_pagination_widget(pagination) %}
   {%- macro _get_href_or_onclick(page, _js_argument_provider=none) -%}
     {% if _js_argument_provider is not none %}
-      onclick="pagination_js_helper('{{ pagination.get_link(page, **kwargs).replace("'", "\\'") }}', {{ _js_argument_provider }}() )"
+      href="{{ pagination.get_link(page, **kwargs) }}" onclick="pagination_js_helper('{{ pagination.get_link(page, **kwargs).replace("'", "\\'") }}', {{ _js_argument_provider }}() ); return false"
     {% else %}
       href="{{ pagination.get_link(page, **kwargs) }}"
     {% endif %}
@@ -118,10 +119,10 @@
   {{ params.update(**kwargs)|silent }}
   <ul class="pagination justify-content-center">
     <li class="page-item {% if not pagination.hasBackward %}disabled{% endif %}">
-      <a class="page-link" {{ _get_href_or_onclick('first', **params) }}><i class="fa-solid fa-angles-left"></i></a>
+      <a aria-label="First page" title="First page" class="page-link" {{ _get_href_or_onclick('first', **params) }}><i class="fa-solid fa-angles-left"></i></a>
     </li>
     <li class="page-item {% if not pagination.hasBackward %}disabled{% endif %}">
-      <a class="page-link" {{ _get_href_or_onclick('backward', **params) }}><i class="fa-solid fa-angle-left"></i></a>
+      <a aria-label="Previous page" title="Previous page" class="page-link" {{ _get_href_or_onclick('backward', **params) }}><i class="fa-solid fa-angle-left"></i></a>
     </li>
     {% if pagination.hasBackward %}
       <li class="page-item"><a class="page-link" {{ _get_href_or_onclick('backward', **params) }}>{{ pagination.page-1 }}</a></li>
@@ -131,15 +132,15 @@
       <li class="page-item"><a class="page-link" {{ _get_href_or_onclick('forward', **params) }}>{{ pagination.page+1 }}</a></li>
     {% endif %}
     <li class="page-item {% if not pagination.hasForward %}disabled{% endif %}">
-      <a class="page-link" {{ _get_href_or_onclick('forward', **params) }}><i class="fa-solid fa-angle-right "></i></a>
+      <a aria-label="Next page" title="Next page" class="page-link" {{ _get_href_or_onclick('forward', **params) }}><i class="fa-solid fa-angle-right "></i></a>
     </li>
     <li class="page-item disabled">
       <span class="d-inline-block" tabindex="0" data-toggle="tooltip" data-placement="top" title="Last page not supported for search.&#013;Please reverse sort order instead.">
-        <a class="page-link"><i class="fa-solid fa-angles-right"></i></a>
+        <a role="link" aria-disabled="true" aria-label="Last page" title="Last page" class="page-link"><i class="fa-solid fa-angles-right"></i></a>
       </span>
     </li>
     <li class="page-item">
-      <select class="form-select page-link" {{ _get_limit_onchange(**kwargs) }} style="border: none; background: transparent;">
+      <select aria-label="Rows per page" class="form-select page-link" {{ _get_limit_onchange(**kwargs) }} style="border: none; background: transparent;">
         {% for limit_option in [10, 25, 50, 100, 250] %}
           <option value="{{ limit_option }}" {% if pagination.limit == limit_option %}selected{% endif %}>{{ limit_option }}</option>
         {% endfor %}
