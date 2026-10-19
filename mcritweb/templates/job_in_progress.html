@@ -9,7 +9,7 @@ Progress Report for Job: {{ job_info.job_id }}
 {% block content %}
 <h1>Job in Progress: {{ job_info.parameters }}</h1>
 
-{{ job_column_table(job_info, show_progress=True, show_duration=False) }}
+{{ job_column_table(job_info, show_progress=True, show_duration=False, child_jobs=child_jobs) }}
 
 {% endblock %}
 

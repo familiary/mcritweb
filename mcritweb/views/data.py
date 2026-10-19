@@ -546,7 +546,7 @@ def result(job_id):
         # it ran to completion and the report it produced is empty. That is a result
         return render_template("result_empty.html", job_id=job_id)
     # if we are not done processing, list job data
-    return render_template("job_in_progress.html", job_info=job_info)
+    return render_job_in_progress(client, job_info)
 
 #: `UniqueBlocksResult.generateYaraRule`'s own defaults, restated so the page can offer
 #: them as a form. These are not job parameters - the backend stores blocks and
@@ -1053,7 +1053,7 @@ def linkhunt(job_id):
             return render_template("result_empty.html", job_id=job_id)
         return render_template("result_incompatible.html", job_id=job_id)
     # genuinely still working
-    return render_template("job_in_progress.html", job_info=job_info)
+    return render_job_in_progress(client, job_info)
 
 def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
     name_query_sample(job_info, matching_result)
@@ -1157,20 +1157,37 @@ def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
 # the last child is done, so its own duration covers only the assembly of the result
 # and reads as ~0 however long the matching took (issue #46). created_at ->
 # finished_at brackets the children too, and both are already on the job document, so
-# it costs no additional backend call. Until the job finishes the far end of that
-# span is the clock: `utc_now` from mcritweb.db, the one the rest of the app reads.
+# it costs no additional backend call. Until the job finishes, the far end of that
+# span is the latest time the backend wrote on the job or its dependencies, see
+# `latest_job_timestamp`.
 JOB_TIMESTAMP_FMT = "%Y-%m-%d-%H:%M:%S"
+#: The timestamps the queue writes on a job, all from the backend's own clock.
+JOB_TIMESTAMP_FIELDS = ("created_at", "started_at", "finished_at", "locked_at")
 
 
-def job_clock_now():
-    """The wall clock a still-running job's total is measured against.
+def latest_job_timestamp(jobs):
+    """The latest time the backend wrote on any of `jobs`, or None if none is readable.
 
-    `utc_now` is timezone-aware (#98), while the job timestamps it is subtracted from
-    arrive as naive strings that hold UTC - so it is made naive here, and cut to whole
-    seconds like every other timestamp that goes into the subtraction. Read through
-    the module global, so a test that freezes `data.utc_now` freezes this too.
+    mcrit's queue stamps its jobs with `datetime.now()`, the backend's local time
+    (`libs/mongoqueue.py`: created_at on enqueue, started_at and locked_at when a worker
+    takes the job, locked_at again on each progress update, finished_at), and the REST
+    API sends them with a "Z" all the same. Measured against this server's clock, a
+    running job's total was off by the backend's UTC offset - negative east of UTC, so
+    the row was hidden. Measured against the backend's own latest stamp instead, the
+    total is a lower bound, short by the time since that stamp, but never off by a
+    time zone.
     """
-    return utc_now().replace(tzinfo=None, microsecond=0)
+    latest = None
+    for job in jobs:
+        for field in JOB_TIMESTAMP_FIELDS:
+            try:
+                stamp = job_timestamp_as_datetime(getattr(job, field))
+            except KeyError:
+                # a job document written before the field existed
+                continue
+            if stamp is not None and (latest is None or stamp > latest):
+                latest = stamp
+    return latest
 
 
 def dependency_progress(child_jobs):
@@ -1217,23 +1234,28 @@ def job_timestamp_as_datetime(value):
 
 
 @bp.app_template_filter('total_duration')
-def total_duration(job_info):
+def total_duration(job_info, child_jobs=None):
     """How long a job that waited on dependencies has taken end to end, or None when
     that is not a number this job can produce.
 
-    A job still waiting on its dependencies is measured against the clock. That is
-    the state issue #46 is really about - while the children run, the parent has no
+    A job still waiting on its dependencies is measured up to the latest time the
+    backend wrote on it or on `child_jobs`, the dependencies the page has fetched. That
+    is the state issue #46 is really about - while the children run, the parent has no
     duration and a progress of 0, so the page a reader watches refresh says nothing
-    at all about how long the work has been going.
+    at all about how long the work has been going. A page that has not fetched the
+    dependencies gets None for a running job: the parent's own stamps would only give
+    the time between its creation and its children's.
     """
     try:
         if not job_info.all_dependencies:
             return None
         created_at = job_timestamp_as_datetime(job_info.created_at)
         if job_info.finished_at is None:
-            # a failed or terminated job never gets a finished_at, so counting it
-            # against the clock would keep growing for as long as the document lives
-            finished_at = None if job_info.is_failed or job_info.is_terminated else job_clock_now()
+            # a failed or terminated job never gets a finished_at, so there is no end
+            # to measure to
+            if job_info.is_failed or job_info.is_terminated or child_jobs is None:
+                return None
+            finished_at = latest_job_timestamp([job_info, *child_jobs])
         else:
             finished_at = job_timestamp_as_datetime(job_info.finished_at)
     except KeyError:
@@ -1247,6 +1269,8 @@ def total_duration(job_info):
         return None
     duration = finished_at - created_at
     return duration if duration.total_seconds() >= 0 else None
+
+
 #: The job types this front end knows the names of. Not the authority on what a job type
 #: is - the backend is, and `known_job_category` below defers to it. This is only the
 #: fallback for a type the backend is not currently reporting, because it has no jobs of
@@ -1439,6 +1463,15 @@ def job_by_id(job_id):
 #: a request line of about 6,250 bytes, over gunicorn's default limit_request_line of
 #: 4,094 (mcrit's USE_GUNICORN). 100 keep it at about 2,530.
 JOB_IDS_PER_REQUEST = 100
+
+
+def render_job_in_progress(client, job_info):
+    """The progress page of a job that has not finished. A job with dependencies gets
+    them fetched, since its total is measured up to the latest time the backend wrote
+    on one of them - see `total_duration`."""
+    dependencies = list(dict.fromkeys(job_info.all_dependencies or []))
+    child_jobs = dependency_jobs(client, dependencies) if dependencies else None
+    return render_template("job_in_progress.html", job_info=job_info, child_jobs=child_jobs)
 
 
 def dependency_jobs(client, job_ids):
