@@ -231,7 +231,7 @@ Results for Job: {{ job_info.job_id }}
   {{ pagination_widget(funp, _anchor="function-matches")}}
 
 <h2 class="h3">Matching Method Statistics </h2>
-{{ matching_statistics_table(matching_result.match_aggregation) }}
+{{ matching_statistics_table(matching_statistics(matching_result)) }}
 
 {% endblock %}
 
