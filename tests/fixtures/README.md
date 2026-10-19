@@ -28,7 +28,7 @@ captured.
 | file | content |
 |---|---|
 | `status`, `version` | backend identity, for the admin server page |
-| `families`, `samples` | the whole corpus, untrimmed |
+| `families`, `samples` | the whole corpus, untrimmed; each family carries its samples |
 | `queue`, `queue_statistics` | 17 finished jobs, for the jobs page |
 | `matches_for_sample.*` | 1-vs-corpus match report, sample 0 |
 | `matches_for_sample_vs.*` | 1-vs-1 match report, samples 1 and 3 |
@@ -52,6 +52,12 @@ It finds jobs by method name and recency rather than by id, so it runs against a
 instance that has one finished job of each type. If a type is missing it says so and
 writes nothing for it, rather than leaving a stale fixture in place.
 
+Families are read one at a time, from `/families/{id}?with_samples=true`, because the
+`/families` collection does not carry a family's samples — storage does not keep that
+list, and only the single-family endpoint fills it in. `data.get_sample_versions`
+reads sample versions straight off the family entry a result page already holds, so a
+`families` fixture captured off the collection leaves that path untested.
+
 Two things are trimmed, and both trims are load-bearing rather than cosmetic — read
 the module docstring in `regenerate.py` before changing them. In short: the reference
 function pool keeps its `xcfg`, because `clusterLinkHuntResult()` rebuilds an
@@ -59,8 +65,13 @@ function pool keeps its `xcfg`, because `clusterLinkHuntResult()` rebuilds an
 for the reports it serves, because `data.py` indexes that lookup directly instead of
 tolerating a miss.
 
-Widen the pools when a test needs the filtered result views (`?funid=`, `?samid=`,
-`?famid=`), which reach for matched entries beyond what is captured here.
+Of the filtered result views, `?famid=` and `?funid=` render against these fixtures
+as they stand, and so does `?samid=` on `matches_for_sample_vs` - a 1-vs-1 report
+matched one sample, so a pool that is complete for the report is complete for its
+`?samid=` page too. `?samid=` on the 1-vs-corpus and query reports is the one that is
+not: it keeps every match against the chosen sample, `assign_matched_offsets` then
+asks for matched entries beyond the pool, and the view renders `result_corrupted.html`.
+Widen the pools when a test needs that.
 
 ## `cfg_loop_functions.json`
 
