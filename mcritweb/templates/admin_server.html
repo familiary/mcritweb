@@ -41,27 +41,27 @@ Server settings
 <h2 class="h3">Maintenance:</h2>
 <p>Schedule jobs for various Maintenance functionality. Note that depending on your database size, some of these operations may take some time.</p>
 
-<form action = "{{ url_for('admin.schedule_recalc_pichashes') }}" method='post'>
+<form action = "{{ url_for('admin.schedule_recalc_pichashes') }}" method='post' onsubmit="if (!window.confirm('This schedules a job over the whole corpus. Continue?')) { return false; } this.querySelector('button[type=submit]').disabled = true;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit" class="btn btn-primary">Recalculate PicHashes</button>
 </form>
-<form action = "{{ url_for('admin.schedule_recalc_minhashes') }}" method='post'>
+<form action = "{{ url_for('admin.schedule_recalc_minhashes') }}" method='post' onsubmit="if (!window.confirm('This schedules a job over the whole corpus. Continue?')) { return false; } this.querySelector('button[type=submit]').disabled = true;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit" class="btn btn-primary">Recalculate MinHashes</button>
 </form>
-<form action = "{{ url_for('admin.schedule_rebuild_index') }}" method='post'>
+<form action = "{{ url_for('admin.schedule_rebuild_index') }}" method='post' onsubmit="if (!window.confirm('This schedules a job over the whole corpus. Continue?')) { return false; } this.querySelector('button[type=submit]').disabled = true;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit" class="btn btn-primary">Rebuild MinHash Index</button>
 </form>
-<form action = "{{ url_for('admin.schedule_repair_minhashes') }}" method='post'>
+<form action = "{{ url_for('admin.schedule_repair_minhashes') }}" method='post' onsubmit="if (!window.confirm('This schedules a job over the whole corpus. Continue?')) { return false; } this.querySelector('button[type=submit]').disabled = true;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit" class="btn btn-primary">Repair stale MinHashes</button>
 </form>
-<form action = "{{ url_for('admin.schedule_recompute_family_stats') }}" method='post'>
+<form action = "{{ url_for('admin.schedule_recompute_family_stats') }}" method='post' onsubmit="if (!window.confirm('This schedules a job over the whole corpus. Continue?')) { return false; } this.querySelector('button[type=submit]').disabled = true;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit" class="btn btn-primary">Recompute Family Statistics</button>
 </form>
-<form action = "{{ url_for('admin.schedule_rebuild_picblockhash_index') }}" method='post'>
+<form action = "{{ url_for('admin.schedule_rebuild_picblockhash_index') }}" method='post' onsubmit="if (!window.confirm('This schedules a job over the whole corpus. Continue?')) { return false; } this.querySelector('button[type=submit]').disabled = true;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <button type="submit" class="btn btn-primary">Rebuild PicBlockHash Index</button>
 </form>

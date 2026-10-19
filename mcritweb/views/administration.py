@@ -11,7 +11,7 @@ from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_req
 from mcritweb.views.client import get_client
 from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
-from mcritweb.views.utility import forget_server_probe, get_session_user_id
+from mcritweb.views.utility import forget_server_probe, get_session_user_id, mcrit_server_required
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -321,9 +321,11 @@ def reset_server():
 def _redirect_to_scheduled_job(job_id, scheduled_message):
     """Send the admin to the job they just scheduled, or say it was not scheduled.
 
-    A backend that refuses the request - unreachable, out of workers, or simply older than the
-    route - answers None through McritClient, and url_for then raises a BuildError for the
-    missing job_id: a 500 on the admin page, where a message belongs. testRoutePolicy caught
+    A backend that refuses the request - out of workers, or simply older than the route -
+    answers None through McritClient, and url_for then raises a BuildError for the missing
+    job_id: a 500 on the admin page, where a message belongs. One that cannot be reached at
+    all raises instead, which `mcrit_server_required` on each route turns into its usual
+    message before the request is made. testRoutePolicy caught
     it on the three routes below that mcrit 1.9.0 made possible; the three older ones had the
     same hole and only ever avoided it because the backend answered.
     """
@@ -336,6 +338,7 @@ def _redirect_to_scheduled_job(job_id, scheduled_message):
 
 @bp.route('/schedule_rebuild_index' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_rebuild_index():
     client = get_client()
     return _redirect_to_scheduled_job(client.rebuildIndex(), 'A job for rebuilding the MinHash Index has been scheduled.')
@@ -343,6 +346,7 @@ def schedule_rebuild_index():
 
 @bp.route('/schedule_recalc_pichashes' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_recalc_pichashes():
     client = get_client()
     return _redirect_to_scheduled_job(client.recalculatePicHashes(), 'A job for recalculating all PicHashes has been scheduled.')
@@ -350,6 +354,7 @@ def schedule_recalc_pichashes():
 
 @bp.route('/schedule_recalc_minhashes' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_recalc_minhashes():
     client = get_client()
     return _redirect_to_scheduled_job(client.recalculateMinHashes(), 'A job for recalculating and indexing all MinHashes has been scheduled.')
@@ -361,6 +366,7 @@ def schedule_recalc_minhashes():
 # counters and the picblockhash index, and every one of the repairs was out of reach.
 @bp.route('/schedule_repair_minhashes' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_repair_minhashes():
     client = get_client()
     return _redirect_to_scheduled_job(client.repairMinHashes(), 'A job for repairing the MinHashes of samples hashed by an older smda has been scheduled.')
@@ -368,6 +374,7 @@ def schedule_repair_minhashes():
 
 @bp.route('/schedule_recompute_family_stats' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_recompute_family_stats():
     client = get_client()
     return _redirect_to_scheduled_job(client.recomputeFamilyStats(), 'A job for recomputing the family statistics has been scheduled.')
@@ -375,6 +382,7 @@ def schedule_recompute_family_stats():
 
 @bp.route('/schedule_rebuild_picblockhash_index' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_rebuild_picblockhash_index():
     client = get_client()
     return _redirect_to_scheduled_job(client.rebuildPicBlockHashIndex(), 'A job for rebuilding the PicBlockHash index has been scheduled.')

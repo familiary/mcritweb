@@ -19,6 +19,7 @@ import logging
 import re
 
 import pytest
+import requests
 from mcrit.queue.LocalQueue import Job
 
 LOG = logging.getLogger(__name__)
@@ -194,3 +195,35 @@ def test_the_repair_report_names_the_samples_it_could_not_rehash(client, as_role
 
     assert b"skipped" in page
     assert b"1" in page and b"118" in page
+
+
+@pytest.mark.parametrize("path", ALL_SCHEDULERS)
+def test_an_unreachable_backend_is_a_message_not_a_500(app, client, as_role, path):
+    """McritClient lets a connection error propagate, so a scheduling route that called
+    it with the backend gone was a 500. The routes check reachability first, as every
+    other route that talks to the backend does."""
+    class Unreachable:
+        def __getattr__(self, name):
+            def call(*args, **kwargs):
+                raise requests.ConnectionError("connection refused")
+            return call
+
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: Unreachable()
+    app.config["MCRIT_SERVER_PROBE"] = lambda *args, **kwargs: False
+    as_role("admin")
+
+    response = client.post(path)
+
+    assert response.status_code == 302
+
+
+def test_the_scheduling_buttons_ask_before_queueing_a_whole_corpus_job(client, as_role):
+    """Each of them forces a recalculation over the whole corpus, so a stray click or a
+    double click queues it, or queues it twice."""
+    as_role("admin")
+    page = client.get("/admin/server").get_data(as_text=True)
+
+    for path in ALL_SCHEDULERS:
+        form = re.search(r'<form action = "%s" method=\'post\'([^>]*)>' % re.escape(path), page)
+        assert form, f"no form for {path}"
+        assert "confirm(" in form.group(1) and ".disabled = true" in form.group(1), path

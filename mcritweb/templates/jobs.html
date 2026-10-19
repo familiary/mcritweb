@@ -170,11 +170,10 @@ Jobs
     getMatchesForSampleVsGroup and doDbCleanup went missing from this map.
 
     That is how repairMinHashes, recomputeFamilyStats and rebuildPicBlockHashIndex arrived:
-    mcrit 1.9.0 added all three and the suite failed until they were named here. MCRITweb
-    offers no button for any of them - the server page starts only rebuildIndex and
-    recalculateMinHashes - so they carry doDbCleanup's wording and no link, rather than
-    pointing at a page that cannot start them. The same holds for the four that came
-    after: rebuildBandDfIndex, rebuildFunctionRangeIndex and deleteOrphanedQueueFiles
+    mcrit 1.9.0 added all three and the suite failed until they were named here. The server
+    page starts them since #212, so they say so, as rebuildIndex does. Jobs MCRITweb offers
+    no button for carry doDbCleanup's wording and no link, rather than pointing at a page
+    that cannot start them - the four that came after: rebuildBandDfIndex, rebuildFunctionRangeIndex and deleteOrphanedQueueFiles
     (mcrit 1.13.0), and getBandDfCutoffCoverage (mcrit 1.15.0).
   #}
   {% set job_category_empty_states = {
@@ -191,9 +190,9 @@ Jobs
     "rebuildIndex":              ("No index rebuilds yet. An admin can start one from the server page.", None),
     "recalculateMinHashes":      ("No MinHash recalculations yet. An admin can start one from the server page.", None),
     "recalculatePicHashes":      ("No PicHash recalculations yet. An admin can start one from the server page.", None),
-    "repairMinHashes":           ("No MinHash repairs yet. They are started on the backend, not from here.", None),
-    "recomputeFamilyStats":      ("No family statistics recomputations yet. They are started on the backend, not from here.", None),
-    "rebuildPicBlockHashIndex":  ("No PicBlockHash index rebuilds yet. They are started on the backend, not from here.", None),
+    "repairMinHashes":           ("No MinHash repairs yet. An admin can start one from the server page.", None),
+    "recomputeFamilyStats":      ("No family statistics recomputations yet. An admin can start one from the server page.", None),
+    "rebuildPicBlockHashIndex":  ("No PicBlockHash index rebuilds yet. An admin can start one from the server page.", None),
     "rebuildBandDfIndex":        ("No band DF index rebuilds yet. They are started on the backend, not from here.", None),
     "rebuildFunctionRangeIndex": ("No function range index rebuilds yet. They are started on the backend, not from here.", None),
     "getBandDfCutoffCoverage":   ("No band DF cutoff coverage reports yet. They are started on the backend, not from here.", None),

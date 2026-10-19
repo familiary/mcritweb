@@ -146,13 +146,13 @@
   {{ job.method|job_name }}
 
 {% elif job.method == "repairMinHashes" %}
-  Repair stale MinHashes
+  {{ job.method|job_name }}
 
 {% elif job.method == "recomputeFamilyStats" %}
-  Recompute Family Statistics
+  {{ job.method|job_name }}
 
 {% elif job.method == "rebuildPicBlockHashIndex" %}
-  Rebuild PicBlockHash Index
+  {{ job.method|job_name }}
 
 {% elif job.method == "addBinarySample" %}
   {{ job.method|job_name }} | <i class="fa-solid fa-bug " title="Family ID"></i> {{ job.family }}<br />
