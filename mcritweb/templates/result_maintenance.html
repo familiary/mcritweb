@@ -22,6 +22,39 @@ Updated functions: {{ result['minhash_functions_indexed'] }}
 <p>
     Updated functions: {{ result }}
 </p>
+{% elif job_info.parameters == "repairMinHashes()" %}
+{# #142: only the samples an older smda escaper hashed are rehashed, so the counts below are
+   about that subset and not about the corpus. A skipped sample is one whose disassembly is
+   gone (STORAGE_DROP_DISASSEMBLY), which keeps its old minhashes rather than losing them. #}
+<p>
+    Stale samples: {{ result['num_samples_stale'] }} | repaired: {{ result['num_samples_repaired'] }} | skipped, no disassembly to rehash from: {{ result['num_samples_skipped'] }}<br />
+    Functions dropped/rehashed: {{ result['num_functions_dropped'] }} / {{ result['num_functions_rehashed'] }}<br />
+    Rehashed with smda {{ result['smda_version'] }}, against escaper compatibility threshold {{ result['compatibility_threshold'] }}
+</p>
+{% elif job_info.parameters == "recomputeFamilyStats()" %}
+<p>
+    Families: {{ result['num_families'] }} | corrected: {{ result['num_families_corrected'] }} | created for samples that referenced a missing family: {{ result['num_families_created'] }}
+</p>
+{% if result['corrections'] %}
+<table class="table table-sm">
+  <thead><tr><th>Family</th><th>Samples before &rarr; after</th><th>Functions before &rarr; after</th><th>Library samples before &rarr; after</th></tr></thead>
+  <tbody>
+  {% for family_id, correction in result['corrections'].items() %}
+    <tr>
+      <td>{{ family_id }}</td>
+      <td>{{ correction['before']['num_samples'] }} &rarr; {{ correction['after']['num_samples'] }}</td>
+      <td>{{ correction['before']['num_functions'] }} &rarr; {{ correction['after']['num_functions'] }}</td>
+      <td>{{ correction['before']['num_library_samples'] }} &rarr; {{ correction['after']['num_library_samples'] }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% elif job_info.parameters == "rebuildPicBlockHashIndex()" %}
+<p>
+    {# the worker answers with a plain count here, not a report #}
+    Indexed block hashes: {{ result }}
+</p>
 {% else %}
 <p>
     Unhandled maintenance job type with result:

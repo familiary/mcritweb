@@ -53,14 +53,14 @@ def _job_id(fake):
 
 def test_the_jobs_page_names_who_asked(client, as_role, fake_mcrit):
     as_role("visitor")
-    page = client.get("/data/jobs").data.decode()
+    page = client.get("/data/jobs", follow_redirects=True).data.decode()
     assert "<th scope=\"col\">User</th>" in page
     assert "alice" in page and "bob" in page
 
 
 def test_a_job_without_a_user_shows_a_dash_not_none(client, as_role, fake_mcrit):
     as_role("visitor")
-    page = client.get("/data/jobs").data.decode()
+    page = client.get("/data/jobs", follow_redirects=True).data.decode()
     assert "None" not in page.split("<tbody>")[-1]
 
 
@@ -74,7 +74,7 @@ def test_the_job_page_has_a_requested_by_row(client, as_role, fake_mcrit):
 @pytest.mark.parametrize("fake_mcrit", [OwnerlessCorpus()])
 def test_an_older_backend_without_the_field_still_renders(client, as_role, fake_mcrit):
     as_role("visitor")
-    response = client.get("/data/jobs")
+    response = client.get("/data/jobs", follow_redirects=True)
     assert response.status_code == 200
     page = response.data.decode()
     assert "<th scope=\"col\">User</th>" in page
