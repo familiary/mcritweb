@@ -3,6 +3,31 @@
 {% from 'table/function_row.html' import function_row, function_header %}
 {% from 'table/sample_row.html' import sample_row, sample_header, minisample_row, minisample_header %}
 
+{#
+  The "this table has no rows" state, in one place. Every table used to hard-code the
+  same sentence, which meant a sample with no functions was told to "upload your first
+  sample" and a job list filtered to cross-compares was told to create "your first
+  job". Callers now pass the sentence that fits where they are, and fall back to the
+  generic one when they have nothing more specific to say. Issue #65.
+#}
+{# Several of these messages invite the reader to submit a sample, and data.submit is
+   contributor-only - the navbar has always hidden "Submit binary" from a visitor for
+   that reason. An empty table that says "click here to upload your first sample" and
+   answers 403 is worse than one that just says the table is empty, so a link a visitor
+   cannot follow is dropped and the message stays. Roles are checked here rather than at
+   each of the nine call sites, so a new empty state cannot forget. #}
+{% set CONTRIBUTOR_ONLY_LINKS = [url_for("data.submit"), url_for("data.submit_or_query")] %}
+
+{% macro empty_state(message, link=None) %}
+  <center>
+    {%- if link and not (link in CONTRIBUTOR_ONLY_LINKS and g.user.role not in ["admin", "contributor"]) -%}
+      <a href="{{ link }}" style="color: #0d6efd; text-decoration: underline;">{{ message }}</a>
+    {%- else -%}
+      <span class="text-muted">{{ message }}</span>
+    {%- endif -%}
+  </center>
+{% endmacro %}
+
 {% macro _table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table") %}
   <table class="table table-hover" id="{{table_id}}">
     <thead class="thead-light">
@@ -30,24 +55,24 @@
   </table>
 {% endmacro %}
 
-{% macro job_table(jobs, table_id="job-table") %}
+{% macro job_table(jobs, table_id="job-table", empty_message=None, empty_link=None) %}
   {% if jobs %}
   {{ _table_base(jobs, job_header, job_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("analyze.compare") }}' style="color: #0d6efd; text-decoration: underline;" >No jobs available. Click here to create your first job</a></center>
+  {{ empty_state(empty_message or "No jobs available. Click here to create your first job", empty_link if empty_message else url_for("analyze.compare")) }}
   {% endif %}
 {% endmacro %}
 
-{% macro minijob_table(jobs, table_id="job-table") %}
+{% macro minijob_table(jobs, table_id="job-table", empty_message=None, empty_link=None) %}
   {% if jobs %}
   {{ _half_table_base(jobs, minijob_header, minijob_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("analyze.compare") }}' style="color: #0d6efd; text-decoration: underline;" >No jobs available. Click here to create your first job</a></center>
+  {{ empty_state(empty_message or "No jobs available. Click here to create your first job", empty_link if empty_message else url_for("analyze.compare")) }}
   {% endif %}
 {% endmacro %}
 
 
-{% macro family_table(families, table_id="family-table") %}
+{% macro family_table(families, table_id="family-table", empty_message=None, empty_link=None) %}
   {% if families %}
 <!-- Modal -->
 <div class="modal fade" id="editFamilyModal" tabindex="-1" aria-labelledby="editFamilyModalLabel" aria-hidden="true">
@@ -104,19 +129,19 @@
   </script>
   {{ _table_base(families, family_header, family_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No families available. Click here to upload your first sample</a></center>
+  {{ empty_state(empty_message or "No families available. Click here to upload your first sample", empty_link if empty_message else url_for("data.submit")) }}
   {% endif %}
 {% endmacro %}
 
-{% macro function_table(functions, table_id="function-table") %}
+{% macro function_table(functions, table_id="function-table", empty_message=None, empty_link=None) %}
   {% if functions %}
   {{ _table_base(functions, function_header, function_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No functions available. Click here to upload your first sample</a></center>
+  {{ empty_state(empty_message or "No functions available. Click here to upload your first sample", empty_link if empty_message else url_for("data.submit")) }}
   {% endif %}
 {% endmacro %}
 
-{% macro sample_table(samples, table_id="sample-table") %}
+{% macro sample_table(samples, table_id="sample-table", empty_message=None, empty_link=None) %}
   {% if samples %}
 <!-- Modal -->
 <div class="modal fade" id="editSampleModal" tabindex="-1" aria-labelledby="editSampleModalLabel" aria-hidden="true">
@@ -169,14 +194,14 @@
   </script>
   {{ _table_base(samples, sample_header, sample_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  {{ empty_state(empty_message or "No samples available. Click here to upload your first sample", empty_link if empty_message else url_for("data.submit")) }}
   {% endif %}
 {% endmacro %}
 
-{% macro minisample_table(samples, table_id="sample-table") %}
+{% macro minisample_table(samples, table_id="sample-table", empty_message=None, empty_link=None) %}
   {% if samples %}
   {{ _half_table_base(samples, minisample_header, minisample_row, table_id=table_id, **kwargs) }}
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  {{ empty_state(empty_message or "No samples available. Click here to upload your first sample", empty_link if empty_message else url_for("data.submit")) }}
   {% endif %}
 {% endmacro %}

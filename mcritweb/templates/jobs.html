@@ -158,7 +158,57 @@ Jobs
 </p>
 {% endif %}
 
-  {{ job_table(jobs, table_id=active, families_by_id=families, samples_by_id=samples) }}
+  {#
+    Issue #65: "No jobs available. Click here to create your first job" is wrong on
+    every tab but the very first visit - the collection usually has plenty of jobs,
+    just none of this kind. Each category says what is missing, and links to the page
+    that starts one where such a page exists.
+
+    Every job method the worker can run needs a key here, whether or not the menu
+    above offers a tab for it: `active` is a query parameter, so any category the
+    backend reports in getQueueStatistics() is reachable whether a tab links to it or
+    not - getMatchesForSampleVsGroup has no tab and is spawned per sample by a cross
+    compare over only the selected samples.
+    tests/testEmptyTableMessages.py enumerates them from `mcrit.Worker.Worker` rather
+    than from a list written by hand, so a method added to the backend fails the suite
+    instead of silently falling back to the generic sentence - which is how
+    getMatchesForSampleVsGroup and doDbCleanup went missing from this map.
+
+    That is how repairMinHashes, recomputeFamilyStats and rebuildPicBlockHashIndex arrived:
+    mcrit 1.9.0 added all three and the suite failed until they were named here. MCRITweb
+    offers no button for any of them - the server page starts only rebuildIndex and
+    recalculateMinHashes - so they carry doDbCleanup's wording and no link, rather than
+    pointing at a page that cannot start them.
+  #}
+  {% set job_category_empty_states = {
+    "getMatchesForSample":       ("No 1 vs N matching jobs yet. Click here to start one", url_for("analyze.compare")),
+    "getMatchesForSampleVs":     ("No 1 vs 1 matching jobs yet. Click here to start one", url_for("analyze.compare_versus")),
+    "getMatchesForSampleVsGroup": ("No 1 vs group matching jobs yet. Click here to cross compare a group of samples", url_for("analyze.cross_compare")),
+    "combineMatchesToCross":     ("No cross compare jobs yet. Click here to start one", url_for("analyze.cross_compare")),
+    "getMatchesForUnmappedBinary": ("No query jobs for an unmapped binary yet. Click here to run one", url_for("analyze.query")),
+    "getMatchesForMappedBinary": ("No query jobs for a mapped binary yet. Click here to run one", url_for("analyze.query")),
+    "getMatchesForSmdaReport":   ("No query jobs for an SMDA report yet. Click here to run one", url_for("analyze.query")),
+    "getUniqueBlocks":           ("No unique blocks jobs yet. They are started from a family or sample row.", None),
+    "updateMinHashesForSample":  ("No MinHash updates for a single sample yet.", None),
+    "updateMinHashes":           ("No MinHash updates yet. An admin can start one from the server page.", None),
+    "rebuildIndex":              ("No index rebuilds yet. An admin can start one from the server page.", None),
+    "recalculateMinHashes":      ("No MinHash recalculations yet. An admin can start one from the server page.", None),
+    "recalculatePicHashes":      ("No PicHash recalculations yet. An admin can start one from the server page.", None),
+    "repairMinHashes":           ("No MinHash repairs yet. They are started on the backend, not from here.", None),
+    "recomputeFamilyStats":      ("No family statistics recomputations yet. They are started on the backend, not from here.", None),
+    "rebuildPicBlockHashIndex":  ("No PicBlockHash index rebuilds yet. They are started on the backend, not from here.", None),
+    "addBinarySample":           ("No samples have been submitted yet. Click here to submit one", url_for("data.submit")),
+    "deleteSample":              ("No samples have been deleted.", None),
+    "modifySample":              ("No samples have been modified.", None),
+    "deleteFamily":              ("No families have been deleted.", None),
+    "modifyFamily":              ("No families have been modified.", None),
+    "doDbCleanup":               ("No database cleanups yet. They are started on the backend, not from here.", None),
+  } %}
+  {% set empty_for_category = job_category_empty_states.get(active) %}
+  {{ job_table(jobs, table_id=active, families_by_id=families, samples_by_id=samples,
+               empty_message=("No jobs are in state \"" ~ state ~ "\".") if state
+                             else (empty_for_category[0] if empty_for_category else None),
+               empty_link=None if state else (empty_for_category[1] if empty_for_category else None)) }}
   {% if p %}
     {{ pagination_widget(p) }}
   {% endif %}

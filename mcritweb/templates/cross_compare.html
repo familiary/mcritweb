@@ -2,6 +2,7 @@
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% from 'table/sample_row.html' import sample_header %}
 {% from 'table/row_decoration.html' import row_tint %}
+{% from 'table/table.html' import empty_state %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -222,7 +223,14 @@ function handleSliderChange(val) {
       {% endif %}
   </center>
   {% else %}
-  <center><a href='{{ url_for("data.submit") }}' style="color: #0d6efd; text-decoration: underline;" >No samples available. Click here to upload your first sample</a></center>
+  {# a search box sits directly above this table, so "upload your first sample" is
+     almost never what happened - the collection is full and the term missed. Routed
+     through the shared macro so this picker gets the same wording *and* the same
+     contributor-only link rule as every other table: data.submit is contributor-only,
+     and an empty state that invites a visitor to upload answers 403. Issue #65. #}
+  {{ empty_state("No sample matches \"" ~ query ~ "\"." if query
+                  else "No samples available. Click here to upload your first sample",
+                  none if query else url_for("data.submit")) }}
 {% endif %}
 </div>
 {% endblock %}
