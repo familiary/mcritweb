@@ -1,7 +1,7 @@
 # Function labels cannot be edited from MCRITweb
 
 ---
-status: accepted — blocked upstream, re-check when mcrit exposes a write path
+status: superseded — mcrit 1.10.0 added the write path (McritClient.modifyFunction, PUT /functions/{id}), and #173 renames functions from their page
 ---
 
 Issue #72 asks for a way to modify functions — renaming them, or editing their labels —

@@ -1,7 +1,7 @@
 # Jobs carry no owner, so MCRITweb cannot annotate activity with one
 
 ---
-status: accepted — blocked upstream, and there is a design question to settle first
+status: partly superseded — mcrit 1.10.0 records a `username` on the job (mcrit#161), and #172 shows it; the point about a stable identifier still stands, since that name is the requester's at request time and can be renamed or reused
 ---
 
 Issue #37 proposes annotating objects such as jobs with user uuids, for accountability,
