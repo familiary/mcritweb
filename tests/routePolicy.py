@@ -63,6 +63,7 @@ MUTATING_CLIENT_CALLS = {
     "deleteJob",
     "deleteSample",
     "modifyFamily",
+    "modifyFunction",
     "modifySample",
     "rebuildIndex",
     "recalculateMinHashes",
@@ -202,6 +203,7 @@ ROUTE_POLICY = {
     "data.request_filename_info": (CONTRIBUTOR, READ_ONLY),   # classifies a posted filename
     "data.delete_job_by_id": (CONTRIBUTOR, WRITES_ON_POST),
     "explore.modifyFamily": (CONTRIBUTOR, WRITES_ON_POST),
+    "explore.modifyFunction": (CONTRIBUTOR, WRITES_ON_POST),
     "explore.modifySample": (CONTRIBUTOR, WRITES_ON_POST),
 
     # --- admin only --------------------------------------------------------------

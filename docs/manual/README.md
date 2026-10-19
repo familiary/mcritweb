@@ -144,7 +144,12 @@ The page is organized in collapsible sections:
 
 ![The MinHash and basic block sections](images/function_sections.png "The MinHash and basic block sections")
 
-The buttons in the top right corner open the analyze menu, lead to the function's sample and family, show the API usage and jump to the CFG.
+The buttons in the top right corner open the analyze menu, lead to the function's sample and family, rename the function, show the API usage and jump to the CFG.
+
+Contributors can rename a function; the MCRIT backend records every name as a label by the user who set it, so the *Function Labels* row keeps who named the function when (this needs an MCRIT backend newer than 1.8.1, which MCRITweb checks through the backend's version, otherwise the button is disabled).
+The same operation is available to API tokens with the contributor role as `PUT /api/functions/<function_id>` with a `function_name` field:
+
+![Renaming a function](images/function_rename.png "Renaming a function")
 The analyze menu starts a 1vsN, 1vs1 or cross compare job for the sample, searches for all functions sharing the PicHash, or compares this function with any other stored function by its function_id:
 
 ![The analyze menu of a function](images/function_analyze_menu.png "The analyze menu of a function")
