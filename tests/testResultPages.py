@@ -1350,12 +1350,21 @@ def sortable_order(html):
 
 
 def matrix_orders(html):
-    """method -> the sample id order of that matrix's rows."""
+    """method -> the sample id order of that matrix's rows.
+
+    Only one matrix is rendered (#213); the others are filled in the browser on first
+    click from the page's `cross-lazy-panes` JSON, so their order is read from there."""
     panes = re.finditer(r'id="pills-(\w+)" role="tabpanel"(.*?)(?=<div class="tab-pane|\Z)', html, re.S)
-    return {
+    orders = {
         pane.group(1): re.findall(r'<td class="id clickable"[^>]*>\s*(\d+)\s*</td>', pane.group(2))
         for pane in panes
     }
+    lazy = re.search(r'<script type="application/json" id="cross-lazy-panes">(.*?)</script>', html, re.S)
+    if lazy is not None:
+        for method, pane in json.loads(lazy.group(1))["panes"].items():
+            assert not orders.get(method), f"matrix {method} is both rendered and lazy"
+            orders[method] = [str(sample_id) for sample_id in pane["order"]]
+    return orders
 
 
 def active_ordering_button(html):
