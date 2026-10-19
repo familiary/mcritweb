@@ -620,6 +620,10 @@
   content: "\f059"; }
 
 
+.fa-pen::before {
+  content: "\f304"; }
+
+
 .fa-sort-up::before {
   content: "\f0de"; }
 
