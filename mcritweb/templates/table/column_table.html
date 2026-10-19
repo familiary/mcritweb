@@ -206,10 +206,10 @@
     <tbody>
       <tr>
         <td valign="middle">Task:</td>
-        {# the same raw parameters string the jobs list wraps - it reaches the job
-           overview and every result page through this macro, so it needs the class
-           here too or the fix stops at the list. See issue #41. #}
-        <td valign="middle" class="job-description">{{ job_info.parameters }}</td>
+        {# the readable form; the RPC call the queue recorded stays reachable as the tooltip (issue #40).
+           It reaches the job overview and every result page through this macro, and a long one
+           widens the page the way the raw string did, so it keeps the wrapping class (issue #41). #}
+        <td valign="middle" class="job-description" title="{{ job_info.parameters }}">{{ job_info|job_task }}</td>
       </tr>
       {# the band setting is already in the Task row above, but only as an unlabelled
          trailing number - getMatchesForSample(0, 2) reads like a second sample id.
