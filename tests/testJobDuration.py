@@ -169,6 +169,14 @@ class TestWhileTheDependenciesAreStillRunning:
         # clock - whatever this server's reads
         assert job_table_row(page, "Total (since queued)") == RUNNING_TOTAL
 
+    def test_the_progress_cell_says_it_shows_the_dependencies(self, client, as_role):
+        """A script that updates the progress cell from the parent's own counter (the
+        polling of #214) has to leave this number alone, or the 100% drops to 0%."""
+        as_role("visitor")
+        page = client.get(f"/data/jobs/{job_id_of('cross_compare')}").data.decode()
+
+        assert re.search(r'<td valign="middle" data-progress-of="dependencies">\s*100\.00%', page)
+
     def test_the_in_progress_page_reports_it_too(self, client, as_role, server_clock):
         """`/data/result` of an unfinished job renders job_in_progress.html, which
         switches the duration row off - so this row is the only elapsed time on it."""
@@ -292,7 +300,6 @@ def test_latest_job_timestamp_reads_every_field_and_shape():
     assert data.latest_job_timestamp([]) is None
 
 
-
 class _Child:
     """The two attributes `dependency_progress` reads, and nothing else."""
 
@@ -327,6 +334,7 @@ def test_a_counter_outside_zero_to_one_is_clamped():
     """The counter is written by a worker; the row must not render -300% or 4200%."""
     assert dependency_progress([_Child(5.0)]) == 1.0
     assert dependency_progress([_Child(-2.0)]) == 0.0
+
 
 if __name__ == "__main__":
     unittest.main()

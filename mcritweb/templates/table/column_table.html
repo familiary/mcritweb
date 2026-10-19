@@ -286,15 +286,36 @@
             <td valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued. A job that fans out is queued just after the children it waits on, so this is a lower bound by that enqueue interval - 10ms for five children.">Total (since queued): </span></td>
             <td valign="middle">{{ job_total_duration }}</td>
           {% else %}
-            <td valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued to the latest time the backend recorded on it or its sub-jobs, since the backend's clock need not be this server's. It is a lower bound by the time since then.">Total (since queued): </span></td>
+            <td valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued to the latest time the backend recorded on it or its sub-jobs, since the backend's clock need not be this server's. From there it counts on in the browser, so it is a lower bound.">Total (since queued): </span></td>
             <td valign="middle"><span data-elapsed-seconds="{{ job_total_duration.total_seconds()|int }}">{{ job_total_duration }}</span> and counting</td>
           {% endif %}
         </tr>
+        {% if not job_info.finished_at %}
+          <script>
+            (function () {
+              // counts on from what the page was rendered with, in the format Python
+              // gives a timedelta: "0:01:30", "1 day, 2:03:04"
+              const cell = document.querySelector("[data-elapsed-seconds]");
+              const rendered = Number(cell.dataset.elapsedSeconds);
+              const loaded = Date.now();
+              function two(n) { return String(n).padStart(2, "0"); }
+              window.setInterval(function () {
+                const total = rendered + Math.floor((Date.now() - loaded) / 1000);
+                const days = Math.floor(total / 86400);
+                const rest = total % 86400;
+                const clock = Math.floor(rest / 3600) + ":" + two(Math.floor(rest % 3600 / 60)) + ":" + two(rest % 60);
+                cell.textContent = days ? days + (days === 1 ? " day, " : " days, ") + clock : clock;
+              }, 1000);
+            })();
+          </script>
+        {% endif %}
       {% endif %}
       {% if show_progress %}
         <tr>
           <td valign="middle">Progress: </td>
-          <td valign="middle">
+          {# the flag tells a script that updates this cell from the job's own
+             progress that the number here is the dependencies' #}
+          <td valign="middle"{% if child_progress is not none and not job_info.finished_at %} data-progress-of="dependencies"{% endif %}>
             {% if job_info.finished_at %}
               <a href="{{ url_for('data.result', job_id=job_info.job_id ) }}">Results available</a>
             {% else %}
