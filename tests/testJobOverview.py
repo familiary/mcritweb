@@ -29,6 +29,8 @@ from mcrit.queue.LocalQueue import Job
 LOG = logging.getLogger(__name__)
 #: job ids are hex object ids; the job page refuses anything else
 PARENT_JOB_ID = "abababababababababababab"
+DONE_JOB_ID = "cdcdcdcdcdcdcdcdcdcdcdcd"
+UNKNOWN_JOB_ID = "efefefefefefefefefefefef"
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
 logging.disable(logging.CRITICAL)
 
@@ -174,7 +176,7 @@ def cross_compare_backend(app):
     children = [job_data(f"child-{sample_id}", sample_id, params=f'{{"0": {sample_id}}}') for sample_id in (7, 8, 9)]
     children[1] = running(children[1])
     children[2] = running(children[2])
-    parent = running(job_data("parent", 10, "combineMatchesToCross", [child["_id"] for child in children]))
+    parent = running(job_data(PARENT_JOB_ID, 10, "combineMatchesToCross", [child["_id"] for child in children]))
     parent["unfinished_dependencies"] = ["child-8", "child-9"]
     parent["started_at"] = None
     backend = CountingJobs(parent, children)
@@ -184,7 +186,7 @@ def cross_compare_backend(app):
 
 def test_the_status_of_a_running_job_is_read_off_the_job_alone(client, as_role, cross_compare_backend):
     as_role("visitor")
-    response = client.get("/data/jobs/parent/status")
+    response = client.get(f"/data/jobs/{PARENT_JOB_ID}/status")
 
     assert response.status_code == 200
     assert response.get_json() == {
@@ -194,12 +196,12 @@ def test_the_status_of_a_running_job_is_read_off_the_job_alone(client, as_role, 
         "progress": 0.25,
         "unfinished_sub_jobs": 2,
     }
-    assert cross_compare_backend.calls == [("getJobData", "parent")], "a tick fetched more than the job it polls"
+    assert cross_compare_backend.calls == [("getJobData", PARENT_JOB_ID)], "a tick fetched more than the job it polls"
 
 
 def test_the_status_of_an_unknown_job_is_a_404(client, as_role, cross_compare_backend):
     as_role("visitor")
-    response = client.get("/data/jobs/no-such-job/status")
+    response = client.get(f"/data/jobs/{UNKNOWN_JOB_ID}/status")
 
     assert response.status_code == 404
     assert response.is_json
@@ -207,9 +209,9 @@ def test_the_status_of_an_unknown_job_is_a_404(client, as_role, cross_compare_ba
 
 def test_a_running_job_polls_rather_than_reloading_on_every_tick(client, as_role, cross_compare_backend):
     as_role("visitor")
-    body = client.get("/data/jobs/parent?refresh=3").get_data(as_text=True)
+    body = client.get(f"/data/jobs/{PARENT_JOB_ID}?refresh=3").get_data(as_text=True)
 
-    assert '"/data/jobs/parent/status"' in body, "the page does not poll the status endpoint"
+    assert f'"/data/jobs/{PARENT_JOB_ID}/status"' in body, "the page does not poll the status endpoint"
     # without scripting, the meta refresh is still what brings the page up to date
     assert re.search(r'<noscript>\s*<meta http-equiv="refresh" content="3">\s*</noscript>', body)
     assert body.count('http-equiv="refresh"') == 1, "a meta refresh outside <noscript> would still reload every tick"
@@ -219,19 +221,19 @@ def test_the_page_compares_against_what_the_endpoint_answers(client, as_role, cr
     """The page reloads when the endpoint's answer differs from the state it rendered,
     so the two have to agree on an unchanged job - or every tick reloads after all."""
     as_role("visitor")
-    body = client.get("/data/jobs/parent?refresh=3").get_data(as_text=True)
+    body = client.get(f"/data/jobs/{PARENT_JOB_ID}?refresh=3").get_data(as_text=True)
     rendered = json.loads(re.search(r"const shown = (\{.*?\});", body).group(1))
 
-    assert rendered == client.get("/data/jobs/parent/status").get_json()
+    assert rendered == client.get(f"/data/jobs/{PARENT_JOB_ID}/status").get_json()
 
 
 def test_a_finished_job_neither_polls_nor_refreshes(client, as_role, app):
-    backend = CountingJobs(job_data("done", 3, "getMatchesForSample", [], params='{"0": 7}'), [])
+    backend = CountingJobs(job_data(DONE_JOB_ID, 3, "getMatchesForSample", [], params='{"0": 7}'), [])
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend
     as_role("visitor")
-    body = client.get("/data/jobs/done?refresh=3").get_data(as_text=True)
+    body = client.get(f"/data/jobs/{DONE_JOB_ID}?refresh=3").get_data(as_text=True)
 
-    assert "/data/jobs/done/status" not in body
+    assert f"/data/jobs/{DONE_JOB_ID}/status" not in body
     assert 'http-equiv="refresh"' not in body
 
 
@@ -244,12 +246,12 @@ def test_a_page_that_will_not_poll_does_not_build_the_poll_state(client, as_role
         raise AssertionError("built the poll state for a page that does not poll")
 
     monkeypatch.setattr(data_views, "job_overview_state", unexpected)
-    backend = CountingJobs(job_data("done", 3, "getMatchesForSample", [], params='{"0": 7}'), [])
+    backend = CountingJobs(job_data(DONE_JOB_ID, 3, "getMatchesForSample", [], params='{"0": 7}'), [])
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend
     as_role("visitor")
 
-    assert client.get("/data/jobs/done?refresh=3").status_code == 200
-    assert client.get("/data/jobs/done").status_code == 200
+    assert client.get(f"/data/jobs/{DONE_JOB_ID}?refresh=3").status_code == 200
+    assert client.get(f"/data/jobs/{DONE_JOB_ID}").status_code == 200
 
 
 def test_the_poll_state_survives_a_job_without_its_raw_document():
