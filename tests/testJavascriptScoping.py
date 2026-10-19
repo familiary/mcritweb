@@ -3,8 +3,8 @@
 
 An assignment with no `var`, `let` or `const` creates a property on `window`. Two
 pages, or two script blocks on one page, then share a variable neither of them meant
-to - and `families_ac` and `myDropzone` really are written from two different blocks
-that land on the same page. Issue #61.
+to - and `myDropzone` really is written from two different blocks that land on the
+same page. Issue #61.
 
 This is a ratchet: the list below is empty and may only stay empty. Adding a name to
 it is a regression, not a note.

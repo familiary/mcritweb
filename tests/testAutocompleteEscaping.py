@@ -6,15 +6,16 @@
 builds each suggestion by interpolating the label and the value into an HTML string,
 and `ce()` assigns that string to `innerHTML`. A family name is chosen by whoever
 submits or renames a family, so a name that *is* markup becomes script the moment
-someone opens the edit-family/edit-sample modal and types a matching character. Two
-sinks, not one: the button's text content, and the `data-label`/`data-value`
-attributes the same value is interpolated into unescaped.
+someone opens the edit-family/edit-sample modal or the submit form and types a
+matching character. Two sinks, not one: the button's text content, and the
+`data-label`/`data-value` attributes the same value is interpolated into unescaped.
 
-`|tojson` at the two call sites protects the transport - the name reaches the browser
-as a correct JS string - and that is all it protects. The sink is in JavaScript, one
-`innerHTML` further on, and issue #85's ratchet in `testScriptEscaping.py` does not
-reach it. AGENTS.md forbids patching a vendored asset, so the escaping is done where
-the data is built: the templates hand the widget names that are already HTML-escaped.
+`jsonify` in `explore.family_names` protects the transport - the name reaches the
+browser as a correct JSON string - and that is all it protects. The sink is in
+JavaScript, one `innerHTML` further on, and issue #85's ratchet in
+`testScriptEscaping.py` does not reach it. AGENTS.md forbids patching a vendored
+asset, so the escaping is done where the data is built: the endpoint, which since #192
+is the only way names reach the widget, hands it names that are already HTML-escaped.
 
 That fix has a known, bounded cost, pinned below by
 `test_the_highlighter_severs_an_entity` rather than left to a comment nobody rereads:
@@ -26,17 +27,17 @@ site, because `item.label` (`autocomplete.js:110`) is the single value the match
 (`:114`), the highlight index (`:70-72`), the rendered slices (`:75-77`) and the
 attribute (`:90`) all read. See AGENTS.md for the full argument.
 
-Four tests, deliberately not redundant:
+Five tests, deliberately not redundant:
 
-`test_the_type_ahead_data_is_html_escaped` is offline and runs everywhere. It decodes
-the JS string literals the page actually emits and asserts none of them still carries
-raw markup - not just `<`, but `"` and `'` too, since `data-label="..."` is an
-attribute and a bare quote there is an event handler.
+`test_no_type_ahead_page_embeds_the_family_names` is offline and runs everywhere.
+Since #192 every type-ahead fetches its names from `explore.family_names`, whose
+escaping `testScriptEscaping.py` pins, so what is left to assert about the pages is
+that none of them puts the names back into its own script.
 
-`test_every_type_ahead_builds_its_data_through_the_escaping_filter` is the ratchet.
-Escaping at the call site is only as good as the next call site, and it checks the
-data *expression* rather than looking for the filter's name somewhere in the block -
-a comment mentioning the filter used to be enough to satisfy it.
+`test_every_type_ahead_gets_its_names_from_the_escaping_endpoint` is the ratchet.
+Escaping where the data is built is only as good as the next way of building it, so
+the widget may only ever be handed an empty list, or - in the fetching partial, and
+only there - the endpoint's `data.suggestions` exactly as they arrived.
 
 `test_a_family_name_cannot_execute_in_the_type_ahead` drives a real browser, because
 the sink is a browser behaviour and no amount of reading the response proves it is
@@ -45,6 +46,10 @@ shut. Two payloads at once - one that opens a tag, one that breaks out of the
 prefix is still highlighted, and selecting one puts the *unescaped* name in the field.
 
 `test_the_highlighter_severs_an_entity` is the honest record of the cost above.
+
+`test_the_drop_overlay_suggests_without_doubling_the_modal_widgets` covers the page
+that runs the fetching partial twice since #192 - once for its edit modals, once for
+the drop overlay - and asserts every family field still carries exactly one widget.
 
 The browser tests need playwright with a chromium build; without either they skip
 rather than fail, so the offline pair is what CI is guaranteed to run.
@@ -84,8 +89,8 @@ POISONED_FAMILY_IDS = (1, 2)
 ENTITY_FAMILY_ID = 3
 
 #: Pages carrying the family type-ahead: the four explore pages reach it through
-#: `js/ac_family_names.html`, `/data/submit` through the `submit_or_query_dropzone`
-#: macro. Both call sites, because each builds the widget's data for itself.
+#: `js/ac_family_names.html` directly, `/data/submit` through the
+#: `submit_or_query_dropzone` macro, which includes the same partial since #192.
 TYPE_AHEAD_PAGES = (
     "/explore/families",
     "/explore/samples",
@@ -93,14 +98,6 @@ TYPE_AHEAD_PAGES = (
     "/explore/samples/0",
     "/data/submit",
 )
-
-#: Of those, the ones that still put the names *in the page*. #146 moved
-#: `js/ac_family_names.html` onto a fetch of `explore.family_names`, so the four
-#: explore pages carry no names to inspect in their markup - the escaping for them
-#: happens in that endpoint, and testScriptEscaping.py pins it there. The markup
-#: assertion below would otherwise pass by finding nothing, which is why it fails
-#: loudly when a page it names carries no payload at all.
-EMBEDDED_NAME_PAGES = ("/data/submit",)
 
 #: The pages the browser test can drive. `/explore/families/<id>` is missing on
 #: purpose: it includes the same `js/ac_family_names.html` partial, but its sample
@@ -111,12 +108,6 @@ BROWSER_PAGES = tuple(page for page in TYPE_AHEAD_PAGES if page != "/explore/fam
 
 #: The field the widget is attached to, per call site. `#family` is the dropzone's.
 FIELD_SELECTOR = "#family_new_name, #sample_family_name, #family"
-
-#: Characters that must not survive into a value the widget renders. `<` and `>` open
-#: a tag in the button's text; `"` and `'` end the attribute at `autocomplete.js:90`,
-#: and an attribute break needs no angle bracket at all. `&` is deliberately absent -
-#: escaping *produces* `&`, so forbidding it would fail on correct output.
-MARKUP_CHARACTERS = ('<', '>', '"', "'")
 
 SCRIPT_BLOCK = re.compile(r"<script\b.*?</script\s*>", re.IGNORECASE | re.DOTALL)
 JS_STRING = re.compile(r'"(?:[^"\\\n]|\\.)*"')
@@ -151,13 +142,14 @@ def autocomplete_scripts(markup):
     return [block for block in SCRIPT_BLOCK.findall(markup) if "new Autocomplete(" in block]
 
 
-@pytest.mark.parametrize("path", EMBEDDED_NAME_PAGES)
-def test_the_type_ahead_data_is_html_escaped(client, as_role, poisoned_backend, path):
-    """No string handed to the widget may still contain raw markup.
+@pytest.mark.parametrize("path", TYPE_AHEAD_PAGES)
+def test_no_type_ahead_page_embeds_the_family_names(client, as_role, poisoned_backend, path):
+    """No page hands the widget family names of its own, escaped or not.
 
-    Asserted on the decoded values rather than on the response bytes: `|tojson` writes
-    `<` as `\\u003c` and `&` as `\\u0026`, so a substring search over the raw response
-    cannot tell an escaped name from an unescaped one.
+    `/data/submit` was the last one: it called `getFamilies()` on every load and
+    embedded the whole table through `|autocomplete_items` (#192). The names now arrive
+    from `explore.family_names` as they are typed, so neither form of a poisoned name
+    may turn up among the JS string literals of a block that builds the widget.
     """
     as_role("admin")
 
@@ -168,30 +160,19 @@ def test_the_type_ahead_data_is_html_escaped(client, as_role, poisoned_backend, 
     scripts = autocomplete_scripts(markup)
     assert scripts, f"no autocomplete script block found on {path} - the scan missed it"
 
-    seen = set()
-    for script in scripts:
-        for literal in JS_STRING.findall(script):
-            value = json.loads(literal)
-            for character in MARKUP_CHARACTERS:
-                assert character not in value, (
-                    f"{path} hands the type-ahead {value!r}, which still carries "
-                    f"{character!r} - the widget writes it into innerHTML and into a "
-                    f"data-label attribute, and both read it as markup"
-                )
-            seen.add(value)
-
+    literals = {json.loads(literal) for script in scripts for literal in JS_STRING.findall(script)}
     for payload in PAYLOADS:
-        assert str(escape(payload)) in seen, (
-            f"the poisoned family name {payload!r} never reached the type-ahead on "
-            f"{path} - the test is not exercising what it claims to"
+        assert payload not in literals and str(escape(payload)) not in literals, (
+            f"{path} embeds the family name {payload!r} in its type-ahead script - "
+            f"the names are fetched from explore.family_names, not shipped with the page"
         )
 
 
 # --- the ratchet ------------------------------------------------------------------
 
-#: Comments are stripped first, or the lint is satisfied by prose: the filter's own
-#: name appears in the explanatory comment above each call site, so a copied-then-
-#: broken call site used to pass on the strength of the comment it was copied with.
+#: Comments are stripped first, or the lint is satisfied by prose: an explanatory
+#: comment above a call site used to be enough to make a copied-then-broken call site
+#: pass on the strength of the comment it was copied with.
 JINJA_COMMENT = re.compile(r"\{#.*?#\}", re.DOTALL)
 BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 LINE_COMMENT = re.compile(r"^[ \t]*//.*$", re.MULTILINE)
@@ -202,32 +183,30 @@ LINE_COMMENT = re.compile(r"^[ \t]*//.*$", re.MULTILINE)
 DATA_OPTION = re.compile(r"new\s+Autocomplete\s*\((?:[^()]|\([^()]*\))*?\bdata\s*:\s*([^,\n}]+)")
 SET_DATA = re.compile(r"\.setData\s*\(\s*([^,\n)]+)")
 
-#: A name bound to a filtered expression: `var families_ac = {{ x|autocomplete_items|tojson }}`.
-FILTERED_BINDING = re.compile(
-    r"(?:var|let|const)?\s*([A-Za-z_$][\w$]*)\s*=\s*\{\{[^{}]*\|\s*autocomplete_items\b"
-)
-
-#: The expression itself being a filtered Jinja expression, passed inline.
-FILTERED_EXPRESSION = re.compile(r"\{\{[^{}]*\|\s*autocomplete_items\b")
-
 #: `data: []` - a widget built empty and filled by a later setData, which is checked
 #: on its own merits. An empty literal carries no names, so it cannot carry markup.
 EMPTY_LITERAL = re.compile(r"\[\s*\]")
 
-#: Files whose data reaches the widget already escaped because a *server-side* caller
-#: built it, not the template filter. The filter stopped being the only way in when
-#: #146 moved the family type-ahead onto a fetch, and the ratchet cannot follow data
-#: across that boundary - it says so in its own docstring. Each entry therefore names
-#: where the escaping happens and the test that pins it, and the entries are checked
-#: for staleness below so this cannot quietly become the exception list AGENTS.md
-#: warns grows back.
+#: The data expressions, per file, that hand the widget items a *server-side* caller
+#: already escaped. Since #192 this is the only way in: no page embeds names any more,
+#: and the `|autocomplete_items` template filter that escaped the embedded ones went
+#: with the last page that used it. The ratchet cannot follow data across the fetch -
+#: it says so in its own docstring - so each entry names where the escaping happens and
+#: the test that pins it, and the entries are checked for staleness below so this
+#: cannot quietly become the exception list AGENTS.md warns grows back.
+#:
+#: Exempt per expression rather than per file: every production call site goes through
+#: this one partial, so exempting the file would leave the ratchet checking no live
+#: call site at all - a partial that decoded the labels before handing them on would
+#: pass every offline test.
 ESCAPED_AT_THE_SOURCE = {
-    "templates/js/ac_family_names.html": (
-        "fetched from explore.family_names, which answers {label, value} items built by "
-        "mcritweb.autocomplete.autocomplete_items - the same function behind the filter. "
-        "Pinned by testScriptEscaping.py::"
-        "test_a_family_name_stays_a_string_in_the_type_ahead_response."
-    ),
+    "templates/js/ac_family_names.html": {
+        "data.suggestions || []": (
+            "fetched from explore.family_names, which answers {label, value} items built "
+            "by mcritweb.autocomplete.autocomplete_items. Pinned by testScriptEscaping.py::"
+            "test_a_family_name_stays_a_string_in_the_type_ahead_response."
+        ),
+    },
 }
 
 
@@ -235,20 +214,25 @@ def strip_comments(source):
     return LINE_COMMENT.sub("", BLOCK_COMMENT.sub("", JINJA_COMMENT.sub("", source)))
 
 
-def unfiltered_data_expressions(source):
-    """The expressions in one file that reach the widget without going through the
-    filter. Split out from the walk so the lint's own regression test can drive it."""
+def unescaped_data_expressions(source, allowed=()):
+    """The expressions in one file that hand the widget anything but an empty list or
+    one of the `allowed` expressions. Split out from the walk so the lint's own
+    regression test can drive it."""
     stripped = strip_comments(source)
-    safe_names = set(FILTERED_BINDING.findall(stripped))
     for pattern in (DATA_OPTION, SET_DATA):
         for match in pattern.finditer(stripped):
             expression = match.group(1).strip()
-            if FILTERED_EXPRESSION.search(expression) or expression in safe_names:
-                continue
             if EMPTY_LITERAL.fullmatch(expression):
                 # a widget constructed with no data at all. Whatever fills it later is
                 # a setData call, which this same walk checks on its own merits.
                 continue
+            if expression in allowed:
+                # the endpoint's items, handed on as they arrived - which only holds
+                # while nothing else in the file touches them. Named anywhere else, they
+                # could have been rewritten in place before reaching this line.
+                payload = expression.split("||")[0].strip()
+                if stripped.count(payload) == 1:
+                    continue
             yield stripped.count("\n", 0, match.start()) + 1, expression
 
 
@@ -277,86 +261,110 @@ def front_end_sources():
                     yield path, source
 
 
-def test_every_type_ahead_builds_its_data_through_the_escaping_filter():
+def test_every_type_ahead_gets_its_names_from_the_escaping_endpoint():
     """A ratchet, in the shape of `testScriptEscaping.py`'s.
 
-    The escaping lives at the call sites because `static/autocomplete.js` is vendored
-    and may not be patched, which means a third call site added without it reopens the
-    hole in full. The browser test below only knows the pages that exist today.
+    The escaping lives where the data is built because `static/autocomplete.js` is
+    vendored and may not be patched, which means a second way of feeding it names,
+    added without escaping, reopens the hole in full. The browser test below only
+    knows the pages that exist today.
 
-    This resolves the data *expression* - a bare name has to be bound to a filtered
-    expression somewhere in the same file - rather than asking whether the filter's
-    name appears anywhere in the block, which a comment satisfies. It covers
-    `setData` as well as the constructor, and `static/*.js` as well as the templates.
-    What it cannot follow is data built in one file and consumed in another; nothing
-    does that today.
+    Every data expression must be an empty literal or the one expression
+    `ESCAPED_AT_THE_SOURCE` allows in its file. It covers `setData` as well as the
+    constructor, and `static/*.js` as well as the templates. What it cannot follow is
+    data built in one file and consumed in another; nothing does that today.
     """
     offenders = []
-    exempt_and_still_needed = set()
     for path, source in front_end_sources():
         relative = os.path.relpath(path, PACKAGE_ROOT).replace(os.sep, "/")
-        for line, expression in unfiltered_data_expressions(source):
-            if relative in ESCAPED_AT_THE_SOURCE:
-                exempt_and_still_needed.add(relative)
-                continue
+        allowed = ESCAPED_AT_THE_SOURCE.get(relative, {})
+        for line, expression in unescaped_data_expressions(source, allowed):
             offenders.append(f"{relative}:{line} ({expression})")
     offenders.sort()
 
-    stale = set(ESCAPED_AT_THE_SOURCE) - exempt_and_still_needed
-    assert stale == set(), (
-        "ESCAPED_AT_THE_SOURCE names a file that now builds its data through the "
-        f"filter, or no longer feeds a widget at all: {sorted(stale)}. Drop the entry - "
-        "an exemption nothing needs is how the list stops being read."
+    stale = []
+    for relative, expressions in ESCAPED_AT_THE_SOURCE.items():
+        with open(os.path.join(PACKAGE_ROOT, relative), encoding="utf-8") as handle:
+            stripped = strip_comments(handle.read())
+        stale.extend(f"{relative} ({expression})" for expression in expressions if expression not in stripped)
+    assert stale == [], (
+        "ESCAPED_AT_THE_SOURCE allows an expression its file no longer uses: "
+        f"{stale}. Drop the entry - an exemption nothing needs is how the list stops "
+        "being read."
     )
 
     assert not offenders, (
-        "a type-ahead is built from data the escaping filter did not produce, at: "
+        "a type-ahead is handed names that did not come from explore.family_names, at: "
         + ", ".join(offenders) + ". autocomplete.js renders each suggestion through "
-        "innerHTML and into a data-label attribute, so pass the names through "
-        "|autocomplete_items - |tojson only protects the transport."
+        "innerHTML and into a data-label attribute, so include js/ac_family_names.html "
+        "instead - |tojson only protects the transport."
     )
 
 
-#: Each of these passed the ratchet's first version. They are the review findings
-#: turned into cases, so the lint cannot quietly regress to a substring search.
+#: Each of these passed the ratchet's first version, or would pass a ratchet that
+#: trusted the template filter #192 removed. They are the review findings turned into
+#: cases, so the lint cannot quietly regress to a substring search.
 RATCHET_BYPASSES = {
-    "a comment naming the filter": (
-        "<script>\n// built with |autocomplete_items\n"
+    "a comment naming the escaping": (
+        "<script>\n// built with mcritweb.autocomplete\n"
         "var ac_data = {{ families|tojson }};\n"
         "new Autocomplete(field, {data: ac_data, threshold: 1});\n</script>"
     ),
     "setData with raw names": (
-        "<script>\nvar ok = {{ families|autocomplete_items|tojson }};\n"
-        "new Autocomplete(field, {data: ok});\nac.setData(rawFamilies);\n</script>"
+        "<script>\nnew Autocomplete(field, {data: []});\nac.setData(rawFamilies);\n</script>"
     ),
     "built in one block, consumed in another": (
         "<script>\nvar d = {{ families|tojson }};\n</script>\n"
         "<script>\nnew Autocomplete(field, {data: d});\n</script>"
     ),
+    "names embedded in the page again": (
+        "<script>\nnew Autocomplete(field, {data: {{ families|autocomplete_items|tojson }}});\n</script>"
+    ),
+    "the partial post-processes the endpoint's items": (
+        "<script>\nconst completer = new Autocomplete(field, {data: []});\n"
+        "const t = document.createElement('textarea');\n"
+        "const decoded = (data.suggestions || []).map(function (i) {\n"
+        "    t.innerHTML = i.label; return {label: t.value, value: t.value};\n});\n"
+        "completer.setData(decoded);\n</script>"
+    ),
+    "the partial rewrites the endpoint's items in place": (
+        "<script>\nconst completer = new Autocomplete(field, {data: []});\n"
+        "const t = document.createElement('textarea');\n"
+        "data.suggestions.forEach(function (i) { t.innerHTML = i.label; i.label = t.value; });\n"
+        "completer.setData(data.suggestions || []);\n</script>"
+    ),
 }
 
 #: And these must stay quiet, or the ratchet is just noise.
 RATCHET_ACCEPTS = {
-    "inline filtered expression": (
-        "<script>\nnew Autocomplete(field, {data: {{ families|autocomplete_items|tojson }}});\n</script>"
+    "a widget built empty": (
+        "<script>\nnew Autocomplete(field, {data: [], maximumItems: 5, threshold: 1});\n</script>"
     ),
-    "filtered binding, used later": (
-        "<script>\nvar families_ac = {{ family_names|autocomplete_items|tojson }};\n"
-        "new Autocomplete(field, {data: families_ac, maximumItems: 5});\n"
-        "families_ac.push;\nac.setData(families_ac);\n</script>"
+    "a widget built empty, on several lines": (
+        "<script>\nconst completer = new Autocomplete(field, {\n    data: [ ],\n"
+        "    maximumItems: 5,\n});\n</script>"
+    ),
+    "the endpoint's items, handed on as they arrived": (
+        "<script>\nconst completer = new Autocomplete(field, {data: []});\n"
+        "fetch(url).then(r => r.json()).then(function (data) {\n"
+        "    completer.setData(data.suggestions || []);\n});\n</script>"
     ),
 }
+
+#: The cases are judged as if they were the fetching partial, the one file with an
+#: exemption, so a bypass has to get past that exemption to count.
+PARTIAL_EXEMPTION = ESCAPED_AT_THE_SOURCE["templates/js/ac_family_names.html"]
 
 
 @pytest.mark.parametrize("description", sorted(RATCHET_BYPASSES))
 def test_the_ratchet_rejects_the_ways_around_it(description):
-    findings = list(unfiltered_data_expressions(RATCHET_BYPASSES[description]))
+    findings = list(unescaped_data_expressions(RATCHET_BYPASSES[description], PARTIAL_EXEMPTION))
     assert findings, f"the ratchet still lets through: {description}"
 
 
 @pytest.mark.parametrize("description", sorted(RATCHET_ACCEPTS))
 def test_the_ratchet_accepts_a_correct_call_site(description):
-    findings = list(unfiltered_data_expressions(RATCHET_ACCEPTS[description]))
+    findings = list(unescaped_data_expressions(RATCHET_ACCEPTS[description], PARTIAL_EXEMPTION))
     assert not findings, f"the ratchet wrongly flags: {description} -> {findings}"
 
 
@@ -551,4 +559,59 @@ def test_the_highlighter_severs_an_entity(app, poisoned_backend, live_url, make_
     )
     assert "R&amp;D" in rendered["texts"], (
         f"expected the severed entity to render literally - got {rendered['texts']}"
+    )
+
+
+#: How many widgets each family field on a page carries. The vendored widget inserts
+#: its dropdown as the field's next sibling, so a second widget shows up as a second
+#: `.dropdown-menu` straight after the field. A field the page does not carry is left
+#: out - `/explore/samples` has the overlay's and the edit-sample modal's.
+WIDGETS_PER_FIELD = """
+() => Object.fromEntries(['family', 'sample_family_name', 'family_new_name'].filter(id => document.getElementById(id)).map(id => {
+  let count = 0;
+  let sibling = document.getElementById(id).nextElementSibling;
+  while (sibling && sibling.classList.contains('dropdown-menu')) {
+    count += 1;
+    sibling = sibling.nextElementSibling;
+  }
+  return [id, count];
+}))
+"""
+
+
+def test_the_drop_overlay_suggests_without_doubling_the_modal_widgets(app, poisoned_backend, live_url, make_user):
+    """`/explore/samples` runs `js/ac_family_names.html` twice since #192: once for its
+    edit modals, once through the drop overlay's dropzone macro. The overlay's field
+    has to get suggestions - it used to be built with none - and the modal fields must
+    still carry exactly one widget each, or every keystroke there would render two
+    dropdowns and fetch twice."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+    user_id = make_user("admin")
+    with sync_api.sync_playwright() as playwright:
+        try:
+            browser = playwright.chromium.launch()
+        except Exception as exc:  # noqa: BLE001 - a missing browser is a skip, not a failure
+            pytest.skip(f"playwright has no chromium installed: {exc}")
+        try:
+            context = browser.new_context()
+            context.add_cookies([{
+                "name": "session",
+                "value": session_cookie_value(app, user_id),
+                "url": live_url,
+            }])
+            page = context.new_page()
+            page.goto(live_url + "/explore/samples")
+            page.wait_for_selector("#family", state="attached", timeout=15000)
+
+            page.evaluate(TYPE_INTO_FIELD, ["#family", LOOKUP])
+            page.wait_for_function(HAS_SUGGESTION, arg=["#family", len(PAYLOADS)], timeout=10000)
+            snapshot = page.evaluate(MENU_SNAPSHOT, "#family")
+            widgets = page.evaluate(WIDGETS_PER_FIELD)
+        finally:
+            browser.close()
+
+    for payload in PAYLOADS:
+        assert payload in snapshot["labels"], f"the overlay did not suggest {payload!r}: {snapshot['labels']}"
+    assert widgets == {"family": 1, "sample_family_name": 1}, (
+        f"a family field carries the wrong number of type-ahead widgets: {widgets}"
     )

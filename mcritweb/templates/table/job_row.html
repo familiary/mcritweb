@@ -59,7 +59,7 @@
       {% set sample_entry = samples_by_id.get(target_sample_id|int) %}
       {% if sample_entry %}
           {# Check if family_id exists before grouping #}
-          {% if sample_entry.family_id %}
+          {% if sample_entry.family_id is not none %}
               {# Create a dictionary to group sample_ids by family_id #}
               {% set _ = grouped_samples.update({sample_entry.family_id: (grouped_samples.get(sample_entry.family_id, []) + [target_sample_id|int])}) %}
           {% endif %}

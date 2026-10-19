@@ -39,6 +39,11 @@ SCRIPT_BLOCK = re.compile(r"<script\b.*?</script\s*>", re.IGNORECASE | re.DOTALL
 #: its own. Flask's `|tojson` escapes `"` and `<`, so none of it survives as markup.
 BREAKOUT_NAME = 'evil" </script><script>alert(1)</script>'
 
+#: A name that needs no angle bracket at all: the type-ahead interpolates a suggestion
+#: into double-quoted `data-label`/`data-value` attributes, so a quote of either kind
+#: is enough to add an attribute of its own there.
+ATTRIBUTE_NAME = "evil' onmouseover='window.__pwned=1' \" onfocus=\"window.__pwned=2"
+
 
 def template_files():
     for directory, _, filenames in os.walk(TEMPLATE_ROOT):
@@ -93,11 +98,11 @@ def test_a_family_name_cannot_break_out_of_a_script_string(client, as_role, fake
     input arriving by way of the backend - exactly what AGENTS.md says must never reach
     `|safe`.
 
-    `/data/submit` is the remaining page that embeds the names in its source, through
-    `table/submit_or_query_dropzone.html`. The two explore listings used to do the same
-    through `js/ac_family_names.html`; #77 moved them onto `explore.family_names`, which
-    the test below covers. They stay in this list so that re-embedding a name there
-    would have to pass this again.
+    None of these pages embeds the names in its source any more. The two explore
+    listings used to, through `js/ac_family_names.html`, until #77 moved them onto
+    `explore.family_names`, which the test below covers; `/data/submit` did through
+    `table/submit_or_query_dropzone.html` until #192 moved it onto the same fetch. They
+    stay in this list so that re-embedding a name there would have to pass this again.
     """
     family_id, family_entry = next(iter(fake_mcrit._families.items()))
     fake_mcrit._families[family_id] = FamilyEntry.fromDict(
@@ -113,7 +118,8 @@ def test_a_family_name_cannot_break_out_of_a_script_string(client, as_role, fake
     )
 
 
-def test_a_family_name_stays_a_string_in_the_type_ahead_response(client, as_role, fake_mcrit):
+@pytest.mark.parametrize("name", [BREAKOUT_NAME, ATTRIBUTE_NAME])
+def test_a_family_name_stays_a_string_in_the_type_ahead_response(client, as_role, fake_mcrit, name):
     """Where those names travel since #77: JSON, fetched by `js/ac_family_names.html`.
 
     A JSON body is not a script context and is not served as one, so part of what this
@@ -122,14 +128,14 @@ def test_a_family_name_stays_a_string_in_the_type_ahead_response(client, as_role
 
     The rest is the sink the transport never covered. `Autocomplete.createItem` in
     `static/autocomplete.js` builds its dropdown by interpolating the label into an HTML
-    string, so a name that *is* markup executes there however safely it travelled. #168
-    escapes the names the page embeds; this endpoint is the other way into the same
-    widget, so it escapes through the same function (`mcritweb.autocomplete`) and the
-    raw name must not survive the round trip.
+    string, so a name that *is* markup executes there however safely it travelled.
+    Since #192 this endpoint is the only way names reach that widget, so it escapes
+    them (`mcritweb.autocomplete`, #168) and the raw name must not survive the round
+    trip - neither its angle brackets nor, for the attribute sink, its quotes.
     """
     family_id, family_entry = next(iter(fake_mcrit._families.items()))
     fake_mcrit._families[family_id] = FamilyEntry.fromDict(
-        dict(family_entry.toDict(), family_name=BREAKOUT_NAME)
+        dict(family_entry.toDict(), family_name=name)
     )
     as_role("visitor")
 
@@ -137,11 +143,15 @@ def test_a_family_name_stays_a_string_in_the_type_ahead_response(client, as_role
 
     assert response.status_code == 200
     assert response.mimetype == "application/json"
-    escaped = str(escape(BREAKOUT_NAME))
+    escaped = str(escape(name))
     assert response.json["suggestions"] == [{"label": escaped, "value": escaped}]
-    assert BREAKOUT_NAME not in response.get_data(as_text=True), (
-        "the unescaped name reached the widget, which renders it through innerHTML"
-    )
+    for item in response.json["suggestions"]:
+        for field in ("label", "value"):
+            for character in ('<', '>', '"', "'"):
+                assert character not in item[field], (
+                    f"the {field} {item[field]!r} still carries {character!r} - the widget "
+                    f"writes it into innerHTML and into a double-quoted attribute"
+                )
 
 
 # --- the CFG page's own script ---------------------------------------------------

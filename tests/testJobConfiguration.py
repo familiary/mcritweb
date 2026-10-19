@@ -34,7 +34,7 @@ import re
 import unittest
 
 import pytest
-from fixtureData import altered_job, inject_job, job_id_of
+from fixtureData import altered_job, inject_job, job_id_of, remove_job
 
 from mcritweb.views.params import parse_band_range
 
@@ -269,7 +269,7 @@ def test_a_cross_compare_missing_a_child_is_not_linked(client, as_role, fake_mcr
     it - the same reason it cannot be rerun."""
     as_role("visitor")
     job_id = job_id_of("cross_compare")
-    fake_mcrit._queued_by_id.pop(fake_mcrit.getJobData(job_id).all_dependencies[0])
+    remove_job(fake_mcrit, fake_mcrit.getJobData(job_id).all_dependencies[0])
 
     assert link_for(client, job_id) is None
 

@@ -56,15 +56,18 @@ def generate_csrf():
 
 
 def _submitted_token():
-    """Pull the token out of the form body, then the headers."""
-    token = request.form.get(FIELD_NAME)
-    if token:
-        return token
+    """Pull the token out of the headers, then the form body.
+
+    Headers first, because reading `request.form` reads and parses the whole body, and
+    this runs before any view. The upload dropzone sends its token as a header, so
+    `analyze.query` can still refuse an upload over the role's cap from its declared
+    length before the body is taken in.
+    """
     for header in HEADER_NAMES:
         token = request.headers.get(header)
         if token:
             return token
-    return None
+    return request.form.get(FIELD_NAME) or None
 
 
 def validate_csrf():

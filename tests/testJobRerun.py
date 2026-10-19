@@ -33,7 +33,7 @@ import logging
 import unittest
 
 import pytest
-from fixtureData import altered_job, inject_job, job_id_of, load
+from fixtureData import altered_job, inject_job, job_id_of, load, remove_job
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -257,13 +257,13 @@ def test_a_cross_compare_missing_a_child_is_not_rerun(client, as_role, fake_mcri
     as_role("visitor")
     job_id = job_id_of("cross_compare")
     child_job_id = load("cross_compare.job")["all_dependencies"][0]
-    fake_mcrit._queued_by_id.pop(child_job_id)
+    remove_job(fake_mcrit, child_job_id)
 
     page = client.get(f"/data/jobs/{job_id}")
     response = client.post(f"/data/jobs/{job_id}/rerun")
 
-    # the page has to survive that at all: it resolves every dependency, and
-    # getJobData answers None for one that is gone, which used to be an
+    # the page has to survive that at all: it reads every dependency, and one that
+    # is gone is missing from the answer. A None per child used to be an
     # AttributeError on `.number` - a 500 for the exact job this button is about
     assert page.status_code == 200
     assert not rerun_button_for(page.get_data(as_text=True), job_id)

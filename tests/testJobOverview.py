@@ -49,7 +49,10 @@ def job_data(job_id, number, method="getMatchesForSample", dependencies=(), para
 
 
 class JobsWithHoles:
-    """A backend that knows the parent job and only the children it is told about."""
+    """A backend that knows the parent job and only the children it is told about.
+
+    The overview reads the children in one `getQueueData(job_ids=...)` request, which
+    leaves out a job the backend does not have, as `getJobData` answers None for it."""
 
     def __init__(self, parent, children):
         self._jobs = {parent["_id"]: parent}
@@ -59,11 +62,20 @@ class JobsWithHoles:
         entry = self._jobs.get(job_id)
         return Job(entry, None) if entry else None
 
+    def getQueueData(self, *args, job_ids=None, **kwargs):
+        return [Job(self._jobs[job_id], None) for job_id in job_ids or [] if job_id in self._jobs]
+
     def getSampleById(self, *args, **kwargs):
         return None
 
+    def getSamplesByIds(self, *args, **kwargs):
+        return {}
+
     def getFamily(self, *args, **kwargs):
         return None
+
+    def getFamiliesByIds(self, *args, **kwargs):
+        return {}
 
 
 @pytest.fixture

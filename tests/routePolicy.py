@@ -117,8 +117,8 @@ ROUTE_POLICY = {
     # --- authenticated, any role including 'pending' -----------------------------
     "authentication.logout": (LOGGED_IN, WRITES_ON_GET),   # session teardown, by design
     "authentication.settings": (LOGGED_IN, READ_ONLY),
-    "admin.change_username": (LOGGED_IN, WRITES_ON_POST),   # GET raises 400 on request.form
-    "admin.change_password": (LOGGED_IN, WRITES_ON_POST),   # GET raises 400 on request.form
+    "admin.change_username": (LOGGED_IN, WRITES_ON_POST),
+    "admin.change_password": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_default_filter": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_column_settings": (LOGGED_IN, WRITES_ON_POST),
     "admin.reset_column_settings": (LOGGED_IN, WRITES_ON_POST),
@@ -126,8 +126,9 @@ ROUTE_POLICY = {
 
     # --- visitor and above -------------------------------------------------------
     "explore.families": (VISITOR, READ_ONLY),
-    # the family type-ahead behind the edit modals (#77). Visitors already read every
-    # family name off explore.families, so this exposes nothing the listing does not.
+    # the family type-ahead behind the edit modals (#77), and since #192 behind the
+    # submit form and the drop overlay too. Visitors already read every family name
+    # off explore.families, so this exposes nothing the listing does not.
     "explore.family_names": (VISITOR, READ_ONLY),
     "explore.family_by_id": (VISITOR, READ_ONLY),
     "explore.samples": (VISITOR, READ_ONLY),
