@@ -28,6 +28,9 @@ Only the filtered result views (?funid=, ?samid=, ?famid=) reach for matched ent
 beyond that set. A test that exercises them needs this script to widen the pool
 first.
 
+Families are read one at a time rather than off `/families`, because only the
+single-family endpoint answers with the family's samples - see families_with_samples().
+
 Unique blocks are trimmed too: 6124 blocks -> the first 250, enough for the block
 table to paginate several pages. `statistics` is left untouched and so describes the
 full run rather than the subset.
@@ -83,6 +86,25 @@ def newest_finished_job(jobs, method):
     return max(candidates, key=lambda job: job["number"])
 
 
+def families_with_samples(server):
+    """Every family the way `getFamily` answers for one, keyed by family id.
+
+    `/families` and `/families/{id}` do not return the same thing. The collection
+    reads `MinHashIndex.getFamilies()`, and storage does not keep a family's sample
+    list; only `FamilyResource.on_get` fills `family.samples` in, which is why
+    `McritClient.getFamily` asks with `with_samples=true` by default. The views build
+    on that - `data.get_sample_versions` reads the versions of a family's samples off
+    the entry the page is already holding, and issues no request of its own for them.
+
+    Capturing the collection shape here left `FamilyEntry.samples` None in every
+    test, so that shortcut was never exercised. Hence one request per family.
+    """
+    return {
+        family_id: fetch(server, f"/families/{family_id}?with_samples=true")
+        for family_id in fetch(server, "/families")
+    }
+
+
 def reference_functions(server, sample_id):
     """The head of a sample's functions, graphs included."""
     functions = fetch(server, f"/samples/{sample_id}/functions")
@@ -122,7 +144,7 @@ def main():
     print("corpus:")
     write("status", fetch(server, "/status"))
     write("version", fetch(server, "/version"))
-    write("families", fetch(server, "/families"))
+    write("families", families_with_samples(server))
     write("samples", fetch(server, "/samples"))
     write("queue", fetch(server, "/jobs?limit=25"))
     write("queue_statistics", fetch(server, "/jobs/stats/"))
