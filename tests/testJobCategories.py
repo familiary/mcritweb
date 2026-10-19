@@ -145,13 +145,15 @@ def test_totals_is_not_mistaken_for_a_category(client, as_role):
 
 
 def test_the_known_categories_cover_what_the_backend_can_produce(client):
-    """Job.method_types["all"] omits the two maintenance methods the admin routes
-    create, so it cannot be the whole list on its own - this pins that."""
+    """Job.method_types["all"] omits the maintenance methods the admin routes create,
+    so it cannot be the whole list on its own - this pins that. testMaintenanceJobs
+    checks the same against each route's own call."""
     from mcritweb.views.data import JOB_CATEGORIES
 
     for method in Job(None, None).method_types["all"]:
         assert method in JOB_CATEGORIES, method
-    for method in ("recalculatePicHashes", "recalculateMinHashes"):
+    for method in ("recalculatePicHashes", "recalculateMinHashes", "repairMinHashes",
+                   "recomputeFamilyStats", "rebuildPicBlockHashIndex"):
         assert method in JOB_CATEGORIES, f"{method} is created by admin routes"
 
 

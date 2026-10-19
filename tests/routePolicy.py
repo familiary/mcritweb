@@ -220,6 +220,9 @@ ROUTE_POLICY = {
     "admin.schedule_rebuild_index": (ADMIN, WRITES_ON_POST),
     "admin.schedule_recalc_minhashes": (ADMIN, WRITES_ON_POST),
     "admin.schedule_recalc_pichashes": (ADMIN, WRITES_ON_POST),
+    "admin.schedule_repair_minhashes": (ADMIN, WRITES_ON_POST),
+    "admin.schedule_recompute_family_stats": (ADMIN, WRITES_ON_POST),
+    "admin.schedule_rebuild_picblockhash_index": (ADMIN, WRITES_ON_POST),
 
     # --- token authenticated -----------------------------------------------------
     # Dispatches an allowlist of ~18 path patterns to the backend. The gate is the

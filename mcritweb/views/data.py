@@ -804,7 +804,16 @@ def result(job_id):
             return redirect(url_for('explore.families'))
         elif job_info.parameters.startswith("modifyFamily"):
             return redirect(url_for('explore.families'))
-        elif job_info.parameters in ["rebuildIndex()", "recalculatePicHashes()", "recalculateMinHashes()"]:
+        elif job_info.parameters in [
+            "rebuildIndex()",
+            "recalculatePicHashes()",
+            "recalculateMinHashes()",
+            # mcrit 1.9.0. Leave one of these three out and the result of a job MCRITweb
+            # itself scheduled never reaches the maintenance report.
+            "repairMinHashes()",
+            "recomputeFamilyStats()",
+            "rebuildPicBlockHashIndex()",
+        ]:
             return render_template("result_maintenance.html", result=result_json, job_info=job_info)
         else:
             # a job type this dispatch has never been taught. Falling off the end of the
@@ -1590,8 +1599,9 @@ UNREADABLE_PAYLOAD_REASON = (
 #: is - the backend is, and `known_job_category` below defers to it. This is only the
 #: fallback for a type the backend is not currently reporting, because it has no jobs of
 #: that kind. `Job.method_types["all"]` is not even the whole local list: it omits
-#: recalculatePicHashes and recalculateMinHashes, which the admin maintenance routes
-#: create and which the menu does render.
+#: every job the admin maintenance routes create - recalculatePicHashes and
+#: recalculateMinHashes, and the three repairs mcrit 1.9.0 added - all of which the
+#: menu does render.
 JOB_CATEGORIES = tuple(Job(None, None).method_types["all"]) + (
     "recalculatePicHashes",
     "recalculateMinHashes",
@@ -1599,6 +1609,9 @@ JOB_CATEGORIES = tuple(Job(None, None).method_types["all"]) + (
     # about either; data.jobs gives them a tab (#51), so its own link has to be accepted
     # on an installation that has not run a cross compare yet
     "getMatchesForSampleVsGroup",
+    "repairMinHashes",
+    "recomputeFamilyStats",
+    "rebuildPicBlockHashIndex",
 )
 
 
@@ -1717,12 +1730,17 @@ def jobs():
                 {"name": "getMatchesForSmdaReport", "title": f"getMatchesForSmdaReport ({sum(statistics['getMatchesForSmdaReport'].values()) if 'getMatchesForSmdaReport' in statistics else 0})", "active": "getMatchesForSmdaReport" == active_category, "available": "getMatchesForSmdaReport" in statistics},
             ]}, 
             {"group": "getUniqueBlocks", "title": f"Blocks ({summarized_groups['blocks']})", "active": "getUniqueBlocks" == active_category, "available": "getUniqueBlocks" in statistics},
-            {"group": "minhashing", "title": f"Minhashing ({summarized_groups['minhashing']})", "active": active_category in ["updateMinHashesForSample", "updateMinHashes", "rebuildIndex"], "available": True, "submenu": [
+            # the admin page's maintenance jobs are filed here too, pichash and family
+            # statistics included; the tab is active for every entry it opens onto
+            {"group": "minhashing", "title": f"Minhashing ({summarized_groups['minhashing']})", "active": active_category in ["updateMinHashesForSample", "updateMinHashes", "rebuildIndex", "recalculateMinHashes", "recalculatePicHashes", "repairMinHashes", "recomputeFamilyStats", "rebuildPicBlockHashIndex"], "available": True, "submenu": [
                 {"name": "updateMinHashesForSample", "title": f"updateMinHashesForSample ({sum(statistics['updateMinHashesForSample'].values()) if 'updateMinHashesForSample' in statistics else 0})", "active": "updateMinHashesForSample" == active_category, "available": "updateMinHashesForSample" in statistics},
                 {"name": "updateMinHashes", "title": f"updateMinHashes ({sum(statistics['updateMinHashes'].values()) if 'updateMinHashes' in statistics else 0})", "active": "updateMinHashes" == active_category, "available": "updateMinHashes" in statistics},
                 {"name": "rebuildIndex", "title": f"rebuildIndex ({sum(statistics['rebuildIndex'].values()) if 'rebuildIndex' in statistics else 0})", "active": "rebuildIndex" == active_category, "available": "rebuildIndex" in statistics},
                 {"name": "recalculateMinHashes", "title": f"recalculateMinHashes ({sum(statistics['recalculateMinHashes'].values()) if 'recalculateMinHashes' in statistics else 0})", "active": "recalculateMinHashes" == active_category, "available": "recalculateMinHashes" in statistics},
                 {"name": "recalculatePicHashes", "title": f"recalculatePicHashes ({sum(statistics['recalculatePicHashes'].values()) if 'recalculatePicHashes' in statistics else 0})", "active": "recalculatePicHashes" == active_category, "available": "recalculatePicHashes" in statistics},
+                {"name": "repairMinHashes", "title": f"repairMinHashes ({sum(statistics['repairMinHashes'].values()) if 'repairMinHashes' in statistics else 0})", "active": "repairMinHashes" == active_category, "available": "repairMinHashes" in statistics},
+                {"name": "recomputeFamilyStats", "title": f"recomputeFamilyStats ({sum(statistics['recomputeFamilyStats'].values()) if 'recomputeFamilyStats' in statistics else 0})", "active": "recomputeFamilyStats" == active_category, "available": "recomputeFamilyStats" in statistics},
+                {"name": "rebuildPicBlockHashIndex", "title": f"rebuildPicBlockHashIndex ({sum(statistics['rebuildPicBlockHashIndex'].values()) if 'rebuildPicBlockHashIndex' in statistics else 0})", "active": "rebuildPicBlockHashIndex" == active_category, "available": "rebuildPicBlockHashIndex" in statistics},
             ]}, 
             {"group": "collection", "title": f"Collection ({summarized_groups['collection']})", "active": active_category in ["addBinarySample", "deleteSample", "modifySample", "deleteFamily", "modifyFamily"], "available": True, "submenu": [
                 {"name": "addBinarySample", "title": f"addBinarySample ({sum(statistics['addBinarySample'].values()) if 'addBinarySample' in statistics else 0})", "active": "addBinarySample" == active_category, "available": "addBinarySample" in statistics},
