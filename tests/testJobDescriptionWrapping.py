@@ -55,7 +55,7 @@ def test_the_stylesheet_lets_that_cell_break():
 def test_the_class_reaches_a_rendered_jobs_page(client, as_role):
     as_role("visitor")
 
-    page = client.get("/data/jobs").get_data(as_text=True)
+    page = client.get("/data/jobs", follow_redirects=True).get_data(as_text=True)
 
     assert "job-description" in page
     assert "job-cell job-description" in page, "the click handler's class is still there"
@@ -73,7 +73,7 @@ def test_an_unrecognised_job_method_still_renders_its_raw_parameters(client, as_
     job_data["payload"]["method"] = "someFutureMethodWithAVeryLongNameIndeed"
     monkeypatch.setattr(fake_mcrit, "getQueueData", lambda *args, **kwargs: [Job(job_data, None)])
 
-    page = client.get("/data/jobs").get_data(as_text=True)
+    page = client.get("/data/jobs", follow_redirects=True).get_data(as_text=True)
 
     assert "someFutureMethodWithAVeryLongNameIndeed" in page
     assert "job-description" in page

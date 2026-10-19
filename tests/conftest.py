@@ -246,7 +246,7 @@ FAKE_JOB_ID = "0123456789abcdef01234567"
 #: Client methods that queue backend work and answer a job id. A view that gets None
 #: from one of these dies in url_for building the redirect to the job page, which
 #: reads as a broken route rather than as the gap in the fake that it is.
-QUEUEING_METHODS = ("request", "delete", "schedule", "update", "rebuild", "recalculate")
+QUEUEING_METHODS = ("request", "delete", "schedule", "update", "rebuild", "recalculate", "repair", "recompute")
 
 
 class RecordingMcritClient(FakeMcritClient):
