@@ -214,7 +214,8 @@ class TestTheJobsPage:
     @pytest.mark.parametrize("path", JOBS_PAGES)
     def test_it_does_not_render_the_id_datatables_selected(self, client, as_role, path):
         as_role("visitor")
-        response = client.get(path)
+        # /data/jobs redirects to the URL naming its first tab (issue #36); check the page it lands on
+        response = client.get(path, follow_redirects=True)
         assert response.status_code == 200, path
         assert b'id="job-table"' not in response.data, f"{path} renders the selector DataTables used"
 
