@@ -576,6 +576,12 @@ def test_the_status_line_cannot_be_built_out_of_a_filename(client, as_role):
         "sample.DEDUMPED.bin",
         "sample_DEdumped.bin",
         "SAMPLE_DEDUMPED.BIN",
+        # both markers: a de-dump tool that appends its marker to the dump's own name
+        # leaves the dump marker and its base address in place. The file is unmapped
+        # all the same, and must not be submitted with the dump's base address
+        "foo_dump_0x00400000_dedumped",
+        "dump_dedumped_0x00400000.bin",
+        "dump_dedumped_0x400000.bin",
     ],
 )
 def test_a_dedumped_file_is_offered_as_unmapped(client, as_role, filename):
@@ -600,14 +606,19 @@ def test_a_dedumped_file_is_offered_as_unmapped(client, as_role, filename):
         ("widedump.bin", None, ""),
         ("sidedump.bin", None, ""),
         ("WideDump.bin", None, ""),
-        # both markers: the name carries a de-dump marker *and* a dump of its own, so
-        # the dump wins. The other way round costs the user a base address they have
-        ("dump_dedumped_0x400000.bin", None, ""),
-        ("dump_dedumped_0x00400000.bin", 32, "0x400000"),
         # a behaviour change: master matched "dump" case-sensitively, so a name a
         # Windows tool wrote in caps was not offered as a dump at all
         ("SAMPLE_DUMP.BIN", None, ""),
         ("SAMPLE_DUMP_0x00400000.BIN", 32, "0x400000"),
+        # the address is read whatever case its prefix is in: a name found a dump but no
+        # address used to leave the form on "Dumped" with an empty base address, which
+        # the submit refuses
+        ("SAMPLE_DUMP_0X00400000.BIN", 32, "0x400000"),
+        ("SAMPLE_DUMP_0X140000000.BIN", 64, "0x140000000"),
+        # an address written with fewer than 8 digits is still an address
+        ("foo_dump7_0x400000", 32, "0x400000"),
+        # more digits than any 64 bit address is not an address, not its first 16 digits
+        ("foo_dump_0x001122334455667788.bin", None, ""),
         ("Sample_Dump.bin", None, ""),
     ],
 )

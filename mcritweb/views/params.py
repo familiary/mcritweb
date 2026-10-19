@@ -205,18 +205,25 @@ DUMP_IN_FILENAME = re.compile(r"dump", re.IGNORECASE)
 
 def parseIsDumpFromFilename(filename):
     # try to infer from the filename whether the sample is a memory dump.
-    # a name can carry both markers ("dump_dedumped_0x400000"), so drop the de-dumps and
-    # ask what is left, which keeps the dump such a name still claims
-    return bool(DUMP_IN_FILENAME.search(DEDUMP_IN_FILENAME.sub("", filename)))
+    # a de-dump marker wins over a dump one: a de-dump tool that appends "_dedumped" to
+    # the dump's own name ("foo_dump_0x00400000_dedumped") leaves both, and taking that
+    # for a dump would submit an unmapped file with the dump's base address
+    return not DEDUMP_IN_FILENAME.search(filename) and bool(DUMP_IN_FILENAME.search(filename))
+
+
+#: `_0x` or `_0X` and the address. The digits must end there: a longer run is not an
+#: address MCRIT could map, and cutting it to its first 16 digits would invent one.
+BASE_ADDR_IN_FILENAME = re.compile(r"_0[xX](?P<base_addr>[0-9a-fA-F]{1,16})(?![0-9a-fA-F])")
 
 
 def parseBaseAddrAndBitnessFromFilename(filename):
     """(base_addr, bitness) as a dump's filename declares them, or (None, None).
 
-    Both come from the one `_0x<address>` match - the bitness is read off how many
-    digits the address was written with - so the name is parsed once. See issue #190.
+    Both come from the one `_0x<address>` match, so the name is parsed once (issue
+    #190). The bitness is read off how many digits the address was written with: more
+    than 8 is 64 bit, up to 8 is 32 bit.
     """
-    baddr_match = re.search(re.compile("_0x(?P<base_addr>[0-9a-fA-F]{8,16})"), filename)
+    baddr_match = BASE_ADDR_IN_FILENAME.search(filename)
     if not baddr_match:
         logging.warning("No base address recognized, using None.")
         return None, None
