@@ -101,7 +101,7 @@ def test_the_upload_pages_load_dropzone_up_front(client, as_role):
     as_role("contributor")
     for path in ("/analyze/query", "/data/submit", "/data/import"):
         page = client.get(path).get_data(as_text=True)
-        assert 'src="/static/dropzone.min.js"' in page, f"{path} does not load Dropzone"
+        assert 'src="/static/dropzone.js"' in page, f"{path} does not load the patched Dropzone"
         assert "dropzone.min.css" in page, f"{path} does not load Dropzone's stylesheet"
         assert 'class="dropzone"' in page, f"{path} does not render the form for auto-discovery"
 

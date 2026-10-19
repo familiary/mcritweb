@@ -160,7 +160,7 @@ Unique Blocks
           <td valign="middle">{{ sample.getShortFilename() }}</td>
           <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
           <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
-          <td align="center" valign="middle"><i {% if sample.is_library %} class="fa-solid fa-square-check" {% else %} class="fa-solid fa-times-circle"> {% endif %}</i></td>
+          <td align="center" valign="middle"><i {% if sample.is_library %} class="fa-solid fa-square-check" {% else %} class="fa-solid fa-times-circle" {% endif %}></i></td>
         </tr>
         {% endfor %}
       </tbody>

@@ -10,6 +10,7 @@ renderer that miscounts a filtered report, fails here rather than in a browser.
 The reports come from a live instance - see tests/fixtures/regenerate.py.
 """
 
+import copy
 import json
 import logging
 import pathlib
@@ -385,11 +386,156 @@ def test_the_filtered_figure_accounts_for_the_rest_of_the_report(client, as_role
     assert not wrong, "the filtered figure does not account for the report:\n  " + "\n  ".join(wrong)
 
 
+# Issue #207: `?samid=` asked `isSampleId` and then `getSampleById` for the same id,
+# and the match diagram asked `isSampleId` for the reference sample before
+# `getFunctionsBySampleId` - both fetches answer None for an id the backend does not
+# know, so each check was one request more than the question needed.
+
+def _sample_lookups(backend):
+    return [(name, args) for name, args, _ in backend.calls if name in ("isSampleId", "getSampleById")]
+
+
+@pytest.mark.parametrize("report", ["matches_for_sample", "matches_for_query"])
+def test_the_sample_filter_looks_the_sample_up_once(client, as_role, widened_corpus_mcrit, app, report):
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: widened_corpus_mcrit
+    as_role("visitor")
+    sample_id = matched_sample_ids(report)[0]
+    widened_corpus_mcrit.calls.clear()
+    response = client.get(f"/data/result/{job_id_of(report)}?samid={sample_id}")
+    assert response.status_code == 200
+    assert b"are corrupted" not in response.data and b"Offset B" in response.data
+    # the diagram was drawn on this request, off the reference sample's functions
+    assert any(name == "getFunctionsBySampleId" for name, _, _ in widened_corpus_mcrit.calls)
+    assert _sample_lookups(widened_corpus_mcrit) == [("getSampleById", (sample_id,))]
+
+
+def test_an_unknown_sample_filter_falls_back_to_the_whole_report(client, as_role):
+    as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+    unfiltered = client.get(f"/data/result/{job_id}")
+    response = client.get(f"/data/result/{job_id}?samid=987654321")
+    assert response.status_code == 200
+    # the sample-filtered page has an Offset B column; the report overview does not
+    assert b"Offset B" not in response.data
+    assert response.data.count(b"<tr") == unfiltered.data.count(b"<tr")
+
+
 def test_a_job_id_nobody_knows_is_reported_not_crashed(client, as_role):
     as_role("visitor")
     response = client.get("/data/result/ffffffffffffffffffffffff")
     assert response.status_code == 200
     assert b"was not found in the system" in response.data
+
+
+def test_a_finished_job_with_an_empty_result_says_the_result_is_empty(client, as_role, corpus_mcrit, monkeypatch):
+    """An empty report is a result, not a missing one.
+
+    `data.result` opens with `if result_json:`, and {} is falsy, so a finished job
+    whose report is empty skipped the whole dispatch and fell through to the page for
+    an unknown job id - which told the reader their job did not exist. Issue #73.
+    """
+    as_role("visitor")
+    monkeypatch.setattr(corpus_mcrit, "getResultForJob", lambda *args, **kwargs: {})
+
+    response = client.get(f"/data/result/{job_id_of('matches_for_sample')}")
+
+    assert response.status_code == 200
+    # the sentence in result_empty.html
+    assert b"does not contain any data" in response.data
+    # ... and not the one in result_invalid.html
+    assert b"was not found in the system" not in response.data
+
+
+# --- the other reasons a finished job has no report to show -------------------
+#
+# The first pass distinguished "empty" from "unknown job id" and then merged three
+# further reasons back together. Each of these was reported as something it is not.
+
+def _with_job(corpus_mcrit, monkeypatch, **changes):
+    """The corpus's 1vN job, with fields overridden, and no result to hand back."""
+    job_data = copy.deepcopy(corpus_mcrit.getJobData(job_id_of("matches_for_sample"))._data)
+    job_data.update(changes)
+    monkeypatch.setattr(corpus_mcrit, "getJobData", lambda *args, **kwargs: Job(job_data, None))
+    monkeypatch.setattr(corpus_mcrit, "getResultForJob", lambda *args, **kwargs: None)
+    return job_id_of("matches_for_sample")
+
+
+def test_a_failed_job_is_not_reported_as_an_unknown_one(client, as_role, corpus_mcrit, monkeypatch):
+    """result_invalid.html says the job "was not found in the system". For a failed job
+    that is false in both halves - it is in the system and this view is holding its Job
+    object. Merging failed into unknown is the same conflation issue #73 is about."""
+    as_role("visitor")
+    job_id = _with_job(corpus_mcrit, monkeypatch, attempts_left=0)
+
+    response = client.get(f"/data/result/{job_id}")
+
+    assert response.status_code == 200
+    assert b"was not found in the system" not in response.data
+    assert b"ran out of attempts" in response.data
+
+
+def test_the_result_page_of_a_terminated_job_says_it_was_terminated(client, as_role, corpus_mcrit, monkeypatch):
+    as_role("visitor")
+    job_id = _with_job(corpus_mcrit, monkeypatch, terminated=True)
+
+    response = client.get(f"/data/result/{job_id}")
+
+    assert response.status_code == 200
+    assert b"was not found in the system" not in response.data
+    assert b"terminated before it could finish" in response.data
+
+
+def test_a_report_that_cannot_be_fetched_is_not_reported_as_an_empty_one(client, as_role, corpus_mcrit, monkeypatch):
+    """getResultForJob answers None both when the job produced no result and when the
+    stored document can no longer be retrieved - a purged GridFS entry, a backend
+    re-provisioned with the job metadata intact. job_info.result, the result id, is what
+    separates them, and it was not being consulted.
+
+    Saying "this job does not contain any data" for a report that merely cannot be
+    fetched is a wrong analytical answer in a triage UI, not just wrong wording: it
+    reads as "your matching run found nothing".
+    """
+    as_role("visitor")
+    job_id = _with_job(corpus_mcrit, monkeypatch, result="6a7464fcffffffffffffffff")
+
+    response = client.get(f"/data/result/{job_id}")
+
+    assert response.status_code == 200
+    assert b"does not contain any data" not in response.data
+    assert b"was not found in the system" in response.data
+
+
+def test_a_job_that_produced_no_result_at_all_says_it_is_empty(client, as_role, corpus_mcrit, monkeypatch):
+    """The other side of the same test: no result id means nothing was ever produced."""
+    as_role("visitor")
+    job_id = _with_job(corpus_mcrit, monkeypatch, result=None)
+
+    response = client.get(f"/data/result/{job_id}")
+
+    assert response.status_code == 200
+    assert b"does not contain any data" in response.data
+
+
+def test_a_report_this_dispatch_cannot_render_is_reported_not_crashed(client, as_role, corpus_mcrit, monkeypatch):
+    """The dispatch chain in `data.result` had no else, so a job method it does not
+    know - a new one on the backend, say - returned None and Flask answered 500."""
+
+
+def test_a_report_of_a_job_type_the_dispatch_does_not_know_is_reported_not_crashed(client, as_role, corpus_mcrit, monkeypatch):
+    """The dispatch in `data.result` had no else, so a finished job whose type it does not
+    know returned None and Flask answered 500. The three repair jobs mcrit 1.9.0 added
+    were such types on a live instance."""
+    as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+    # deep copy: the corpus client hands out the dict it keeps, and Job wraps it
+    job_data = copy.deepcopy(corpus_mcrit.getJobData(job_id)._data)
+    job_data["payload"]["method"] = "someFutureMethod"
+    monkeypatch.setattr(corpus_mcrit, "getJobData", lambda *args, **kwargs: Job(job_data, None))
+
+    response = client.get(f"/data/result/{job_id}")
+
+    assert response.status_code == 200
+    assert b"incompatible with the requested interpretation" in response.data
 
 
 @pytest.mark.parametrize(

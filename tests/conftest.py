@@ -258,13 +258,8 @@ class RecordingMcritClient(FakeMcritClient):
         which is the opposite of letting the view run on. A test that cares about a
         *missing* id overrides the method for that id.
 
-    Deliberately only `isSampleId`, not every `is*Id`. Extending it to `isFunctionId`
-    lets `data.match_functions` past its guard and into `match_info["function_entry_a"]`
-    on the None this fake answers `getMatchFunctionVs` with - a TypeError, and a real
-    defect in that view (a backend that cannot answer takes the page down rather than
-    reporting it) that is nothing to do with the route this commitment exists for.
-    Widening this is the right thing to do together with guarding that view, not
-    before it.
+    Deliberately only `isSampleId`, not every `is*Id`: each is a claim about the
+    backend, made when a view needs it and not before.
     """
 
     def __getattr__(self, name):

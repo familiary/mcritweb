@@ -55,10 +55,11 @@ PAGE_SPECIFIC = {
     "jquery-ui.css": "result_cross.html",
 }
 
-#: assets no template should load at all any more. dropzone.js is the unminified build
-#: of the same 5.9.2 that dropzone.min.js is; all.css and bootstrap.css are the full
-#: builds the subset and the minified file replaced (issue #63)
-RETIRED = ["jquery.dataTables.min.js", "dataTables.bootstrap5.min.js", "dataTables.bootstrap5.min.css", "dropzone.js", "css/all.css", "css/bootstrap.css"]
+#: assets no template should load at all any more. dropzone.min.js is stock 5.9.2,
+#: without the patch in dropzone.js that sends the head of a dropped file for the
+#: pre-fill (AGENTS.md); all.css and bootstrap.css are the full builds the subset and
+#: the minified file replaced (issue #63)
+RETIRED = ["jquery.dataTables.min.js", "dataTables.bootstrap5.min.js", "dataTables.bootstrap5.min.css", "dropzone.min.js", "css/all.css", "css/bootstrap.css"]
 
 
 @pytest.mark.parametrize("asset", sorted(PAGE_SPECIFIC))

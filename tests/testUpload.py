@@ -16,6 +16,7 @@ import json
 import logging
 import random
 import re
+from pathlib import Path
 from urllib.parse import quote
 
 import pytest
@@ -317,6 +318,23 @@ def test_a_dump_carries_its_bitness_and_base_address(client, as_role, fake_mcrit
     assert kwargs["base_addr"] == 0x140000000
 
 
+@pytest.mark.parametrize("options, extra", [
+    ("unmapped", {}),
+    ("dumped", {"bitness": "32", "base_addr": "0x400000"}),
+])
+def test_submitting_a_binary_keeps_no_local_copy(client, app, as_role, fake_mcrit, options, extra):
+    as_role("contributor")
+    binary = b"MZ sample submission"
+
+    response = submit_binary(client, binary, options=options, **extra)
+
+    assert response.status_code == 202, response.get_data(as_text=True)[:200]
+    queued = [call for call in fake_mcrit.calls if call[0] == "addBinarySample"]
+    assert len(queued) == 1
+    assert queued[0][1][0] == binary
+    assert list((Path(app.instance_path) / "temp" / "uploads").iterdir()) == []
+
+
 # --- the filename probe the dropzone fires on drop ---------------------------------
 
 def filename_info(client, filename, file_header="", file_metadata=None):
@@ -372,6 +390,35 @@ def test_a_dump_filename_yields_bitness_and_base_address(client, as_role):
         "bitness": 64,
         "base_addr": "0x140000000",
     }
+
+
+def test_a_32_bit_dump_and_an_unaddressed_one(client, as_role):
+    as_role("contributor")
+    assert filename_info(client, "malware_dump_0x00400000.bin") == {
+        "dump": True,
+        "bitness": 32,
+        "base_addr": "0x400000",
+    }
+    assert filename_info(client, "malware_dump.bin") == {"dump": True, "bitness": None, "base_addr": ""}
+
+
+def test_a_dump_filename_is_parsed_once(client, as_role, monkeypatch):
+    """Bitness and base address come out of the same match, so one parse answers
+    both - and a name without an address is reported once, not once per field.
+    Issue #190. Only params' own `logging` name is replaced; the module is untouched."""
+    from types import SimpleNamespace
+
+    from mcritweb.views import params
+
+    warnings = []
+    monkeypatch.setattr(params, "logging", SimpleNamespace(
+        info=lambda *args: None,
+        warning=lambda message, *args: warnings.append(message % args)))
+
+    as_role("contributor")
+    filename_info(client, "malware_dump.bin")
+
+    assert warnings == ["No base address recognized, using None."]
 
 
 def test_an_smda_report_is_read_out_of_the_uploaded_header(client, as_role):

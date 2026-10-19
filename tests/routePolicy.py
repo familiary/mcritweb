@@ -117,8 +117,8 @@ ROUTE_POLICY = {
     # --- authenticated, any role including 'pending' -----------------------------
     "authentication.logout": (LOGGED_IN, WRITES_ON_GET),   # session teardown, by design
     "authentication.settings": (LOGGED_IN, READ_ONLY),
-    "admin.change_username": (LOGGED_IN, WRITES_ON_POST),   # GET raises 400 on request.form
-    "admin.change_password": (LOGGED_IN, WRITES_ON_POST),   # GET raises 400 on request.form
+    "admin.change_username": (LOGGED_IN, WRITES_ON_POST),
+    "admin.change_password": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_default_filter": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_column_settings": (LOGGED_IN, WRITES_ON_POST),
     "admin.reset_column_settings": (LOGGED_IN, WRITES_ON_POST),

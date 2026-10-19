@@ -25,10 +25,15 @@ MongoDB + mcrit instance, `/explore/samples`.
 NGINX. That is still the case, and NGINX is still where compression *should* happen
 there. What it left uncovered is every other shape: `flask run` in development, a
 waitress deployment without a proxy, and a proxy whose config never grew the `gzip`
-directive (docker-mcrit's has not). `mcritweb/compression.py` is forty lines over the
-standard library's `gzip`: compressible types only, bodies over 1 KiB only, clients that
-accept it only, `Vary: Accept-Encoding`, `mtime=0` so the bytes are stable, and an ETag
-suffix so a cache keeps the two encodings apart. A proxy that compresses on its own sees
+directive (docker-mcrit's has not). `mcritweb/compression.py` is seventy lines over the
+standard library's `gzip`: compressible types only, bodies between 1 KiB and 1 MiB with
+a known length only, clients that accept it only, `Vary: Accept-Encoding`, `mtime=0` so
+the bytes are stable, and an ETag suffix so a cache keeps the two encodings apart, with
+the conditional check made again against the renamed ETag so revalidation still ends in
+a 304. HTML is not compressed: a page carries the session's CSRF token, the same in
+every response, next to input it reflects, which is what BREACH needs. Downloads and
+the `/api` passthrough are not either, since they are streamed so that they never sit
+in memory whole. A proxy that compresses on its own sees
 `Content-Encoding` already set and leaves the body alone, so leaving it on behind NGINX
 costs nothing; `MCRITWEB_COMPRESS_RESPONSES = False` hands the job over entirely.
 
