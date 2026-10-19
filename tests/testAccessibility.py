@@ -204,7 +204,8 @@ def test_first_run_registration(client):
 @pytest.mark.parametrize("path", VISITOR_PAGES)
 def test_visitor_pages(client, as_role, path):
     as_role("visitor")
-    assert_accessible(client.get(path))
+    # the jobs list redirects to the URL naming its tab (#132); the page is behind it
+    assert_accessible(client.get(path, follow_redirects=path == "/data/jobs"))
 
 
 @pytest.mark.parametrize("path", CONTRIBUTOR_PAGES)
