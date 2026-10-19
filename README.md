@@ -41,7 +41,8 @@ and then to run MCRITweb, execute:
 
 Note that most functionality of MCRITweb will only work if an MCRIT backend is configured and available.
 
-MCRITweb gzips its pages and static files for browsers that accept it, so a bare `flask run` or waitress deployment is not stuck with uncompressed transfers. A reverse proxy that compresses on its own (the reference `docker-mcrit` deployment's NGINX does) leaves already encoded bodies alone; to hand the job to the proxy entirely, set `MCRITWEB_COMPRESS_RESPONSES = False` in `instance/config.py`.
+MCRITweb gzips its stylesheets, scripts and JSON for browsers that accept it, so a bare `flask run` or waitress deployment is not stuck with uncompressed transfers. The reference `docker-mcrit` deployment does not compress either: its NGINX configuration has no `gzip` directive (`docs/adr/0015-the-rest-of-63-is-gzip-in-the-proxy.md`). HTML pages are left uncompressed, because they carry the session's CSRF token next to input they reflect, which a compressed response leaks to a BREACH attack; so are downloads and the `/api` passthrough, which are streamed rather than read into memory, and bodies over 1 MiB. A proxy that compresses on its own leaves already encoded bodies alone; to hand the job to the proxy entirely, set `MCRITWEB_COMPRESS_RESPONSES = False` in `instance/config.py`, and keep `text/html` out of its `gzip_types` for the same reason.
+
 ### Running behind a reverse proxy
 
 If MCRITweb is served through a reverse proxy - which the recommended [docker-mcrit](https://github.com/danielplohmann/docker-mcrit) deployment does, with NGINX in front - the app never sees a client address. Every request arrives from the proxy, so `request.remote_addr` is the proxy's address and the failed-login throttle would meter every caller in the world into a single bucket: ten failed logins from anyone would refuse the next login attempt for *everybody* until the window expired.
