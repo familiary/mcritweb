@@ -133,7 +133,9 @@ def test_the_api_blueprint_is_exempt(client, make_user):
         response = client.post("/api/samples", headers={"apitoken": "apitoken-contributor"}, json={})
     except Exception:
         return
-    assert response.status_code != 400, "the API must not require a browser token"
+    # the router answers a body that is not a report with a 400 of its own; the
+    # refusal this test is about is the CSRF one, so it looks for that
+    assert b"CSRF token is missing or invalid" not in response.data, "the API must not require a browser token"
 
 
 # --- what the pages emit ---------------------------------------------------------
