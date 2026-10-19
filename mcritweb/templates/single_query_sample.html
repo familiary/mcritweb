@@ -35,7 +35,7 @@ Sample: {{ entry.sample_id }}
         {% endfor %}
         <tr>
           <th valign="middle">Timestamp</td>
-          <td valign="middle">{{ entry.timestamp }}</td>
+          <td valign="middle">{{ entry.timestamp if entry.timestamp is not none else "" }}</td>
         </tr>
         <tr>
           <th valign="middle">Version</td>

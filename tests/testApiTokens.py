@@ -76,6 +76,27 @@ def test_a_contributor_token_may_add_a_report(client, make_user, role):
     assert _verdict(lambda: client.post("/api/samples", headers=token_for(role), json={})) == ALLOWED
 
 
+def test_a_visitor_token_cannot_rename_a_function(client, make_user):
+    """PUT /api/functions/<id> reaches modifyFunction, which explore.modifyFunction puts
+    behind contributor_required (fkie-cad/mcritweb#72)."""
+    make_user("visitor")
+    assert _verdict(lambda: client.put("/api/functions/1", headers=token_for("visitor"), json={"function_name": "x"})) == 403
+
+
+@pytest.mark.parametrize("role", ["contributor", "admin"])
+def test_a_contributor_token_may_rename_a_function(client, make_user, role):
+    make_user(role)
+    assert _verdict(lambda: client.put("/api/functions/1", headers=token_for(role), json={"function_name": "x"})) == ALLOWED
+
+
+@pytest.mark.parametrize("path", ["matches/sample/1", "samples", "status", "functions/1/extra"])
+def test_put_is_refused_everywhere_but_a_function(client, make_user, path):
+    """The router accepts PUT for modifyFunction only. Every other branch ignores the
+    method, so before this a PUT /api/matches/sample/1 queued a matching job."""
+    make_user("admin")
+    assert client.put(f"/api/{path}", headers=token_for("admin"), json={}).status_code == 405
+
+
 def test_a_visitor_token_can_still_read_samples(client, make_user):
     """The same path by GET is a read, and stays visitor-level."""
     make_user("visitor")
