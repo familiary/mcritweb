@@ -1903,7 +1903,7 @@ def job_overview_state(job_info):
 @mcrit_server_required
 def job_status(job_id):
     """The job overview's polling endpoint: one getJobData, as JSON."""
-    job_info = get_client().getJobData(job_id)
+    job_info = get_client().getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if job_info is None:
         return {"error": "unknown job"}, 404
     return job_overview_state(job_info)

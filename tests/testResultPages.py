@@ -1469,6 +1469,26 @@ def test_a_job_id_that_is_not_one_never_reaches_the_backend(client, as_role, cor
 
 
 @pytest.mark.parametrize("crafted", CRAFTED_JOB_IDS)
+def test_the_job_status_of_a_crafted_id_never_reaches_the_backend(client, as_role, corpus_mcrit, crafted):
+    as_role("visitor")
+
+    response = client.get(f"/data/jobs/{crafted}/status")
+
+    assert response.status_code == 404
+    assert response.get_json() == {"error": "unknown job"}
+    assert _job_calls(corpus_mcrit) == []
+
+
+def test_the_job_status_of_a_real_id_is_still_answered(client, as_role, corpus_mcrit):
+    as_role("visitor")
+
+    response = client.get(f"/data/jobs/{job_id_of('cross_compare')}/status")
+
+    assert response.status_code == 200
+    assert ("getJobData", (job_id_of("cross_compare"),)) in [call[:2] for call in _job_calls(corpus_mcrit)]
+
+
+@pytest.mark.parametrize("crafted", CRAFTED_JOB_IDS)
 def test_a_crafted_job_id_deletes_nothing(client, as_role, corpus_mcrit, monkeypatch, crafted):
     as_role("contributor")
     deleted = []
