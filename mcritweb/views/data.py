@@ -20,7 +20,7 @@ from mcritweb.db import UserColumnSettings, UserFilters, get_query_filename, utc
 from mcritweb.views.analyze import query as analyze_query
 from mcritweb.views.authentication import contributor_required, visitor_required
 from mcritweb.views.client import get_client, get_family_entries, get_sample_entries
-from mcritweb.views.cross_compare import CROSS_ORDERINGS, get_sample_to_job_id, order_sample_ids, score_to_color
+from mcritweb.views.cross_compare import CROSS_ORDERINGS, get_sample_to_job_id, lazy_cross_panes, order_sample_ids, score_to_color
 from mcritweb.views.functiondiff import get_function_diff
 from mcritweb.views.MatchReportRenderer import MatchReportRenderer
 from mcritweb.views.memo import app_memo
@@ -1071,6 +1071,8 @@ def result_matches_for_cross(job_info, result_json):
         else:
             samples_by_method[method] = samples
         sample_indices[method] = [x for index, x in enumerate([sample.sample_id for sample in samples_by_method[method]]) if (index+1) % 5 == 0]
+    # only the tab shown on load is rendered, the others are filled from lazy_panes on first click
+    rendered_method = "unweighted" if "unweighted" in result_json else next(iter(result_json))
     return render_template('result_cross.html',
         is_corrupted=False,
         active_order="custom" if custom_order else ordering,
@@ -1081,6 +1083,8 @@ def result_matches_for_cross(job_info, result_json):
         matching_matches={method: result_json[method]["matching_matches"] for method in result_json.keys()},
         matching_percent={method: result_json[method]["matching_percent"] for method in result_json.keys()},
         score_to_color=score_to_color,
+        rendered_method=rendered_method,
+        lazy_panes=lazy_cross_panes(samples_by_method, result_json, rendered_method),
     )
 
 
