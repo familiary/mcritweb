@@ -1762,8 +1762,12 @@ def jobs():
         # unpaged and filter here, where the count that drives pagination is the count
         # of things actually shown. `getQueueData(method=...)` with no start/limit is
         # already how delete_job_by_id enumerates a category.
-        matches = client.getQueueData(method=active_category, state=state_category, ascending=ascending) or []
-        matches = [job for job in matches if query.casefold() in job_parameters_or_blank(job).casefold()]
+        queue = client.getQueueData(method=active_category, state=state_category, ascending=ascending)
+        if queue is None:
+            # a failed read is not an empty result: "0 jobs matching" would be a claim
+            # about the queue that nobody could check
+            flash("Ups, reading MCRIT's job queue failed - the search could not be run.", category="error")
+        matches = [job for job in queue or [] if query.casefold() in job_parameters_or_blank(job).casefold()]
         pagination = Pagination(request, len(matches), limit=25, query_param="p", limit_param=limit_param)
         jobs = matches[pagination.start_index:pagination.end_index]
     else:
@@ -1786,7 +1790,7 @@ def jobs():
     for job in described_jobs:
         if job.family_id is not None and job.family_id not in families_by_id:
             families_by_id[job.family_id] = client.getFamily(job.family_id)
-    return render_template('jobs.html', families=families_by_id, samples=samples_by_id, active=active_category, state=state_category, ascending=ascending, order_toggle=order_toggle, jobs=jobs, menu_configuration=menu_configuration, p=pagination, query=query, match_count=len(matches) if query else None)
+    return render_template('jobs.html', families=families_by_id, samples=samples_by_id, active=active_category, state=state_category, ascending=ascending, order_toggle=order_toggle, jobs=jobs, menu_configuration=menu_configuration, p=pagination, query=query, match_count=len(matches) if query and queue is not None else None)
 
 
 @bp.route('/jobs/<job_id>')

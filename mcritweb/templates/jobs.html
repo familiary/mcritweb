@@ -135,7 +135,7 @@ Jobs
     <input type="text" class="form-control shadow-none" name="Search" id="Search" placeholder="Search jobs" value="{{ query or '' }}" autocomplete="on">
     <input type='submit' hidden>
   </form>
-  {% if query %}
+  {% if query and match_count is not none %}
   <p>
     {{ match_count }} job{{ '' if match_count == 1 else 's' }} matching "{{ query }}"
     &mdash; <a href="{{ url_for('data.jobs', active=active, state=state) }}">clear</a>
@@ -205,7 +205,10 @@ Jobs
     "doDbCleanup":               ("No database cleanups yet. They are started on the backend, not from here.", None),
     "deleteOrphanedQueueFiles":  ("No orphaned queue file cleanups yet. They are started on the backend, not from here.", None),
   } %}
-  {% if query and not jobs %}
+  {% if query and match_count is none %}
+    {# the search could not be run; the flash says why, and an empty state would
+       misstate it as a fact about the queue #}
+  {% elif query and not jobs %}
     {# the table's empty state invites you to create your first job, which is the wrong
        thing to say to someone whose search simply matched nothing on a full queue #}
     <center class="mt-3">No job's parameters contain "{{ query }}".</center>

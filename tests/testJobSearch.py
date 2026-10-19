@@ -274,3 +274,16 @@ def test_the_unreadable_job_is_not_listed_as_a_match(client, corrupt_queue):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_a_failed_queue_read_is_not_reported_as_no_match(client, as_role, corpus_mcrit, monkeypatch):
+    """The search fetches the category and filters it here; when that read fails, the
+    page must say so rather than "0 jobs matching" and "No job's parameters contain"."""
+    monkeypatch.setattr(corpus_mcrit, "getQueueData", lambda *args, **kwargs: None)
+    as_role("visitor")
+
+    page = client.get("/data/jobs?active=getMatchesForSample&Search=evil", follow_redirects=True).get_data(as_text=True)
+
+    assert "the search could not be run" in page
+    assert "0 jobs matching" not in page
+    assert "No job&#39;s parameters contain" not in page and "No job's parameters contain" not in page
