@@ -108,18 +108,18 @@ def order_toggle(page):
 def test_the_job_number_column_offers_the_other_order(client, ordered_queue):
     """Newest first is the default, so the link on offer is the ascending one, and from
     there it must lead back - a toggle that only goes one way is a dead end."""
-    descending = client.get("/data/jobs").get_data(as_text=True)
+    descending = client.get("/data/jobs", follow_redirects=True).get_data(as_text=True)
     assert "ascending=true" in order_toggle(descending)
 
-    ascending = client.get(order_toggle(descending)).get_data(as_text=True)
+    ascending = client.get(order_toggle(descending), follow_redirects=True).get_data(as_text=True)
     assert "ascending=false" in order_toggle(ascending)
 
 
 def test_the_order_covers_the_whole_queue_and_not_the_page(client, ordered_queue):
     """The point of the issue. 100 jobs, 25 to a page: reversing the order has to bring
     up the far end of the queue, which a sort of the rows on screen could never do."""
-    descending = client.get("/data/jobs").get_data(as_text=True)
-    ascending = client.get(order_toggle(descending)).get_data(as_text=True)
+    descending = client.get("/data/jobs", follow_redirects=True).get_data(as_text=True)
+    ascending = client.get(order_toggle(descending), follow_redirects=True).get_data(as_text=True)
 
     assert "getMatchesForSample0099" in descending and "getMatchesForSample0000" not in descending
     assert "getMatchesForSample0000" in ascending and "getMatchesForSample0099" not in ascending
@@ -128,14 +128,14 @@ def test_the_order_covers_the_whole_queue_and_not_the_page(client, ordered_queue
 def test_flipping_the_order_starts_over_at_the_first_page(client, ordered_queue):
     """Page 3 of one order is an unrelated slice of the other, so carrying the page
     number across would land you somewhere you did not ask to be."""
-    page_three = client.get("/data/jobs?p=3").get_data(as_text=True)
+    page_three = client.get("/data/jobs?p=3", follow_redirects=True).get_data(as_text=True)
 
     assert "p=" not in order_toggle(page_three)
 
 
 def test_the_order_toggle_keeps_what_you_were_looking_at(client, ordered_queue):
     """Reordering should rearrange the list you have, not hand you a different one."""
-    page = client.get("/data/jobs?active=getMatchesForSample&Search=sample1").get_data(as_text=True)
+    page = client.get("/data/jobs?active=getMatchesForSample&Search=sample1", follow_redirects=True).get_data(as_text=True)
 
     link = order_toggle(page)
     assert "active=getMatchesForSample" in link
@@ -147,7 +147,7 @@ def test_the_order_toggle_carries_only_what_the_page_understands(client, ordered
     out of the keyword arguments it is handed - so a query string forwarded wholesale is
     a query string that gets to steer it, `_external` here being the mildest of them. It
     only ever needs five parameters."""
-    page = client.get("/data/jobs?active=getMatchesForSample&_external=true&zzz=1").get_data(as_text=True)
+    page = client.get("/data/jobs?active=getMatchesForSample&_external=true&zzz=1", follow_redirects=True).get_data(as_text=True)
 
     link = order_toggle(page)
     assert link.startswith("/data/jobs?"), "the query string steered url_for"
@@ -159,7 +159,7 @@ def test_the_page_does_not_sort_the_rows_it_has_client_side(client, ordered_queu
     """A DataTable over the page would reorder 25 of 100 jobs and call it a sort, which
     is what the issue is about. It also never ran here - it selected an id the page does
     not render - so there was nothing to keep working."""
-    page = client.get("/data/jobs").get_data(as_text=True)
+    page = client.get("/data/jobs", follow_redirects=True).get_data(as_text=True)
 
     assert ".DataTable(" not in page
 
@@ -168,17 +168,17 @@ def test_the_jobs_a_cross_compare_runs_can_be_listed(client, ordered_queue):
     """getMatchesForSampleVsGroup is missing from mcrit's Job.method_types, which is
     where the category menu comes from, so the jobs behind every cross compare had no
     tab to be listed, ordered or searched under."""
-    page = client.get("/data/jobs").get_data(as_text=True)
+    page = client.get("/data/jobs", follow_redirects=True).get_data(as_text=True)
     assert "active=getMatchesForSampleVsGroup" in page
 
-    listed = client.get("/data/jobs?active=getMatchesForSampleVsGroup").get_data(as_text=True)
+    listed = client.get("/data/jobs?active=getMatchesForSampleVsGroup", follow_redirects=True).get_data(as_text=True)
     assert "getMatchesForSampleVsGroup0004" in listed
 
 
 def test_the_matching_count_includes_the_jobs_cross_compares_run(client, ordered_queue):
     """100 matching jobs plus the 5 group jobs of a cross compare. Leaving the group jobs
     out made the tab disagree with the totals row above it, which counts every job."""
-    page = client.get("/data/jobs").get_data(as_text=True)
+    page = client.get("/data/jobs", follow_redirects=True).get_data(as_text=True)
 
     assert "Matching (105)" in page
 

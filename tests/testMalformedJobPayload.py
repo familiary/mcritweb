@@ -115,6 +115,14 @@ class JobsBackend:
     def getFamily(self, *args, **kwargs):
         return None
 
+    # the batched lookups master gained in #191; an empty answer is what a backend
+    # that knows none of the ids gives, and the views fall back to the single calls
+    def getSamplesByIds(self, *args, **kwargs):
+        return {}
+
+    def getFamiliesByIds(self, *args, **kwargs):
+        return {}
+
 
 @pytest.fixture
 def backend(app, as_role):
@@ -371,7 +379,7 @@ def test_the_browse_list_survives_a_job_it_cannot_describe(client, backend, shap
         job_document(CHILD_ID, UNLISTABLE_PARAMS[shape], method="getMatchesForSample", number=2),
     ])
 
-    response = client.get("/data/jobs?active=getMatchesForSample")
+    response = client.get("/data/jobs?active=getMatchesForSample", follow_redirects=True)
 
     assert response.status_code == 200, f"{shape} still breaks the job listing"
     assert "details unavailable" in response.get_data(as_text=True)
@@ -469,7 +477,7 @@ def test_the_readability_check_is_asked_once_per_job_per_request(client, app, as
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: CountingBackend([])
     as_role("visitor")
 
-    client.get("/data/jobs?active=getMatchesForSample")
+    client.get("/data/jobs?active=getMatchesForSample", follow_redirects=True)
 
     assert CountingJob.reads == 1, "the readability check is being redone per call site"
 

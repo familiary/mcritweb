@@ -165,6 +165,16 @@ class RawResponse:
     def json(self):
         return {"status": "successful", "data": self._payload}
 
+def _descriptor_sample_id(document):
+    """The first positional argument as mcrit's descriptor regex reads it: the integer
+    that directly follows `["<method>", {"0": `, or None."""
+    descriptor = document.get("payload", {}).get("descriptor")
+    if not isinstance(descriptor, str):
+        return None
+    match = re.match(r'^\["[^"]*", \{"0": (-?\d+)[,}]', descriptor)
+    return int(match.group(1)) if match else None
+
+
 def _job_state(document):
     """mongoqueue._identifyJobState, transcribed - `state=` is filtered on it."""
     if document["started_at"] and document["locked_by"] and not (document["finished_at"] or document["terminated"]):
@@ -471,7 +481,11 @@ class CorpusMcritClient:
         if method is not None:
             documents = [entry for entry in documents if entry["payload"]["method"] == method]
         if sample_ids is not None:
-            documents = [entry for entry in documents if Job(entry, None).sample_id in set(sample_ids)]
+            # matched on payload.descriptor the way mcrit's _sample_ids_condition does, not
+            # by parsing each job - a job whose params cannot be parsed is still answered
+            # if its descriptor names the sample, and the views have to cope with it (#115)
+            wanted = {int(sample_id) for sample_id in sample_ids}
+            documents = [entry for entry in documents if _descriptor_sample_id(entry) in wanted]
         if job_ids is not None:
             documents = [entry for entry in documents if _job_id(entry) in {str(job_id) for job_id in job_ids}]
         if state is not None:

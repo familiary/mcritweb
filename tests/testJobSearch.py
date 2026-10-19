@@ -104,7 +104,7 @@ def paged_queue(app, as_role):
 
 def test_the_jobs_page_offers_a_search_box(client, as_role):
     as_role("visitor")
-    page = client.get("/data/jobs").get_data(as_text=True)
+    page = client.get("/data/jobs", follow_redirects=True).get_data(as_text=True)
 
     assert 'name="Search"' in page
     assert 'placeholder="Search jobs"' in page
@@ -113,7 +113,7 @@ def test_the_jobs_page_offers_a_search_box(client, as_role):
 def test_a_search_finds_a_match_that_is_not_on_the_first_page(client, paged_queue):
     """The one that fails if the term is handed to the backend's own filter: the only
     matching job is number 60, so a filtered request for jobs 0-24 returns nothing."""
-    page = client.get("/data/jobs?Search=evil.exe").get_data(as_text=True)
+    page = client.get("/data/jobs?Search=evil.exe", follow_redirects=True).get_data(as_text=True)
 
     assert "job0060" in page, "the match was not on the page the search landed on"
     assert "1 job matching" in page
@@ -124,14 +124,14 @@ def test_a_search_does_not_ask_the_backend_to_filter(client, paged_queue):
     This also keeps the term out of the URL the client builds, which it interpolates
     without encoding."""
     assert queue_filters(paged_queue) == []
-    client.get("/data/jobs?Search=evil.exe")
+    client.get("/data/jobs?Search=evil.exe", follow_redirects=True)
     assert all(value is None for value in queue_filters(paged_queue))
 
 
 def test_the_pages_are_counted_from_the_matches_not_the_whole_queue(client, paged_queue):
     """100 jobs, 1 match, 25 to a page: a search must offer one page, not four."""
-    page = client.get("/data/jobs?Search=evil.exe").get_data(as_text=True)
-    unfiltered = client.get("/data/jobs").get_data(as_text=True)
+    page = client.get("/data/jobs?Search=evil.exe", follow_redirects=True).get_data(as_text=True)
+    unfiltered = client.get("/data/jobs", follow_redirects=True).get_data(as_text=True)
 
     assert page.count('class="page-item ') < unfiltered.count('class="page-item ')
     assert "p=4" not in page
@@ -139,8 +139,8 @@ def test_the_pages_are_counted_from_the_matches_not_the_whole_queue(client, page
 
 def test_a_search_that_matches_everything_still_pages(client, paged_queue):
     """The filter must not collapse paging: 100 matches is still four pages."""
-    first = client.get("/data/jobs?Search=.exe").get_data(as_text=True)
-    second = client.get("/data/jobs?Search=.exe&p=2").get_data(as_text=True)
+    first = client.get("/data/jobs?Search=.exe", follow_redirects=True).get_data(as_text=True)
+    second = client.get("/data/jobs?Search=.exe&p=2", follow_redirects=True).get_data(as_text=True)
 
     assert "100 jobs matching" in first
     assert "job0000" in first and "job0000" not in second
@@ -150,7 +150,7 @@ def test_a_search_that_matches_everything_still_pages(client, paged_queue):
 def test_the_search_is_case_insensitive(client, paged_queue):
     """The backend's filter was a case-sensitive `in`. Doing it here means choosing,
     and a search box that misses EVIL.EXE for evil.exe is a surprise."""
-    page = client.get("/data/jobs?Search=EVIL.EXE").get_data(as_text=True)
+    page = client.get("/data/jobs?Search=EVIL.EXE", follow_redirects=True).get_data(as_text=True)
 
     assert "job0060" in page
 
@@ -160,7 +160,7 @@ def test_no_search_term_means_no_filter(client, as_role, fake_mcrit):
     that happens to match everything today, but saying None is what we mean."""
     as_role("visitor")
 
-    client.get("/data/jobs")
+    client.get("/data/jobs", follow_redirects=True)
 
     assert queue_filters(fake_mcrit) == [None]
 
@@ -168,13 +168,13 @@ def test_no_search_term_means_no_filter(client, as_role, fake_mcrit):
 def test_whitespace_only_is_treated_as_no_search(client, as_role, fake_mcrit):
     as_role("visitor")
 
-    client.get("/data/jobs?Search=%20%20")
+    client.get("/data/jobs?Search=%20%20", follow_redirects=True)
 
     assert queue_filters(fake_mcrit) == [None]
 
 
 def test_the_page_says_what_it_searched_for_and_how_much_it_found(client, paged_queue):
-    page = client.get("/data/jobs?Search=evil.exe").get_data(as_text=True)
+    page = client.get("/data/jobs?Search=evil.exe", follow_redirects=True).get_data(as_text=True)
 
     assert '1 job matching "evil.exe"' in page
 
@@ -183,7 +183,7 @@ def test_a_search_that_matches_nothing_does_not_offer_to_create_a_first_job(clie
     """The table's empty state reads "No jobs available. Click here to create your
     first job" - the wrong thing to say to someone whose search missed on a full
     queue, and the reading of it is "there are no jobs", which is false."""
-    page = client.get("/data/jobs?Search=zzznomatchzzz").get_data(as_text=True)
+    page = client.get("/data/jobs?Search=zzznomatchzzz", follow_redirects=True).get_data(as_text=True)
 
     assert "create your first job" not in page
     assert 'No job\'s parameters contain "zzznomatchzzz"' in page
@@ -195,7 +195,7 @@ def test_the_search_term_is_escaped(client, as_role):
     somebody typed."""
     as_role("visitor")
 
-    page = client.get("/data/jobs?Search=%22%3E%3Cimg+src%3Dx+onerror%3Dalert(1)%3E").get_data(as_text=True)
+    page = client.get("/data/jobs?Search=%22%3E%3Cimg+src%3Dx+onerror%3Dalert(1)%3E", follow_redirects=True).get_data(as_text=True)
 
     assert '"><img src=x onerror=alert(1)>' not in page
     assert "&lt;img src=x onerror=alert(1)&gt;" in page
@@ -205,7 +205,7 @@ def test_searching_keeps_the_category_you_were_looking_at(client, as_role):
     """Otherwise typing in the box silently throws away the tab you had open."""
     as_role("visitor")
 
-    page = client.get("/data/jobs?active=getMatchesForSample").get_data(as_text=True)
+    page = client.get("/data/jobs?active=getMatchesForSample", follow_redirects=True).get_data(as_text=True)
 
     assert '<input type="hidden" name="active" value="getMatchesForSample">' in page
 
@@ -215,7 +215,7 @@ def test_searching_keeps_the_sort_order_you_had(client, as_role):
     quietly reset how it is arranged."""
     as_role("visitor")
 
-    page = client.get("/data/jobs?ascending=true").get_data(as_text=True)
+    page = client.get("/data/jobs?ascending=true", follow_redirects=True).get_data(as_text=True)
 
     assert '<input type="hidden" name="ascending" value="true">' in page
 
@@ -253,7 +253,7 @@ def test_one_unreadable_job_does_not_break_the_whole_search(client, corrupt_queu
     """Filtering the category rather than a page means the search touches every job in
     it, so a single unreadable one would take the search down for the entire category
     - where before it only broke the one page of the browse view that showed it."""
-    response = client.get("/data/jobs?Search=evil.exe")
+    response = client.get("/data/jobs?Search=evil.exe", follow_redirects=True)
 
     assert response.status_code == 200
     assert b"job0060" in response.data, "the match is still found"
@@ -264,10 +264,10 @@ def test_the_unreadable_job_is_not_listed_as_a_match(client, corrupt_queue):
     is the honest answer rather than a workaround. Its neighbours are unaffected: 98 of
     the 100 jobs match (one is unreadable, one is the evil.exe needle), and page 2 holds
     the ones either side of the gap."""
-    first = client.get("/data/jobs?Search=benign").get_data(as_text=True)
+    first = client.get("/data/jobs?Search=benign", follow_redirects=True).get_data(as_text=True)
     assert "98 jobs matching" in first
 
-    page_two = client.get("/data/jobs?Search=benign&p=2").get_data(as_text=True)
+    page_two = client.get("/data/jobs?Search=benign&p=2", follow_redirects=True).get_data(as_text=True)
     assert "job0040" not in page_two
     assert "job0039" in page_two and "job0041" in page_two
 
