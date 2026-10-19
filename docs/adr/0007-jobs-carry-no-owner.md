@@ -1,7 +1,7 @@
 # Jobs carry no owner, so MCRITweb cannot annotate activity with one
 
 ---
-status: partly superseded — mcrit 1.10.0 records a `username` on the job (mcrit#161), and #172 shows it; the point about a stable identifier still stands, since that name is the requester's at request time and can be renamed or reused
+status: partly superseded — mcrit 1.10.0 records a username on each job; the stable-identifier requirement below still stands
 ---
 
 Issue #37 proposes annotating objects such as jobs with user uuids, for accountability,
@@ -61,3 +61,9 @@ somewhere to put it, or it is the dead schema the previous paragraph rules out.
 Re-file the substance on `danielplohmann/mcrit` as a request for an owner field on the
 job document, stating the stable-identifier requirement as established rather than as a
 question: the field cannot be a username, because MCRITweb renames and frees them.
+
+**Re-checked for #172:** mcrit 1.10.0 stores the requesting username on the job document
+(`Job.username`). That is the key this record argues against, so what #172 shows is the
+name *at the time of the request*, as the backend recorded it. It is not a stable owner:
+after a rename or a deleted-and-reused username, old jobs keep the old name or appear
+under the new holder's. An owner that survives both still needs the uuid described above.
