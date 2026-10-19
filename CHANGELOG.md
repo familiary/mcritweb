@@ -25,6 +25,22 @@ rather than reconstructing it from the commit log at release time.
   a checkout. Pre-release tags (`v1.5.0rc1`) are marked as such. See `RELEASING.md`.
 - A pull request that changes `mcritweb/` or `pyproject.toml` has to add a `CHANGELOG.md` entry or
   carry the `no-changelog` label; CI checks it.
+- The jobs list and the job page show who requested a job (#172). mcrit 1.10 and later record it;
+  an older backend, or a job from before, shows a dash. **Upgrading:** every user, visitors
+  included, sees the requester of every job.
+- Contributors can rename a function from its page, and through `PUT /api/functions/<id>` (#173).
+  **Upgrading:** this needs a backend of mcrit 1.10.0 or newer; against an older one the button is
+  disabled. A rename is recorded as a label on the backend.
+- The admin server page schedules the three corpus repairs mcrit 1.9.0 added, each behind a
+  confirmation; their jobs appear in the jobs list and their reports can be read (#212).
+- The search term is marked in the rows that matched it (#136).
+- The cross compare matrix can be ordered three ways: clustered, by sample id and by family (#159).
+- The jobs page search box works, ordering by job number covers the whole queue, and a tab lists the
+  per-sample jobs a cross compare runs (#115).
+- The Unique Blocks statistics table has a Version column, and each YARA rule comment names the
+  function its block comes from (#147).
+- The jobs mcrit 1.13 and 1.15 added (`rebuildBandDfIndex`, `rebuildFunctionRangeIndex`,
+  `deleteOrphanedQueueFiles`, `getBandDfCutoffCoverage`) have a name and an empty-state message.
 
 ### Changed
 
@@ -37,6 +53,36 @@ rather than reconstructing it from the commit log at release time.
   is now equivalent, and `pip install -e ".[dev]"` brings the test and lint tooling, which used
   to arrive as a side effect of `mcrit` and no longer does since MCRIT 1.8.0.
 - The release history moved out of `README.md` into this file; the entries below are unchanged.
+- Every job method has one name, used wherever a job is named; the Task row of the job and result
+  pages describes the job in words, with the raw call as its tooltip (#122). Long job descriptions
+  wrap (#117).
+- An empty table says what is missing, per job category, and no longer invites a visitor to a page
+  that answers 403 (#119).
+- The jobs list keeps its tab in the URL, so a refresh, the back button and a link reproduce the page
+  (#132).
+- A running job's overview polls its status and reloads only when something changed (#214).
+- Score columns round instead of truncating, and their tooltips state the fraction behind the
+  percentage (#148). The Matching Method Statistics are computed for the matches on screen (#142).
+- A cross compare result renders only the visible matrix and fills the other tabs on first click
+  (#213); its tooltips are built on hover (#226).
+- The match diagram is rendered by a request of its own into a reserved box, so the first view of a
+  result page shows the box and the image a moment later (#145).
+- The result cache is bounded, by `RESULT_CACHE_MAX_BYTES` and `RESULT_CACHE_MAX_FILES`, and stored
+  as compact JSON (#229). **Upgrading:** by default it holds 1 GiB or 1000 reports and evicts the
+  oldest written; the diagrams cache is still unbounded.
+- Sample and family changes are confirmed by reading them back instead of waiting 0.3 s. A family
+  rename counts as done only once the old family answers 404, since mcrit moves its samples to the
+  family with the new name and deletes the old one (#219).
+- Heading levels, labels, contrast and link target sizes, from the Lighthouse accessibility and
+  SEO audits (#244).
+- Searches are read through one adapter, `views/search.py` (#174).
+
+### Fixed
+
+- The YARA copy button copies what the text area holds (#147).
+- One unreadable job no longer takes a job listing down (#115).
+- A match diagram is cached under its whole name, its aggregation is counted once, and cache files
+  are written atomically (#145).
 
 ## [1.6.0] - 2026-10-16
 
