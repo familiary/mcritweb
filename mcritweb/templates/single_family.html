@@ -21,7 +21,7 @@ Family: {{ family.family }}
   </form>
 
 {{ sample_table(samples, job_collection=job_collection, show_edit=True, no_family=True, sort_pagination=pagination, column_setup=user_column_setup,
-                empty_message=("No samples in this family match \"" ~ query ~ "\".") if query else "This family has no samples.") }}
+                empty_message=("No samples in this family match \"" ~ query ~ "\".") if query else "This family has no samples.", highlight_terms=query|search_terms) }}
 {% if samples %}
 {{ pagination_widget(pagination) }}
 {% endif %}
