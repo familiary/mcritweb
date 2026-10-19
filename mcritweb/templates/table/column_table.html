@@ -323,8 +323,9 @@
       {% if show_progress %}
         <tr>
           <td valign="middle">Progress: </td>
-          {# the flag tells a script that updates this cell from the job's own
-             progress that the number here is the dependencies' #}
+          {# the flag tells the overview's polling script that the number here is the
+             dependencies' average, which it takes from data.job_status's
+             dependency_progress rather than from the job's own progress #}
           <td valign="middle"{% if progress_id %} id="{{ progress_id }}"{% endif %}{% if child_progress is not none and not job_info.finished_at %} data-progress-of="dependencies"{% endif %}>
             {% if job_info.finished_at %}
               <a href="{{ url_for('data.result', job_id=job_info.job_id ) }}">Results available</a>

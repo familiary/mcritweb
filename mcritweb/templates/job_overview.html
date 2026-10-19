@@ -38,7 +38,16 @@ Overview for Job: {{ job_info.job_id }}
             return;
           }
           const progress = document.getElementById("job-progress");
-          if (progress && state.started) {
+          if (progress && progress.dataset.progressOf === "dependencies") {
+            // a job waiting on sub-jobs has not started, and the cell shows their
+            // average; the state carries it, unless none of them could be read
+            if (typeof state.dependency_progress === "number") {
+              const count = document.createElement("span");
+              count.className = "text-muted";
+              count.textContent = "(across " + state.dependencies + " dependencies)";
+              progress.replaceChildren((100 * state.dependency_progress).toFixed(2) + "% ", count);
+            }
+          } else if (progress && state.started) {
             progress.textContent = (100 * state.progress).toFixed(2) + "%";
           }
           window.setTimeout(poll, interval);

@@ -1984,19 +1984,26 @@ def job_by_id(job_id):
         samples_by_id.update(get_sample_entries(sample_id for job in described_children for sample_id in job.sample_ids or []))
         families_by_id.update(get_family_entries(job.family_id for job in described_children if job.family_id is not None))
     # only a page that will poll needs it, so a finished job's page never reads it
-    job_state = job_overview_state(job_info) if auto_refresh > 0 and not job_info.finished_at else None
+    job_state = job_overview_state(job_info, child_jobs if dependencies else None) if auto_refresh > 0 and not job_info.finished_at else None
     return render_template('job_overview.html', families=families_by_id, samples=samples_by_id, job_info=job_info, job_state=job_state, auto_refresh=auto_refresh, child_jobs=child_jobs, child_progress=dependency_progress(child_jobs), missing_children=missing_children)
 
 
-def job_overview_state(job_info):
+def job_overview_state(job_info, child_jobs=None):
     """What the overview of a running job shows that can still change, read off the job
-    alone - without its sub-jobs or the samples and families they name.
+    and, for a job waiting on sub-jobs, off those sub-jobs - never the samples and
+    families they name.
 
     The overview polls `job_status` for this and reloads once the answer differs from
     what it rendered. A reload fetches every sub-job and every sample they name, so it
     should happen when there is something new to show, not on every tick. See #183.
+
+    A job waiting on sub-jobs does not start until the last of them is done, so its own
+    progress reads 0 while they run, and the overview shows their average instead (#46).
+    `child_jobs` are the sub-jobs the backend still has; with them the state also
+    carries that average and how many it covers, for the page to update in place.
+    Neither is a reload trigger: a sub-job's progress moves on every tick.
     """
-    return {
+    state = {
         "started": job_info.started_at is not None,
         "finished": job_info.finished_at is not None,
         "failed": job_info.is_failed,
@@ -2009,17 +2016,29 @@ def job_overview_state(job_info):
         # not the page.
         "unfinished_sub_jobs": len(getattr(job_info, "_data", {}).get("unfinished_dependencies") or []),
     }
+    if child_jobs is not None:
+        known = [job for job in child_jobs if job is not None]
+        state["dependency_progress"] = dependency_progress(known)
+        state["dependencies"] = len(known)
+    return state
 
 
 @bp.route('/jobs/<job_id>/status')
 @visitor_required
 @mcrit_server_required
 def job_status(job_id):
-    """The job overview's polling endpoint: one getJobData, as JSON."""
-    job_info = get_client().getJobData(job_id)
+    """The job overview's polling endpoint, as JSON: one getJobData, and for an
+    unfinished job waiting on sub-jobs one queue read per JOB_IDS_PER_REQUEST of them -
+    still no samples or families, which are most of what a reload reads."""
+    client = get_client()
+    job_info = client.getJobData(job_id)
     if job_info is None:
         return {"error": "unknown job"}, 404
-    return job_overview_state(job_info)
+    child_jobs = None
+    dependencies = list(dict.fromkeys(getattr(job_info, "all_dependencies", None) or []))
+    if dependencies and not job_info.finished_at:
+        child_jobs = dependency_jobs(client, dependencies)
+    return job_overview_state(job_info, child_jobs)
 
 
 #: job ids per `getQueueData(job_ids=...)` request. The ids travel in the query string,
