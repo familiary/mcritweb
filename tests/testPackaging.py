@@ -5,8 +5,6 @@ a checkout, and the version the running application reports - to it."""
 import tomllib
 from pathlib import Path
 
-import pytest
-
 from mcritweb.views.utility import get_mcritweb_version
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -14,8 +12,8 @@ PYPROJECT = ROOT / "pyproject.toml"
 
 
 def _project():
-    if not PYPROJECT.exists():
-        pytest.skip("running outside a source tree")
+    # the suite runs from a checkout, so a missing pyproject.toml is a moved one, not a wheel
+    assert PYPROJECT.exists(), f"{PYPROJECT} is gone - this test names the wrong file now"
     return tomllib.loads(PYPROJECT.read_text())["project"]
 
 

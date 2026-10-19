@@ -37,8 +37,9 @@ CHANGELOG = """# Changelog
 
 @pytest.fixture(scope="module")
 def guard():
-    if not SCRIPT.exists():
-        pytest.skip("running outside a source tree")
+    # the suite runs from a checkout, never from an installed wheel, so a missing script is a
+    # moved script, and skipping would hide that
+    assert SCRIPT.exists(), f"{SCRIPT} is gone - this test names the wrong file now"
     spec = importlib.util.spec_from_file_location("release_guard", SCRIPT)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
