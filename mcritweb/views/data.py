@@ -1336,18 +1336,23 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
 
 
 def order_samples(samples, order):
-    """`samples` in the order `order` names them, or None if it names one that is not there.
+    """`samples` in the order `order` names them, or None if it names one that is not
+    there, or one more than once.
 
     The ordering used to scan `samples` for every id in `order`, which made laying
     out n samples cost O(n^2) - and the cross-compare page does it once per matching
     method, so six times over. Both sides are compared as strings because `order` is
     either the report's clustered sequence or the `custom` query parameter, neither
     of which is guaranteed to arrive as an int. See issue #68.
+
+    A repeated id is refused rather than drawn twice: every row of the matrix is a row
+    and a column, so `?custom=` naming one sample a few thousand times would have the
+    page render millions of cells for anyone who can view the job.
     """
     samples_by_id = {str(sample.sample_id): sample for sample in samples}
     ordered_samples = []
     for order_sample_id in order:
-        sample = samples_by_id.get(str(order_sample_id))
+        sample = samples_by_id.pop(str(order_sample_id), None)
         if sample is None:
             return None
         ordered_samples.append(sample)
@@ -1379,7 +1384,7 @@ def result_matches_for_cross(job_info, result_json):
         if order:
             ordered_samples = order_samples(samples, order)
             if ordered_samples is None:
-                reason = "MCRIT was not able to produce the chosen custom ordering, as some sample_ids are not part of the cross compare originally specified."
+                reason = "MCRIT was not able to produce the chosen custom ordering, as some sample_ids are repeated or not part of the cross compare originally specified."
                 # job_info, not result_json: the template reads job_info.job_id for
                 # its heading and for the delete link, and a result dict has neither.
                 # The sibling corrupted branch above already passes the Job.

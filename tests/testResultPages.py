@@ -1204,6 +1204,26 @@ def test_ordering_samples_walks_the_sample_list_once():
     assert samples.walks == 1, f"the sample list was walked {samples.walks} times"
 
 
+def test_a_custom_order_naming_a_sample_twice_is_refused():
+    """Each repetition adds a row and a column, so a long `?custom=` of one id would
+    grow the page with the square of the query."""
+    samples = [types.SimpleNamespace(sample_id=sample_id) for sample_id in range(3)]
+
+    assert order_samples(samples, ["0", "1", "0"]) is None
+    assert [sample.sample_id for sample in order_samples(samples, ["2", "0", "1"])] == [2, 0, 1]
+
+
+def test_the_page_refuses_a_custom_order_with_a_repeated_sample(client, as_role):
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+    sample_id = re.search(r'<td class="id clickable"[^>]*>\s*(\d+)\s*</td>', client.get(f"/data/result/{job_id}").data.decode()).group(1)
+
+    response = client.get(f"/data/result/{job_id}?custom=" + ",".join([sample_id] * 200))
+
+    assert response.status_code == 200
+    assert b"repeated or not part of the cross compare" in response.data
+    assert len(response.data) < 100_000
+
 def test_ordering_samples_reports_an_id_that_is_not_there():
     samples = [types.SimpleNamespace(sample_id=sample_id) for sample_id in range(3)]
 

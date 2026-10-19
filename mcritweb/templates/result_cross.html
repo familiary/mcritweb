@@ -195,7 +195,7 @@ Results for Job: {{ job_info.job_id }}
 <h1>Results for Job: {{ job_info.method|job_name }}</h1>
 {{ job_column_table(job_info, show_created=False, show_started=False, show_finished=False) }}
 
-<p>Cross Comparison of {{ samples[rendered_method]|length }} samples in the data set. You can order the samples in this list per drag and drop to change the order in the matrices, or use the ordering buttons to switch between the clustered order, ascending sample ID and family name. Whichever order is chosen applies to all matrices, not just the one on screen.</p>
+<p>Cross Comparison of {{ samples[rendered_method]|length }} samples in the data set. You can order the samples in this list per drag and drop to change the order in the matrices, or use the ordering buttons to switch between the clustered order, ascending sample ID and family name. The sample ID and family orders, and an order dragged here, apply to all matrices, not just the one on screen; the clustered order is computed for each matching method separately, and this list shows the one of the first tab.</p>
 <div class="container">
     <div class="row">
       <div class="col-sm-auto">
