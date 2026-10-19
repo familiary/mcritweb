@@ -89,7 +89,8 @@ def test_an_unrecognised_job_method_still_renders_its_raw_parameters(client, as_
 )
 def test_the_task_row_wraps_wherever_it_is_shown(client, as_role, path):
     """The jobs list is not the only place the raw parameters string appears. The
-    "Task:" row of job_column_table prints the same string, and that macro reaches the
+    "Task:" row of job_column_table prints the same job (in words since #122, the raw
+    string as its tooltip), and that macro reaches the
     job overview and - through matching_result_job_column_table - every result page. A
     120-character filename in an addBinarySample job widens those tables past the
     viewport exactly as it used to widen the list."""
@@ -97,8 +98,9 @@ def test_the_task_row_wraps_wherever_it_is_shown(client, as_role, path):
 
     page = client.get(path.format(job_id=job_id_of("matches_for_sample"))).get_data(as_text=True)
 
-    assert "getMatchesForSample(0, 2)" in page, "the Task row is not on this page"
-    assert 'class="job-description">getMatchesForSample(0, 2)' in page
+    # since #122 the row shows the readable task and keeps the raw call as its tooltip
+    assert 'title="getMatchesForSample(0, 2)"' in page, "the Task row is not on this page"
+    assert 'class="job-description" title="getMatchesForSample(0, 2)"' in page
 
 
 if __name__ == "__main__":
