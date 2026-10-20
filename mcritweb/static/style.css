@@ -1,6 +1,95 @@
+/* The palette (#70). Every colour this stylesheet and the templates paint is named here
+   once, by the job it does, and the rules below use the names. These are the light values,
+   which are the colours the pages always had; static/theme-dark.css gives the same names
+   their dark values, and base.html links it only when the user's theme can be dark.
+   A new colour gets a name here and in theme-dark.css - tests/testTheme.py fails on a
+   colour written anywhere else, and on a name that only one of the two files defines. */
+:root {
+  /* surfaces, from the page ground up */
+  --surface-page: white;
+  /* the grey chrome: navbar, table heads, active pills and pages, accordion headers,
+     the drop zone, the diagram placeholder */
+  --surface-chrome: rgb(240, 240, 240);
+  /* a panel a shade off the page: manual code blocks, the column-settings lists */
+  --surface-subtle: rgb(248, 249, 250);
+  /* the flash notice */
+  --surface-info: #cae6f6;
+  /* the veil page_loading.js lays over a page that is navigating away */
+  --surface-veil: rgba(255, 255, 255, 0.6);
+
+  /* text */
+  --text-body: #212529;
+  /* full-contrast text on the chrome and on a score tint */
+  --text-strong: black;
+  --text-muted: #6c757d;
+  --text-subtle: slategray;
+  --text-danger: #cc2f2e;
+  /* the project accent: headings and rules */
+  --accent: #377ba8;
+  --link: #377ba8;
+  /* a link inside a row tinted by score or selection: the accent falls below 4.5:1 on
+     the palest of the light tints (#99b4e3), this stays above it on every one of them */
+  --link-on-tint: #17466b;
+  /* Bootstrap's own link blue, which two empty-state prompts keep, and its hover */
+  --link-plain: #0d6efd;
+  --link-hover: #0a58ca;
+  /* the "loading graph" notice of the CFG panes */
+  --text-progress: #3f51b5;
+
+  /* lines */
+  --rule-subtle: lightgray;
+  --border-subtle: rgb(222, 226, 230);
+  --border-strong: #333;
+  --border-swatch: #444;
+  --dropzone-border: black;
+
+  /* states and indicators */
+  --sort-idle: rgba(0, 0, 0, 0.3);
+  --sort-active: rgba(0, 0, 0, 1);
+  /* the ring an accordion header draws instead of Bootstrap's */
+  --accordion-focus-ring: #FFF;
+  /* a sample picker row: in the comparison, or already computed / just clicked */
+  --row-selected: yellowgreen;
+  --row-pending: var(--surface-chrome);
+  /* the tick and the cross of a yes/no column */
+  --status-yes: green;
+  --status-no: darkred;
+
+  /* score tints (ScoreColorProvider): the view picks the hue of a score, these decide
+     how strongly it shows and what it is mixed into */
+  --tint-ground: var(--surface-page);
+  --tint-strength: 40%;
+
+  /* the CFG viewer. The first twelve are the block matching colours: views/functiondiff.py
+     hands them to the graphs as var(--cfg-...) and the legend of the comparison page names
+     the same ones, so each theme decides here what a match looks like on its canvas. These
+     are the hex values the graphs always used */
+  --cfg-unmatched: #FFA0A0;
+  --cfg-escaped-match: #00ff00;
+  --cfg-adhoc-picblock: #C0F4FF;
+  --cfg-full-picblock: #00DDFF;
+  --cfg-only-in-b: #D0B0FF;
+  --cfg-levenshtein-0: #40ff40;
+  --cfg-levenshtein-1: #c0ff80;
+  --cfg-levenshtein-2: #FFFF40;
+  --cfg-levenshtein-3: #FFCC40;
+  --cfg-edge-both: #000000;
+  --cfg-edge-only-a: #d62728;
+  --cfg-edge-only-b: #7b2cbf;
+  /* the pane a graph is drawn on (trace_CFG/cfg_style.css paints the other three itself) */
+  --cfg-canvas: #FFFFFF;
+  /* the outline of the block on the other side that matched the hovered one */
+  --cfg-matched: #ff7f00;
+  /* the tooltip of the combined view */
+  --cfg-tooltip-bg: white;
+  --cfg-tooltip-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  /* the label of "Show Loop Boundaries": the colour the first (outermost) loop is drawn in */
+  --cfg-loop-label: #fdd0a2;
+}
+
 html {
     font-family: 'Roboto', sans-serif;
-    background: white;
+    background: var(--surface-page);
     padding: 1rem;
   }
   
@@ -9,11 +98,11 @@ html {
     max-width: 1824px;
     font-size: 0.9em;
     margin: 0 auto;
-    background: white;
+    background: var(--surface-page);
   }
   
   h1, h2, h3, h4, h5, h6 {
-    color: #377ba8;
+    color: var(--accent);
     margin: 1rem 0;
   }
 
@@ -24,13 +113,35 @@ html {
   }
   
   a {
-    color: #377ba8;
+    color: var(--link);
   }
 
-  /* rows tinted inline by score or selection: #377ba8 falls below 4.5:1 on the palest of
-     the 40% score tints (#99b4e3), this stays above it on every one of them */
-  tr[style*="background-color"] a {
-    color: #17466b;
+  a:hover {
+    color: var(--link-hover);
+  }
+
+  /* Settings' "Match my system" says which way the system leans right now, so it follows
+     the operating system's preference rather than the theme the page is in */
+  .system-scheme-dark {
+    display: none;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .system-scheme-light {
+      display: none;
+    }
+
+    .system-scheme-dark {
+      display: inline;
+    }
+  }
+
+  /* rows tinted inline by score, and picker rows in a state (see tr.row-selected), see
+     --link-on-tint */
+  tr[style*="background-color"] a,
+  tr.row-selected a,
+  tr.row-pending a {
+    color: var(--link-on-tint);
   }
 
   /* a table link is often one digit or one icon; 24x24 is the WCAG 2.5.8 minimum target */
@@ -54,13 +165,13 @@ html {
   
   hr {
     border: none;
-    border-top: 1px solid #377ba8;
+    border-top: 1px solid var(--accent);
   }
   
 
 
   nav {
-    background: rgb(240, 240, 240);
+    background: var(--surface-chrome);
     display: flex;
     align-items: center;
     padding: 0 0.5rem;
@@ -93,7 +204,7 @@ html {
   }
   
   .content > header {
-    border-bottom: 1px solid lightgray;
+    border-bottom: 1px solid var(--rule-subtle);
     display: flex;
     align-items: flex-end;
   }
@@ -106,8 +217,8 @@ html {
   .flash {
     margin: 1em 0;
     padding: 1em;
-    background: #cae6f6;
-    border: 1px solid #377ba8;
+    background: var(--surface-info);
+    border: 1px solid var(--accent);
   }
   
   .post > header {
@@ -126,7 +237,7 @@ html {
   }
   
   .post .about {
-    color: slategray;
+    color: var(--text-subtle);
     font-style: italic;
   }
   
@@ -160,54 +271,62 @@ html {
   }
   
   input.danger {
-    color: #cc2f2e;
+    color: var(--text-danger);
   }
   
   input[type=submit] {
     align-self: start;
     min-width: 10em;
   }
-  .nav-pills .nav-link.active { background-color: rgb(240, 240, 240); color:black}
-  .nav-pills .nav-link{color:black}
-  .thead-light { background-color: rgb(240, 240, 240); color:black}
+  .nav-pills .nav-link.active { background-color: var(--surface-chrome); color: var(--text-strong)}
+  .nav-pills .nav-link{color: var(--text-strong)}
+  .thead-light { background-color: var(--surface-chrome); color: var(--text-strong)}
+
+  /* A row of a sample picker (compare, 1 vs 1, cross compare, unique blocks) says which
+     state it is in with one of these classes, and the page's script toggles and tests the
+     class. A colour written into the style attribute could not follow the theme, and a
+     script that read it back to find the state was tied to it. Bootstrap leaves
+     --bs-table-bg transparent, so the row's background shows through its cells. #70 */
+  tr.row-selected { background-color: var(--row-selected); }
+  tr.row-pending { background-color: var(--row-pending); }
  a > * {
     pointer-events: none;
   }
 
   .accordion-button:link, .accordion-button:visited, .accordion-button:hover, .accordion-button:active  {
-    background-color: rgb(240, 240, 240)!important;
-      color:black !important;
+    background-color: var(--surface-chrome)!important;
+      color: var(--text-strong) !important;
       text-decoration: none !important;
-         border-color: rgb(240, 240, 240) !important;
+         border-color: var(--surface-chrome) !important;
       box-shadow: 0px !important;   
   }
 
   .accordion-button:focus {
     z-index: 3;
-    border-color: rgb(240, 240, 240)!important;
+    border-color: var(--surface-chrome)!important;
     outline: 0;
-    box-shadow: 0 0 0 .25rem #FFF !important;
+    box-shadow: 0 0 0 .25rem var(--accordion-focus-ring) !important;
   }
   .accordion-button:not(.collapsed) {
-    color:black  !important;
-    background-color: rgb(240, 240, 240)!important;
-    border-color: rgb(240, 240, 240)!important;
+    color: var(--text-strong)  !important;
+    background-color: var(--surface-chrome)!important;
+    border-color: var(--surface-chrome)!important;
   }
 
   .page-link {
-    color: black;
+    color: var(--text-strong);
   }
   .page-item.active .page-link{ 
-    color:black;
-    background-color:rgb(240, 240, 240);
-    border-color:rgb(240, 240, 240)}
+    color: var(--text-strong);
+    background-color: var(--surface-chrome);
+    border-color: var(--surface-chrome)}
 
   .fa-sort {
-    color: rgba(0, 0, 0, 0.3);
+    color: var(--sort-idle);
   }
 
   .fa-sort-up, .fa-sort-down {
-    color: rgba(0, 0, 0, 1);
+    color: var(--sort-active);
   }
 
   .pointer {
@@ -249,7 +368,7 @@ html {
     height: auto;
     display: block;
     margin: 1rem auto;
-    border: 1px solid rgb(222, 226, 230);
+    border: 1px solid var(--border-subtle);
     border-radius: 4px;
   }
 
@@ -261,12 +380,12 @@ html {
 
   .manual th, .manual td {
     padding: 0.5rem;
-    border: 1px solid rgb(222, 226, 230);
+    border: 1px solid var(--border-subtle);
   }
 
   .manual pre {
     padding: 0.75rem;
-    background-color: rgb(248, 249, 250);
+    background-color: var(--surface-subtle);
     border-radius: 4px;
     overflow-x: auto;
   }
@@ -274,7 +393,7 @@ html {
   .manual h1, .manual h2 {
     margin-top: 1.5rem;
     padding-bottom: 0.25rem;
-    border-bottom: 1px solid rgb(222, 226, 230);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .manual h3, .manual h4, .manual h5 {
@@ -287,7 +406,7 @@ html {
      it has loaded. */
   .mcrit-diagram {
     position: relative;
-    background-color: rgb(240, 240, 240);
+    background-color: var(--surface-chrome);
   }
 
   .mcrit-diagram::before {
@@ -297,7 +416,7 @@ html {
     left: 0;
     right: 0;
     text-align: center;
-    color: slategray;
+    color: var(--text-subtle);
   }
 
   .mcrit-diagram img {
@@ -326,7 +445,7 @@ table.table td.buttons {
 #xcfg_combined {
   position: relative;
   overflow: hidden;
-  background-color: #FFFFFF;
+  background-color: var(--cfg-canvas);
   width: 100%;
   min-height: 100px;
   height: calc(100vh - 106px);
@@ -337,16 +456,16 @@ table.table td.buttons {
 }
 /* a block on the other side that matched the hovered one */
 .node.matched rect {
-  stroke: #ff7f00;
+  stroke: var(--cfg-matched);
   stroke-width: 9;
 }
 #tooltip_c {
   position: absolute;
   max-width: 45%;
   padding: 3px;
-  background-color: white;
+  background-color: var(--cfg-tooltip-bg);
   border-radius: 10px;
-  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--cfg-tooltip-shadow);
   pointer-events: none;
 }
 #tooltip_c p {
@@ -358,14 +477,14 @@ table.table td.buttons {
   display: inline-block;
   width: 0.9em;
   height: 0.9em;
-  border: 1px solid #444;
+  border: 1px solid var(--border-swatch);
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }
 .cfg-legend span.edge-swatch {
   display: inline-block;
   width: 1.4em;
-  border-top: 3px solid #444;
+  border-top: 3px solid var(--border-swatch);
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }

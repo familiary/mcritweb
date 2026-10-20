@@ -122,6 +122,7 @@ ROUTE_POLICY = {
     "admin.change_password": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_default_filter": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_column_settings": (LOGGED_IN, WRITES_ON_POST),
+    "admin.change_theme": (LOGGED_IN, WRITES_ON_POST),
     "admin.reset_column_settings": (LOGGED_IN, WRITES_ON_POST),
     "admin.regenerate_apitoken": (LOGGED_IN, WRITES_ON_POST),   # only ever the caller's own row
 

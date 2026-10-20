@@ -90,7 +90,7 @@
   {% if column_setup is none %}
     {% set column_setup = ["family_id", "family_name", "num_samples", "num_functions", "is_library"] %}
   {% endif %}
-  <tr class="family-row parent_{{ kwargs['parent'] }}"{{ row_tint(row_decorations, family.family_id) }} >
+  <tr class="family-row parent_{{ kwargs['parent'] }}{{ row_tint(row_decorations, family.family_id) }}" >
   {{ badge_column_cell(row_decorations, family.family_id) }}
   {% for column_type in column_setup %}
     {% if column_type == "family_id" %}
@@ -102,7 +102,7 @@
     {% elif column_type == "num_functions" %}
       <td align="right" valign="middle">{{ "%d"|format(family.num_functions) }}</td>
     {% elif column_type == "is_library" %}
-      <td align="center" valign="middle"><i {% if family.is_library %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td align="center" valign="middle"><i {% if family.is_library %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
     {% endif %}
   {% endfor %}
     <td align="center" valign="middle" class="buttons">

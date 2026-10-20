@@ -7,5 +7,6 @@ CREATE TABLE user (
   role VARCHAR NOT NULL,
   registered VARCHAR NOT NULL,
   last_login VARCHAR,
-  apitoken VARCHAR
+  apitoken VARCHAR,
+  theme VARCHAR
 );

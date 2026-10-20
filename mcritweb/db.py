@@ -49,6 +49,19 @@ def parse_timestamp(value):
         return parsed.replace(tzinfo=datetime.UTC)
     raise ValueError(f"Not a stored timestamp: {value!r}")
 
+#: The colour themes a user can pick in Settings (#70). "system" follows the browser's
+#: light/dark preference; base.html turns the choice into the page's color-scheme and
+#: decides when static/theme-dark.css applies.
+THEMES = ("light", "dark", "system")
+#: An account that never picked one - every account from before #70, whose column is
+#: NULL - keeps the light pages it always had.
+DEFAULT_THEME = "light"
+
+
+def normalize_theme(theme):
+    """A stored or submitted theme, or the default for anything that is not one."""
+    return theme if theme in THEMES else DEFAULT_THEME
+
 #: Bytes of entropy behind a per-user API token. 32 gives a 64-character hex string.
 APITOKEN_BYTES = 32
 
@@ -69,7 +82,7 @@ def generate_apitoken():
 class UserInfo:
 
     #: The columns of `user` a UserInfo carries besides its id, as attribute names.
-    COLUMNS = ("username", "password", "role", "registered", "last_login", "apitoken")
+    COLUMNS = ("username", "password", "role", "registered", "last_login", "apitoken", "theme")
 
     def __init__(self) -> None:
         self.user_id = None
@@ -80,6 +93,7 @@ class UserInfo:
         self.registered = None
         self.last_login = None
         self.apitoken = None
+        self.theme = DEFAULT_THEME
         # the values the row had when it was read, see saveToDb
         self._stored = {}
 
@@ -103,6 +117,7 @@ class UserInfo:
             if record["last_login"] != "no login":
                 user_info.last_login = parse_timestamp(record["last_login"])
             user_info.apitoken = record["apitoken"]
+            user_info.theme = normalize_theme(record["theme"])
             user_info._stored = {column: getattr(user_info, column) for column in cls.COLUMNS}
         else:
             user_info = None
@@ -133,11 +148,12 @@ class UserInfo:
                 raise sqlite3.IntegrityError("UNIQUE constraint failed: user.username (ignoring case)")
         if self.user_id is None:
             database.execute(
-                "INSERT INTO user (username, password, role, registered, last_login, apitoken) VALUES (?,?,?,?,?,?)",
+                "INSERT INTO user (username, password, role, registered, last_login, apitoken, theme) VALUES (?,?,?,?,?,?,?)",
                 # formatted here rather than handed over as a datetime: sqlite3's
                 # implicit adapter is deprecated as of 3.12, and it wrote a value
                 # fromDb could not always read back. See issue #98.
-                (self.username, self.password, self.role, format_timestamp(utc_now()), 'no login', self.apitoken),
+                (self.username, self.password, self.role, format_timestamp(utc_now()), 'no login', self.apitoken,
+                 normalize_theme(self.theme)),
             )
         else:
             for column in self.COLUMNS:
@@ -768,6 +784,11 @@ def migrate(app_context):
             db.execute('ALTER TABLE server ADD server_token VARCHAR')
             db.execute("UPDATE server SET server_token = ?;", ("",))
             print("EXECUTED MIGRATION: ADD SERVER_TOKEN TO TABLE SERVER")
+        # since #70, users pick a colour theme, ensure the column exists. It stays NULL
+        # for existing accounts, which UserInfo reads as DEFAULT_THEME.
+        if "theme" not in user_table_columns:
+            db.execute('ALTER TABLE user ADD theme VARCHAR')
+            print("EXECUTED MIGRATION: ADD THEME TO TABLE USER")
         # since version v1.4.0, we have user_column_settings, ensure table exists
         try:
             db.execute('SELECT * FROM user_column_settings').fetchone()

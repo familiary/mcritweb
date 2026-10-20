@@ -2,14 +2,14 @@
 
   <table>
     <tr>
-      <td style="font-size: 13px;color: black">#</td>
-      <td style="font-size: 13px;color: black">family</td>
-      <td style="font-size: 13px;color: black">version</td>
+      <td style="font-size: 13px; color: var(--text-strong)">#</td>
+      <td style="font-size: 13px; color: var(--text-strong)">family</td>
+      <td style="font-size: 13px; color: var(--text-strong)">version</td>
       <td></td>
-        <td style="font-size: 13px;color: black">ID</td>
-        <td style="font-size: 13px;color: black">Bit</td>
-        <td style="font-size: 13px;color: black">FNs</td>
-        <td style="font-size: 13px;color: black" colspan="{{ samples|length }}">Matrix</td>
+        <td style="font-size: 13px; color: var(--text-strong)">ID</td>
+        <td style="font-size: 13px; color: var(--text-strong)">Bit</td>
+        <td style="font-size: 13px; color: var(--text-strong)">FNs</td>
+        <td style="font-size: 13px; color: var(--text-strong)" colspan="{{ samples|length }}">Matrix</td>
     </tr>
     
     <tr>
@@ -25,24 +25,24 @@
         <td></td>
         <td></td>
         <td></td>
-        <td align="middle" style="font-size: 10px;color: black">{{id}}</td>
+        <td align="middle" style="font-size: 10px; color: var(--text-strong)">{{id}}</td>
     {% endfor %}
     </tr>
 
     {% for sample in samples %}
       {% set outer_loop = loop %}
-      <tr class="sample-row" style="border: 0px solid black; line-height: 0.7em;" data-hint-sample="{{ sample.sample_id }}: {{sample.sha256[:8]}} -- {{ sample.family }} {{ sample.version }} -- ({{sample.statistics['num_functions']}} func)">
+      <tr class="sample-row" style="border: 0; line-height: 0.7em;" data-hint-sample="{{ sample.sample_id }}: {{sample.sha256[:8]}} -- {{ sample.family }} {{ sample.version }} -- ({{sample.statistics['num_functions']}} func)">
         <td class="result clickable" style="display: none;">{{ sample_to_job_id[sample.sample_id|string] }}</td>
         <td class="sha256" style="font-size: 13px; min-width: 100px;">{{ format_sha_short_clipboard(sample.sha256) }}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.family}}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.version}}</td>
         <td><a aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square"></i></a></td>
-        <td class="id clickable" style="padding: 0 5px; font-size: 13px;color: black">{{ sample.sample_id }}</td>
+        <td class="id clickable" style="padding: 0 5px; font-size: 13px; color: var(--text-strong)">{{ sample.sample_id }}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.bitness}}</td>
-        <td class="" style="padding: 0 5px; font-size: 13px;color: black">{{sample.statistics['num_functions']}}</td>
+        <td class="" style="padding: 0 5px; font-size: 13px; color: var(--text-strong)">{{sample.statistics['num_functions']}}</td>
       {# a pane filled in the browser writes its own score line into data-hint, see the script at the end #}
       {% for sample2 in samples %}
-        <td><span onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}'";" class="hint--top" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
+        <td><span onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}'";" class="hint--top score-swatch" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
             style="background-color: #{{ score_to_color(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }}; width: 25px; height: 25px; "></span>
         </td>
       {% endfor %}

@@ -1,4 +1,4 @@
-{% from 'table/match_diagram.html' import match_diagram %}
+{% from 'table/match_diagram.html' import match_diagram with context %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% from 'table/column_table.html' import sample_column_table, matching_result_job_column_table %}
 {% from 'table/matching_statistics_table.html' import matching_statistics_table %}
@@ -83,7 +83,7 @@ Results for Job: {{ job_info.job_id }}
   </thead>
   <tbody>
     {% for matched_sample in matching_result.getSampleMatches(samp.start_index, samp.limit) %}
-      <tr style="background-color:#{{ scp.getMatchHexColorFromResult(matched_sample, 'matched_percent_score_weighted') }}">
+      <tr style="background-color: {{ scp.getMatchTintFromResult(matched_sample, 'matched_percent_score_weighted') }}">
         {% for column_type in ucs_famlib %}
           {% if column_type == "family_name" %}
             <td valign="middle">{{ format_family_name(matched_sample.family, matched_sample.family_id) }}&nbsp;<a aria-label="Filter by this family" title="Filter by this family" href="{{ url_for(request.endpoint, famid=matched_sample.family_id, samp=1, funp=1, **request.view_args) }}#sample-matches"><i class="fa-solid fa-filter"></i></a></td>
@@ -110,11 +110,11 @@ Results for Job: {{ job_info.job_id }}
           {% elif column_type == "direct_nonlib_score" %}
             <td style="text-align: right;" valign="middle"><span class="hint--left" data-hint="Weighted Direct Score (Library Excluded): &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_nonlib_score_weighted) }} / {{ '%.2f'|format(divisors.nonlibrary) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_nonlib_score_weighted) }}%">{{ "%3.0f"|format(matched_sample.matched_percent_nonlib_score_weighted) }} </span></td>
           {% elif column_type == "frequency_score" %}
-            <td style="text-align: right; background-color:#{{ scp.getMatchHexColorFromResult(matched_sample, 'matched_percent_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="Frequency Weighted Score: &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_frequency_weighted) }} / {{ '%.2f'|format(divisors.matchable) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_frequency_weighted) }}%">{{ "%3.0f"|format(matched_sample.matched_percent_frequency_weighted) }}</span></td>
+            <td style="text-align: right; background-color: {{ scp.getMatchTintFromResult(matched_sample, 'matched_percent_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="Frequency Weighted Score: &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_frequency_weighted) }} / {{ '%.2f'|format(divisors.matchable) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_frequency_weighted) }}%">{{ "%3.0f"|format(matched_sample.matched_percent_frequency_weighted) }}</span></td>
           {% elif column_type == "frequency_nonlib_score" %}
-            <td style="text-align: right; background-color:#{{ scp.getMatchHexColorFromResult(matched_sample, 'matched_percent_nonlib_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="Frequency Weighted Score (Library Excluded): &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_nonlib_frequency_weighted) }} / {{ '%.2f'|format(divisors.nonlibrary) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}%">{{ "%3.0f"|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}</span></td>
+            <td style="text-align: right; background-color: {{ scp.getMatchTintFromResult(matched_sample, 'matched_percent_nonlib_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="Frequency Weighted Score (Library Excluded): &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_nonlib_frequency_weighted) }} / {{ '%.2f'|format(divisors.nonlibrary) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}%">{{ "%3.0f"|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}</span></td>
           {% elif column_type == "uniq_score" %}
-            <td style="text-align: right; background-color:#{{ scp.getUniqueColorScore(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}" valign="middle"><span class="hint--left" data-hint="Unique Matching Score: &#10;Functions: {{ '%4d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['functions_matched']) }} &#10;Bytes: {{ '%2d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['bytes_matched']) }} &#10;Percent: {{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%">{{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%</span></td>
+            <td style="text-align: right; background-color: {{ scp.getUniqueTint(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}" valign="middle"><span class="hint--left" data-hint="Unique Matching Score: &#10;Functions: {{ '%4d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['functions_matched']) }} &#10;Bytes: {{ '%2d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['bytes_matched']) }} &#10;Percent: {{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%">{{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%</span></td>
           {% endif %}
         {% endfor %}
       </tr>
@@ -189,7 +189,7 @@ Results for Job: {{ job_info.job_id }}
   </thead>
   <tbody>
     {% for aggregate in function_rows %}
-      <tr style="background-color:#{{ scp.getMatchHexColorByScore50(aggregate['best_score'] + aggregate['pichash_matches'], 0.4) }}">
+      <tr style="background-color: {{ scp.getMatchTintByScore50(aggregate['best_score'] + aggregate['pichash_matches']) }}">
         {% for column_type in ucs_functions %}
           {% if column_type == "matched_function_id" %}
             <td valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=aggregate['function_id'] * -1 if matching_result.is_query else aggregate['function_id']) }}">{% if matching_result.is_query %}*{% endif %}{{ aggregate["function_id"] }}</a>&nbsp;<a aria-label="Filter by this function" title="Filter by this function" href="{{ url_for(request.endpoint, funid=aggregate['function_id'], samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
@@ -218,9 +218,9 @@ Results for Job: {{ job_info.job_id }}
           {% elif column_type == "num_pichash" %}
             <td style="text-align: right;" valign="middle">{{ aggregate["pichash_matches"] }}</td>
           {% elif column_type == "is_library_match" %}
-            <td style="text-align: right;" valign="middle"><i {% if aggregate["library_matches"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
+            <td style="text-align: right;" valign="middle"><i {% if aggregate["library_matches"] %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
           {% elif column_type == "is_unique_match" %}
-            <td style="text-align: right;" valign="middle"><i {% if aggregate["is_family_unique"] %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
+            <td style="text-align: right;" valign="middle"><i {% if aggregate["is_family_unique"] %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
           {% endif %}
         {% endfor %}
       </tr>

@@ -119,7 +119,7 @@
   {% endif %}
   {% set matching_jobs = job_collection.getJobsForSample(sample.sample_id, matching_only=True) if job_collection else None -%}
   {% set last_matches_job = job_collection.getJobsForSample(sample.sample_id, method="getMatchesForSample", finished_only=True) if job_collection else None -%}
-  <tr class="sample-row parent_{{ kwargs['parent'] }}"{{ row_tint(row_decorations, sample.sample_id) }} >
+  <tr class="sample-row parent_{{ kwargs['parent'] }}{{ row_tint(row_decorations, sample.sample_id) }}" >
     {{ badge_column_cell(row_decorations, sample.sample_id) }}
     {% for column_type in column_setup %}
       {% if column_type == "sample_id" %}
@@ -139,7 +139,7 @@
       {% elif column_type == "num_functions" %}
         <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
       {% elif column_type == "is_library" %}
-        <td align="center" valign="middle"><i {% if sample.is_library %} style="color:green;" class="fa-solid fa-square-check" {% else %} style="color:darkred;" class="fa-solid fa-times-circle" {% endif %}></i></td>
+        <td align="center" valign="middle"><i {% if sample.is_library %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
       {% endif %}
     {% endfor %}
     {% if show_hint %}
@@ -152,7 +152,7 @@
         {% if show_analyze %}
           <button type="button" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_analyze" title="Analyze" onclick=set_analyze_sample_button_clicked() bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             {% if job_collection and matching_jobs %}
-            <i style="color:green;" class="fa-solid fa-flask"></i><span class="visually-hidden">Analyze, matching jobs:</span>&nbsp;{{ matching_jobs | length}}
+            <i style="color: var(--status-yes);" class="fa-solid fa-flask"></i><span class="visually-hidden">Analyze, matching jobs:</span>&nbsp;{{ matching_jobs | length}}
             {% else %}
             <i class="fa-solid fa-flask"></i>
             {% endif %}

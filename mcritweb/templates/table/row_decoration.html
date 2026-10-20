@@ -17,16 +17,21 @@
     unknown name renders nothing. Badge text is ordinary autoescaped output.
 -#}
 
-{#- "selected" and "pending" are the two shades cross_compare.html has always used for
-    its selection; keeping the exact values keeps that page looking as it did. -#}
-{%- set ROW_TINTS = {"selected": "yellowgreen", "pending": "rgb(240, 240, 240)"} -%}
+{#- "selected" and "pending" are the two states of a row in cross_compare.html's sample
+    picker. A tint is a class on the row, `tr.row-selected` / `tr.row-pending` in
+    static/style.css, which paints it from --row-selected / --row-pending, so the theme
+    decides the colour (#70). The scripts of the pickers (compare, compare_versus,
+    unique_blocks, cross_compare) toggle and test the same two classes. -#}
+{%- set ROW_TINTS = {"selected": "row-selected", "pending": "row-pending"} -%}
 {%- set BADGE_VARIANTS = ["primary", "secondary", "success", "danger", "warning", "info", "light", "dark"] -%}
 
 
-{#- an attribute for the enclosing <tr>, so it stays empty when nothing is decorated -#}
+{#- a class for the enclosing <tr>, with its leading space, to be written at the end of the
+    row's own class attribute: `<tr class="sample-row{{ row_tint(...) }}">`. It stays empty
+    when nothing is decorated -#}
 {%- macro row_tint(row_decorations, row_id) -%}
   {%- set tint = ROW_TINTS.get((row_decorations or {}).get(row_id, {}).get("tint")) -%}
-  {%- if tint %} style="background-color: {{ tint }};"{% endif -%}
+  {%- if tint %} {{ tint }}{% endif -%}
 {%- endmacro -%}
 
 
