@@ -1,7 +1,7 @@
 # The rest of #63 is gzip in the proxy, not more surgery here
 
 ---
-status: superseded by 0016 — measured 2026-08-30; each "not now" below was later done, see 0016 for what changed the arithmetic
+status: superseded by 0017 — measured 2026-08-30; each "not now" below was later done, see 0017 for what changed the arithmetic
 ---
 
 Issue #63 is a five-item checklist about browser performance. Removing DataTables and
