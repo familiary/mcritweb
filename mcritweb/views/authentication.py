@@ -362,6 +362,8 @@ def load_logged_in_user():
             session.clear()
             user_info = None
         g.user = user_info
+    # the colour theme every page renders with; a logged-out page has the default (#70)
+    g.theme = g.user.theme if g.user is not None else db.DEFAULT_THEME
 
 
 @bp.after_app_request

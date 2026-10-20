@@ -1,0 +1,885 @@
+/* The dark palette (#70).
+
+   base.html links this file only when the user's theme can be dark, with a media query
+   that says when (mcritweb/theme.py): "all" for the dark theme, the browser's
+   prefers-color-scheme for "system". So nothing in here needs a theme selector, and the
+   light pages never download it.
+
+   Part one gives the names static/style.css declares their dark values; everything the
+   project paints follows from that. Part two brings what the project did not write onto
+   the same names: Bootstrap 5.0.2 predates its own colour modes (data-bs-theme arrived in
+   5.3) and paints its components with literals, and hint.css, Dropzone and the CFG viewer
+   do the same. The vendored files are not edited (AGENTS.md); they are overridden from
+   here. Every such rule starts at :root, which outranks the vendored selector whatever
+   order the stylesheets end up linked in.
+
+   The ground is a blue-grey slate rather than black, so long sessions are easy on the eye
+   and the elevation steps stay visible; text reaches 12:1 on it and the accent 7.8:1. Every
+   pair below was measured against WCAG 2.2: 4.5:1 for text, 3:1 for control borders,
+   icons and focus rings. */
+
+/* --- part one: the palette ----------------------------------------------------------- */
+
+:root {
+  color-scheme: dark;
+
+  --surface-page: #141a21;
+  --surface-chrome: #1c242e;
+  --surface-subtle: #19202a;
+  --surface-info: #13324a;
+  --surface-veil: rgba(20, 26, 33, 0.6);
+
+  /* body text a step below white: 12:1 rather than the 15:1 near-white would reach, which
+     is plenty, and bright text on a dark ground seems to bleed at the edges after a while */
+  --text-body: #cfd7e0;
+  --text-strong: #e4e9ef;
+  --text-muted: #95a3b4;
+  --text-subtle: #95a3b4;
+  --text-danger: #ff9d96;
+  --accent: #7ab4dc;
+  --link: #7ab4dc;
+  --link-on-tint: #b5dbf7;
+  --link-plain: #8ab8f0;
+  --link-hover: #a8cde8;
+  --text-progress: #a3b3ff;
+
+  --rule-subtle: #2a3440;
+  --border-subtle: #2a3440;
+  --border-strong: #657790;
+  --border-swatch: #8796a8;
+  --dropzone-border: #657790;
+
+  --sort-idle: rgba(207, 215, 224, 0.45);
+  --sort-active: var(--text-strong);
+  --accordion-focus-ring: var(--focus-ring);
+  /* a muted sage: the light theme's yellowgreen family, without its glare */
+  --row-selected: #2c4a38;
+  --row-pending: #2a3542;
+  --status-yes: #56d39a;
+  --status-no: #ff9d96;
+
+  /* a score's hue shows at 28% over the dark ground: strong enough to tell the bands
+     apart, weak enough that body text keeps 5:1 on the brightest of them (yellow) */
+  --tint-ground: var(--surface-page);
+  --tint-strength: 28%;
+
+  /* names only this file needs, for the vendored widgets below */
+  --surface-raised: #222b36;
+  --surface-input: #10161d;
+  --surface-hover: rgba(255, 255, 255, 0.06);
+  --surface-active: #2a3542;
+  --border: #34404e;
+  /* control borders: 3:1 or more on every surface a control sits on, the chrome (3.4)
+     and the raised dialogs (3.1) included */
+  --border-control: #657790;
+  --primary: #2c6fb7;
+  --primary-hover: #3678bf;
+  --focus-ring: rgba(122, 180, 220, 0.6);
+  --shadow-raised: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
+  /* tooltips: a raised dark bubble with a hairline, rather than a bright one that flares
+     up over the page every time the pointer rests on a score */
+  --tooltip-bg: var(--surface-active);
+  --tooltip-text: var(--text-strong);
+  --tooltip-border: #3d4a5a;
+
+  /* the CFG viewer, kept quiet for a long session. A block matching colour is its light hue
+     mixed into the canvas, about 28% of it, with the chroma of the greens and yellows held
+     down and the lightness stepped where two came too close, so the hue still tells the
+     matches apart and nothing glows. Measured against the body text (#cfd7e0): unmatched
+     6.8, escaped match 8.0, ad-hoc PicBlockHash 5.5, indexed PicBlockHash 6.6, only in B
+     6.7, edit distance 0 to 3: 6.4, 5.2, 5.6, 7.2. No two of them, nor one and the default
+     block, are closer than dE2000 8.6 (light: the escaped match and edit distance 0 are 2.2
+     apart), each is 18 or more from the canvas, and none has a chroma over 24. The edges are
+     a calm grey, a muted salmon and a muted violet: 4.9, 6.0 and 6.4:1 on the canvas and 2.8,
+     3.5 and 3.7:1 on the palest loop fill */
+  --cfg-unmatched: #533d42;
+  --cfg-escaped-match: #253f23;
+  --cfg-adhoc-picblock: #41545c;
+  --cfg-full-picblock: #094c5b;
+  --cfg-only-in-b: #46415c;
+  --cfg-levenshtein-0: #3e4a3e;
+  --cfg-levenshtein-1: #425b39;
+  --cfg-levenshtein-2: #505235;
+  --cfg-levenshtein-3: #493f1c;
+  --cfg-edge-both: #758699;
+  --cfg-edge-only-a: #cf7f78;
+  --cfg-edge-only-b: #a090d0;
+  --cfg-canvas: var(--surface-input);
+  /* a muted amber for the block on the other side that matched the hovered one: the light
+     theme's #ff7f00 is the loudest colour on the page, and this is 7.5:1 on the canvas */
+  --cfg-matched: #c8a05a;
+  --cfg-tooltip-bg: var(--surface-raised);
+  --cfg-tooltip-shadow: 4px 4px 10px rgba(0, 0, 0, 0.6);
+  /* names only the CFG viewer section below needs: what outlines a hovered block or edge
+     (the light theme's #008080 is 3.8:1 on the canvas and 1.7:1 on the palest loop fill;
+     the accent is 8.1:1 and 4.7:1); the rose of a loop's back edge, from #dd1c77 (3.9:1
+     and 1.7:1) to 5.5:1 and 3.2:1; how much of a loop's colour shows over the canvas, and
+     how much of a cycle's; the lift of the hovered line of code */
+  --cfg-highlight: var(--accent);
+  --cfg-backedge: #c0789a;
+  --cfg-code-active: color-mix(in srgb, var(--accent) 14%, transparent);
+  --cfg-hull-opacity: 0.22;
+  --cfg-cycle-opacity: 0.35;
+  /* the label of "Show Loop Boundaries" is the first loop colour as it is drawn, i.e. at
+     the hull opacity over the canvas */
+  --cfg-loop-label: color-mix(in srgb, #fdd0a2 calc(var(--cfg-hull-opacity) * 100%), var(--cfg-canvas));
+
+  accent-color: var(--accent);
+}
+
+::selection {
+  background-color: rgba(122, 180, 220, 0.3);
+  color: var(--text-strong);
+}
+
+/* --- part two: what the project did not write --------------------------------------- */
+
+/* Bootstrap's reboot */
+:root body {
+  color: var(--text-body);
+}
+
+:root hr {
+  opacity: 0.5;
+}
+
+:root mark,
+:root .mark {
+  background-color: rgba(224, 180, 74, 0.32);
+  color: var(--text-strong);
+}
+
+/* a soft amber, where Bootstrap's light code colour is a loud pink */
+:root code {
+  color: #e3b386;
+}
+
+:root .text-muted {
+  color: var(--text-muted) !important;
+}
+
+:root .text-dark {
+  color: var(--text-strong) !important;
+}
+
+:root .text-primary {
+  color: var(--link-plain) !important;
+}
+
+:root .text-secondary {
+  color: var(--text-muted) !important;
+}
+
+:root .text-success {
+  color: var(--status-yes) !important;
+}
+
+:root .text-danger {
+  color: var(--text-danger) !important;
+}
+
+:root .text-warning {
+  color: #f5c75a !important;
+}
+
+:root .text-info {
+  color: #7fd3f0 !important;
+}
+
+:root .bg-light {
+  background-color: var(--surface-chrome) !important;
+}
+
+:root .bg-white {
+  background-color: var(--surface-raised) !important;
+}
+
+:root .border,
+:root .border-top,
+:root .border-bottom,
+:root .border-start,
+:root .border-end {
+  border-color: var(--border) !important;
+}
+
+/* the navbar: the chrome colour comes from style.css; a hairline of the accent under it
+   marks where the application ends and the page begins */
+:root nav.navbar {
+  box-shadow: inset 0 -1px 0 var(--border), 0 1px 0 rgba(122, 180, 220, 0.18);
+}
+
+:root .navbar-light .navbar-brand,
+:root .navbar-light .navbar-brand:hover,
+:root .navbar-light .navbar-brand:focus {
+  color: var(--text-strong);
+}
+
+:root .navbar-light .navbar-nav .nav-link {
+  color: rgba(219, 226, 234, 0.75);
+}
+
+:root .navbar-light .navbar-nav .nav-link:hover,
+:root .navbar-light .navbar-nav .nav-link:focus {
+  color: var(--text-strong);
+}
+
+:root .navbar-light .navbar-nav .show > .nav-link,
+:root .navbar-light .navbar-nav .nav-link.active {
+  color: var(--text-strong);
+}
+
+:root .navbar-light .navbar-toggler {
+  color: rgba(219, 226, 234, 0.75);
+  border-color: var(--border-control);
+}
+
+/* the icon is an SVG drawn in rgba(0,0,0,.55); inverted it is the light equivalent */
+:root .navbar-light .navbar-toggler-icon {
+  filter: invert(1);
+}
+
+/* pills and the pager: the active one is lifted and underlined in the accent, which tells
+   it apart on a dark ground better than the light theme's grey alone would */
+:root .nav-pills .nav-link.active,
+:root .nav-pills .show > .nav-link {
+  background-color: var(--surface-active);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+:root .nav-pills .nav-link:not(.active):hover {
+  background-color: var(--surface-hover);
+}
+
+/* tables */
+:root .table {
+  --bs-table-striped-color: var(--text-body);
+  --bs-table-striped-bg: rgba(255, 255, 255, 0.035);
+  --bs-table-active-color: var(--text-strong);
+  --bs-table-active-bg: rgba(255, 255, 255, 0.08);
+  --bs-table-hover-color: var(--text-strong);
+  --bs-table-hover-bg: var(--surface-hover);
+  color: var(--text-body);
+  border-color: var(--border-subtle);
+}
+
+/* Bootstrap draws the rule between head and body in currentColor, which is the light
+   text colour here: a step down to the control border keeps it a rule, not a glare */
+:root .table > :not(:first-child) {
+  border-top-color: var(--border-strong);
+}
+
+:root .table-bordered > :not(caption) > * > * {
+  border-color: var(--border);
+}
+
+:root .table-light {
+  --bs-table-bg: var(--surface-chrome);
+  --bs-table-striped-bg: var(--surface-chrome);
+  --bs-table-hover-bg: var(--surface-active);
+  color: var(--text-strong);
+  border-color: var(--border);
+}
+
+:root .table-primary {
+  --bs-table-bg: #18324d;
+  color: var(--text-strong);
+  border-color: #24466a;
+}
+
+:root .table-secondary {
+  --bs-table-bg: #262f3a;
+  color: var(--text-strong);
+  border-color: var(--border);
+}
+
+:root .table-success {
+  --bs-table-bg: #153424;
+  color: var(--text-strong);
+  border-color: #1f4d35;
+}
+
+:root .table-warning {
+  --bs-table-bg: #3a3218;
+  color: var(--text-strong);
+  border-color: #5a4c22;
+}
+
+:root .table-danger {
+  --bs-table-bg: #3d1e22;
+  color: var(--text-strong);
+  border-color: #5e2b31;
+}
+
+/* forms */
+:root .form-control,
+:root .form-select {
+  color: var(--text-body);
+  background-color: var(--surface-input);
+  border-color: var(--border-control);
+}
+
+:root .form-control:focus,
+:root .form-select:focus {
+  color: var(--text-strong);
+  background-color: var(--surface-input);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.25rem var(--focus-ring);
+}
+
+:root .form-control::placeholder {
+  color: var(--text-muted);
+}
+
+:root .form-control:disabled,
+:root .form-control[readonly],
+:root .form-select:disabled {
+  background-color: var(--surface-chrome);
+  color: var(--text-muted);
+}
+
+:root .form-control-plaintext {
+  color: var(--text-body);
+}
+
+:root .form-text {
+  color: var(--text-muted);
+}
+
+/* fields without Bootstrap's classes (the result pages' filters, link hunt, the YARA editor)
+   are left to the browser, whose dark controls are #3b3b3b with a placeholder at 2.4:1; they
+   take .form-control's colours. :where() keeps this under every class rule, Bootstrap's too */
+:root :where(input:not(.form-control, .form-check-input, .form-range, .btn, [type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], [type="hidden"]), select:not(.form-select), textarea:not(.form-control)) {
+  color: var(--text-body);
+  background-color: var(--surface-input);
+  border-color: var(--border-control);
+}
+
+/* a text field the browser draws has a flat 1px line inside a 2px inset border; given colours
+   it would draw the 2px bevel. 1px solid and 1px more padding top and bottom keep its height */
+:root :where(input:not(.form-control, .form-check-input, .form-range, .btn, [type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="submit"], [type="button"], [type="reset"], [type="image"], [type="hidden"])) {
+  border: 1px solid var(--border-control);
+  padding-block: 2px;
+}
+
+/* Firefox draws a placeholder at 0.54 opacity, which would take this under 4.5:1;
+   Bootstrap sets 1 for .form-control's */
+:root :where(input, textarea)::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+:root .form-check-input {
+  background-color: var(--surface-input);
+  border-color: var(--border-control);
+}
+
+:root .form-check-input:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+:root .form-check-input:focus,
+:root .form-range:focus::-webkit-slider-thumb {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.25rem var(--focus-ring);
+}
+
+:root .form-range::-webkit-slider-runnable-track {
+  background-color: var(--border);
+}
+
+:root .form-range::-moz-range-track {
+  background-color: var(--border);
+}
+
+:root .form-range::-webkit-slider-thumb {
+  background-color: var(--primary);
+}
+
+:root .form-range::-moz-range-thumb {
+  background-color: var(--primary);
+}
+
+:root .input-group-text {
+  color: var(--text-body);
+  background-color: var(--surface-chrome);
+  border-color: var(--border-control);
+}
+
+/* buttons */
+:root .btn-primary {
+  color: #fff;
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+:root .btn-primary:hover,
+:root .btn-primary:focus,
+:root .btn-check:checked + .btn-primary,
+:root .btn-primary:active,
+:root .btn-primary.active {
+  color: #fff;
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+:root .btn-secondary {
+  color: #fff;
+  background-color: #4b5866;
+  border-color: #4b5866;
+}
+
+:root .btn-secondary:hover,
+:root .btn-secondary:focus,
+:root .btn-secondary:active,
+:root .btn-secondary.active {
+  color: #fff;
+  background-color: #586779;
+  border-color: #586779;
+}
+
+:root .btn-light {
+  color: var(--text-body);
+  background-color: var(--surface-active);
+  border-color: var(--border);
+}
+
+:root .btn-light:hover,
+:root .btn-light:focus,
+:root .btn-light:active,
+:root .btn-light.active {
+  color: var(--text-strong);
+  background-color: #344251;
+  border-color: var(--border-control);
+}
+
+:root .btn-outline-dark,
+:root .btn-outline-secondary {
+  color: var(--text-body);
+  border-color: var(--border-control);
+}
+
+:root .btn-outline-dark:hover,
+:root .btn-outline-dark:focus,
+:root .btn-outline-dark:active,
+:root .btn-outline-dark.active,
+:root .btn-outline-dark.dropdown-toggle.show,
+:root .btn-outline-secondary:hover,
+:root .btn-outline-secondary:focus,
+:root .btn-outline-secondary:active,
+:root .btn-outline-secondary.active {
+  color: var(--text-strong);
+  background-color: var(--surface-active);
+  border-color: #8796a8;
+}
+
+:root .btn-outline-primary {
+  color: var(--link);
+  border-color: var(--link);
+}
+
+:root .btn-outline-primary:hover,
+:root .btn-outline-primary:focus,
+:root .btn-check:checked + .btn-outline-primary,
+:root .btn-outline-primary:active,
+:root .btn-outline-primary.active {
+  color: #fff;
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+:root .btn-outline-danger {
+  color: var(--text-danger);
+  border-color: var(--text-danger);
+}
+
+:root .btn-outline-danger:hover,
+:root .btn-outline-danger:focus,
+:root .btn-outline-danger:active {
+  color: #fff;
+  background-color: #b4323e;
+  border-color: #b4323e;
+}
+
+:root .btn-link {
+  color: var(--link);
+}
+
+:root .btn:focus,
+:root .btn-check:focus + .btn {
+  box-shadow: 0 0 0 0.25rem var(--focus-ring);
+}
+
+:root .btn:disabled,
+:root .btn.disabled {
+  opacity: 0.55;
+}
+
+/* the close cross is an SVG drawn in black; this is Bootstrap 5.3's own recipe for
+   its white variant */
+:root .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* menus: the navbar's, the row actions', and the type-ahead (autocomplete.js) */
+:root .dropdown-menu {
+  color: var(--text-body);
+  background-color: var(--surface-raised);
+  border-color: var(--border);
+  box-shadow: var(--shadow-raised);
+}
+
+:root .dropdown-item {
+  color: var(--text-body);
+}
+
+:root .dropdown-item:hover,
+:root .dropdown-item:focus {
+  color: var(--text-strong);
+  background-color: var(--surface-hover);
+}
+
+:root .dropdown-item.active,
+:root .dropdown-item:active {
+  color: #fff;
+  background-color: var(--primary);
+}
+
+:root .dropdown-item.disabled,
+:root .dropdown-item:disabled {
+  color: var(--text-muted);
+}
+
+:root .dropdown-divider {
+  border-top-color: var(--border);
+}
+
+:root .dropdown-header {
+  color: var(--text-muted);
+}
+
+/* dialogs */
+:root .modal-content {
+  color: var(--text-body);
+  background-color: var(--surface-raised);
+  border-color: var(--border);
+  box-shadow: var(--shadow-raised);
+}
+
+:root .modal-header,
+:root .modal-footer {
+  border-color: var(--border);
+}
+
+:root .modal-backdrop.show {
+  opacity: 0.6;
+}
+
+/* notices. Bootstrap's semantic set, so the dark counterparts are stated here rather
+   than named in style.css */
+:root .alert-info {
+  color: #a6dcf2;
+  background-color: #11303d;
+  border-color: #1d4a5c;
+}
+
+:root .alert-success {
+  color: #a6e6c4;
+  background-color: #12301f;
+  border-color: #1f4d33;
+}
+
+:root .alert-warning {
+  color: #f5d68e;
+  background-color: #332d17;
+  border-color: #57491f;
+}
+
+:root .alert-danger {
+  color: #ffbab5;
+  background-color: #3a1d20;
+  border-color: #5e2a2f;
+}
+
+:root .alert-primary {
+  color: #b3d4f5;
+  background-color: #152c45;
+  border-color: #24466a;
+}
+
+:root .alert-secondary {
+  color: var(--text-body);
+  background-color: var(--surface-chrome);
+  border-color: var(--border);
+}
+
+:root .alert-link {
+  color: inherit;
+}
+
+/* lists, breadcrumbs, accordions, the pager */
+:root .list-group-item {
+  color: var(--text-body);
+  background-color: var(--surface-raised);
+  border-color: var(--border);
+}
+
+:root .breadcrumb-item + .breadcrumb-item::before,
+:root .breadcrumb-item.active {
+  color: var(--text-muted);
+}
+
+:root .accordion-item {
+  background-color: var(--surface-page);
+  border-color: var(--border);
+}
+
+:root .accordion-body {
+  color: var(--text-body);
+}
+
+:root .accordion-button {
+  color: var(--text-strong);
+  background-color: var(--surface-chrome);
+}
+
+/* the chevron is an SVG in #212529 (open: #0c63e4); inverted it reads on the chrome */
+:root .accordion-button::after {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+:root .page-link {
+  background-color: var(--surface-page);
+  border-color: var(--border);
+}
+
+/* Bootstrap turns a pager link #0a58ca under the pointer or the keyboard, as the light
+   pages show it; here that is --link-hover. The current page keeps its colour, as it does
+   in light, where style.css's rule for it outranks Bootstrap's */
+:root .page-link:hover {
+  color: var(--link-hover);
+  background-color: var(--surface-hover);
+  border-color: var(--border-control);
+}
+
+:root .page-link:focus {
+  color: var(--link-hover);
+  background-color: var(--surface-hover);
+  box-shadow: 0 0 0 0.25rem var(--focus-ring);
+}
+
+:root .page-item.active .page-link {
+  color: var(--text-strong);
+  background-color: var(--surface-active);
+  border-color: var(--border-control);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* the underline above replaces .page-link:focus's ring on the current page; keep both */
+:root .page-item.active .page-link:focus {
+  box-shadow: inset 0 -2px 0 var(--accent), 0 0 0 0.25rem var(--focus-ring);
+}
+
+:root .page-item.disabled .page-link {
+  color: var(--text-muted);
+  background-color: var(--surface-page);
+  border-color: var(--border);
+}
+
+/* tooltips, Bootstrap's (the clipboard button) and hint.css's (score details) alike: the
+   raised bubble of --tooltip-bg. The arrows are borders of the same colour */
+:root .tooltip-inner {
+  color: var(--tooltip-text);
+  background-color: var(--tooltip-bg);
+  box-shadow: 0 0 0 1px var(--tooltip-border), var(--shadow-raised);
+}
+
+:root .bs-tooltip-top .tooltip-arrow::before,
+:root .bs-tooltip-auto[data-popper-placement^=top] .tooltip-arrow::before {
+  border-top-color: var(--tooltip-bg);
+}
+
+:root .bs-tooltip-end .tooltip-arrow::before,
+:root .bs-tooltip-auto[data-popper-placement^=right] .tooltip-arrow::before {
+  border-right-color: var(--tooltip-bg);
+}
+
+:root .bs-tooltip-bottom .tooltip-arrow::before,
+:root .bs-tooltip-auto[data-popper-placement^=bottom] .tooltip-arrow::before {
+  border-bottom-color: var(--tooltip-bg);
+}
+
+:root .bs-tooltip-start .tooltip-arrow::before,
+:root .bs-tooltip-auto[data-popper-placement^=left] .tooltip-arrow::before {
+  border-left-color: var(--tooltip-bg);
+}
+
+:root [class*=hint--]::after {
+  color: var(--tooltip-text);
+  background-color: var(--tooltip-bg);
+  text-shadow: none;
+  box-shadow: 0 0 0 1px var(--tooltip-border), var(--shadow-raised);
+}
+
+:root .hint--top::before,
+:root .hint--top-left::before,
+:root .hint--top-right::before {
+  border-top-color: var(--tooltip-bg);
+}
+
+:root .hint--bottom::before,
+:root .hint--bottom-left::before,
+:root .hint--bottom-right::before {
+  border-bottom-color: var(--tooltip-bg);
+}
+
+:root .hint--left::before {
+  border-left-color: var(--tooltip-bg);
+}
+
+:root .hint--right::before {
+  border-right-color: var(--tooltip-bg);
+}
+
+/* data drawn at full strength for a white page: the cross-compare matrix squares
+   (score_to_color) and the manual's screenshots of the light pages. Dimmed, not recoloured:
+   the hues keep their order and meaning, they just stop glowing on the dark ground */
+:root .score-swatch {
+  filter: brightness(0.8) saturate(0.8);
+}
+
+/* the manual's screenshots are of the light pages, up to 1296px across and half the help
+   page; at 0.75 their white is #bfbfbf, under the body text, so none outshines the text */
+:root .manual img {
+  filter: brightness(0.75);
+}
+
+/* Dropzone's preview card; the drop target itself takes its colours from the names
+   above (templates/table/submit_or_query_dropzone.html) */
+:root .dropzone .dz-preview .dz-details {
+  color: var(--text-strong);
+}
+
+:root .dropzone .dz-preview .dz-details .dz-filename span,
+:root .dropzone .dz-preview .dz-details .dz-size span {
+  background-color: rgba(20, 26, 33, 0.75);
+}
+
+:root .dropzone .dz-preview .dz-details .dz-filename:hover span {
+  background-color: var(--surface-raised);
+  border-color: var(--border-control);
+}
+
+:root .dropzone .dz-preview.dz-file-preview .dz-image {
+  background: var(--surface-raised);
+}
+
+/* --- the CFG viewer ------------------------------------------------------------------- */
+
+/* The function page and the comparison page draw their graphs with trace_CFG/cfg_style.css
+   and the CFGExplorer scripts, which paint with literals: black outlines on linen blocks on
+   a white pane, white code lines, a white tooltip. What follows is the dark counterpart of
+   each. The data colours are not here: the block matching tints and the edge colours of the
+   comparison are names (--cfg-*, part one), views/functiondiff.py hands the graphs those
+   names and the legend writes them too, so the graphs, the combined view and the legend
+   change with the theme without a rule of their own.
+
+   A rule that stands in for a plain default (.node rect, .edgePath) has to lose to the
+   states the vendored stylesheet layers on top of it, and :root alone would tie with them;
+   so the states that can occur on these pages (hovered, matched on the other side) are
+   restated below with a class more. */
+
+/* the panes: #xcfg_combined takes --cfg-canvas from style.css itself */
+:root #xcfg_left,
+:root #xcfg_right,
+:root #xcfg_text_right {
+  background-color: var(--cfg-canvas);
+}
+
+/* a block is a raised surface with the control border. Its text is set on the group, which
+   the text inherits from (SVG text is black by default); the group is also where the
+   scripts put fill="white" while cycles or loops are coloured, and a rule beats an
+   attribute, so that text takes the same colour */
+:root .node rect {
+  fill: var(--surface-raised);
+  stroke: var(--border-control);
+}
+
+:root .node {
+  fill: var(--text-body);
+}
+
+/* "Show Cycles" and "Show Loops" give a block's rect one of sixteen saturated colours
+   inline (the palette in main.js and main_duo.js). Under the block text, twelve of them are
+   below 4.5:1 and the orange one is at 1.5:1; shown at 35% over the canvas, so they read as
+   soft patches, the worst is 6.1:1 */
+:root .node[fill="white"] rect {
+  fill-opacity: var(--cfg-cycle-opacity);
+}
+
+:root .node.highlight rect,
+:root .node.active rect {
+  stroke: var(--cfg-highlight);
+}
+
+:root .node.matched rect {
+  stroke: var(--cfg-matched);
+}
+
+/* edges, and the one arrowhead every edge shares: dagre-d3 writes its fill inline */
+:root .edgePath {
+  stroke: var(--cfg-edge-both);
+}
+
+/* in the order cfg_style.css has them, which decides what a back edge that is hovered
+   looks like: the loop's colour while it is only highlighted, the hover's once it is active */
+:root .edgePath.highlight {
+  stroke: var(--cfg-highlight);
+}
+
+:root .edgePath.backedge {
+  stroke: var(--cfg-backedge);
+}
+
+:root .edgePath.active {
+  stroke: var(--cfg-highlight);
+}
+
+:root marker {
+  fill: var(--cfg-edge-both) !important;
+}
+
+/* the loop boundaries are drawn in the loop palette of loopify_dagre.js and main_duo.js,
+   which is made for a white pane; at 22% over the canvas they are soft brown shades that
+   the edges and blocks still stand out from, and the label of the checkbox is the first of
+   them (--cfg-loop-label). The opacity is the group's, not each path's: one loop is drawn
+   as two overlapping paths of one colour on the function page, and with a translucent
+   fill the overlap would show as a lighter patch */
+:root #bgFill,
+:root g.bgFill {
+  opacity: var(--cfg-hull-opacity);
+}
+
+/* the code panel: main.js writes `background: white` on every line, hence !important. The
+   line under the pointer is lifted by a tint of the accent, not a bright band */
+:root #text_code p {
+  background-color: transparent !important;
+}
+
+:root #text_code p.active {
+  background-color: var(--cfg-code-active) !important;
+}
+
+:root #text_code p.highlight,
+:root #text_code p.active {
+  border-color: var(--cfg-highlight);
+}
+
+/* the tooltips: main_duo.js writes white on #tooltip_a and #tooltip_b inline; #tooltip and
+   #tooltip_c are styled by cfg_style.css and style.css. The text takes the page's colour */
+:root #tooltip,
+:root #tooltip_a,
+:root #tooltip_b {
+  background-color: var(--cfg-tooltip-bg) !important;
+  box-shadow: var(--cfg-tooltip-shadow) !important;
+}

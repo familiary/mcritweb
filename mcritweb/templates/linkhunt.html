@@ -64,7 +64,7 @@ Results for Job: {{ job_info.job_id }}
   </thead>
   <tbody>
     {% for cluster_entry in lc[clup.start_index:clup.start_index+clup.limit] %}
-    <tr style="background-color:#{{ scp.getMatchHexColorByScore100(cluster_entry['max_score'], 0.4) }}">
+    <tr style="background-color: {{ scp.getMatchTintByScore100(cluster_entry['max_score']) }}">
       <td style="text-align: right;" valign="middle">{{ clup.start_index + loop.index }}</td>
       <td style="text-align: right;" valign="middle">{{ "%7.2f"|format(cluster_entry['score']) }}</td>
       <td style="text-align: right;" valign="middle">{{ "%7.2f"|format(cluster_entry['max_score']) }}</td>
@@ -78,7 +78,7 @@ Results for Job: {{ job_info.job_id }}
           {% endif %}
           <a href="{{ url_for('explore.function_by_id', function_id=link_entry.function_id) }}">
             {% if link_entry.matched_unique %}
-            <b style="color: black;">0x{{ "%x"|format(link_entry.offset) }}</b></a>
+            <b style="color: var(--text-strong);">0x{{ "%x"|format(link_entry.offset) }}</b></a>
             {% else %}
             0x{{ "%x"|format(link_entry.offset) }}</a>
             {% endif %}
@@ -117,7 +117,7 @@ Results for Job: {{ job_info.job_id }}
     </thead>
     <tbody>
       {% for link_entry in lhr[funp.start_index:funp.start_index+funp.limit] %}
-      <tr style="background-color:#{{ scp.getMatchHexColorByScore100(link_entry.matched_link_score, 0.4) }}">
+      <tr style="background-color: {{ scp.getMatchTintByScore100(link_entry.matched_link_score) }}">
         <td style="text-align: right;" valign="middle">{{ funp.start_index + loop.index }}</td>
         <td style="text-align: right;" valign="middle">{{ "%5.2f"|format(link_entry.matched_link_score) }}</td>
         <td style="text-align: right;" valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=link_entry.function_id * -1 if matching_result.is_query else link_entry.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ link_entry.function_id }}</a></td>
@@ -128,7 +128,7 @@ Results for Job: {{ job_info.job_id }}
         <td style="text-align: right;" valign="middle">
           <a href="{{ url_for('explore.function_by_id', function_id=link_entry.matched_function_id) }}">
           {% if link_entry.matched_unique %}
-          <b style="color: black;">{{ link_entry.matched_function_id }}</b>
+          <b style="color: var(--text-strong);">{{ link_entry.matched_function_id }}</b>
           {% else %}
           {{ link_entry.matched_function_id }}
           {% endif %}

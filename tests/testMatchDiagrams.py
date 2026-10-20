@@ -421,14 +421,15 @@ def test_a_filename_the_app_never_wrote_is_not_parsed(filename):
 
 # --- the page reserves the box the diagram will land in ---------------------------
 
-#: The <img> the four result templates build through templates/match_diagram.html.
-DIAGRAM_IMG_RE = re.compile(r'<div class="mcrit-diagram">\s*<img [^>]*>')
+#: The <img> the four result templates build through templates/match_diagram.html,
+#: inside the <picture> that may offer the dark variant of it first (#70).
+DIAGRAM_IMG_RE = re.compile(r'<div class="mcrit-diagram">\s*<picture>\s*(?:<source [^>]*>\s*)?(<img [^>]*>)')
 
 
 def diagram_img(response):
     match = DIAGRAM_IMG_RE.search(response.data.decode())
     assert match is not None, "the page shows no diagram"
-    return match.group(0)
+    return match.group(1)
 
 
 def report_trimmed_to_the_fixture_pool(corpus_mcrit, report):

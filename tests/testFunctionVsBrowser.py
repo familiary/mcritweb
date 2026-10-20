@@ -26,7 +26,10 @@ import re
 import threading
 
 import pytest
+from cfgColors import CFG_FILLS, LIGHT_CFG_COLORS, blend, contrast, dark_value, hex_to_rgb, parse_rgb
 from werkzeug.serving import make_server
+
+from mcritweb.db import UserInfo
 
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
 
@@ -610,3 +613,153 @@ def test_the_tooltip_stays_inside_its_panel(comparison_page, panel):
             f"block {index} of panel {panel} overflows its panel to the left by "
             f"{metrics['overflow_left']:.1f}px"
         )
+
+
+# --- the colour themes (#70) -----------------------------------------------------------
+#
+# The block colours reach the page as `var(--cfg-...)`, and what each paints is decided
+# by the stylesheet in force. These load the page in each theme and read back what the
+# browser computed: a name that resolves to the wrong value, a rule that loses a
+# specificity tie, a colour a script writes inline over the theme - none of those can be
+# seen in the markup.
+
+def use_theme(app, theme):
+    """Switch the account `browser_page` is logged in as to a theme."""
+    with app.app_context():
+        user = UserInfo.fromDb(username="visitoruser")
+        user.theme = theme
+        user.saveToDb()
+
+
+def open_comparison(page, live_server):
+    page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    for panel in ("a", "b"):
+        page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
+
+
+#: what the browser computed for every block: its fill, how much of it shows, its text
+PAINTED_BLOCKS = """() => Array.from(document.querySelectorAll('g.node.enter')).map(node => {
+    const rect = getComputedStyle(node.querySelector('rect'));
+    const text = getComputedStyle(node.querySelector('text'));
+    return {fill: rect.fill, opacity: parseFloat(rect.fillOpacity), text: text.fill};
+})"""
+
+
+def canvas_of(page):
+    return parse_rgb(page.evaluate("getComputedStyle(document.getElementById('xcfg_left')).backgroundColor"))
+
+
+def test_in_the_light_theme_the_blocks_wear_the_colors_they_always_had(comparison_page):
+    blocks = comparison_page.evaluate(PAINTED_BLOCKS)
+    assert blocks
+    light = {hex_to_rgb(value) for name, value in LIGHT_CFG_COLORS.items() if name in CFG_FILLS}
+    for block in blocks:
+        assert tuple(int(c) for c in parse_rgb(block["fill"])) in light, block
+        assert parse_rgb(block["text"]) == (0, 0, 0)
+    assert canvas_of(comparison_page) == (255, 255, 255)
+
+
+def test_in_the_dark_theme_the_blocks_are_dark_tints_with_readable_text(app, browser_page, live_server):
+    use_theme(app, "dark")
+    open_comparison(browser_page, live_server)
+    blocks = browser_page.evaluate(PAINTED_BLOCKS)
+    assert blocks
+    dark = {hex_to_rgb(dark_value(name)) for name in CFG_FILLS}
+    canvas = canvas_of(browser_page)
+    assert canvas == hex_to_rgb(dark_value("--cfg-canvas"))
+    for block in blocks:
+        fill = tuple(int(c) for c in parse_rgb(block["fill"]))
+        # the name resolved to the dark value, not to the light one
+        assert fill in dark, block
+        assert contrast(fill, parse_rgb(block["text"])) >= 4.5, block
+
+
+def test_in_the_dark_theme_a_hovered_or_matched_block_is_outlined_in_the_dark_colors(app, browser_page, live_server):
+    """The vendored stylesheet draws these outlines, and the dark rule that restyles
+    every block and edge would win over them on a tie - so each state is put on a
+    block or an edge and the colour the browser computes is read back."""
+    use_theme(app, "dark")
+    open_comparison(browser_page, live_server)
+    outlines = browser_page.evaluate(
+        """() => {
+            const block = document.querySelector('#graphContainer_a g.node.enter');
+            const result = {};
+            for (const state of ['', 'active', 'matched']) {
+                block.classList.remove('active', 'matched');
+                if (state) { block.classList.add(state); }
+                result[state || 'plain'] = getComputedStyle(block.querySelector('rect')).stroke;
+            }
+            const edge = document.querySelector('#graphContainer_a g.edgePath.enter');
+            for (const state of ['', 'backedge', 'active']) {
+                edge.classList.remove('backedge', 'active');
+                if (state) { edge.classList.add(state); }
+                result['edge ' + (state || 'plain')] = getComputedStyle(edge).stroke;
+            }
+            return result;
+        }"""
+    )
+    expect = {name: hex_to_rgb(dark_value(name)) for name in ("--cfg-highlight", "--cfg-matched", "--cfg-edge-both", "--cfg-backedge")}
+    expect["--border-control"] = hex_to_rgb(dark_value("--border-control"))
+    got = {state: tuple(int(c) for c in parse_rgb(stroke)) for state, stroke in outlines.items()}
+    assert got["plain"] == expect["--border-control"]
+    assert got["active"] == expect["--cfg-highlight"]
+    assert got["matched"] == expect["--cfg-matched"]
+    assert got["edge plain"] == expect["--cfg-edge-both"]
+    # loopCollapser.js marks a loop's back edge on the function page; here it is done by hand
+    assert got["edge backedge"] == expect["--cfg-backedge"]
+    assert got["edge active"] == expect["--cfg-highlight"]
+
+
+def test_in_the_dark_theme_cycle_colors_keep_the_text_readable(app, browser_page, live_server):
+    """`Show Cycles` writes one of sixteen saturated colours into each block inline and
+    puts fill="white" on the block's group. Orange and yellow ones leave white text at
+    2:1; the dark theme lets them through at 55% over the canvas instead."""
+    use_theme(app, "dark")
+    open_comparison(browser_page, live_server)
+    browser_page.click("#showCycles")
+    coloured = browser_page.evaluate(
+        """() => Array.from(document.querySelectorAll('g.node.enter')).filter(node => node.getAttribute('fill') === 'white').map(node => {
+            const rect = getComputedStyle(node.querySelector('rect'));
+            return {fill: rect.fill, opacity: parseFloat(rect.fillOpacity), text: getComputedStyle(node.querySelector('text')).fill};
+        })"""
+    )
+    assert coloured, "the cycles painted nothing"
+    canvas = canvas_of(browser_page)
+    for block in coloured:
+        shown = blend(parse_rgb(block["fill"]), block["opacity"], canvas)
+        assert contrast(shown, parse_rgb(block["text"])) >= 4.5, block
+
+
+def test_the_loop_label_is_the_colour_the_first_boundary_is_drawn_in(app, browser_page, live_server):
+    """"Show Loop Boundaries" is labelled with the outermost loop's colour. In the dark
+    theme the boundaries are translucent over the canvas, and the label has to be that
+    mix - a label in the light colour would be a pale patch that matches nothing."""
+    use_theme(app, "dark")
+    open_comparison(browser_page, live_server)
+    drawn = browser_page.evaluate(
+        """() => {
+            const group = document.getElementById('bgFill_a');
+            const path = group.querySelector('path');
+            const label = document.getElementById('loopBgFill').parentNode;
+            return {fill: getComputedStyle(path).fill, opacity: parseFloat(getComputedStyle(group).opacity),
+                    label: getComputedStyle(label).backgroundColor};
+        }"""
+    )
+    shown = blend(parse_rgb(drawn["fill"]), drawn["opacity"], canvas_of(browser_page))
+    # color-mix() computes to color(srgb 0.34 0.30 0.27): channels as fractions
+    label = tuple(255 * c for c in parse_rgb(drawn["label"]))
+    assert drawn["label"].startswith("color(srgb")
+    assert all(abs(a - b) <= 1.5 for a, b in zip(shown, label)), (shown, label)
+
+
+def test_in_the_dark_theme_the_tooltips_and_the_code_lines_are_dark(app, browser_page, live_server):
+    """Both tooltips of this page are white before the theme gets to them - #tooltip_a
+    and #tooltip_b because main_duo.js writes it inline."""
+    use_theme(app, "dark")
+    open_comparison(browser_page, live_server)
+    browser_page.check("#enableTooltip")
+    hover_a_block(browser_page, "a")
+    background = browser_page.evaluate("getComputedStyle(document.getElementById('tooltip_a')).backgroundColor")
+    text = browser_page.evaluate("getComputedStyle(document.querySelector('#tooltip_a p')).color")
+    assert tuple(int(c) for c in parse_rgb(background)) == hex_to_rgb(dark_value("--cfg-tooltip-bg"))
+    assert contrast(parse_rgb(background), parse_rgb(text)) >= 4.5

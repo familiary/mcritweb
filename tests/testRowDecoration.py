@@ -4,12 +4,12 @@
 A view hands a table macro `row_decorations`, a mapping of row id to a decoration
 dict, and `_table_base` forwards it to the row macro and the header macro alike. The
 two shapes the issue asks for are covered here: a badge marking an id match, and a
-full-row tint (the cross-compare selection green, which that page used to hand-roll as
-inline `style` attributes).
+full-row tint (the cross-compare selection, which that page used to hand-roll as inline
+`style` attributes and which is a state class of the row now, painted from the palette).
 
 The values in these rows come out of a malware corpus and are chosen by whoever
-submitted the sample, so the escaping half is not decoration: the tint colour and the
-badge variant are *names* resolved against a table in `row_decoration.html` rather than
+submitted the sample, so the escaping half is not decoration: the tint and the badge
+variant are *names* resolved against a table in `row_decoration.html` rather than
 interpolated, and the tests below drive both with values that would break out if they
 were not.
 """
@@ -18,6 +18,7 @@ import logging
 import re
 import unittest
 from html.parser import HTMLParser
+from pathlib import Path
 
 import pytest
 
@@ -82,6 +83,13 @@ def row_tags(rendered):
     return re.findall(r"<tr[^>]*>", rendered)
 
 
+def tinted_rows(rendered, state):
+    """The <tr> tags that carry the state class `row-<state>` as a class of their own
+    (not as part of another name)."""
+    return [tag for tag in row_tags(rendered)
+            if re.search(r'class="[^"]*\brow-%s\b[^"]*"' % state, tag)]
+
+
 # --- the mechanism ---------------------------------------------------------------
 
 @pytest.mark.parametrize("macro", sorted(DECORATED_TABLES))
@@ -135,7 +143,9 @@ def test_a_tint_reaches_the_row_it_names(app, fake_mcrit, macro):
 
     rendered = render_table(app, macro, rows, row_decorations=decorations)
 
-    assert rendered.count('style="background-color: yellowgreen;"') == 1
+    assert len(tinted_rows(rendered, "selected")) == 1
+    assert not tinted_rows(rendered, "pending")
+    assert not any("background-color" in tag for tag in row_tags(rendered)), "the tint is a class, not an inline colour"
 
 
 @pytest.mark.parametrize("macro", sorted(DECORATED_TABLES))
@@ -148,6 +158,7 @@ def test_an_undecorated_table_renders_exactly_as_before(app, fake_mcrit, macro):
 
     assert "badge" not in without
     assert not any("background-color" in tag for tag in row_tags(without))
+    assert not tinted_rows(without, "selected") and not tinted_rows(without, "pending")
     assert without_csrf(empty) == without_csrf(without)
 
 
@@ -163,6 +174,7 @@ def test_a_tint_that_is_not_in_the_palette_renders_nothing(app, fake_mcrit):
         rows[0].sample_id: {"tint": hostile}})
 
     assert not any("background-color" in tag for tag in row_tags(rendered))
+    assert not tinted_rows(rendered, "selected") and not tinted_rows(rendered, "pending")
     assert "alert(1)" not in rendered
 
 
@@ -227,7 +239,7 @@ def test_cross_compare_tints_a_selected_row(client, as_role, fake_mcrit):
 
     page = client.get(f"/analyze/cross_compare?samples={sample.sample_id}").get_data(as_text=True)
 
-    assert '<tr style="background-color: yellowgreen;" class="parent">' in page
+    assert '<tr class="parent row-selected">' in page
 
 
 def test_cross_compare_tints_a_row_clicked_but_not_yet_added(client, as_role, fake_mcrit):
@@ -236,7 +248,7 @@ def test_cross_compare_tints_a_row_clicked_but_not_yet_added(client, as_role, fa
 
     page = client.get(f"/analyze/cross_compare?cache={sample.sample_id}").get_data(as_text=True)
 
-    assert '<tr style="background-color: rgb(240, 240, 240);" class="parent">' in page
+    assert '<tr class="parent row-pending">' in page
 
 
 def test_a_selected_row_that_is_also_cached_stays_green(client, as_role, fake_mcrit):
@@ -248,8 +260,47 @@ def test_a_selected_row_that_is_also_cached_stays_green(client, as_role, fake_mc
     page = client.get(
         f"/analyze/cross_compare?samples={sample.sample_id}&cache={sample.sample_id}").get_data(as_text=True)
 
-    assert '<tr style="background-color: yellowgreen;" class="parent">' in page
-    assert not any("rgb(240, 240, 240)" in tag for tag in row_tags(page))
+    assert '<tr class="parent row-selected">' in page
+    assert not tinted_rows(page, "pending")
+
+
+# --- the pickers' scripts and the stylesheet: a state is a class, never a colour (#70) -----
+
+PICKER_PAGES = ["/analyze/compare", "/analyze/compare_versus", "/analyze/cross_compare", "/analyze/unique_blocks"]
+
+STYLE_CSS = Path(__file__).resolve().parent.parent / "mcritweb" / "static" / "style.css"
+
+
+@pytest.mark.parametrize("path", PICKER_PAGES)
+def test_a_picker_toggles_a_class_and_writes_no_colour(client, as_role, fake_mcrit, path):
+    """These pages wrote `rgb(240, 240, 240)` and `white` into a row's style attribute
+    when it was clicked, which no theme can change. A deselected row loses the class now
+    rather than being painted white."""
+    as_role("visitor")
+
+    page = client.get(path).get_data(as_text=True)
+
+    assert 'classList.add("row-pending")' in page
+    assert 'classList.remove("row-pending")' in page
+    assert "backgroundColor" not in page
+    assert "rgb(240, 240, 240)" not in page
+
+
+def test_cross_compare_skips_a_selected_row_by_its_class(client, as_role, fake_mcrit):
+    """The handler read `style.backgroundColor` back and compared it with "yellowgreen"."""
+    as_role("visitor")
+
+    page = client.get("/analyze/cross_compare").get_data(as_text=True)
+
+    assert 'classList.contains("row-selected")' in page
+    assert "yellowgreen" not in page
+
+
+@pytest.mark.parametrize("state", ["selected", "pending"])
+def test_the_stylesheet_paints_a_row_state_from_its_token(state):
+    css = STYLE_CSS.read_text()
+
+    assert re.search(r"tr\.row-%s\s*\{\s*background-color:\s*var\(--row-%s\)\s*;?\s*\}" % (state, state), css)
 
 
 if __name__ == "__main__":
