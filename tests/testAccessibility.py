@@ -140,9 +140,13 @@ def problems_of(html):
         problems.append("<html> has no lang")
     if len(page.all("main")) != 1:
         problems.append(f"{len(page.all('main'))} <main> landmarks, expected one")
-    if not any(meta.attrs.get("name") == "description" and (meta.attrs.get("content") or "").strip()
-               for meta in page.all("meta")):
+    descriptions = [meta for meta in page.all("meta") if meta.attrs.get("name") == "description"]
+    if not any((meta.attrs.get("content") or "").strip() for meta in descriptions):
         problems.append("no meta description")
+    # a second one is not a fallback: crawlers take either, and a page's own description
+    # (the {% block description %} in base.html) must be the only one
+    if len(descriptions) > 1:
+        problems.append(f"{len(descriptions)} meta descriptions, expected one")
     for img in page.all("img"):
         if "alt" not in img.attrs:
             problems.append(f"<img src={img.attrs.get('src')}> has no alt")
@@ -231,6 +235,9 @@ def test_the_checker_catches_what_it_claims_to():
                      "<a ", "<input ", "<h1> is followed by <h3>",
                      "not crawlable", "aria-label but no href or role"):
         assert expected in problems, expected
+    twice = ('<!doctype html><html lang="en"><head><meta name="description" content="a">'
+             '<meta name="description" content="b"></head><body><main></main></body></html>')
+    assert "2 meta descriptions, expected one" in problems_of(twice)
 
 
 def test_the_static_images_declare_their_own_size():
