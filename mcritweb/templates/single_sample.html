@@ -107,11 +107,12 @@ Sample: {{ entry.sample_id }}
     <div class="row">
       <div align="right" class="col">
         <div class="btn-group dropdown">
-          <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="button_sample_analyze" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Analyze sample">
+          {# named by its content, so that the count it shows is part of its name (WCAG 2.5.3) #}
+          <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="button_sample_analyze" data-bs-toggle="dropdown" aria-expanded="false">
             {% if matching_jobs %}
-            <i style="color:green;" class="fa-solid fa-flask"></i>&nbsp;{{ matching_jobs | length}}
+            <i style="color:green;" class="fa-solid fa-flask" aria-hidden="true"></i><span class="visually-hidden">Analyze sample, matching jobs:</span>&nbsp;{{ matching_jobs | length}}
             {% else %}
-            <i class="fa-solid fa-flask"></i>
+            <i class="fa-solid fa-flask" aria-hidden="true"></i><span class="visually-hidden">Analyze sample</span>
             {% endif %}
           </button>
           <div class="dropdown-menu dropdown-menu-end" id="dropdown-menu-single-sample">
