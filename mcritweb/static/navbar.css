@@ -1,3 +1,4 @@
+/* the logos carry intrinsic width/height attributes; without width:auto the attribute width would stretch them at these heights */
 .navbar-brand img {
   height: 48px;
   width: auto;

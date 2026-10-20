@@ -126,7 +126,9 @@ function handleSliderChange(val) {
       <input type="text" class="form-control shadow-none" name="query_a" id="Search_a" value="{{ query_a }}" placeholder="Search" autofocus autocomplete="on">
     </form>
     {{ set_pagination_params(pagination_a, _js_argument_provider="fetchState", _anchor="Search_a") }}
-    {{ sample_table(samples_a, table_id="table_sample_a", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_a) }}
+    {{ sample_table(samples_a, table_id="table_sample_a", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_a,
+                empty_message="No sample matches \"" ~ query_a ~ "\"." if query_a else "No samples available. Click here to upload your first sample",
+                empty_link=none if query_a else url_for("data.submit")) }}
     {% if samples_a %}
       {{ pagination_widget(pagination_a)}}
     {% endif %}
@@ -136,7 +138,9 @@ function handleSliderChange(val) {
       <input type="text" class="form-control shadow-none" name="query_b" id="Search_b" value="{{ query_b }}" placeholder="Search" autofocus autocomplete="on">
     </form>
     {{ set_pagination_params(pagination_b, _js_argument_provider="fetchState", _anchor="Search_b") }}
-    {{ sample_table(samples_b, table_id="table_sample_b", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_b) }}
+    {{ sample_table(samples_b, table_id="table_sample_b", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_b,
+                empty_message="No sample matches \"" ~ query_b ~ "\"." if query_b else "No samples available. Click here to upload your first sample",
+                empty_link=none if query_b else url_for("data.submit")) }}
     {% if samples_b %}
       {{ pagination_widget(pagination_b)}}
     {% endif %}

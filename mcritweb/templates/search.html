@@ -64,9 +64,12 @@ Search
 
   {% if families |length > 0 or (family_pagination and family_pagination.hasCurrent) %}
     {% if families |length > 0 %}{% set rendered.anything = True %}{% endif %}
-    <h3 id="family-results">Families</h3>
+    <h2 class="h3" id="family-results">Families</h2>
     {{ set_pagination_params(family_pagination, _anchor="family-results") }}
-    {{ family_table(families, sort_pagination=family_pagination, column_setup=family_column_setup, row_decorations=family_decorations) }}
+    {# reachable by paging past the last page of a search: the section renders because
+       the request carried a cursor, and the slice behind it is empty #}
+    {{ family_table(families, sort_pagination=family_pagination, column_setup=family_column_setup, row_decorations=family_decorations,
+                    empty_message="No more families match \"" ~ query ~ "\" on this page.", highlight_terms=query|search_terms) }}
     {% if families %}
     {{ pagination_widget(family_pagination) }}
     {% endif %}
@@ -74,9 +77,10 @@ Search
 
   {% if samples |length > 0 or (sample_pagination and sample_pagination.hasCurrent) %}
     {% if samples |length > 0 %}{% set rendered.anything = True %}{% endif %}
-    <h3 id="sample-results">Samples</h3>
+    <h2 class="h3" id="sample-results">Samples</h2>
     {{ set_pagination_params(sample_pagination, _anchor="sample-results") }}
-    {{ sample_table(samples, sort_pagination=sample_pagination, column_setup=sample_column_setup, row_decorations=sample_decorations) }}
+    {{ sample_table(samples, sort_pagination=sample_pagination, column_setup=sample_column_setup, row_decorations=sample_decorations,
+                    empty_message="No more samples match \"" ~ query ~ "\" on this page.", highlight_terms=query|search_terms) }}
     {% if samples %}
     {{ pagination_widget(sample_pagination) }}
     {% endif %}
@@ -85,7 +89,7 @@ Search
   {% if query and not search_types.__contains__('function') %}
     {# Never leave the omission silent: without this, a search for a function name
        reads as "no such function" rather than "functions were not searched". #}
-    <h3 id="function-results">Functions</h3>
+    <h2 class="h3" id="function-results">Functions</h2>
     <p class="text-muted">
       Not searched.
       <a href="{{ url_for('explore.search', query=query, type=(search_types + ['function'])|join(',')) }}">Search functions too</a>
@@ -95,9 +99,10 @@ Search
 
   {% if functions |length > 0 or (function_pagination and function_pagination.hasCurrent) %}
     {% if functions |length > 0 %}{% set rendered.anything = True %}{% endif %}
-    <h3 id="function-results">Functions</h3>
+    <h2 class="h3" id="function-results">Functions</h2>
     {{ set_pagination_params(function_pagination, _anchor="function-results") }}
-    {{ function_table(functions, sort_pagination=function_pagination, column_setup=function_column_setup, row_decorations=function_decorations) }}
+    {{ function_table(functions, sort_pagination=function_pagination, column_setup=function_column_setup, row_decorations=function_decorations,
+                      empty_message="No more functions match \"" ~ query ~ "\" on this page.", highlight_terms=query|search_terms) }}
     {% if functions %}
     {{ pagination_widget(function_pagination) }}
     {% endif %}
