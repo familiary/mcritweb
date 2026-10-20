@@ -13,7 +13,9 @@ Compare
 
 {% block style %}
 <script>
-  var selected = {{ cached|tojson }};
+  // the ids the URL carried arrive as numbers and a clicked row's as the text of its id
+  // cell, and indexOf compares strictly: kept as strings, a row the URL tinted clicks off
+  var selected = {{ cached|tojson }}.map(String);
   console.log(selected)
   $(document).ready(function(){
     $("tr.parent").click(function(){
