@@ -8,6 +8,12 @@ Job overview: {{ job_info.job_id }} - corrupted!
 
 <p>{{reason}}</p>
 <p>back to <a href="{{ url_for('data.jobs') }}">Jobs and Results</a></p>
+{# deleting is the only thing left to do with this job, but delete_job_by_id is
+   contributor_required while this page is only visitor_required - offering a visitor
+   a button that answers 403 is worse on this page than anywhere else, because it is
+   the one action it exists to offer #}
+{% if g.user.role == 'admin' or g.user.role == 'contributor' %}
 <p><button type="button" class="btn btn-link p-0 align-baseline" data-post="{{ url_for('data.delete_job_by_id', job_id=job_info.job_id) }}">Delete job data</button> and return back to Jobs and Results</p>
+{% endif %}
 
 {% endblock %}

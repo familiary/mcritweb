@@ -1,3 +1,18 @@
+{#- Marks the parts of `text` that the current search query matched (issue #45).
+
+  `split_search_matches` hands back (chunk, is_match) pairs of *plain* strings and no
+  markup at all; the <mark> element is written here, around an autoescaped `{{ chunk }}`.
+  That is what keeps the feature safe: the search term and the backend name it was found
+  in are both user input, and neither ever passes through |safe or Markup. Do not be
+  tempted to build the marked string in Python instead. See mcritweb/search_highlighting.py.
+
+  `highlight_terms` is `query|search_terms`; passing nothing marks nothing. -#}
+{%- macro mark(text, highlight_terms=None, field=None) -%}
+  {%- for chunk, is_match in split_search_matches(text, highlight_terms, field) -%}
+    {%- if is_match -%}<mark>{{ chunk }}</mark>{%- else -%}{{ chunk }}{%- endif -%}
+  {%- endfor -%}
+{%- endmacro -%}
+
 {%- macro format_monospace(content) -%}
   <span class="font-monospace">{{ content }}</span>
 {%- endmacro -%}
@@ -11,11 +26,11 @@
   <span class="font-monospace">0x{{ "%0x"|format(offset) }}</span>
 {%- endmacro -%}
 
-{%- macro format_family_name(family_name, family_id) -%}
+{%- macro format_family_name(family_name, family_id, highlight_terms=None, highlight_field="family") -%}
   {% if family_id is none %}
-    {{ family_name or "Unnamed" }}
+    {{ mark(family_name or "Unnamed", highlight_terms, highlight_field) }}
   {% else %}
-    <a href="{{ url_for('explore.family_by_id', family_id=family_id) }}">{{ family_name or "Unnamed" }}</a>
+    <a href="{{ url_for('explore.family_by_id', family_id=family_id) }}">{{ mark(family_name or "Unnamed", highlight_terms, highlight_field) }}</a>
   {% endif %}
 {%- endmacro -%}
 

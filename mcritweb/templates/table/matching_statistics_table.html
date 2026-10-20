@@ -1,4 +1,7 @@
-{% macro matching_statistics_table(match_aggregation) %}
+{# `statistics` is what the matching_statistics() template global builds, not the
+   backend's job-wide match_aggregation: every field but num_self_matches is
+   recomputed over the matches the page is showing - see issue #38. #}
+{% macro matching_statistics_table(statistics) %}
   {% set fields = [
     'num_own_functions_matched',
     'num_foreign_functions_matched',
@@ -18,9 +21,13 @@
     <tbody>
       {% for field in fields %}
         <tr>
+          {%- if field == 'num_self_matches' and statistics['is_filtered'] %}
+            <td valign="middle"><span class="hint--right" data-hint="Matches of the sample against itself are not part of the report's function matches, so this row cannot be narrowed and still counts the whole job.">{{ field }} (whole job)</span>: </td>
+          {%- else %}
           <td valign="middle">{{ field }}: </td>
-          <td style="text-align: right;" valign="middle">{{ match_aggregation["minhash"][field] }}</td>
-          <td style="text-align: right;" valign="middle">{{ match_aggregation["pichash"][field] }}</td>
+          {%- endif %}
+          <td style="text-align: right;" valign="middle">{{ statistics["minhash"][field] }}</td>
+          <td style="text-align: right;" valign="middle">{{ statistics["pichash"][field] }}</td>
         </tr>
       {% endfor %}
     </tbody>

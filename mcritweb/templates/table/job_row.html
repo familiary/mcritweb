@@ -11,11 +11,24 @@
 </script>
 {% endmacro %}
 
+{# The label each branch prints is the same lookup in every case - it moved to
+   mcritweb/jobnames.py so the result and overview pages can say the same thing (issue
+   #39). The branches stay because what follows the label differs per method: which ids
+   to resolve, which of them may be deleted, how to word the count. #}
 {% macro job_description(job, families_by_id, samples_by_id) %}
 
-{% if job.method == "getMatchesForSample" %}
+{# Every branch below rebuilds something from the job's payload - the sample ids, the
+   family, the hash, the argument list - so this has to come first: for a job whose
+   payload cannot supply them there is nothing to describe, and reaching for it would
+   take down the whole listing rather than this one row. The method is a plain
+   dictionary read and is safe to name. The rest of the row - number, timestamps,
+   progress, the job id it links to - does not touch the payload and still renders. #}
+{% if not job_is_describable(job) %}
+  <span class="text-muted" title="This job's stored request cannot be read back, so there is nothing to show about it.">{{ job.method or "Job" }} | details unavailable</span>
+
+{% elif job.method == "getMatchesForSample" %}
   {% set sample_entry = samples_by_id.get(job.sample_id) %}
-  Match 1vN | 
+  {{ job.method|job_name }} | 
   {% if sample_entry %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> {{ format_sample_id(job.sample_id) }}<br />
     {{ format_monospace(samples_by_id[job.sample_id].sha256[:8]) }} | {{ samples_by_id[job.sample_id].getShortFilename() or "-" }}
@@ -27,7 +40,7 @@
 {% elif job.method == "getMatchesForSampleVs" %}
   {% set sample_entry_a = samples_by_id.get(job.sample_id) %}
   {% set sample_entry_b = samples_by_id.get(job.other_sample_id) %}
-  Match 1v1 | 
+  {{ job.method|job_name }} | 
   {% if sample_entry_a %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(sample_entry_a.family, sample_entry_a.family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> {{ format_sample_id(job.sample_id) }} vs. 
   {% else %}
@@ -52,7 +65,7 @@
   {% endif %}
   
 {% elif job.method == "combineMatchesToCross" %}
-  CrossCompare | {{ job.arguments[0] | length }} samples<br />
+  {{ job.method|job_name }} | {{ job.arguments[0] | length }} samples<br />
   {# reorganize data #}
   {% set grouped_samples = grouped_samples|default({}) %}
   {% for target_sample_id in job.arguments[0] %}
@@ -61,7 +74,7 @@
           {# Check if family_id exists before grouping #}
           {% if sample_entry.family_id is not none %}
               {# Create a dictionary to group sample_ids by family_id #}
-              {% set _ = grouped_samples.update({sample_entry.family_id: (grouped_samples.get(sample_entry.family_id, []) + [target_sample_id|int])}) %}
+              {% set _ = grouped_samples.setdefault(sample_entry.family_id, []).append(target_sample_id|int) %}
           {% endif %}
       {% endif %}
   {% endfor %}
@@ -72,13 +85,13 @@
   {% endfor %}
 
 {% elif job.method == "getMatchesForUnmappedBinary" %}
-  Match Binary (unmapped) | {{ format_monospace(job.sha256[:8]) }}
+  {{ job.method|job_name }} | {{ format_monospace(job.sha256[:8]) }}
 
 {% elif job.method == "getMatchesForMappedBinary" %}
-  Match Binary (mapped) | {{ format_monospace(job.sha256[:8]) }}
+  {{ job.method|job_name }} | {{ format_monospace(job.sha256[:8]) }}
 
   {% elif job.method == "getMatchesForSmdaReport" %}
-  Match SMDA Report | {{ format_monospace(job.sha256[:8]) }}
+  {{ job.method|job_name }} | {{ format_monospace(job.sha256[:8]) }}
 
 {% elif job.method == "getUniqueBlocks" %}
 
@@ -91,9 +104,9 @@
   {% endfor %}
 
   {% if job.arguments[0]|length > 1 %}
-    UniqueBlocks | {{ job.arguments[0] | length }} samples<br />
+    {{ job.method|job_name }} | {{ job.arguments[0] | length }} samples<br />
   {% else %}
-    UniqueBlocks | {{ job.arguments[0] | length }} sample<br />
+    {{ job.method|job_name }} | {{ job.arguments[0] | length }} sample<br />
   {% endif %}
 
   {% if job.arguments|length > 1 %}
@@ -113,7 +126,7 @@
 
 {% elif job.method == "updateMinHashesForSample" %}
   {% set sample_entry = samples_by_id.get(job.sample_id) %}
-  Update MinHash | 
+  {{ job.method|job_name }} | 
   {% if sample_entry %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> {{ format_sample_id(job.sample_id) }}
   {% else %}
@@ -121,27 +134,36 @@
   {% endif %}
 
 {% elif job.method == "updateMinHashes" %}
-  Update all missing MinHashes
+  {{ job.method|job_name }}
 
 {% elif job.method == "rebuildIndex" %}
-  Rebuild full Index
+  {{ job.method|job_name }}
 
 {% elif job.method == "recalculatePicHashes" %}
-  Recalculate PicHashes
+  {{ job.method|job_name }}
 
 {% elif job.method == "recalculateMinHashes" %}
-  Recalculate MinHashes and Index
+  {{ job.method|job_name }}
+
+{% elif job.method == "repairMinHashes" %}
+  {{ job.method|job_name }}
+
+{% elif job.method == "recomputeFamilyStats" %}
+  {{ job.method|job_name }}
+
+{% elif job.method == "rebuildPicBlockHashIndex" %}
+  {{ job.method|job_name }}
 
 {% elif job.method == "addBinarySample" %}
-  Add Binary | <i class="fa-solid fa-bug " title="Family ID"></i> {{ job.family }}<br />
+  {{ job.method|job_name }} | <i class="fa-solid fa-bug " title="Family ID"></i> {{ job.family }}<br />
   {{ format_monospace(job.sha256[:8]) }} | {{ job.filename }}
 
 {% elif job.method == "deleteSample" %}
-  Delete Sample | <i class="fa-solid fa-virus " title="Sample ID"></i>  {{ job.arguments[0] }}
+  {{ job.method|job_name }} | <i class="fa-solid fa-virus " title="Sample ID"></i>  {{ job.arguments[0] }}
 
 {% elif job.method == "modifySample" %}
   {% set sample_entry = samples_by_id.get(job.sample_id) %}
-  Modify Sample | 
+  {{ job.method|job_name }} | 
   {% if sample_entry %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> {{ format_sample_id(job.sample_id) }}
   {% else %}
@@ -152,11 +174,11 @@
   {% endfor %}
 
   {% elif job.method == "deleteFamily" %}
-  Delete Family | <i class="fa-solid fa-bug " title="Family ID"></i>  {{ job.arguments[0] }}
+  {{ job.method|job_name }} | <i class="fa-solid fa-bug " title="Family ID"></i>  {{ job.arguments[0] }}
 
 {% elif job.method == "modifyFamily" %}
   {% set family_entry = families_by_id.get(job.family_id) %}
-  Modify Family | 
+  {{ job.method|job_name }} | 
   {% if family_entry %}
     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(family_entry.family_name, family_entry.family_id) }} 
   {% else %}
@@ -172,13 +194,19 @@
 {% endmacro %}
 
 
-{% macro job_header(families_by_id, samples_by_id) %}
+{% macro job_header(families_by_id, samples_by_id, order_toggle=None, order_ascending=False) %}
   {# accept but discard additional kwargs - see _table_base in table.html, which
      forwards the caller's kwargs to the header as well as to the row macro #}
   {% if False %}{{ kwargs }}{% endif %}
   <tr>
-    <th scope="col">#</th>
+    {% if order_toggle %}
+      {# job number is the one order mcrit can apply to a whole queue - see data.jobs() #}
+      <th scope="col"><a href="{{ order_toggle }}" title="Order the whole queue by job number">#</a>&nbsp;<i class="fa fa-sort-{{ 'up' if order_ascending else 'down' }}"></i></th>
+    {% else %}
+      <th scope="col">#</th>
+    {% endif %}
     <th scope="col">Type</th>
+    <th scope="col">User</th>
     <th style="text-align: right;" scope="col">Started</th>
     <th style="text-align: right;" scope="col">Finished</th>
     <th style="text-align: right;" scope="col">Progress</th>
@@ -189,7 +217,9 @@
 {% macro job_row(job) %}
   <tr class="job-row parent_{{ kwargs['parent'] }}" >
     <th job_id="{{ job.job_id }}" class="job-cell" align="right" valign="middle" class="id" scope="row">{{ "%d"|format(job.number) }}</th>
-    <td job_id="{{ job.job_id }}" class="job-cell" valign="middle">{{ job_description(job, kwargs['families_by_id'], kwargs['samples_by_id']) }}</td>
+    <td job_id="{{ job.job_id }}" class="job-cell job-description" valign="middle">{{ job_description(job, kwargs['families_by_id'], kwargs['samples_by_id']) }}</td>
+    {# who asked for the job (fkie-cad/mcritweb#37); a backend that does not record it, or a job from before it did, shows a dash #}
+    <td job_id="{{ job.job_id }}" class="job-cell" valign="middle">{{ job.username if job.username is defined and job.username else "-" }}</td>
     {% if job.started_at != None %}
     <td job_id="{{ job.job_id }}" class="job-cell" align="right" valign="middle">{{ job.started_at|date_time }}</td>
     {% else %}
@@ -209,10 +239,10 @@
     {% endif %}
     <td align="right" class="buttons">
       {% if not job.started_at or job.finished_at %}
-      <button type="button" id="job_id_{{ job.job_id }}" class="confirm-delete btn btn-outline-dark btn-sm"><i class="fa-solid fa-trash"></i></button>
+      <button aria-label="Delete job" title="Delete job" type="button" id="job_id_{{ job.job_id }}" class="confirm-delete btn btn-outline-dark btn-sm"><i class="fa-solid fa-trash"></i></button>
       {% endif %}
       {% if job.finished_at %}
-      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('data.result', job_id=job.job_id) }}"  role="button" target="_self"><i class="fa-solid fa-square-poll-vertical"></i></a>
+      <a aria-label="Show result" title="Show result" class="btn btn-outline-dark btn-sm" href="{{ url_for('data.result', job_id=job.job_id) }}"  role="button" target="_self"><i class="fa-solid fa-square-poll-vertical"></i></a>
       {% endif %}
     </td>
   </tr>
@@ -233,9 +263,9 @@
 {% macro minijob_row(job) %}
   <tr class="job-row parent_{{ kwargs['parent'] }}" >
     <td job_id="{{ job.job_id }}" class="job-cell" align="right" valign="middle">{{ job.finished_at|date_time }}</td>
-    <td job_id="{{ job.job_id }}" class="job-cell" valign="middle">{{ job_description(job, kwargs['families_by_id'], kwargs['samples_by_id']) }}</td>
+    <td job_id="{{ job.job_id }}" class="job-cell job-description" valign="middle">{{ job_description(job, kwargs['families_by_id'], kwargs['samples_by_id']) }}</td>
     <td align="right" class="buttons">
-      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('data.result', job_id=job.job_id) }}"  role="button" target="_self"><i class="fa-solid fa-square-poll-vertical"></i></a>
+      <a aria-label="Show result" title="Show result" class="btn btn-outline-dark btn-sm" href="{{ url_for('data.result', job_id=job.job_id) }}"  role="button" target="_self"><i class="fa-solid fa-square-poll-vertical"></i></a>
     </td>
   </tr>
 {% endmacro %}  

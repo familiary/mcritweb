@@ -1,12 +1,13 @@
 {% from 'table/pagination_widget.html' import sortable_header_col %}
-{% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
+{% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id, mark %}
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro family_row_std_js() %}
 <script>
   $(document).ready(function(){
     var editFamilyModal = document.getElementById('editFamilyModal');
-    editFamilyModal.addEventListener('show.bs.modal', function (event) {
+    {# sample_table/family_table render the modal only when they have rows #}
+    editFamilyModal?.addEventListener('show.bs.modal', function (event) {
     // Button that triggered the modal
     var button = event.relatedTarget;
     // Extract info from data-bs-* attributes
@@ -32,19 +33,16 @@
 
 
     $("tr.family-row").click(function(e){
-      console.log(e.target.name)
-      if(event.target.id.includes("_edit")) {
+      // links and buttons in the row (edit, compare, export, Malpedia) do their own thing;
+      // closest() also catches a click on the icon inside them
+      if ($(e.target).closest("a, button").length) {
+        return;
       }
-      else if(e.target.name === 'malpedia') {
-        e.stopPropagation();
+      var family_id = $(this).children("th.id").text();
+      if (family_id === ''){
+        throw Error("Assertion failed")
       }
-      else{
-        var family_id = $(this).children("th.id").text();
-        if (family_id === ''){
-          throw Error("Assertion failed")
-        }
-        window.location.href="{{ url_for('explore.families') }}"+ "/" + family_id;  
-      }
+      window.location.href="{{ url_for('explore.families') }}"+ "/" + family_id;
     });
   });
 </script>
@@ -85,7 +83,7 @@
   </tr>
 {% endmacro %}  
   
-{% macro family_row(family, show_export=False, show_edit=False, column_setup=None, row_decorations=None) %}
+{% macro family_row(family, show_export=False, show_edit=False, column_setup=None, row_decorations=None, highlight_terms=None) %}
   {% if column_setup is none %}
     {% set column_setup = ["family_id", "family_name", "num_samples", "num_functions", "is_library"] %}
   {% endif %}
@@ -95,7 +93,7 @@
     {% if column_type == "family_id" %}
       <th align="right" valign="middle" class="id" scope="row">{{ "%d"|format(family.family_id) }}</th>
     {% elif column_type == "family_name" %}
-      <td valign="middle" >{{ format_family_name(family.family_name, None) }}<a name="malpedia" href="https://malpedia.caad.fkie.fraunhofer.de/details/{{ family.family }}" target="_blank"><i class="fa-solid fa-external-link-alt "></i></a></td>
+      <td valign="middle" >{{ format_family_name(family.family_name, None, highlight_terms, "family_name") }}<a aria-label="Show family on Malpedia" title="Show family on Malpedia" name="malpedia" href="https://malpedia.caad.fkie.fraunhofer.de/details/{{ family.family }}" target="_blank"><i class="fa-solid fa-external-link-alt "></i></a></td>
     {% elif column_type == "num_samples" %}
       <td align="right" valign="middle">{{ "%d"|format(family.num_samples) }}</td>
     {% elif column_type == "num_functions" %}

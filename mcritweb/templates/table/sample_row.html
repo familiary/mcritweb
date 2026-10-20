@@ -1,5 +1,5 @@
 {% from 'table/pagination_widget.html' import sortable_header_col %}
-{% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
+{% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id, mark %}
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro sample_row_std_js() %}
@@ -8,7 +8,7 @@
   
   $(document).ready(function(){
     var editSampleModal = document.getElementById('editSampleModal');
-    editSampleModal.addEventListener('show.bs.modal', function (event) {
+    editSampleModal?.addEventListener('show.bs.modal', function (event) {
     // Button that triggered the modal
     var button = event.relatedTarget;
     // Extract info from data-bs-* attributes
@@ -99,7 +99,7 @@
 {% endmacro %}
   
   
-{% macro sample_row(sample, no_family=False, compact_view=False, show_analyze=True, show_export=False, show_edit=False, show_hint=False, job_collection=None, column_setup=None, row_decorations=None) %}
+{% macro sample_row(sample, no_family=False, compact_view=False, show_analyze=True, show_export=False, show_edit=False, show_hint=False, job_collection=None, column_setup=None, row_decorations=None, highlight_terms=None) %}
   {% if column_setup is none %}
     {% set column_setup = ["sample_id", "sha256", "family", "version", "filename", "bitness", "num_functions", "is_library"] %}
   {% endif %}
@@ -111,15 +111,15 @@
       {% if column_type == "sample_id" %}
        <th align="left" valign="middle" scope="row" class="sample-id">{{ "%d"|format(sample.sample_id) }}</th>
       {% elif column_type == "sha256" %}
-        <td align="right" valign="middle" class="font-monospace">{{ sample.getShortSha256() }}</td>
+        <td align="right" valign="middle" class="font-monospace">{{ mark(sample.getShortSha256(), highlight_terms, "sha256") }}</td>
       {% elif column_type == "family" %}
         {% if not no_family %}
-          <td valign="middle">{{ format_family_name(sample.family, sample.family_id) }}</td>
+          <td valign="middle">{{ format_family_name(sample.family, sample.family_id, highlight_terms, "family") }}</td>
         {% endif %}
       {% elif column_type == "version" and not compact_view %}
-        <td valign="middle">{{ sample.version }}</td>
+        <td valign="middle">{{ mark(sample.version, highlight_terms, "version") }}</td>
       {% elif column_type == "filename" and not compact_view %}
-        <td valign="middle">{{ sample.getShortFilename() }}</td>
+        <td valign="middle">{{ mark(sample.getShortFilename(), highlight_terms, "filename") }}</td>
       {% elif column_type == "bitness" and not compact_view %}
         <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
       {% elif column_type == "num_functions" %}
@@ -136,9 +136,9 @@
     {% if (show_export or show_analyze) %}
       <td align="right" class="buttons">
         {% if show_analyze %}
-          <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="sample_{{ sample.sample_id }}_analyze" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Analyze actions for sample {{ sample.sample_id }}">
+          <button type="button" title="Analyze" class="btn btn-outline-dark btn-sm dropdown-toggle" id="sample_{{ sample.sample_id }}_analyze" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Analyze actions for sample {{ sample.sample_id }}">
             {% if job_collection and matching_jobs %}
-            <i style="color:green;" class="fa-solid fa-flask"></i>&nbsp;{{ matching_jobs | length}}
+            <i style="color:green;" class="fa-solid fa-flask"></i><span class="visually-hidden">Analyze, matching jobs:</span>&nbsp;{{ matching_jobs | length}}
             {% else %}
             <i class="fa-solid fa-flask"></i>
             {% endif %}
@@ -154,13 +154,13 @@
           </div>
         {% endif %}
         {% if show_analyze %}
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_family_blocks" href="{{ url_for('analyze.blocks_sample', sample_id=sample.sample_id) }}" role="button" target="_self" aria-label="Unique blocks for sample {{ sample.sample_id }}"><i class="fa-solid fa-cubes-stacked"></i></a>
+          <a title="Unique blocks" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_family_blocks" href="{{ url_for('analyze.blocks_sample', sample_id=sample.sample_id) }}" role="button" target="_self" aria-label="Unique blocks for sample {{ sample.sample_id }}"><i class="fa-solid fa-cubes-stacked"></i></a>
         {% endif %}
         {% if show_export %}
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=sample.sample_id) }}" role="button" target="_self" aria-label="Export sample {{ sample.sample_id }}"><i class="fa-solid fa-file-export"></i></a>
+          <a title="Export" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=sample.sample_id) }}" role="button" target="_self" aria-label="Export sample {{ sample.sample_id }}"><i class="fa-solid fa-file-export"></i></a>
         {% endif %}
         {% if show_edit %}
-          <a class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}" aria-label="Edit sample {{ sample.sample_id }}"><i class="fa-solid fa-pen-to-square"></i></a>
+          <a title="Edit sample" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}" aria-label="Edit sample {{ sample.sample_id }}"><i class="fa-solid fa-pen-to-square"></i></a>
         {% endif %}
       </td>
     {% endif %}

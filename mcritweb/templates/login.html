@@ -19,7 +19,7 @@ Login
         <button class="btn btn-lg btn-primary w-100 mb-2" type="submit">Sign in</button>
         {% if g.operation_mode == 'multi' %}
         <div class="text-center">
-            <a class="mono-font" href="{{ url_for('authentication.register') }}">Click here to register</a>
+            <a class="mono-font d-inline-block mt-2 py-1" href="{{ url_for('authentication.register') }}">Click here to register</a>
         </div>
         {% endif %}
       </form>
