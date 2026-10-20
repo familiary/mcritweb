@@ -204,6 +204,15 @@ table.table td.buttons {
   white-space: nowrap;
 }
 
+/* The result pages' filter forms set a checkbox under each row of fields, less than 24px
+   tall at desktop width: under what WCAG 2.5.8 asks of a target unless it keeps 12px clear
+   of the next one. The 1em gap below every field that `.content input` gave them kept it
+   clear; without it, a checkbox sits flush against the field above and the Filter button
+   below. */
+form.form-inline input {
+  margin-bottom: 1em;
+}
+
 /* function comparison page (data.match_functions), issue #74 */
 #xcfg_combined {
   position: relative;
