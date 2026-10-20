@@ -322,6 +322,13 @@ table.table td.buttons {
   white-space: nowrap;
 }
 
+/* the result pages put two links in an id or family cell, the value and its filter icon.
+   Stacked by a narrow column, they are 21.6px lines apart, closer than the 24px WCAG 2.5.8
+   asks; side by side, the &nbsp; between them keeps both 24px targets clear of each other */
+table.table td.id, table.table td.family {
+  white-space: nowrap;
+}
+
 /* function comparison page (data.match_functions), issue #74 */
 #xcfg_combined {
   position: relative;

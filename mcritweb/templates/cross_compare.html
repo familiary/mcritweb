@@ -124,14 +124,14 @@ function handleSliderChange(val) {
   <table class="table table-hover">
     <thead class="thead-light">
       <tr>
-        <th scope="col"><i class="fa-solid fa-virus" title="Sample ID"></th>
+        <th scope="col"><i class="fa-solid fa-virus" title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample ID</span></th>
         <th scope="col">SHA256</th>
         <th scope="col">Family</th>
         <th scope="col">Version</th>
         <th scope="col">Filename</th>
         <th scope="col">Bitness</th>
         <th scope="col">Functions</th>
-        <th scope="col"></th>
+        <th scope="col"><span class="visually-hidden">Actions</span></th>
       </tr>
     </thead>
     {% if selected_samples %}
