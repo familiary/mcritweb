@@ -31,14 +31,15 @@ This repository owns **no analysis data of its own**. Families, samples, functio
 - `docs/manual/` — the user manual (markdown + screenshots), for readers on GitHub.
 - `docs/agents/` — configuration read by the agent skills: issue tracker, triage labels, domain-doc layout.
 - **The user manual has one copy: `docs/manual/README.md`.** `mcritweb/manual.py` renders it at request time for `/help`; `templates/help.html` is only the frame around the result, and prose written into it is the duplication of #91 coming back. Screenshots live beside the markdown in `docs/manual/images/` — the markdown's relative links are what make it render on GitHub — and are served by the `help_image` route, with the prefix substituted at render time. Markdown's `toc` extension supplies the heading ids that four templates link to (`url_for('help') + '#search'`), so it is load-bearing rather than decorative.
-- `setup.py`, `requirements.txt`, `flask_env.sh`, `Makefile` — build/run config.
+- `pyproject.toml`, `requirements.txt`, `flask_env.sh`, `Makefile` — build/run config. `pyproject.toml` is the single source for the version, the dependencies and the ruff/pytest configuration; `requirements.txt` mirrors the dependency list for deployments that install from a checkout, and `tests/testPackaging.py` keeps the two identical.
+- `CHANGELOG.md` — the release history, newest first. It used to live in `README.md`, which now only links here.
 
 ## Development setup
 
-The README states Python 3.12+ - inherited from mcrit, which has declared it since v1.10.0 (v1.5.0 to v1.9.x declared 3.11); the reference deployment (`docker-mcrit`) runs **Python 3.12**. Target 3.12 for anything new.
+Requires **Python 3.12 or newer** (`pyproject.toml` sets `requires-python = ">=3.12"`) - inherited from mcrit, which has declared it since v1.10.0 (v1.5.0 to v1.9.x declared 3.11); the reference deployment (`docker-mcrit`) runs **Python 3.12**. Target 3.12 for anything new.
 
 ```bash
-make init   # requirements.txt, plus pytest/pytest-cov/ruff at the versions CI pins
+make init   # pip install -e ".[dev]": the package, plus pytest/pytest-cov/ruff at the versions CI pins
 ```
 
 `pytest`, `pytest-cov` and `ruff` are not runtime dependencies, so they are not in
@@ -54,7 +55,7 @@ source ./flask_env.sh     # sets FLASK_APP=mcritweb, FLASK_DEBUG=1
 flask init-db             # once, before first use — creates instance/mcritweb.sqlite
 flask run                 # http://127.0.0.1:5000/
 python -m pytest          # the offline suite, no backend needed
-ruff check .              # config in ruff.toml; CI runs exactly this
+ruff check .              # config in pyproject.toml [tool.ruff]; CI runs exactly this
 ```
 
 The first browser visit redirects to `/register`; the first registered user automatically becomes `admin` and configures the backend URL/token in the same form.
@@ -87,7 +88,7 @@ Optional: set `PROFILER=True` in `instance/config.py` while `FLASK_DEBUG=1` to e
 
 ## Code conventions
 
-- **Python:** 4-space indent. `ruff check .` is configured (`ruff.toml`) and CI runs exactly that; no formatter is configured, deliberately — this codebase has never been formatted and reflowing it would bury the history of every file. Match the surrounding style rather than reformatting; do **not** introduce a repo-wide reformat as a side effect of a change.
+- **Python:** 4-space indent. `ruff check .` is configured (`[tool.ruff]` in `pyproject.toml`) and CI runs exactly that; no formatter is configured, deliberately — this codebase has never been formatted and reflowing it would bury the history of every file. Match the surrounding style rather than reformatting; do **not** introduce a repo-wide reformat as a side effect of a change.
 - **Templates:** Jinja2 with Bootstrap 5 markup. Put reusable table rows/headers in `templates/table/` as macros and import them; do not copy row markup between pages. To make a *particular* row render differently - a badge on an exact hit, a tinted selection - pass the table macro `row_decorations`, a `{row_id: decoration}` mapping (`templates/table/row_decoration.html`, issue #53), rather than adding another boolean flag to every macro in the chain. Tint and badge colours in a decoration are names resolved against a palette there, never CSS or class names, because row values come from the corpus.
 - **Front-end:** no build step, no npm, no bundler. All libraries are vendored under `static/` and included via `url_for('static', ...)` in `base.html`. Do not add a CDN link (deployments are expected to work offline) and do not add a toolchain without being asked.
 - **Tables reload by navigating, not by swapping.** A pagination, sort or page-size click is an ordinary link click; `static/page_loading.js` covers the wait with a spinner. Partial rendering was considered and declined in [ADR-0014](docs/adr/0014-no-htmx-for-table-reloads.md) (issue #60) — note in particular that every row-click handler is a direct `$(sel).click(...)` bound at `$(document).ready`, so replacing a table's markup kills its rows silently. The one exception is `td.clickable` in `result_cross.html`, delegated from `document` because the tabs filled on first click clone their rows (issue #182).
@@ -120,13 +121,13 @@ The SQLite schema is versioned by hand — there is no migration framework. Addi
 1. `mcritweb/sql/create_table_*.sql` — the fresh-install schema.
 2. The corresponding class in `mcritweb/db.py` (`fromDb` / `fromDict` / `toDict` / `saveToDb`).
 3. `db.migrate()` — an idempotent `ALTER TABLE` / `CREATE TABLE` guarded by a check, so existing deployments upgrade on next start.
-4. The README "Version History" entry, flagging the DB change (existing entries use `BREAKS DB -> ...`).
+4. The `CHANGELOG.md` entry, flagging the DB change under **Upgrading** (older entries used `BREAKS DB -> ...`).
 
 Adding a **table column setting** additionally means updating `UserColumnSettings._default_settings`, `create_table_user_column_settings.sql`, and the relevant row/header macros in `templates/table/`. The `sql/` scripts start with `DROP TABLE IF EXISTS` — they are for initialization only and must never be run against a populated database.
 
 ## Testing
 
-`python -m pytest` runs the suite with **no backend and no network** — pagination, user filters, the app-factory fixtures in `tests/conftest.py`, and `testMigrations.py`, which upgrades databases built in historical schemas (transcribed from release tags, not read from git — a CI checkout has no tags). `pytest.ini` maps the existing `test*.py` naming; keep it rather than renaming to `test_foo.py`. `make test` and `make lint` run exactly what CI runs (`python3 -m pytest`, `python3 -m ruff check .`) — they used to call `nose` and a `.pylintrc` that has never existed in this repository, fixed in v1.4.7.
+`python -m pytest` runs the suite with **no backend and no network** — pagination, user filters, the app-factory fixtures in `tests/conftest.py`, and `testMigrations.py`, which upgrades databases built in historical schemas (transcribed from release tags, not read from git — a CI checkout has no tags). `[tool.pytest.ini_options]` in `pyproject.toml` maps the existing `test*.py` naming; keep it rather than renaming to `test_foo.py`. `make test` and `make lint` run exactly what CI runs (`python3 -m pytest`, `python3 -m ruff check .`) — they used to call `nose` and a `.pylintrc` that has never existed in this repository, fixed in v1.4.7.
 
 Three backends are available to tests, all offline. `fake_mcrit` is strict — an unknown method raises `NotImplementedError` naming itself, so gaps surface as actionable failures. `recording_mcrit` never raises, for asking "did this request write anything". `corpus_mcrit` serves real captured reports from `tests/fixtures/` and is what makes result pages renderable; see the README there.
 
@@ -146,15 +147,15 @@ a lint beside it in `testResultPages.py` as well.
 
 Coverage is thin and nothing exercises a real backend, so for anything touching views or templates still **verify by exercising the app**: `flask run` against a reachable MCRIT backend and walk the affected pages. When changing shared template macros (`table/*.html`), check every page that imports them — a macro is typically used by 3–5 templates. Results are cached under `instance/cache/` and never invalidated for staleness — only evicted for size — so clear it when validating result rendering. `tests/testBrowserScoreTooltips.py` automates part of that walk for the result pages with playwright, and is the place to check anything that only exists once a browser has parsed the page - a `data-hint` tooltip is an attribute, and `hint.css` draws it from `content: attr(data-hint)`, so neither is visible to a test that reads the HTML as text. It **skips** where playwright or its Chromium build is absent, which includes CI today: neither is in `requirements.txt` and CI does not install them, because a browser download on every job of a four-version matrix is not worth it for one page's hover text. Run it locally before shipping a template change.
 
-CI (`.github/workflows/test.yml`) runs `ruff check .` plus the suite on Python 3.12, 3.13 and 3.14 — the last two became reachable only once the Flask 2.2.5 pin was lifted in #27, since it calls `pkgutil.get_loader`, removed in 3.14. There is deliberately **no `ruff format` check** — this codebase has never been formatted and reflowing it would bury the history of every file. Keep `ruff check .` clean; the rule set in `ruff.toml` mirrors mcrit's.
+CI (`.github/workflows/test.yml`) runs `ruff check .` plus the suite on Python 3.12, 3.13 and 3.14 — the last two became reachable only once the Flask 2.2.5 pin was lifted in #27, since it calls `pkgutil.get_loader`, removed in 3.14. There is deliberately **no `ruff format` check** — this codebase has never been formatted and reflowing it would bury the history of every file. Keep `ruff check .` clean; the rule set in `pyproject.toml` mirrors mcrit's.
 
 ## Versioning & releases
 
-- The version lives in `setup.py` and is **parsed at runtime** by `get_mcritweb_version_from_setup()` (regex on `version="X.Y.Z",`) — keep that literal format intact.
-- A release adds a dated entry at the top of the README "Version History" (` * YYYY-MM-DD vX.Y.Z: <summary>`) and bumps `setup.py`. Historic commit message for this: `bump X.Y.Z`.
-- **Do not bump the version unless explicitly asked.**
-- MCRITweb is **deployed from a checkout** — a container image or a local clone — and no wheel or sdist is ever built or published. `setup.py` exists for the runtime version string and for `pip install -e .`; its `packages` list is not a distribution concern.
-- `mcrit>=1.12.0` is pinned in both `setup.py` and `requirements.txt` — the two must stay in sync, and `tests/testMcritFloor.py` fails when they do not. MCRITweb consumes backend data classes (`MatchingResult`, `SampleEntry`, `FunctionEntry`, `UniqueBlocksResult`, …) directly, so a backend release can break rendering; when a fix depends on new backend behavior, raise the floor in both files and say so in the changelog entry.
+- The version lives in `pyproject.toml` (`[project].version`) and nowhere else: `get_mcritweb_version()` reads it at runtime from the checkout, falling back to the installed metadata, and `create_app` stores it in `MCRITWEB_VERSION` once. `tests/testPackaging.py` checks that the running version is the declared one.
+- `CHANGELOG.md` follows Keep a Changelog. Every PR that changes `mcritweb/` or `pyproject.toml` adds its own entry under `## [Unreleased]` or carries the `no-changelog` label; `.github/workflows/changelog.yml` fails the PR otherwise. An entry that changes the SQLite schema, adds a dependency or changes a default says what an existing deployment has to do, under **Upgrading** — the old entries used `BREAKS DB -> ...` for the schema case.
+- A release bumps `pyproject.toml` and renames `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD` in one PR, and once that has merged and CI is green, pushes the `vX.Y.Z` tag. Pushing the tag is the release: `.github/workflows/release.yml` checks the tag against `pyproject.toml` and the changelog, checks that the commit is on `master` and that CI passed on it, builds and installs the wheel, and creates the GitHub release from the changelog section. [`RELEASING.md`](RELEASING.md) describes it and lists what differs from the other MCRIT repositories. **Do not bump the version or push a tag unless explicitly asked.**
+- MCRITweb is **deployed from a checkout** — a container image or a local clone — and is not published to PyPI. The release workflow still builds a wheel and installs it, as proof that the package is complete, and attaches it to the GitHub release.
+- `mcrit>=1.12.0` is the floor in `pyproject.toml`, mirrored in `requirements.txt`; `tests/testMcritFloor.py` and `tests/testPackaging.py` fail when the two drift. MCRITweb consumes backend data classes (`MatchingResult`, `SampleEntry`, `FunctionEntry`, `UniqueBlocksResult`, …) directly, so a backend release can break rendering; when a fix depends on new backend behavior, raise the floor in both files and say so in the changelog entry. Release order across the ecosystem is in `RELEASING.md`.
 - `flask>=3.0` and `werkzeug>=3.0`. The old hard pins at 2.2.5 / 2.3.3 were lifted in issue #27; the lower bounds are there to stop a resolver sliding back to a 2.x that cannot run on Python 3.12+. See ADR-0001 for what was checked.
 
 ## Agent guardrails

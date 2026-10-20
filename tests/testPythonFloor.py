@@ -1,17 +1,18 @@
 #!/usr/bin/python
 """The supported Python version is stated in four places. They have to agree.
 
-`README.md` told readers "Python 3.8+" while CI tested 3.11 upwards, `ruff.toml` linted
-against py311, and no installable `mcrit` supports anything older.
+`README.md` told readers "Python 3.8+" while CI tested 3.11 upwards, ruff linted against
+py311, and no installable `mcrit` supports anything older.
 
 The floor is **inherited, not intrinsic**. Nothing in mcritweb's own source needs 3.12 -
-there is no `match`, no `except*`, no `tomllib`, no `datetime.UTC`, and `ruff.toml`
+there is no `match`, no `except*`, no `datetime.UTC`, the `tomllib` that reads the
+version out of pyproject.toml needs only 3.11, and the ruff config
 deliberately ignores UP006/UP007/UP045 so the annotation style stays pre-3.9. What makes
 3.8 unusable is the dependency: `mcrit` declared `>=3.11` from v1.5.0 and `>=3.12` from
 v1.10.0, and the pin here is `mcrit>=1.12.0`, so pip finds no satisfiable release below
 3.12 and fails at resolution.
 
-Without a `python_requires`, what the reader gets for following the README is that
+Without a declared floor (`requires-python`), what the reader gets for following the README is that
 resolver error - which names neither Python nor the version they need. Declaring the
 floor turns it into the sentence pip exists to print.
 
@@ -40,15 +41,16 @@ def _read(*parts):
     return path.read_text(encoding="utf8")
 
 
-def test_setup_py_declares_the_floor():
+def test_the_package_metadata_declares_the_floor():
     # tolerant of quoting and of an upper bound: mcrit itself shipped ">=3.11,<3.13"
     # once, and a version of that here must read as declared-but-different rather than
-    # as not-declared-at-all, which is the more misleading failure.
-    declaration = re.search(r"python_requires\s*=\s*['\"]([^'\"]+)['\"]", _read("setup.py"))
-    assert declaration, "setup.py declares no python_requires, so pip cannot say what is wrong"
+    # as not-declared-at-all, which is the more misleading failure. pyproject.toml is
+    # where the package metadata lives since setup.py was folded into it.
+    declaration = re.search(r"requires-python\s*=\s*['\"]([^'\"]+)['\"]", _read("pyproject.toml"))
+    assert declaration, "pyproject.toml declares no requires-python, so pip cannot say what is wrong"
 
     lower_bound = re.search(r">=\s*([\d.]+)", declaration.group(1))
-    assert lower_bound, f"python_requires={declaration.group(1)!r} states no lower bound"
+    assert lower_bound, f"requires-python={declaration.group(1)!r} states no lower bound"
     assert _version(lower_bound.group(1)) == FLOOR
 
 
@@ -73,8 +75,8 @@ def test_the_contributor_guide_agrees_with_the_readme():
 
 
 def test_ruff_lints_against_the_version_that_is_supported():
-    target = re.search(r"target-version\s*=\s*['\"]py(\d)(\d+)['\"]", _read("ruff.toml"))
-    assert target, "ruff.toml sets no target-version"
+    target = re.search(r"target-version\s*=\s*['\"]py(\d)(\d+)['\"]", _read("pyproject.toml"))
+    assert target, "pyproject.toml's [tool.ruff] sets no target-version"
     assert (int(target.group(1)), int(target.group(2))) == FLOOR
 
 
@@ -120,7 +122,7 @@ def test_the_mcrit_pin_stays_above_the_first_release_that_declared_the_floor():
     """v1.10.0 is the first mcrit release to declare `>=3.12` (v1.5.0 to v1.9.x declare
     `>=3.11`, v1.4.3 and earlier nothing). A pin below that would allow a release with a
     lower floor, and the reasoning in this file's docstring would stop being true."""
-    pin = re.search(r"['\"]mcrit>=([\d.]+)['\"]", _read("setup.py"))
+    pin = re.search(r"['\"]mcrit>=([\d.]+)['\"]", _read("pyproject.toml"))
 
     assert pin, "the mcrit pin moved; re-check what Python the oldest allowed release needs"
     assert _version(pin.group(1)) >= (1, 10, 0)
