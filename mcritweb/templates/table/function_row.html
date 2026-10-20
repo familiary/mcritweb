@@ -4,7 +4,7 @@
 
 {% macro function_row_std_js() %}
 <script>
-  $(document).ready(function(){
+  whenReady(function(){
     $("tr.function-row").click(function(){
       var function_id = $(this).children("th.function-id").text();
       window.location.href="{{ url_for('explore.functions') }}"+ "/" + function_id;

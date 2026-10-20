@@ -88,7 +88,7 @@ def create_app(test_config=None, instance_path=None):
     # import - including a test that only wants a pure-python helper. See issue #88.
     from flask_dropzone import Dropzone
 
-    from . import db, manual
+    from . import compression, db, manual
     from .csrf import CsrfProtect
     from .jobnames import job_method_name, job_task
     from .search_highlighting import get_highlight_terms, split_search_matches
@@ -269,6 +269,8 @@ def create_app(test_config=None, instance_path=None):
     app.register_blueprint(data.bp)
     app.register_blueprint(api.bp)
     app.config['MCRITWEB_VERSION'] = get_mcritweb_version_from_setup()
+    # gzip the text responses for deployments without a compressing proxy (issue #63)
+    compression.register(app)
     app.config['DROPZONE_DEFAULT_MESSAGE'] = "Drop file or click here to import"
     app.config['DROPZONE_ALLOWED_FILE_CUSTOM'] = True
     app.config['DROPZONE_ALLOWED_FILE_TYPE'] = ""
