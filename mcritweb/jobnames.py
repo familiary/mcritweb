@@ -125,6 +125,46 @@ def _sample_word(count):
     return "1 sample" if count == 1 else f"{count} samples"
 
 
+#: A unique blocks job names its samples one by one, up to the 250 the selection page
+#: allows (`analyze.MAX_SELECTED_SAMPLES`) or a whole family's. The task line folds runs
+#: of consecutive ids into ranges, and past this many ranges and single ids it gives only
+#: the count; the row's title still carries the call with every id (issue #300).
+MAX_LISTED_SAMPLE_RUNS = 5
+
+
+def _sample_ranges(sample_ids):
+    """`[30, 14, 15, 16, 17, 20, 21]` as `["14–17", "20", "21", "30"]`: sorted, each id
+    once, and three or more consecutive ids as one range."""
+    ids = sorted(set(sample_ids))
+    pieces = []
+    start = 0
+    for end in range(1, len(ids) + 1):
+        if end < len(ids) and ids[end] == ids[end - 1] + 1:
+            continue
+        if end - start >= 3:
+            pieces.append(f"{ids[start]}\N{EN DASH}{ids[end - 1]}")
+        else:
+            pieces.extend(str(sample_id) for sample_id in ids[start:end])
+        start = end
+    return pieces
+
+
+def _unique_blocks_samples(sample_ids):
+    if not sample_ids:
+        return "no samples"
+    # mcrit's server only queues ints here, parsed from the request path or read from a
+    # family's samples, but a record that says otherwise should not break the job's page
+    if not all(type(sample_id) is int for sample_id in sample_ids):
+        return _sample_word(len(sample_ids))
+    count = len(set(sample_ids))
+    pieces = _sample_ranges(sample_ids)
+    if len(pieces) > MAX_LISTED_SAMPLE_RUNS:
+        return _sample_word(count)
+    listed = ("sample " if count == 1 else "samples ") + ", ".join(pieces)
+    # a range hides how many ids it stands for
+    return listed if len(pieces) == count else f"{listed} ({count})"
+
+
 def _short_sha(job):
     sha256 = getattr(job, "sha256", None)
     return sha256[:8] if isinstance(sha256, str) and sha256 else None
@@ -144,7 +184,7 @@ def _task_details(job, positional):
     if method == "combineMatchesToCross" and isinstance(arg, dict):
         return _sample_word(len(arg))
     if method == "getUniqueBlocks" and isinstance(arg, list):
-        return "samples " + ", ".join(str(sample_id) for sample_id in arg) if arg else "no samples"
+        return _unique_blocks_samples(arg)
     if method in ("deleteFamily", "modifyFamily"):
         return f"family {arg}" if arg is not None else None
     if method == "getMatchesForMappedBinary":

@@ -228,10 +228,29 @@ class JobTaskTest(unittest.TestCase):
     def test_the_matching_jobs_name_their_samples(self):
         self.assertEqual("Match 1vN | sample 0 | MinHash matching: Standard", job_task(fixture_job("matches_for_sample")))
         self.assertEqual("Match 1v1 | sample 1 vs. sample 3 | MinHash matching: Standard", job_task(fixture_job("matches_for_sample_vs")))
-        self.assertEqual("UniqueBlocks | samples 0, 1, 2 | family: 1", job_task(fixture_job("unique_blocks")))
+        self.assertEqual("UniqueBlocks | samples 0–2 (3) | family: 1", job_task(fixture_job("unique_blocks")))
         cross = job_task(fixture_job("cross_compare"))
         self.assertTrue(cross.startswith("CrossCompare | "), cross)
         self.assertRegex(cross, r"CrossCompare \| \d+ samples")
+
+    def test_a_unique_blocks_job_folds_its_samples_into_ranges(self):
+        """Issue #300: the task line listed every sample id, up to the 250 a selection may
+        name or a whole family's."""
+        def unique_blocks(sample_ids):
+            return job_task(Job({"payload": {"method": "getUniqueBlocks", "params": json.dumps({"0": sample_ids})}}, None))
+
+        self.assertEqual("UniqueBlocks | samples 14–100 (87)", unique_blocks(list(range(14, 101))))
+        self.assertEqual("UniqueBlocks | samples 14–17, 20, 21, 30 (7)", unique_blocks([30, 14, 15, 16, 17, 20, 21]))
+        self.assertEqual("UniqueBlocks | samples 3, 4, 9", unique_blocks([3, 4, 9]))
+        self.assertEqual("UniqueBlocks | samples 1, 2", unique_blocks([2, 1, 2]))
+        self.assertEqual("UniqueBlocks | sample 16", unique_blocks([16]))
+        self.assertEqual("UniqueBlocks | no samples", unique_blocks([]))
+        # five ranges or single ids are listed, a sixth gives just the count
+        self.assertEqual("UniqueBlocks | samples 1–3, 5, 7, 9, 11–13 (9)", unique_blocks([1, 2, 3, 5, 7, 9, 11, 12, 13]))
+        self.assertEqual("UniqueBlocks | 10 samples", unique_blocks([1, 2, 3, 5, 7, 9, 11, 12, 13, 15]))
+        self.assertEqual("UniqueBlocks | 250 samples", unique_blocks(list(range(1, 500, 2))))
+        # mcrit's server stores the ids as ints, but a record that does not still gets a line
+        self.assertEqual("UniqueBlocks | 2 samples", unique_blocks(["1", True]))
 
     def test_options_read_by_their_names_and_flags_only_when_set(self):
         job = Job({"payload": {"method": "getMatchesForSample", "params": json.dumps({"0": 4, "force_recalculation": True, "minhash_threshold": 70, "sample_group_only": False})}}, None)
@@ -250,3 +269,9 @@ def test_the_job_page_prints_the_readable_task(client, as_role):
     assert "mapped at 0x1e60000" in page
     assert 'title="getMatchesForMappedBinary(None, 31850496, 2)"' in page
     assert ">getMatchesForMappedBinary(None, 31850496, 2)<" not in page
+
+
+def test_a_unique_blocks_job_page_keeps_every_sample_in_the_title(client, as_role):
+    as_role("visitor")
+    page = client.get(f"/data/jobs/{job_id_of('unique_blocks')}").get_data(as_text=True)
+    assert 'title="getUniqueBlocks([0, 1, 2], 1)">UniqueBlocks | samples 0–2 (3) | family: 1<' in page
