@@ -115,9 +115,9 @@ def test_the_sortable_call_and_its_library_are_on_the_same_page():
 
 
 def test_jquery_itself_stays_in_base():
-    """It is not page-specific: 15 of the 26 inline blocks across the tree call `$`,
-    including one in base.html itself, and two vendored trace_CFG files expect it from
-    here. Moving it is issue #63's "consider removing jquery", answered no in ADR-0015."""
+    """It is not page-specific: most of the inline blocks across the tree call `$`,
+    including one in base.html itself. Moving it is issue #63's "consider removing
+    jquery", answered no in ADR-0015."""
     assert "jquery.js" in code_of(BASE)
 
 
@@ -134,16 +134,26 @@ def test_bootstrap_is_deferred_but_never_lazy():
     """What decides that `$.fn.tooltip` is Bootstrap's and not jQuery UI's.
 
     Bootstrap 5.0.2 defines its jQuery plugins when it executes, or on DOMContentLoaded
-    if it executes earlier. A deferred script runs after every plain `<script>` of the
-    document - jQuery UI on the cross compare page among them - and before
-    DOMContentLoaded, so Bootstrap still registers last and still wins the name, while
-    its 78 KB no longer block the first paint. `async`, or loading it on demand after
-    the page is up, would let jQuery UI register after it. Measured both ways in
-    Chromium; see ADR-0015 and issue #63.
+    if it executes earlier. Deferred scripts run in document order, once the document
+    is parsed and before DOMContentLoaded, so Bootstrap registers last - and wins the
+    name - as long as it comes after every other deferred script that defines jQuery
+    plugins: jQuery UI on the cross compare, loaded from {% block style %}, which is why
+    base.html loads Bootstrap below that block (test_bootstrap_comes_after_the_page_libraries).
+    `async`, or loading it on demand after the page is up, would let jQuery UI register
+    after it. See ADR-0015, ADR-0018 and issue #63.
     """
     tag = re.search(r"<script[^>]*bootstrap\.bundle\.min\.js[^>]*>", code_of(BASE))
     assert tag is not None, "base.html no longer loads Bootstrap's bundle"
     assert "defer" in tag.group(0) and "async" not in tag.group(0), tag.group(0)
+
+
+def test_bootstrap_comes_after_the_page_libraries():
+    """...and after jQuery, whose `$.fn` it registers its plugins on."""
+    code = code_of(BASE)
+    bootstrap = code.index("bootstrap.bundle.min.js")
+    assert code.index("jquery.js") < bootstrap, "Bootstrap runs before the jQuery it attaches its plugins to"
+    assert re.search(r"{%\s*block style\s*%}", code).start() < bootstrap, \
+        "a page's own deferred jQuery plugins (jQuery UI) would run after Bootstrap and take $.fn.tooltip from it"
 
 
 def test_nothing_touches_bootstrap_while_the_page_parses():
@@ -155,15 +165,29 @@ def test_nothing_touches_bootstrap_while_the_page_parses():
         code = path.read_text()
         for match in re.finditer(r"new Autocomplete\(", code):
             before = code[max(0, match.start() - 600):match.start()]
-            assert "DOMContentLoaded" in before or "$(document).ready" in before, f"{path.name} builds an Autocomplete while parsing"
+            assert "DOMContentLoaded" in before or "whenReady(" in before, f"{path.name} builds an Autocomplete while parsing"
 
 
-def test_jquery_is_still_a_plain_script():
-    """Inline blocks call `$` while the page parses - `$(document).ready(...)` is itself
-    such a call - so jQuery cannot be deferred without rewriting every one of them."""
+def test_jquery_is_deferred():
+    """It used to be the last script in <head> that held back the first paint: inline
+    blocks called `$` while the page parsed, `$(document).ready(...)` being itself such a
+    call. They hand that work to whenReady() now, and testParseTimeScripts.py fails on
+    one that does not. `async` would not do: jQuery has to run before the libraries
+    that extend it, and only `defer` keeps document order. See ADR-0018."""
     tag = re.search(r"<script[^>]*jquery\.js[^>]*>", code_of(BASE))
     assert tag is not None, "base.html no longer loads jquery.js"
-    assert "defer" not in tag.group(0) and "async" not in tag.group(0), tag.group(0)
+    assert "defer" in tag.group(0) and "async" not in tag.group(0), tag.group(0)
+
+
+def test_when_ready_is_defined_before_any_other_script():
+    """Every inline script may call it, so it has to exist before the first of them -
+    and it cannot come from a file, which would have to be a plain script to be there
+    in time."""
+    code = code_of(BASE)
+    first_script = re.search(r"<script\b[^>]*>(.*?)</script>", code, re.S)
+    assert "src=" not in first_script.group(0), first_script.group(0)
+    assert re.search(r"function whenReady\(fn\)", first_script.group(1)), "the first script in base.html is not the one defining whenReady"
+    assert "jQuery(fn)" in first_script.group(1), "whenReady no longer hands its function to jQuery's ready queue"
 
 
 def test_the_listener_only_scripts_are_deferred():
@@ -226,7 +250,8 @@ class TestTheCrossComparePage:
     Reading the template only proves the tag was written; these prove it reaches the
     browser, and in an order jQuery UI can survive - it is a plugin, so `jquery.js` has
     to have run first. That holds only because base.html loads jQuery *above*
-    `{% block style %}`, which is not obvious from either file on its own.
+    `{% block style %}`, and Bootstrap below it, which is not obvious from either file
+    on its own.
     """
 
     @pytest.fixture
@@ -250,6 +275,15 @@ class TestTheCrossComparePage:
         page = self.rendered(client, as_role)
         assert page.index("jquery.js") < page.index("jquery-ui.js"), \
             "jQuery UI is loaded before the jQuery it extends"
+
+    def test_jquery_ui_runs_between_jquery_and_bootstrap(self, client, as_role):
+        """All three are deferred, so they run in the order of the page: jQuery UI
+        after the jQuery it extends, and before the Bootstrap that has to take
+        `$.fn.tooltip` and `$.fn.button` back from it."""
+        page = self.rendered(client, as_role)
+        tags = {name: re.search(r"<script[^>]*/" + re.escape(name) + r"[^>]*>", page) for name in ("jquery.js", "jquery-ui.js", "bootstrap.bundle.min.js")}
+        assert all(tag is not None and " defer" in tag.group(0) for tag in tags.values()), tags
+        assert tags["jquery.js"].start() < tags["jquery-ui.js"].start() < tags["bootstrap.bundle.min.js"].start()
 
     def test_no_other_page_ships_it(self, client, as_role):
         as_role("visitor")
