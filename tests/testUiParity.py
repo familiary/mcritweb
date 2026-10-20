@@ -114,7 +114,6 @@ def test_base_html_accessibility_and_semantics():
     assert 'width="187" height="52"' in content, "base.html FKIE logo is missing explicit dimensions"
 
 
-
 def test_family_row_click_skips_links_and_buttons():
     """A click on a family row's edit or Malpedia icon must not also open the family page.
 

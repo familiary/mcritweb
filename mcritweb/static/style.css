@@ -78,7 +78,7 @@ hr {
 .page-link {
     color: black;
 }
-.page-item.active .page-link { 
+.page-item.active .page-link {
     color: black;
     background-color: rgb(240, 240, 240);
     border-color: rgb(240, 240, 240);
