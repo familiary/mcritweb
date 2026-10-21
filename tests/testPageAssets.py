@@ -51,15 +51,15 @@ BASE = TEMPLATE_ROOT / "base.html"
 
 #: assets base.html must not load, and where they belong instead
 PAGE_SPECIFIC = {
-    "jquery-ui.js": "result_cross.html",
+    "jquery-ui-sortable.js": "result_cross.html",
     "jquery-ui.css": "result_cross.html",
 }
 
 #: assets no template should load at all any more. dropzone.min.js is stock 5.9.2,
 #: without the patch in dropzone.js that sends the head of a dropped file for the
-#: pre-fill (AGENTS.md); all.css and bootstrap.css are the full builds the subset and
-#: the minified file replaced (issue #63)
-RETIRED = ["jquery.dataTables.min.js", "dataTables.bootstrap5.min.js", "dataTables.bootstrap5.min.css", "dropzone.min.js", "css/all.css", "css/bootstrap.css"]
+#: pre-fill (AGENTS.md); all.css, bootstrap.css and jquery-ui.js are the full builds the
+#: subsets and the minified file replaced (issue #63)
+RETIRED = ["jquery.dataTables.min.js", "dataTables.bootstrap5.min.js", "dataTables.bootstrap5.min.css", "dropzone.min.js", "css/all.css", "css/bootstrap.css", "jquery-ui.js"]
 
 
 @pytest.mark.parametrize("asset", sorted(PAGE_SPECIFIC))
@@ -285,22 +285,22 @@ class TestTheCrossComparePage:
 
     def test_it_ships_the_library_it_calls(self, client, as_role):
         page = self.rendered(client, as_role)
-        assert "jquery-ui.js" in page
+        assert "jquery-ui-sortable.js" in page
         assert "jquery-ui.css" in page
         assert ".sortable()" in page
 
     def test_jquery_reaches_the_page_before_jquery_ui(self, client, as_role):
         page = self.rendered(client, as_role)
-        assert page.index("jquery.js") < page.index("jquery-ui.js"), \
+        assert page.index("jquery.js") < page.index("jquery-ui-sortable.js"), \
             "jQuery UI is loaded before the jQuery it extends"
 
     def test_jquery_ui_runs_between_jquery_and_bootstrap(self, client, as_role):
         """All three are queued, so they run in the order they were queued: jQuery UI
-        after the jQuery it extends, and before the Bootstrap that has to take
-        `$.fn.tooltip` and `$.fn.button` back from it."""
+        after the jQuery it extends, and before Bootstrap, which runs after a page's own
+        jQuery plugins so that `$.fn.tooltip` and `$.fn.button` are its own (base.html)."""
         order = queued(self.rendered(client, as_role))
-        assert {"jquery.js", "jquery-ui.js", "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js"} <= set(order), order
-        assert order.index("jquery.js") < order.index("jquery-ui.js") < order.index("bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js")
+        assert {"jquery.js", "jquery-ui-sortable.js", "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js"} <= set(order), order
+        assert order.index("jquery.js") < order.index("jquery-ui-sortable.js") < order.index("bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js")
 
     def test_no_other_page_ships_it(self, client, as_role):
         as_role("visitor")

@@ -161,6 +161,24 @@ def test_the_cross_compare_keeps_both_libraries(open_as, live_server):
     assert page.errors == []
 
 
+def test_a_sample_dragged_in_the_list_moves(open_as, live_server):
+    """What jQuery UI is loaded for, done with the mouse: the first sample dragged below the
+    second swaps the two."""
+    page = ready(open_as("visitor"), f"{live_server}/data/result/{job_id_of('cross_compare')}")
+    order = """() => Array.from(document.querySelectorAll('#sortable li'), item => item.textContent.split(' ')[0])"""
+    before = page.evaluate(order)
+    assert len(before) >= 2
+    first, second = (page.locator("#sortable li").nth(index).bounding_box() for index in (0, 1))
+    x, y = first["x"] + 10, first["y"] + first["height"] / 2
+    page.mouse.move(x, y)
+    page.mouse.down()
+    for step in range(1, 11):
+        page.mouse.move(x, y + (second["y"] + second["height"] - y) * step / 10 + 2)
+    page.mouse.up()
+    assert page.evaluate(order) == [before[1], before[0], *before[2:]]
+    assert page.errors == []
+
+
 def test_the_settings_lists_are_sortable(open_as, live_server):
     page = ready(open_as("visitor"), f"{live_server}/settings")
 
