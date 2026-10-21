@@ -6,7 +6,7 @@
 <script>
   var button_clicked = false;
   
-  $(document).ready(function(){
+  whenReady(function(){
     var editSampleModal = document.getElementById('editSampleModal');
     editSampleModal?.addEventListener('show.bs.modal', function (event) {
     // Button that triggered the modal
@@ -35,6 +35,10 @@
     }
     })
 
+    // the Analyze buttons' onclick= sets this for the row handler below to take back,
+    // and a click before the deferred jQuery had run set it with no handler there yet:
+    // left set, the next row click would open a menu instead of the sample (ADR-0018)
+    button_clicked = false;
     $("tr.sample-row").click(function(e){
     if(event.target.id.includes("_edit")) {
     }

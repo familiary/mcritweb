@@ -59,14 +59,18 @@
 
 {%- macro clipboard_js() -%}
 <script>
-$(function () {
+whenReady(function () {
   $('[data-toggle="tooltip"]').tooltip()
 })
 function copy_to_clipboard(btn){
   navigator.clipboard.writeText(btn.getAttribute('data-clipboard-value') || "");
-  $(btn).attr('data-bs-original-title', "Copied!");
-  bootstrap.Tooltip.getInstance(btn).show();
-  $(btn).attr('data-bs-original-title', "Copy to Clipboard");
+  // the confirmation is the tooltip Bootstrap builds, which a click right after the page is
+  // painted can come before; the copy above needs neither
+  whenReady(function () {
+    $(btn).attr('data-bs-original-title', "Copied!");
+    bootstrap.Tooltip.getInstance(btn).show();
+    $(btn).attr('data-bs-original-title', "Copy to Clipboard");
+  });
 }
 </script>
 {%- endmacro -%}

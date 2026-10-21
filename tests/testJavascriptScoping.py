@@ -10,7 +10,8 @@ This is a ratchet: the list below is empty and may only stay empty. Adding a nam
 it is a regression, not a note.
 
 Scope is deliberately this repository's own JavaScript - the inline blocks in
-`templates/` and `static/post_action.js`. The vendored libraries under `static/`
+`templates/`, and `static/post_action.js`, `static/upload_form.js` and
+`static/family_names.js`. The vendored libraries under `static/`
 (jQuery, DataTables, Dropzone, ...) carry their own licences and are not ours to
 reformat; see AGENTS.md.
 """
@@ -52,9 +53,10 @@ def javascript_sources():
         if block:
             yield path, text, block
 
-    post_action = ROOT / "static" / "post_action.js"
-    text = post_action.read_text()
-    yield post_action, text, list(enumerate(text.splitlines(), 1))
+    for name in ("post_action.js", "upload_form.js", "family_names.js"):
+        path = ROOT / "static" / name
+        text = path.read_text()
+        yield path, text, list(enumerate(text.splitlines(), 1))
 
 
 #: A binding form that introduces a name.

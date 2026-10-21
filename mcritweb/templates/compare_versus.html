@@ -15,7 +15,7 @@ var selected_a = '{{ selected_a or "" }}'
 var selected_b = '{{ selected_b or "" }}'
 var selected_column_a = null;
 var selected_column_b = null;
-$(document).ready(function(){
+whenReady(function(){
   var table_a = document.getElementsByClassName("parent_table_sample_a");
   var table_b = document.getElementsByClassName("parent_table_sample_b");
 
@@ -53,40 +53,48 @@ $(document).ready(function(){
     this.style.backgroundColor = "rgb(240, 240, 240)";
   });
 
-  $('#compare_search_form_a').submit(function(eventObj) {
-    eventObj.preventDefault();
-    eventObj.stopPropagation();
-    const base_url = window.location.href;
-    const args = fetchState();
-    args.selected_a = null;
-    args._anchor = "Search_a";
-    const null_keys = {{ pagination_a.params_list|tojson }};
-    for(var i = 0, size = null_keys.length; i < size ; i++){
-      args[null_keys[i]] = null;
-    }
-    args["query_a"] = $("#Search_a").val();
-    // overwrites base_link with args and forwards to the resulting url
-    pagination_js_helper(base_url, args);
-    return true;
-  });
+});
 
-  $('#compare_search_form_b').submit(function(eventObj) {
-    eventObj.preventDefault();
-    eventObj.stopPropagation();
-    const base_url = window.location.href;
-    const args = fetchState();
-    args.selected_b = null;
-    args._anchor = "Search_b";
-    const null_keys = {{ pagination_b.params_list|tojson }};
-    for(var i = 0, size = null_keys.length; i < size ; i++){
-      args[null_keys[i]] = null;
-    }
-    args["query_b"] = $("#Search_b").val();
-    // overwrites base_link with args and forwards to the resulting url
-    pagination_js_helper(base_url, args);
-    return true;
-  });
+// A search form is the box a page opens with focus in, so Enter can come before the
+// deferred jQuery has run. Bound from whenReady, a submit was a plain one until then
+// and kept only the query; bound here, to document, while the page parses - the form is
+// not there yet - it carries the rest of the state from the first paint on (ADR-0018).
+document.addEventListener("submit", function(eventObj) {
+  if (eventObj.target.id !== "compare_search_form_a") {
+    return;
+  }
+  eventObj.preventDefault();
+  eventObj.stopPropagation();
+  const base_url = window.location.href;
+  const args = fetchState();
+  args.selected_a = null;
+  args._anchor = "Search_a";
+  const null_keys = {{ pagination_a.params_list|tojson }};
+  for(var i = 0, size = null_keys.length; i < size ; i++){
+    args[null_keys[i]] = null;
+  }
+  args["query_a"] = document.getElementById("Search_a").value;
+  // overwrites base_link with args and forwards to the resulting url
+  pagination_js_helper(base_url, args);
+});
 
+document.addEventListener("submit", function(eventObj) {
+  if (eventObj.target.id !== "compare_search_form_b") {
+    return;
+  }
+  eventObj.preventDefault();
+  eventObj.stopPropagation();
+  const base_url = window.location.href;
+  const args = fetchState();
+  args.selected_b = null;
+  args._anchor = "Search_b";
+  const null_keys = {{ pagination_b.params_list|tojson }};
+  for(var i = 0, size = null_keys.length; i < size ; i++){
+    args[null_keys[i]] = null;
+  }
+  args["query_b"] = document.getElementById("Search_b").value;
+  // overwrites base_link with args and forwards to the resulting url
+  pagination_js_helper(base_url, args);
 });
 
 function createJob() {
@@ -94,9 +102,11 @@ function createJob() {
   window.location.href="/analyze/compare/"+params.selected_a+"/"+params.selected_b+"?rematch="+params.rematch+"&minhashBandRange="+params.minhashBandRange;
 }
 
+// the pagination and sort links call this from onclick=, which a click can reach before
+// the deferred jQuery has run, so it reads the page without it (ADR-0018)
 function fetchState() {
   var minhashBandRange = document.getElementById('minhashBandRange').value;
-  var checkedValue = $("#force_rematch").is(":checked");
+  var checkedValue = document.getElementById("force_rematch").checked;
   return {
     "rematch": checkedValue,
     "selected_a": selected_a,
