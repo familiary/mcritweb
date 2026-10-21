@@ -4,7 +4,7 @@
 
 {% macro family_row_std_js() %}
 <script>
-  $(document).ready(function(){
+  whenReady(function(){
     var editFamilyModal = document.getElementById('editFamilyModal');
     {# sample_table/family_table render the modal only when they have rows #}
     editFamilyModal?.addEventListener('show.bs.modal', function (event) {
