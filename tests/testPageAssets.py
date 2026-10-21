@@ -47,6 +47,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
 logging.disable(logging.CRITICAL)
 
 TEMPLATE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "mcritweb" / "templates"
+STATIC_ROOT = TEMPLATE_ROOT.parent / "static"
 BASE = TEMPLATE_ROOT / "base.html"
 
 #: assets base.html must not load, and where they belong instead
@@ -171,7 +172,7 @@ def test_nothing_touches_bootstrap_while_the_page_parses():
     builds a Bootstrap dropdown - waits in whenReady, by which time the queued bundle has
     run. DOMContentLoaded is too early now: the queue starts loading after it. Measured:
     without the wait every page logged "bootstrap is not defined" from autocomplete.js."""
-    for path in TEMPLATE_ROOT.rglob("*.html"):
+    for path in [*TEMPLATE_ROOT.rglob("*.html"), STATIC_ROOT / "family_names.js"]:
         code = path.read_text()
         for match in re.finditer(r"new Autocomplete\(", code):
             before = code[max(0, match.start() - 600):match.start()]
