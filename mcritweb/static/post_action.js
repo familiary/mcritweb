@@ -9,13 +9,8 @@
 // For a control that confirms first, skip data-post and call postTo() from the
 // confirmation handler instead.
 
-// Reads the token base.html puts in <meta name="csrf-token">. Without it the POST
-// this builds is indistinguishable from a forged one and the server rejects it
-// with a 400. See mcritweb/csrf.py and issue #83.
-function csrfToken() {
-    var meta = document.querySelector('meta[name="csrf-token"]');
-    return meta ? meta.getAttribute("content") : "";
-}
+// The token comes from csrfToken(), which base.html defines in its first script: the
+// CFG viewers ask for it from window.onload, which can run before this file has.
 
 function postTo(url) {
     var form = document.createElement("form");

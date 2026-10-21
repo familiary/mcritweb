@@ -1,19 +1,20 @@
 #!/usr/bin/python
-"""Nothing reaches for jQuery while the page parses, now that jQuery is deferred.
+"""Nothing reaches for jQuery before it has run, now that it loads after the first paint.
 
-`base.html` loads jQuery with `defer` (issue #63, ADR-0018), so it runs once the whole
-document has been parsed, after every inline script. An inline script that calls `$`
-there and then - `$(document).ready(...)` and `$(fn)` are such calls, and so is a
-binding like `$("#x").on(...)` at the top level of a block - stops with "$ is not
-defined", and with it everything after it in the same block. Those scripts hand their
-work to `whenReady(fn)` instead, which base.html defines above every other script.
-A function declaration that uses `$` in its body is fine where it is: it runs when an
-onclick= or another script calls it, by which time jQuery is there. The same holds for
-everything else a deferred script defines - Bootstrap, SortableJS, the type-ahead,
-`csrfToken()` - so the scan looks for all of those, not only for `$`.
+`base.html` queues jQuery with `later()` (issue #63, ADR-0018, ADR-0021), and the queue
+is loaded once the page has been painted, after DOMContentLoaded. So an inline script
+that calls `$` there and then - `$(document).ready(...)` and `$(fn)` are such calls, and
+so is a binding like `$("#x").on(...)` at the top level of a block - stops with "$ is
+not defined", and with it everything after it in the same block; and so does a
+DOMContentLoaded or load listener, or a `window.onload`, that calls it. Those scripts
+hand their work to `whenReady(fn)` instead, which base.html defines above every other
+script. A function declaration that uses `$` in its body is fine where it is: it runs
+when an onclick= or another script calls it. The same holds for everything else a
+queued script defines - Bootstrap, SortableJS, the type-ahead, `postTo()` - so the scan
+looks for all of those, not only for `$`.
 
 The same goes for a library: a plain `<script src>` runs while the page parses, so one
-that extends jQuery has to be deferred like jQuery itself, and after it.
+that extends jQuery has to be queued like jQuery itself, and after it.
 
 The checks read the templates as source, so that a template no test renders is covered
 too, and every page the accessibility checks render, so that what macros and
@@ -64,14 +65,19 @@ KEYWORDS = {"if", "for", "while", "switch", "catch", "function", "return", "type
 #: after one of these, a `/` starts a regex literal rather than a division
 REGEX_MAY_FOLLOW = set("(,=:[!&|?{};+-*%<>~^") | KEYWORDS - {"function"}
 
-#: Callees known to keep a function they are handed for an event - a DOM event,
-#: DOMContentLoaded or load, or the document being ready (whenReady) - rather than call
-#: it there and then. A timer or a promise is not one of them: a setTimeout callback or a
-#: `.then` can run while the deferred scripts are still being fetched. A function handed
-#: to anything else (forEach, a constructor, a call whose name is not known) is taken to
-#: run at once, which errs towards a finding.
+#: Callees known to keep a function they are handed for an event - a DOM event, or the
+#: queued scripts having run (whenReady) - rather than call it there and then. A timer or
+#: a promise is not one of them: a setTimeout callback or a `.then` can run while the
+#: queued scripts are still being fetched. A function handed to anything else (forEach, a
+#: constructor, a call whose name is not known) is taken to run at once, which errs
+#: towards a finding.
 KEEPS_IT_FOR_LATER = {"whenReady", "$", "jQuery", "addEventListener", "on", "one", "ready",
                       "click", "submit", "change"}
+
+#: ...except for the events that come before the queue has run: it starts loading after
+#: DOMContentLoaded, and load, and the pageshow right after it, can fire first when
+#: nothing else was left to fetch
+BEFORE_THE_QUEUE = {"DOMContentLoaded", "load", "pageshow", "readystatechange"}
 
 #: the names a script can reach the global object by: `window.jQuery`, `self.$`
 GLOBAL_OBJECT = ("window", "globalThis", "self")
@@ -272,6 +278,25 @@ def is_method_name(tokens, pairs, index):
     return is_punct(tokens, pairs[index + 1] + 1, "{") and tokens[index - 1].text in BEFORE_A_METHOD_NAME
 
 
+def listens_before_the_queue(tokens, opener):
+    """Whether the call the `(` at `opener` opens is addEventListener for an event that
+    comes before the queued scripts have run."""
+    if callee(tokens, opener) != "addEventListener" or opener + 1 >= len(tokens):
+        return False
+    event = tokens[opener + 1]
+    return event.kind == "string" and event.text[1:-1] in BEFORE_THE_QUEUE
+
+
+def is_the_onload_handler(tokens, first):
+    """Whether what starts at tokens[first] is assigned to the window's `onload`:
+    `window.onload = ...` or `onload = ...`, not `xhr.onload = ...`."""
+    if not (is_punct(tokens, first - 1, "=") and first > 1 and tokens[first - 2].text == "onload"):
+        return False
+    if is_punct(tokens, first - 3, "."):
+        return first > 3 and tokens[first - 4].text in GLOBAL_OBJECT
+    return not is_punct(tokens, first - 3, "=")
+
+
 def runs_at_once(tokens, pairs, first, last, enclosing):
     """Whether the function expression in tokens[first..last] runs as soon as it is
     reached: invoked on the spot, or handed to a call that does not keep it for later.
@@ -284,9 +309,10 @@ def runs_at_once(tokens, pairs, first, last, enclosing):
     if (is_punct(tokens, first - 1, "(") or is_punct(tokens, first - 1, ",")) and enclosing is not None and is_punct(tokens, enclosing, "("):
         name = callee(tokens, enclosing)
         if name is not None:
-            return name not in KEEPS_IT_FOR_LATER
-    # assigned, returned, a property of an object: it runs when something calls it
-    return False
+            return name not in KEEPS_IT_FOR_LATER or listens_before_the_queue(tokens, enclosing)
+    # assigned, returned, a property of an object: it runs when something calls it - and
+    # the window's onload can be called before the queue has run
+    return is_the_onload_handler(tokens, first)
 
 
 def walk(tokens, pairs, start, end, at_once):
@@ -342,10 +368,11 @@ def walk(tokens, pairs, start, end, at_once):
     return now, declarations, inside
 
 
-#: What the deferred scripts define, under the names a page's own script reaches them
-#: by: jQuery, Bootstrap, SortableJS (settings), the type-ahead widget, post_action.js
-#: and page_loading.js. None of it exists yet while an inline script runs.
-DEFERRED_GLOBALS = ("$", "jQuery", "bootstrap", "Sortable", "Autocomplete", "csrfToken", "postTo", "mcritwebPageLoading")
+#: What the queued scripts define, under the names a page's own script reaches them by:
+#: jQuery, Bootstrap, SortableJS (settings), the type-ahead widget, post_action.js and
+#: page_loading.js. None of it exists yet while an inline script runs. csrfToken() is not
+#: among them: base.html defines it in its first script.
+DEFERRED_GLOBALS = ("$", "jQuery", "bootstrap", "Sortable", "Autocomplete", "postTo", "mcritwebPageLoading")
 
 
 def reaches(tokens, index, names=DEFERRED_GLOBALS, pairs=None):
@@ -398,9 +425,11 @@ def parse_time_uses(source):
                 found.add(token.position)
             elif (token.kind == "name" and token.text in declarations and token.text not in followed
                   and not is_punct(tokens, index - 1, ".") and not (index > 0 and tokens[index - 1].text == "function")
-                  and (is_invoked(tokens, index + 1) or is_handed_on(tokens, index, inside[index]))):
+                  and (is_invoked(tokens, index + 1) or is_handed_on(tokens, index, inside[index])
+                       or is_the_onload_handler(tokens, index) and is_punct(tokens, index + 1, ";"))):
                 # f(), f.call(...), f.apply(...) - or f handed to a call that runs it, or
-                # to a timer, which can fire before the deferred scripts have run
+                # to a timer, which can fire before the queued scripts have run, or made
+                # the window's onload
                 followed.add(token.text)
                 body, close = declarations[token.text]
                 pending.append((body + 1, close))
@@ -417,7 +446,7 @@ def is_handed_on(tokens, index, opener):
     if not (is_punct(tokens, index + 1, ")") or is_punct(tokens, index + 1, ",")):
         return False
     name = callee(tokens, opener)
-    return name is not None and name not in KEEPS_IT_FOR_LATER
+    return name is not None and (name not in KEEPS_IT_FOR_LATER or listens_before_the_queue(tokens, opener))
 
 
 def findings_in(code, label):
@@ -565,7 +594,7 @@ def test_a_plain_script_does_not_need_jquery(filename):
         callers = [path.name for path in templates() if ".dropzone(" in code_of(path)]
         assert callers == [], f"{callers} call $.fn.dropzone, which the upload pages no longer attach"
         return
-    assert not names_jquery(filename), f"{filename} uses jQuery, which is deferred: load it with defer, after jquery.js"
+    assert not names_jquery(filename), f"{filename} uses jQuery, which loads after the first paint: queue it with later(), after jquery.js"
 
 
 def test_the_library_check_would_catch_jquery_ui():
@@ -615,10 +644,15 @@ def test_the_library_check_would_catch_jquery_ui():
     ("whenReady(function(){ $('#a').hide(); });", 0),
     ("whenReady(function(){ [1].forEach(function(){ $('#a'); }); });", 0),
     ("var r = /^{|}$/g; whenReady(function(){ $('#a'); });", 0),
-    ("document.addEventListener('DOMContentLoaded', function(){ $('#a'); });", 0),
+    # the queue starts loading after DOMContentLoaded, and load can come before it has run
+    ("document.addEventListener('DOMContentLoaded', function(){ $('#a'); });", 1),
+    ("window.addEventListener('load', () => { $('#a'); });", 1),
+    ("window.addEventListener('pageshow', function(){ $('#a'); });", 1),
+    ("function f(){ $('#a'); }\ndocument.addEventListener('DOMContentLoaded', f);", 1),
+    ("function f(){ $('#a'); }\nwindow.onload = f;", 1),
     ("el.addEventListener('click', function(){ $('#a'); });", 0),
-    ("window.addEventListener('load', function(){ $('#a'); });", 0),
     ("function f(){ $('#a'); }\ndocument.addEventListener('click', f);", 0),
+    ("xhr.onload = function(){ $('#a'); };", 0),
     ("whenReady(function(){ setTimeout(function(){ $('#a'); }, 0); });", 0),
     # methods run when they are called, and a key is not a value
     ("var o = { run() { $('#a'); } };", 0),
@@ -631,7 +665,8 @@ def test_the_library_check_would_catch_jquery_ui():
     ("(function(){ function poll(){ fetch(u).then(function(r){ return r.json(); }).then(function(s){ window.setTimeout(poll, 5); }); } window.setTimeout(poll, 5); })();", 0),
     ("function f(){ $('#a'); }", 0),
     ("var f = function(){ $('#a'); };", 0),
-    ("window.onload = function(){ $('#a'); };", 0),
+    ("window.onload = function(){ $('#a'); };", 1),
+    ("onload = function(){ $('#a'); };", 1),
     ("new Widget(f, {onInput: function(){ $('#a'); }});", 0),
     ("new Autocomplete(f, {});", 1),
     ("if (typeof jQuery !== 'undefined') {}", 0),

@@ -60,10 +60,10 @@ Results for Job: {{ job_info.job_id }}
 {% endblock %}
 {% block style %}
 
-{# this page is the only one that calls .sortable(); see issue #63. Deferred, like the
-   jQuery it extends, and so it runs after it and before Bootstrap - see base.html #}
+{# this page is the only one that calls .sortable(); see issue #63. Queued with later(),
+   like the jQuery it extends, and so it runs after it and before Bootstrap - see base.html #}
 <link rel="stylesheet" href="{{ url_for('static', filename='jquery-ui.css') }}">
-<script defer src="{{ url_for('static', filename='jquery-ui.js') }}"></script>
+<script>later({{ url_for('static', filename='jquery-ui.js')|tojson }})</script>
 
 <script>
   whenReady(function(){
