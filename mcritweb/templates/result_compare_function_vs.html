@@ -58,8 +58,35 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
             nodeMatches: {{ node_matches|tojson }},
             combinedUrl: {{ url_for('explore.fetchCombinedDotGraph', function_id_a=function_id_a, function_id_b=function_id_b)|tojson }}
         });
-        loadWithDotGraphAndFunctionIdA(js_function_id_a, js_node_colors)
-        loadWithDotGraphAndFunctionIdB(js_function_id_b, js_node_colors)
+        bindDisplayControls();
+        // Laying out and drawing the two graphs holds the page's main thread for seconds on
+        // a large function, and they start below the first screen. They are drawn once the
+        // graphs come into view, or a control above them is used, rather than on load.
+        var drawn = false;
+        function drawGraphs() {
+            if (drawn) {
+                return;
+            }
+            drawn = true;
+            loadWithDotGraphAndFunctionIdA(js_function_id_a, js_node_colors)
+            loadWithDotGraphAndFunctionIdB(js_function_id_b, js_node_colors)
+        }
+        var controls = document.getElementById("xcfg_top");
+        ["pointerdown", "focusin", "keydown"].forEach(function (type) {
+            controls.addEventListener(type, drawGraphs, true);
+        });
+        if (!("IntersectionObserver" in window)) {
+            drawGraphs();
+            return;
+        }
+        // in view: any part of the graphs inside the upper three quarters of the window
+        var observer = new IntersectionObserver(function (entries) {
+            if (entries.some(function (entry) { return entry.isIntersecting; })) {
+                observer.disconnect();
+                drawGraphs();
+            }
+        }, { rootMargin: "0px 0px -25% 0px" });
+        observer.observe(document.getElementById("xcfg_container"));
     };
     </script>
     {% endif %}

@@ -20,6 +20,7 @@ var FunctionCompare = (function () {
   var isMirroring = false;      // re-entrancy guard while one graph updates the other
   var combined = null;          // {graph, zoom, svg, inner} once the combined view rendered
   var isCombinedLoading = false;
+  var isCombinedWanted = false; // Combined was pressed before both graphs were drawn
 
   var OTHER = {a: "b", b: "a"};
 
@@ -36,6 +37,23 @@ var FunctionCompare = (function () {
     }
     d3.selectAll("input[name=viewMode]").on("change", function () {
       setViewMode(this.value);
+    });
+    // Combined is offered once both graphs are drawn (onGraphShown), and the page draws
+    // them only when they come into view or a control above them is used. Pressing it
+    // before then starts the drawing, and is remembered until the option is there. A
+    // disabled radio gets no click in Chromium, only the pointerdown, so that is what
+    // its label listens for; pressing Side by side meanwhile takes the wish back.
+    d3.selectAll("input[name=viewMode]").each(function () {
+      var radio = this;
+      if (radio.parentNode.tagName !== "LABEL") {
+        return;
+      }
+      radio.parentNode.addEventListener("pointerdown", function () {
+        var combinedToggle = document.getElementById("viewCombined");
+        if (combinedToggle && combinedToggle.disabled) {
+          isCombinedWanted = radio === combinedToggle;
+        }
+      });
     });
 
     var resetButton = document.getElementById("resetView");
@@ -88,6 +106,13 @@ var FunctionCompare = (function () {
       var combinedToggle = document.getElementById("viewCombined");
       if (combinedToggle) {
         combinedToggle.disabled = false;
+        if (isCombinedWanted) {
+          isCombinedWanted = false;
+          // once main_duo.js has finished drawing the graph that called this
+          setTimeout(function () {
+            combinedToggle.click();
+          }, 0);
+        }
       }
     }
     // Replace the zoom listener main_duo.js installed with one that also drives
