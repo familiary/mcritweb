@@ -2,8 +2,8 @@
 """The rest of issue #63 that lives in this repository: what every page downloads.
 
 Three things a page used to pay for on every load and no longer does: the unminified
-Bootstrap build (196 KB where the minified one is 157), all 1,948 Font Awesome glyph
-rules (140 KB where the icons the templates use fit in a 46 KB subset), and Dropzone
+Bootstrap build (196 KB where the minified one is 157), all 2,447 Font Awesome glyph
+rules (140 KB where the icons the templates use fit in a 22 KB subset), and Dropzone
 (115 KB of script plus its stylesheet) for a drop overlay that most visits never
 open - it now loads on the first drag. The subset is generated, so a test keeps it
 honest: every icon a template names has its glyph, and the committed file is what the
@@ -51,10 +51,29 @@ def test_the_committed_subset_is_what_the_script_generates():
     assert (STATIC / "css" / "fontawesome-subset.css").read_text() == generated, "run scripts/subset_fontawesome.py"
 
 
+#: a glyph rule in either of all.css's spellings, written out here rather than taken from
+#: the script, so that a script that misses one spelling cannot also hide it from this test
+ANY_GLYPH_RULE = re.compile(r"\.fa-([a-z0-9-]+)::?before")
+
+
+def test_every_glyph_rule_the_subset_keeps_draws_an_icon_in_use():
+    """all.css writes its brand icons' rules with one colon, `.fa-github:before`, and a
+    pattern that knew only `::before` kept all 499 of them, half the subset's bytes."""
+    rules, _ = subset_fontawesome.split_rules((STATIC / "css" / "fontawesome-subset.css").read_text())
+    used = subset_fontawesome.used_icons()
+    unused = [selector.strip() for selector, _ in rules
+              if ANY_GLYPH_RULE.findall(selector) and not set(ANY_GLYPH_RULE.findall(selector)) & used]
+    assert unused == [], f"{len(unused)} glyph rules for icons no template uses, e.g. {unused[:3]}"
+
+
+def test_the_glyph_rule_pattern_knows_both_spellings():
+    assert subset_fontawesome.GLYPH_RULE.findall(".fa-house::before, .fa-github:before") == ["house", "github"]
+
+
 def test_the_subset_is_a_fraction_of_the_full_file():
     full = (STATIC / "css" / "all.css").stat().st_size
     subset = (STATIC / "css" / "fontawesome-subset.css").stat().st_size
-    assert subset < full / 2, f"{subset} of {full} bytes"
+    assert subset < full / 4, f"{subset} of {full} bytes"
 
 
 def test_the_subset_keeps_the_font_faces_and_the_style_classes():
