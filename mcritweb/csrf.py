@@ -14,10 +14,15 @@ extension awkward was lifted in issue #27, so that swap is now unblocked (ADR-00
 keeping the names identical makes it an import change instead of a sweep through
 every template again.
 
-What the real extension adds, and this does not: signed and time-limited tokens, a
-referrer check on HTTPS, and per-response token variation. None of them are the
-primary defence, which is why this is a reasonable stop-gap rather than a permanent
-answer.
+What the real extension adds, and this does not: signed and time-limited tokens and a
+referrer check on HTTPS. Neither is the primary defence, which is why this is a
+reasonable stop-gap rather than a permanent answer.
+
+The token a page carries is masked afresh every time it is rendered, the way Rails masks
+its own: a random pad, then the session token XORed with it. Pages are gzipped
+(`mcritweb.compression`), and a secret that is identical in every response, compressed
+next to input the page reflects, is what a BREACH attack reads out of a response's length.
+A masked token is never the same twice, so there is nothing to read.
 
 Token strength rests on the session cookie's signature, so it rests on `SECRET_KEY`.
 See `mcritweb.secret_key`.
@@ -45,14 +50,36 @@ ENABLED_KEY = "WTF_CSRF_ENABLED"
 
 
 def generate_csrf():
-    """Return this session's token, minting one on first use.
+    """Return this session's token, masked afresh, minting the token on first use.
 
     Exposed to templates as `csrf_token()`, so `{{ csrf_token() }}` works the same
     way it would under flask-wtf.
     """
     if FIELD_NAME not in session:
         session[FIELD_NAME] = secrets.token_hex(32)
-    return session[FIELD_NAME]
+    return mask(session[FIELD_NAME])
+
+
+def mask(token):
+    """`token` hidden behind a fresh random pad, as hex: the pad, then the token XOR the pad."""
+    raw = token.encode()
+    pad = secrets.token_bytes(len(raw))
+    return (pad + bytes(a ^ b for a, b in zip(pad, raw))).hex()
+
+
+def unmask(submitted, length):
+    """The token a masked submission of a `length`-byte token carries, as bytes.
+
+    Anything not shaped like one is returned as it came, so the bare session token, which
+    a page rendered before tokens were masked still holds, is compared as it always was.
+    """
+    if len(submitted) == 4 * length:
+        try:
+            data = bytes.fromhex(submitted)
+        except ValueError:
+            return submitted.encode()
+        return bytes(a ^ b for a, b in zip(data[:length], data[length:]))
+    return submitted.encode()
 
 
 def _submitted_token():
@@ -71,13 +98,14 @@ def _submitted_token():
 
 
 def validate_csrf():
-    """True when the request carries this session's token."""
+    """True when the request carries this session's token, masked or bare."""
     expected = session.get(FIELD_NAME)
     submitted = _submitted_token()
     if not expected or not submitted:
         return False
+    expected = expected.encode()
     # constant-time: the token is a secret being compared against attacker input
-    return hmac.compare_digest(expected, submitted)
+    return hmac.compare_digest(expected, unmask(submitted, len(expected)))
 
 
 class CsrfProtect:

@@ -6,6 +6,7 @@ from flask import Blueprint, current_app, flash, g, redirect, render_template, r
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
+from mcritweb.compression import uncompressed
 from mcritweb.db import UserColumnSettings, UserFilters, UserInfo, generate_apitoken
 from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
 from mcritweb.views.client import get_client
@@ -265,6 +266,7 @@ def backend_version(client):
 
 @bp.route('/server')
 @admin_required
+@uncompressed
 def server():
     server_info = db.get_server_info()
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
@@ -276,6 +278,7 @@ def server():
 
 @bp.route('/change_server' , methods=('POST',))
 @admin_required
+@uncompressed
 def change_server():
     server_info = db.get_server_info()
     new_url = request.form.get('mcrit_server_url', '')

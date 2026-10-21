@@ -11,6 +11,7 @@ from flask import Blueprint, abort, current_app, flash, g, redirect, render_temp
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
+from mcritweb.compression import uncompressed
 from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, utc_now
 
 bp = Blueprint('authentication', __name__, url_prefix='/')
@@ -390,6 +391,7 @@ def login_required(view):
 
 @bp.route('/settings')
 @login_required
+@uncompressed
 def settings():
     # login_required has settled that g.user holds this session's row
     user_info = g.user
