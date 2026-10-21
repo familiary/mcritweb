@@ -6,7 +6,7 @@ This document outlines the different functionalities of the MCRIT web frontend.
 
 After installation (e.g. via docker) and when starting MCRIT Web for the first time, you will be greeted with the following screen:
 
-![initial setup and registration for admin user](images/first_login.png "initial setup and registration for admin user")
+![initial setup and registration for admin user](images/first_login.webp "initial setup and registration for admin user")
 
 You will need to register your primary user first, which will automatically be assigned the `admin` role and have maximimum access rights.
 It can also never be degraded from `admin`.

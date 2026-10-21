@@ -60,6 +60,10 @@ Results for Job: {{ job_info.job_id }}
 {% endblock %}
 {% block style %}
 
+{# this page is the only one that calls .sortable(); see issue #63 #}
+<link rel="stylesheet" href="{{ url_for('static', filename='jquery-ui.css') }}">
+<script src="{{ url_for('static', filename='jquery-ui.js') }}"></script>
+
 <script>
   $(document).ready(function(){
     // delegated, so that it also reaches the rows of a pane filled after load

@@ -188,3 +188,57 @@ def test_the_manual_names_the_menu_entry_that_reaches_the_selection_page():
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_only_the_first_screenshot_loads_eagerly():
+    """The first screenshot is the largest paint of /help; the other twenty would
+    otherwise share the connection with it on every visit."""
+    images = re.findall(r"<img [^>]*>", str(render("/help/images/")))
+    assert len(images) > 1
+    assert "loading=" not in images[0]
+    assert all('loading="lazy"' in image for image in images[1:])
+
+
+def test_every_screenshot_carries_the_size_of_its_file():
+    """A lazy screenshot without a size is a 2px placeholder until it loads, so the
+    ones arriving next to a /help#section target pushed that section 4,000+ px away
+    after the browser had scrolled to it."""
+    from mcritweb.manual import IMAGE_DIRECTORY, _image_size
+
+    images = re.findall(r"<img [^>]*>", str(render("/help/images/")))
+    assert images
+    for image in images:
+        name = re.search(r'src="/help/images/([^"]+)"', image).group(1)
+        width, height = _image_size(IMAGE_DIRECTORY / name)
+        assert f'width="{width}" height="{height}"' in image, image
+
+
+def test_the_first_screenshot_is_a_lossless_webp():
+    """It is /help's largest paint on a phone. In 254 colours, as a lossless WebP, it is
+    20,670 bytes; the PNG was 88,783."""
+    images = re.findall(r"<img [^>]*>", str(render("/help/images/")))
+    assert 'src="/help/images/first_login.webp"' in images[0], images[0]
+    assert (MANUAL_PATH.parent / "images" / "first_login.webp").read_bytes()[12:16] == b"VP8L"
+
+
+def test_a_webp_screenshot_is_served_as_one(client):
+    response = client.get("/help/images/first_login.webp")
+    assert response.status_code == 200
+    assert response.mimetype == "image/webp"
+
+
+def test_the_size_is_read_from_a_lossless_webp_header(tmp_path):
+    """Width and height less one, 14 bits each, after the VP8L signature byte."""
+    from mcritweb.manual import _image_size
+
+    def webp(width, height, riff=b"RIFF", chunk=b"VP8L", signature=b"\x2f"):
+        bits = (width - 1) | (height - 1) << 14
+        return riff + (0).to_bytes(4, "little") + b"WEBP" + chunk + (0).to_bytes(4, "little") + signature + bits.to_bytes(4, "little")
+
+    for (width, height) in ((1267, 793), (16384, 9000), (1, 16384)):
+        (tmp_path / "a.webp").write_bytes(webp(width, height))
+        assert _image_size(tmp_path / "a.webp") == (width, height)
+    for name, wrong in (("lossy", {"chunk": b"VP8 "}), ("signature", {"signature": b"\x2e"}), ("riff", {"riff": b"RIFX"})):
+        (tmp_path / f"{name}.webp").write_bytes(webp(1267, 793, **wrong))
+        assert _image_size(tmp_path / f"{name}.webp") is None, name
+    assert _image_size(tmp_path / "missing.webp") is None
