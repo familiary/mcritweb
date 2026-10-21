@@ -262,6 +262,148 @@ def test_combined_pressed_before_the_graphs_are_drawn_is_shown_once_they_are(bro
     assert thrown == []
 
 
+#: the scripts of the graph viewer, which the page loads only once the graphs are wanted
+VIEWER = ["trace_CFG/lib/d3.min.js", "trace_CFG/lib/graphlib.min.js", "trace_CFG/lib/graphlib-dot.min.js",
+          "trace_CFG/lib/dagre-d3.min.js", "trace_CFG/lib/convexhull.js", "trace_CFG/main_duo.js",
+          "trace_CFG/fnManip.js", "trace_CFG/loopCollapser.js", "trace_CFG/loopify_dagre.js", "function_compare.js"]
+
+
+def viewer_requests(page):
+    requests = []
+    page.on("request", lambda request: requests.append(request.url.split("/static/", 1)[1])
+            if "/static/" in request.url and request.url.split("/static/", 1)[1] in VIEWER else None)
+    return requests
+
+
+@pytest.mark.parametrize("viewport", VIEWPORTS, ids=["mobile", "desktop"])
+def test_the_viewer_is_loaded_only_once_the_graphs_are_wanted(browser_page, live_server, thrown, viewport):
+    """The viewer is 698 KB of script, 178 KB gzipped, that only the graphs use, and evaluating it held
+    the main thread while the page loaded. Nothing of it is requested until the graphs come
+    into view, and then each script once."""
+    browser_page.set_viewport_size(viewport)
+    requests = viewer_requests(browser_page)
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    browser_page.wait_for_load_state("networkidle")
+    assert requests == []
+
+    scroll_to_the_graphs(browser_page)
+    for panel in ("a", "b"):
+        browser_page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
+    assert sorted(requests) == sorted(VIEWER)
+    assert thrown == []
+
+
+def hold_the_viewer(page):
+    """Holds main_duo.js until released, so that what is pressed meanwhile is pressed
+    before the viewer is in. Returns a function that lets it through."""
+    held = []
+    page.route("**/static/trace_CFG/main_duo.js", lambda route: held.append(route))
+
+    def release():
+        for _ in range(100):
+            if held:
+                break
+            page.wait_for_timeout(50)
+        assert len(held) == 1, "main_duo.js was never requested"
+        held[0].continue_()
+    return release
+
+
+@pytest.mark.parametrize("button,label", [("#showLoops", "Hide Loops"), ("#showCycles", "Hide Cycles")])
+def test_what_is_pressed_before_the_viewer_is_in_holds_once_it_is(browser_page, live_server, thrown, button, label):
+    """The viewer arrives some time after the first press above the graphs asks for it. The
+    buttons pressed meanwhile are replayed once it is in, and the checkboxes it reads."""
+    browser_page.add_init_script(SILENT_OBSERVER)
+    browser_page.set_viewport_size(VIEWPORTS[1])
+    release = hold_the_viewer(browser_page)
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    browser_page.wait_for_load_state("networkidle")
+
+    browser_page.click(button)
+    browser_page.uncheck("#loopBgFill")
+    browser_page.check("#enableTooltip")
+    assert browser_page.evaluate("typeof bindDisplayControls") == "undefined", "the viewer was in before the presses"
+    release()
+    browser_page.wait_for_function("document.querySelectorAll('g.bgFill').length == 2")
+
+    assert browser_page.get_attribute(button, "value") == label
+    for panel in ("a", "b"):
+        assert browser_page.locator(f'#graphContainer_{panel} g.node[fill="white"]').count(), (
+            "panel " + panel + " has nothing highlighted"
+        )
+    assert browser_page.eval_on_selector_all(
+        "g.bgFill", "groups => groups.map(group => getComputedStyle(group).display)"
+    ) == ["none", "none"]
+    hover_a_block(browser_page, "a")
+    assert not tooltip_state(browser_page, "a")["hidden"], "the tooltip stayed off"
+    assert thrown == []
+
+
+@pytest.mark.parametrize("then_side_by_side", [False, True], ids=["combined", "taken-back"])
+def test_combined_pressed_before_the_viewer_is_in_is_shown_once_the_graphs_are(browser_page, live_server, thrown, then_side_by_side):
+    """The presses are replayed in the order they were made: Combined and then Side by side
+    ends side by side."""
+    browser_page.add_init_script(SILENT_OBSERVER)
+    browser_page.set_viewport_size(VIEWPORTS[1])
+    release = hold_the_viewer(browser_page)
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    browser_page.wait_for_load_state("networkidle")
+
+    browser_page.locator("#viewCombined").click(force=True)
+    if then_side_by_side:
+        browser_page.click("#viewSideBySide")
+    assert browser_page.evaluate("typeof FunctionCompare") == "undefined", "the viewer was in before the press"
+    release()
+    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    if then_side_by_side:
+        # the replay is a timer set when the option was enabled; one set now runs after it
+        browser_page.evaluate("new Promise(resolve => setTimeout(resolve, 0))")
+        assert not browser_page.is_checked("#viewCombined")
+        assert displays(browser_page) == {"xcfg_container": "block", "xcfg_combined": "none"}
+    else:
+        browser_page.wait_for_selector("#graphContainer_c g.node", state="attached")
+        assert browser_page.is_checked("#viewCombined")
+        assert displays(browser_page) == {"xcfg_container": "none", "xcfg_combined": "block"}
+    assert thrown == []
+
+
+@pytest.mark.parametrize("script", ["trace_CFG/lib/d3.min.js", "trace_CFG/main_duo.js", "function_compare.js"])
+def test_a_viewer_script_that_does_not_load_says_so(browser_page, live_server, script):
+    """Without it the graphs cannot be drawn, and the page used to stay blank and silent."""
+    browser_page.route("**/static/" + script, lambda route: route.fulfill(status=404, body="gone"))
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    assert browser_page.is_hidden("#viewer_error")
+    scroll_to_the_graphs(browser_page)
+    browser_page.wait_for_selector("#viewer_error", state="visible")
+    assert "could not be loaded" in browser_page.inner_text("#viewer_error")
+    assert drawn_blocks(browser_page) == [0, 0]
+
+
+def test_without_a_script_the_drawing_can_do_without_the_graphs_are_still_drawn(browser_page, live_server):
+    """loopCollapser.js is not needed to draw. A page that loaded the viewer from plain
+    script tags drew both graphs without it, and this one does too, under the message."""
+    browser_page.route("**/static/trace_CFG/loopCollapser.js", lambda route: route.fulfill(status=404, body="gone"))
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    scroll_to_the_graphs(browser_page)
+    for panel in ("a", "b"):
+        browser_page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
+    assert browser_page.is_visible("#viewer_error")
+
+
+def test_the_viewer_scripts_run_in_order_however_they_arrive(browser_page, live_server, thrown):
+    """Each script builds on the ones before it. Added by a script, they would run as each
+    arrives, so d3 arriving last would break every one after it."""
+    def late(route):
+        browser_page.wait_for_timeout(700)
+        route.continue_()
+    browser_page.route("**/static/trace_CFG/lib/d3.min.js", late)
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    scroll_to_the_graphs(browser_page)
+    for panel in ("a", "b"):
+        browser_page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
+    assert thrown == []
+
+
 def test_without_intersection_observer_the_graphs_are_drawn_on_load(browser_page, live_server):
     browser_page.add_init_script("delete window.IntersectionObserver;")
     browser_page.set_viewport_size(VIEWPORTS[0])

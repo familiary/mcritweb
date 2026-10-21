@@ -169,7 +169,8 @@ def test_the_comparison_page_renders_with_the_match_data(client, as_role):
     assert 'id="syncGraphs"' in page
     assert f"/explore/fetchCombinedDotGraph/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}" in page
     assert "nodeMatches" in page
-    assert "function_compare.js" in page
+    # the script itself comes with the rest of the graph viewer, once the graphs are wanted
+    assert '"/static/function_compare.js"' in page
     assert f"/api/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}" in page
 
 
