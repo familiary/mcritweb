@@ -20,7 +20,7 @@ Sample: {{ entry.sample_id }}
 <script>
   var button_clicked = false;
   
-  $(document).ready(function(){
+  whenReady(function(){
     var editSampleModal = document.getElementById('editSampleModal');
     editSampleModal.addEventListener('show.bs.modal', function (event) {
     // Button that triggered the modal

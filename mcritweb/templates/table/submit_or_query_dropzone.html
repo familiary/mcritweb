@@ -1,48 +1,59 @@
 
 {% set minhash_slider_mapping = ["Off", "Fast", "Standard", "Complete"] %} 
 
-{% macro submit_or_query_dropzone_js(select_form_type=False) %}
+{# `lazy`: the overlay of base.html uses it. The stylesheet and the library are then
+   fetched by mcritLoadDropzone() on the first drag instead of with every page, and the
+   handlers below wait in mcritInitDropzone() until it has. Issue #63. #}
+{% macro submit_or_query_dropzone_js(select_form_type=False, lazy=False) %}
+{% if not lazy %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
+{% endif %}
 {{ dropzone.style('border: 2px dashed black; margin: 30%; min-height: 200px;border-radius: 25px; background: rgb(240, 240, 240);') }}
 <script>
   function show_extended(x) {
-    if (x.checked) {      
+    if (x.checked && window.jQuery) {
       $(document.getElementById("extendedFields")).slideDown();   
     }
   }
  
   function hide_extended(x) {
-    if (x.checked) {
+    if (x.checked && window.jQuery) {
       $(document.getElementById("extendedFields")).slideUp();
     }
   }
 
   function show_submit(x) {
-    if (x.checked) {      
+    if (x.checked && window.jQuery) {
       $(document.getElementsByClassName("submit-form-exclusive")).slideDown();   
       $(document.getElementsByClassName("query-form-exclusive")).slideUp();   
     }
   }
  
   function hide_submit(x) {
-    if (x.checked) {
+    if (x.checked && window.jQuery) {
       $(document.getElementsByClassName("submit-form-exclusive")).slideUp();   
       $(document.getElementsByClassName("query-form-exclusive")).slideDown();   
     }
   }
 
-  $(document).ready(function(){
-    if ($("#dumped").prop("checked")){
-      $(document.getElementById("extendedFields")).slideDown(); 
+  whenReady(function(){
+    // the state the checked radios ask for, whichever way they got checked: a toggle
+    // before jQuery had run is left to this (the handlers above slide the fields with
+    // jQuery), and a page the browser restores comes back with its radios as they were.
+    // SMDA shows the fields as Dumped does. Set, not slid: this runs after the page has
+    // been painted, where a slide is a layout shift on the upload pages, and on every
+    // other page, whose form is in the closed drop overlay, 400 ms of animation no one sees.
+    if ($("#dumped").prop("checked") || $("#smda").prop("checked")){
+      $(document.getElementById("extendedFields")).show();
     }
     {% if select_form_type %}
     if ($("#submit_form").prop("checked")){
-      $(document.getElementsByClassName("submit-form-exclusive")).slideDown();   
-      $(document.getElementsByClassName("query-form-exclusive")).slideUp();   
+      $(document.getElementsByClassName("submit-form-exclusive")).show();
+      $(document.getElementsByClassName("query-form-exclusive")).hide();
     }
     if ($("#query_form").prop("checked")){
-      $(document.getElementsByClassName("submit-form-exclusive")).slideUp();   
-      $(document.getElementsByClassName("query-form-exclusive")).slideDown();   
+      $(document.getElementsByClassName("submit-form-exclusive")).hide();
+      $(document.getElementsByClassName("query-form-exclusive")).show();
     }
     {% endif %}
   });
@@ -71,7 +82,7 @@
   }
 
 
-  $(document).ready(function(){
+  function mcritInitDropzone(){
     const myDropzone = Dropzone.forElement("#myDropzone");
 
     myDropzone.on("removedfile", function(file) {
@@ -142,7 +153,10 @@
       window.location.href=response;
     });
 
-  });
+  }
+  {% if not lazy %}
+  whenReady(mcritInitDropzone);
+  {% endif %}
 
 function handleSliderChange_dropzone(val) {
   const mapping = {{ minhash_slider_mapping|tojson }};
@@ -153,7 +167,7 @@ function handleSliderChange_dropzone(val) {
 </script>
 {% endmacro %}
 
-{% macro submit_or_query_dropzone(select_form_type=False, show_submit_fields=False) %}
+{% macro submit_or_query_dropzone(select_form_type=False, show_submit_fields=False, lazy=False) %}
 {% set show_query_fields = not show_submit_fields %}
 <center>
 
@@ -164,9 +178,59 @@ function handleSliderChange_dropzone(val) {
 {% else %}
   {% set target_link = url_for('analyze.query') %}
 {% endif %}
+{% if lazy %}
+  {# without the `dropzone` class Dropzone's auto-discovery leaves the form alone even if
+     the library arrives before the page has finished loading; mcritLoadDropzone attaches
+     it by hand, with these options, once the script is in #}
+  {# |safe on the needles: with autoescaping on, `replace` escapes them otherwise, and a
+     quote turns into &#34; that matches nothing #}
+  {{ dropzone.create(action=target_link)|replace('class="dropzone"'|safe, 'class="dropzone-pending"'|safe) }}
+  {{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_options='autoProcessQueue: false')|replace('Dropzone.options.myDropzone ='|safe, 'window.mcritDropzoneOptions ='|safe) }}
+  <script>
+  function mcritLoadDropzone(done) {
+    if (window.mcritDropzoneReady) { done(); return; }
+    if (window.mcritDropzoneLoading) {
+      // dragover fires every few milliseconds while a file is held over the page
+      if (window.mcritDropzoneLoading.indexOf(done) < 0) { window.mcritDropzoneLoading.push(done); }
+      return;
+    }
+    window.mcritDropzoneLoading = [done];
+    if (!document.getElementById("mcrit-dropzone-css")) {
+      var css = document.createElement("link");
+      css.id = "mcrit-dropzone-css";
+      css.rel = "stylesheet";
+      css.href = {{ url_for('static', filename='dropzone.min.css')|tojson }};
+      document.head.appendChild(css);
+    }
+    var script = document.createElement("script");
+    // the project's patched build: it sends the head of the file the form is pre-filled from
+    script.src = {{ url_for('static', filename='dropzone.js')|tojson }};
+    script.onerror = function () {
+      // let the next drag try again
+      window.mcritDropzoneLoading = null;
+    };
+    script.onload = function () {
+      Dropzone.autoDiscover = false;
+      Dropzone.options.myDropzone = window.mcritDropzoneOptions;
+      var element = document.getElementById("myDropzone");
+      element.classList.add("dropzone");
+      if (!element.dropzone) {
+        new Dropzone(element, window.mcritDropzoneOptions);
+      }
+      mcritInitDropzone();
+      window.mcritDropzoneReady = true;
+      var waiting = window.mcritDropzoneLoading;
+      window.mcritDropzoneLoading = null;
+      waiting.forEach(function (callback) { callback(); });
+    };
+    document.head.appendChild(script);
+  }
+  </script>
+{% else %}
   {{ dropzone.create(action=target_link) }}
   <script src="{{ url_for('static', filename='dropzone.js') }}"></script>
   {{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_options='autoProcessQueue: false') }}
+{% endif %}
   <form id="dropzone-additional-fields-form">
   {% if select_form_type %}
     <div class="container-fluid">
