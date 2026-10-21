@@ -113,9 +113,161 @@ def comparison_page(browser_page, live_server):
     what says the page is finished.
     """
     browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    scroll_to_the_graphs(browser_page)
     for panel in ("a", "b"):
         browser_page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
     return browser_page
+
+
+def scroll_to_the_graphs(page):
+    """The graphs are drawn once they come into view (see the deferred-drawing tests)."""
+    page.evaluate("document.getElementById('xcfg_container').scrollIntoView()")
+
+
+# --- drawing the graphs when they come into view ------------------------------------
+
+#: Lighthouse's two presets. At both, the graphs start below the window, or show only
+#: their top edge in its last quarter.
+VIEWPORTS = [{"width": 412, "height": 823}, {"width": 1350, "height": 940}]
+
+#: an IntersectionObserver that never reports, so only the controls can start the drawing
+SILENT_OBSERVER = "window.IntersectionObserver = function () { this.observe = function () {}; this.disconnect = function () {}; };"
+
+
+def graph_requests(page):
+    requests = []
+    page.on("request", lambda request: requests.append(request.url) if "/explore/fetchDotGraph/" in request.url else None)
+    return requests
+
+
+def drawn_blocks(page):
+    return page.evaluate("[...['a', 'b']].map(p => document.querySelectorAll('#graphContainer_' + p + ' g.node').length)")
+
+
+@pytest.mark.parametrize("viewport", VIEWPORTS, ids=["mobile", "desktop"])
+def test_the_graphs_are_drawn_when_they_come_into_view(browser_page, live_server, viewport):
+    """Laying out and drawing two large graphs held the main thread for seconds while the
+    page loaded, for graphs below the first screen. Now nothing is fetched or drawn until
+    they are scrolled to."""
+    browser_page.set_viewport_size(viewport)
+    requests = graph_requests(browser_page)
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    browser_page.wait_for_load_state("networkidle")
+    assert requests == [] and drawn_blocks(browser_page) == [0, 0]
+
+    scroll_to_the_graphs(browser_page)
+    for panel in ("a", "b"):
+        browser_page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
+    assert len(requests) == 2
+
+
+@pytest.mark.parametrize("use", ["click", "focus"])
+def test_using_a_control_above_the_graphs_draws_them(browser_page, live_server, thrown, use):
+    """The controls can show above the graphs before the graphs come into view. Using one,
+    by pointer or keyboard, is a request for the graphs too. A control does what it did
+    while the graphs were still loading, before this change: the highlight buttons only
+    take effect once there is a graph."""
+    browser_page.add_init_script(SILENT_OBSERVER)
+    browser_page.set_viewport_size(VIEWPORTS[1])
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    browser_page.wait_for_load_state("networkidle")
+    assert drawn_blocks(browser_page) == [0, 0]
+
+    if use == "click":
+        browser_page.click("#resetView")
+    else:
+        browser_page.focus("#syncGraphs")
+    for panel in ("a", "b"):
+        browser_page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
+    assert thrown == []
+
+
+@pytest.mark.parametrize("button,label", [("#showLoops", "Hide Loops"), ("#showCycles", "Hide Cycles")])
+def test_the_display_controls_used_before_the_graphs_are_drawn_hold_once_they_are(browser_page, live_server, thrown, button, label):
+    """Show Loops, Show Cycles and the two checkboxes were bound as the first graph was
+    drawn: a click before then did nothing, or left a checkbox saying the opposite of
+    what the graphs showed. Until the graphs come into view is now the whole time before
+    scrolling, so the graphs' answers are held here until the controls have been used."""
+    browser_page.add_init_script(SILENT_OBSERVER)
+    browser_page.set_viewport_size(VIEWPORTS[1])
+    held = []
+    browser_page.route("**/explore/fetchDotGraph/*", lambda route: held.append(route))
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    browser_page.wait_for_load_state("networkidle")
+
+    browser_page.click(button)
+    browser_page.uncheck("#loopBgFill")
+    browser_page.check("#enableTooltip")
+    for _ in range(100):
+        if len(held) == 2:
+            break
+        browser_page.wait_for_timeout(50)
+    assert len(held) == 2 and drawn_blocks(browser_page) == [0, 0]
+    for route in held:
+        route.continue_()
+    browser_page.wait_for_function("document.querySelectorAll('g.bgFill').length == 2")
+
+    assert browser_page.get_attribute(button, "value") == label
+    for panel in ("a", "b"):
+        assert browser_page.locator(f'#graphContainer_{panel} g.node[fill="white"]').count(), (
+            "panel " + panel + " has nothing highlighted"
+        )
+    assert browser_page.eval_on_selector_all(
+        "g.bgFill", "groups => groups.map(group => getComputedStyle(group).display)"
+    ) == ["none", "none"]
+    hover_a_block(browser_page, "a")
+    assert not tooltip_state(browser_page, "a")["hidden"], "the tooltip stayed off"
+    assert thrown == []
+
+
+def displays(page):
+    """How the two views are shown; the side-by-side container is 0 px tall, its panes float."""
+    return page.evaluate("Object.fromEntries(['xcfg_container', 'xcfg_combined'].map(id => [id, getComputedStyle(document.getElementById(id)).display]))")
+
+
+@pytest.mark.parametrize("then_side_by_side", [False, True], ids=["combined", "taken-back"])
+def test_combined_pressed_before_the_graphs_are_drawn_is_shown_once_they_are(browser_page, live_server, thrown, then_side_by_side):
+    """Combined is offered once both graphs are drawn. Pressing it before then started the
+    drawing and was lost, and before scrolling it is still disabled. It is now acted on
+    once it is there, unless Side by side was pressed after it."""
+    browser_page.add_init_script(SILENT_OBSERVER)
+    browser_page.set_viewport_size(VIEWPORTS[1])
+    held = []
+    browser_page.route("**/explore/fetchDotGraph/*", lambda route: held.append(route))
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    browser_page.wait_for_load_state("networkidle")
+
+    # a disabled radio gets the pointerdown of a press, and no click
+    browser_page.locator("#viewCombined").click(force=True)
+    if then_side_by_side:
+        browser_page.click("#viewSideBySide")
+    for _ in range(100):
+        if len(held) == 2:
+            break
+        browser_page.wait_for_timeout(50)
+    assert len(held) == 2 and browser_page.is_disabled("#viewCombined")
+    for route in held:
+        route.continue_()
+    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+
+    if then_side_by_side:
+        # the replay is a timer set when the option was enabled; one set now runs after it
+        browser_page.evaluate("new Promise(resolve => setTimeout(resolve, 0))")
+        assert not browser_page.is_checked("#viewCombined")
+        assert displays(browser_page) == {"xcfg_container": "block", "xcfg_combined": "none"}
+    else:
+        browser_page.wait_for_selector("#graphContainer_c g.node", state="attached")
+        assert browser_page.is_checked("#viewCombined")
+        assert displays(browser_page) == {"xcfg_container": "none", "xcfg_combined": "block"}
+    assert thrown == []
+
+
+def test_without_intersection_observer_the_graphs_are_drawn_on_load(browser_page, live_server):
+    browser_page.add_init_script("delete window.IntersectionObserver;")
+    browser_page.set_viewport_size(VIEWPORTS[0])
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    for panel in ("a", "b"):
+        browser_page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
 
 
 def detected_loops(page, function_id):
@@ -453,6 +605,7 @@ def page_with_a_dangerous_api_name(browser_page, live_server):
 
     browser_page.route("**/explore/fetchDotGraph/" + str(FUNCTION_A), plant)
     browser_page.goto(live_server + "/data/matches/function/%d/%d" % (FUNCTION_A, FUNCTION_B))
+    scroll_to_the_graphs(browser_page)
     browser_page.wait_for_selector("#graphContainer_a g.node", state="attached")
     assert replaced == [1], "no api name in function A's dot graph to plant markup in"
     return browser_page
