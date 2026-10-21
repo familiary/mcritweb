@@ -10,6 +10,7 @@ the rows the old call did.
 """
 
 import logging
+import re
 import unittest
 
 import pytest
@@ -31,6 +32,14 @@ def fake_mcrit(corpus_mcrit):
 
 #: the reports whose result page draws the aggregated function table
 AGGREGATED_REPORTS = ["matches_for_sample", "matches_for_query"]
+
+#: the CSRF token a page carries, masked afresh on every render (mcritweb/csrf.py), so the
+#: one thing that differs between two renders of the same page
+CSRF_TOKEN = re.compile(rb'(name="csrf_token" value="|<meta name="csrf-token" content="|"X-CSRF-Token": ")[^"]*"')
+
+
+def without_csrf(page):
+    return CSRF_TOKEN.sub(rb'\1"', page)
 
 
 def filtered_results(report):
@@ -95,7 +104,7 @@ def test_the_rendered_pages_are_unchanged(client, as_role, monkeypatch, report):
         with monkeypatch.context() as patched:
             patched.setattr(data, "aggregate_function_matches_page", lambda matching_result, pagination: matching_result.getAggregatedFunctionMatches(pagination.start_index, pagination.limit))
             reference = client.get(url)
-        assert response.data == reference.data, f"{url} renders differently"
+        assert without_csrf(response.data) == without_csrf(reference.data), f"{url} renders differently"
 
 
 @pytest.mark.parametrize("report", AGGREGATED_REPORTS)
