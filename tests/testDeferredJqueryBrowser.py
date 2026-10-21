@@ -408,19 +408,34 @@ QUEUED_IN_BASE = ["jquery.js", "post_action.js", "page_loading.js", "autocomplet
                   "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js"]
 
 
+#: the scripts in the order they run: a script's load event fires once it has run
+RUN_ORDER = """
+window.mcritRunOrder = [];
+document.addEventListener("load", event => {
+    if (event.target.tagName === "SCRIPT") {
+        window.mcritRunOrder.push(event.target.src.split("/static/")[1]);
+    }
+}, true);
+"""
+
+
 def test_the_queue_is_fetched_once_the_page_has_been_painted(open_as, live_server):
     """What the queue is for: its scripts are not fetched alongside the stylesheets the
-    page is painted with, but once it has been painted, and in the order they were queued."""
-    page = ready(open_as("visitor"), f"{live_server}/explore/samples")
+    page is painted with, but once it has been painted, and they run in the order they were
+    queued. Not the order their requests start in: the browser need not start them in the
+    order they were added, and a test run under load saw it start one ahead of another."""
+    page = open_as("visitor")
+    page.add_init_script(RUN_ORDER)
+    ready(page, f"{live_server}/explore/samples")
     timings = page.evaluate("""() => ({
         paint: performance.getEntriesByName("first-contentful-paint")[0].startTime,
-        // in the order they were requested: entries are added as each download ends
         scripts: performance.getEntriesByType("resource")
             .filter(entry => entry.initiatorType === "script")
-            .sort((a, b) => a.startTime - b.startTime)
             .map(entry => [entry.name.split("/static/")[1], entry.startTime]),
+        ran: window.mcritRunOrder,
     })""")
-    assert [name for name, _ in timings["scripts"]] == QUEUED_IN_BASE
+    assert sorted(name for name, _ in timings["scripts"]) == sorted(QUEUED_IN_BASE)
+    assert timings["ran"] == QUEUED_IN_BASE
     assert all(start > timings["paint"] for _, start in timings["scripts"]), timings
     assert page.errors == []
 
