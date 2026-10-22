@@ -21,6 +21,7 @@ var FunctionCompare = (function () {
   var combined = null;          // {graph, zoom, svg, inner} once the combined view rendered
   var isCombinedLoading = false;
   var isCombinedWanted = false; // Combined was pressed before both graphs were drawn
+  var whenCombinedShown = null; // the next step of the combined graph, waiting for its pane
 
   var OTHER = {a: "b", b: "a"};
 
@@ -229,6 +230,11 @@ var FunctionCompare = (function () {
     if (mode === "combined") {
       sideBySide.style.display = "none";
       combinedPane.style.display = "block";
+      if (whenCombinedShown !== null) {
+        var step = whenCombinedShown;
+        whenCombinedShown = null;
+        step();
+      }
       if (combined === null) {
         loadCombined();
       }
@@ -243,24 +249,63 @@ var FunctionCompare = (function () {
       return;
     }
     isCombinedLoading = true;
+    // a failed load's message goes when the next load starts: its note stands in the same place
+    d3.select("#combined_error").classed("hidden", true);
     d3.select("#loading_c").classed("hidden", false);
     d3.xhr(config.combinedUrl).header("Content-Type", "text/plain").get(function (error, result) {
-      isCombinedLoading = false;
-      d3.select("#loading_c").classed("hidden", true);
       if (error || !result.responseText) {
+        isCombinedLoading = false;
+        d3.select("#loading_c").classed("hidden", true);
         d3.select("#combined_error").classed("hidden", false);
         return;
       }
       // the same line-ending fixup main_duo.js applies before parsing
       var dotFile = result.responseText.replace(/\\l/g, "\n");
-      renderCombined(graphlibDot.parse(dotFile));
+      var graph;
+      try {
+        graph = graphlibDot.parse(dotFile);
+      } catch (error) {
+        // not a dot graph, such as the login page of a lapsed session: said as for a failed
+        // fetch, and the next press of Combined fetches the graph again
+        isCombinedLoading = false;
+        d3.select("#loading_c").classed("hidden", true);
+        d3.select("#combined_error").classed("hidden", false);
+        throw error;
+      }
+      // laid out in a worker, as the two single graphs are (main_duo.js); the loading note
+      // stays up until it is drawn
+      onceCombinedShown(function () {
+        layOutGraph(graph, "#graphContainer_c", function (laidOut) {
+          onceCombinedShown(function () {
+            isCombinedLoading = false;
+            d3.select("#loading_c").classed("hidden", true);
+            renderCombined(graph, laidOut);
+          });
+        });
+      });
     });
   }
 
-  function renderCombined(graph) {
+  // The blocks are measured, and the graph fitted to its pane, from what the pane shows: a
+  // hidden pane measures nothing, and the graph was drawn at scale(-Infinity). So the graph is
+  // measured and drawn only while the combined view is shown; what comes back while the
+  // side-by-side view is, waits until the combined view is shown again.
+  function onceCombinedShown(step) {
+    var combinedPane = document.getElementById("xcfg_combined");
+    if (combinedPane && combinedPane.getClientRects().length > 0) {
+      step();
+    } else {
+      whenCombinedShown = step;
+    }
+  }
+
+  function renderCombined(graph, laidOut) {
     var svg = d3.select("#graphContainer_c");
     var inner = d3.select("#graphContainer_c g");
     var renderer = new dagreD3.Renderer();
+    if (laidOut) {
+      renderer.layout({ run: function () { return laidOut; } });
+    }
     renderer.run(graph, inner);
 
     // colours and dashes come as attributes on the dot graph, see

@@ -1354,14 +1354,17 @@ function highlightUERs(UERtype){
                 cfgPanels.a.rendered = graph_to_display_a;  // mcritweb: issue #69
       
       
-                showGraph("a", node_colors);
-                // mcritweb: issue #69 - the two panels load independently, so a
-                // highlight switched on while this one was still in flight has
-                // already painted the other and would never reach these nodes.
-                reapplyHighlight();
-                renderLoopBoundaries("a");  // mcritweb: issue #69, was loopify_dagre.addBackground()
+                // mcritweb: laid out in a worker, so the page keeps responding meanwhile
+                layOutGraph(cfgPanels.a.rendered, cfgPanels.a.container, function(laidOut) {
+                  showGraph("a", node_colors, laidOut);
+                  // mcritweb: issue #69 - the two panels load independently, so a
+                  // highlight switched on while this one was still in flight has
+                  // already painted the other and would never reach these nodes.
+                  reapplyHighlight();
+                  renderLoopBoundaries("a");  // mcritweb: issue #69, was loopify_dagre.addBackground()
 
-                fnManip.init();
+                  fnManip.init();
+                });
                 // loopCollapser.init();
               });
       });
@@ -1398,18 +1401,111 @@ function highlightUERs(UERtype){
               cfgPanels.b.rendered = graph_to_display_b;  // mcritweb: issue #69
     
     
-              showGraph("b", node_colors);
-              // mcritweb: issue #69 - see the "a" loader.
-              reapplyHighlight();
-              renderLoopBoundaries("b");  // mcritweb: issue #69, see the "a" loader
+              // mcritweb: see the "a" loader
+              layOutGraph(cfgPanels.b.rendered, cfgPanels.b.container, function(laidOut) {
+                showGraph("b", node_colors, laidOut);
+                // mcritweb: issue #69 - see the "a" loader.
+                reapplyHighlight();
+                renderLoopBoundaries("b");  // mcritweb: issue #69, see the "a" loader
 
-              fnManip.init();
+                fnManip.init();
+              });
               // loopCollapser.init();
             });
     });
 
 
     d3.select("#loading").classed("hidden", true);
+  }
+
+  // mcritweb: dagre's layout takes seconds on a large graph, so it runs in a worker
+  // (layout_worker.js, which the single function page uses too) and the page keeps
+  // responding meanwhile. Sizing the blocks needs the DOM, so they are measured here first,
+  // by a renderer whose layout keeps the graph it is handed instead of laying it out: that
+  // is the graph, sized by dagre-d3's own code, that the renderer would have laid out. Calls
+  // back with the layout, as dagre-d3's renderer takes it from its layout, or with
+  // undefined when the worker cannot do it, and the graph is then laid out on the page as
+  // before. function_compare.js lays the combined graph out the same way.
+  function layOutGraph(graph, container_id, laidOut) {
+    var measured;
+    try {
+      measured = measureGraph(graph, container_id);
+    } catch (error) {
+      console.warn("laying the graph out on the page, it could not be measured", error);
+      laidOut(undefined);
+      return;
+    }
+    var worker;
+    try {
+      worker = new Worker(d3.select(container_id).attr("data-layout-worker"));
+    } catch (error) {
+      console.warn("laying the graph out on the page, the layout worker did not start", error);
+      laidOut(undefined);
+      return;
+    }
+    worker.onmessage = function(event) {
+      worker.terminate();
+      if (event.data.error) {
+        console.warn("laying the graph out on the page, the layout worker could not", event.data.error);
+        laidOut(undefined);
+        return;
+      }
+      var answer = event.data.graph;
+      var layout = dagreD3.json.decode(answer.nodes, answer.edges, answer.type);
+      layout.graph(answer.value);
+      laidOut(layout);
+    };
+    worker.onerror = function(event) {
+      // the script did not load or run: the layout itself reports through onmessage
+      event.preventDefault();
+      worker.terminate();
+      console.warn("laying the graph out on the page, the layout worker failed", event.message);
+      laidOut(undefined);
+    };
+    worker.postMessage(graphAsJson(measured));
+  }
+
+  function measureGraph(graph, container_id) {
+    var measured;
+    var measuredOnly = {};
+    var renderer = new dagreD3.Renderer().layout({ run: function(sized) { measured = sized; throw measuredOnly; } });
+    // the renderer writes the sizes into the node and edge values it is given, and draws a
+    // block that already has one at that size; the drawing must start from unsized values
+    var unsized = graph.copy();
+    unsized.eachNode(function(id, value) { unsized.node(id, Object.assign({}, value)); });
+    unsized.eachEdge(function(id, u, v, value) { unsized.edge(id, Object.assign({}, value)); });
+    try {
+      renderer.run(unsized, d3.select(container_id + " g"));
+    } catch (error) {
+      if (error !== measuredOnly) {
+        throw error;
+      }
+    } finally {
+      // what the renderer set up to draw the graph, so the drawing starts from the same page
+      d3.select(container_id + " g").selectAll("*").remove();
+      d3.select(container_id + " rect.overlay").remove();
+      d3.select(container_id).on(".zoom", null);
+    }
+    return measured;
+  }
+
+  // A graph as dagreD3.json.decode() takes it. dagreD3.json.encode() does the same, but only
+  // for the graph classes bundled with dagre-d3, and the page's graphs come from graphlib-dot.
+  function graphAsJson(graph) {
+    var nodes = [];
+    var edges = [];
+    graph.eachNode(function(id, value) {
+      var node = { id: id, value: value };
+      var children = graph.children ? graph.children(id) : [];
+      if (children.length) {
+        node.children = children;
+      }
+      nodes.push(node);
+    });
+    graph.eachEdge(function(id, u, v, value) {
+      edges.push({ id: id, u: u, v: v, value: value });
+    });
+    return { nodes: nodes, edges: edges, type: graph.children ? "cdigraph" : "digraph", value: graph.graph() };
   }
 
   // populate the dicts with nodes, edges, and edgelabels
@@ -2181,7 +2277,7 @@ function highlightUERs(UERtype){
 
   // The main function that sets up the graph, initializes all variables and 
   // sets up event listeners
-  function showGraph(graph_id, node_colors) {
+  function showGraph(graph_id, node_colors, laidOut) {
     // mcritweb: issue #69 - showGraph runs once per panel, and the handlers it
     // binds at the bottom used to say nothing about which panel they were for.
     // Everything they need comes off the panel table instead:
@@ -2203,6 +2299,10 @@ function highlightUERs(UERtype){
 
     // Render the graphlib object using d3.
     var renderer = new dagreD3.Renderer();
+    // mcritweb: a graph laid out by layOutGraph() is drawn with that layout
+    if (laidOut) {
+      renderer.layout({ run: function() { return laidOut; } });
+    }
     // renderer.run(g, d3.select("#graphContainer g"));
 
     //Render the modified file (output from loopified code) i.e. the file with invisible edges, ports etc.
