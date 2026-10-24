@@ -297,6 +297,15 @@ def create_app(test_config=None, instance_path=None):
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         return response
 
+    @app.after_request
+    def no_referrer_to_other_sites(response):
+        # our URLs carry job ids, sample hashes and search terms. Current browsers send
+        # another site only our origin by default, but that still names an instance that
+        # may be internal, and an older browser sends the whole URL. Requests within
+        # MCRITweb keep their Referer
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        return response
+
     @app.template_filter('silent')
     def silent(input):
         return ""
