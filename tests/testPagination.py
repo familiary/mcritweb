@@ -201,7 +201,8 @@ def test_a_quote_in_the_query_string_stays_inside_the_handler_url(client, as_rol
     did escape, but on the output of a macro - markup by then, holding `&#39;` and
     no quote to replace."""
     as_role("visitor")
-    response = client.get(path + "zz=%27%2Calert(1)%2C%27")
+    # the job list redirects to the URL that names its tab, and keeps the query on the way
+    response = client.get(path + "zz=%27%2Calert(1)%2C%27", follow_redirects=True)
 
     assert response.status_code == 200
     urls = [url for url in JS_LINK_LITERAL.findall(unescape(response.get_data(as_text=True))) if "zz=" in url]
