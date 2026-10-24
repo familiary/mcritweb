@@ -157,3 +157,104 @@ def test_removing_the_mapping_uncaps_every_role(app, client, as_role):
     app.config["QUERY_UPLOAD_LIMITS"] = {}
     as_role("visitor")
     assert post_query(client, VISITOR_LIMIT + 1).status_code != 403
+
+
+# --- the same cap on the API's query routes --------------------------------------------
+
+#: Every router branch that hands an uploaded body to a backend query.
+API_QUERY_PATHS = ["query/binary", "query/binary/mapped/4194304", "query/function"]
+
+
+def post_api_query(client, path, size, role):
+    """POST a body to the API the way a script holding `role`'s token does. Past the
+    gate the strict fake answers plain values, which `handle_raw_response` cannot read,
+    so a request that was let through may end in an exception - that counts as 'not
+    refused', exactly as in testApiTokens.py."""
+    try:
+        return client.post(f"/api/{path}", data=b"M" * size, headers={"apitoken": f"apitoken-{role}"}).status_code
+    except Exception:
+        return "dispatched"
+
+
+@pytest.mark.parametrize("path", API_QUERY_PATHS)
+def test_a_visitor_token_over_the_cap_is_refused_by_the_api_too(client, make_user, fake_mcrit, path):
+    """The API used to have no such check, so the same account that the web form
+    refused at 1 MiB could queue a query of up to MAX_CONTENT_LENGTH with its token."""
+    make_user("visitor")
+
+    assert post_api_query(client, path, VISITOR_LIMIT + 1, "visitor") == 403
+    assert not [call for call in fake_mcrit.calls if "Matches" in call[0]], "the oversized query reached the backend"
+
+
+@pytest.mark.parametrize("path", API_QUERY_PATHS)
+def test_a_visitor_token_under_the_cap_is_not_refused_by_it(client, make_user, path):
+    make_user("visitor")
+    assert post_api_query(client, path, 128, "visitor") != 403
+
+
+@pytest.mark.parametrize("path", API_QUERY_PATHS)
+def test_a_contributor_token_is_not_capped_by_the_api(client, make_user, path):
+    make_user("contributor")
+    assert post_api_query(client, path, VISITOR_LIMIT + 1, "contributor") != 403
+
+
+def test_an_oversized_declared_body_is_refused_without_being_read(client, make_user, monkeypatch):
+    """The cost of a refusal is the body it read. A request that declares its length
+    is turned away on the header alone."""
+    from werkzeug.wrappers import Request
+
+    reads = []
+    real_get_data = Request.get_data
+    monkeypatch.setattr(Request, "get_data", lambda self, *args, **kwargs: reads.append(1) or real_get_data(self, *args, **kwargs))
+    make_user("visitor")
+
+    assert post_api_query(client, "query/binary", VISITOR_LIMIT + 1, "visitor") == 403
+    assert not reads, "the body was read before the cap was applied"
+
+
+#: A chunked body: the test client always declares a length, so the declaration is
+#: blanked in the environ and the body is marked as framed by the server.
+CHUNKED = {"CONTENT_LENGTH": "", "HTTP_TRANSFER_ENCODING": "chunked", "wsgi.input_terminated": True}
+
+
+@pytest.mark.parametrize("size", [128, 8 * VISITOR_LIMIT])
+def test_a_capped_body_with_no_declared_length_is_refused_unread(client, make_user, size):
+    """Only reading it would tell how large it is, and McritClient always declares a
+    length. Where the stream stands afterwards is how far it was read."""
+    import io
+
+    make_user("visitor")
+    body = io.BytesIO(b"M" * size)
+
+    response = client.post("/api/query/binary", headers={"apitoken": "apitoken-visitor"},
+                           environ_overrides=dict(CHUNKED, **{"wsgi.input": body}))
+
+    assert response.status_code == 403
+    assert body.tell() == 0
+
+
+def test_the_cap_holds_where_flask_has_no_per_request_limit(client, make_user, monkeypatch):
+    """requirements.txt allows Flask 3.0, whose `request.max_content_length` is
+    read-only; setting it there raised AttributeError, a 500."""
+    import flask
+
+    monkeypatch.setattr(flask.Request, "max_content_length",
+                        property(lambda self: flask.current_app.config["MAX_CONTENT_LENGTH"]))
+    make_user("visitor")
+
+    response = client.post("/api/query/binary", data=b"M" * 128, headers={"apitoken": "apitoken-visitor"},
+                           environ_overrides=CHUNKED)
+
+    assert response.status_code == 403
+
+
+def test_an_uncapped_role_may_still_send_a_chunked_body(client, make_user, fake_mcrit):
+    make_user("contributor")
+
+    try:
+        client.post("/api/query/binary", data=b"M" * 128, headers={"apitoken": "apitoken-contributor"},
+                    environ_overrides=CHUNKED)
+    except Exception:
+        pass  # past the gate the strict fake answers values handle_raw_response cannot read
+
+    assert [call for call in fake_mcrit.calls if "Matches" in call[0]], "the query did not reach the backend"
