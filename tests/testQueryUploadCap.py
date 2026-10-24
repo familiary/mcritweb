@@ -108,3 +108,40 @@ def test_with_csrf_on_the_dropzone_upload_is_still_refused_unparsed(app, client,
 
     assert response.status_code == 403
     assert form_parses == []
+
+
+def test_with_csrf_a_token_in_the_form_does_not_get_the_upload_parsed(app, client, as_role, form_parses):
+    """Reading the header first was not enough: a caller could put the token in the form
+    instead, and the CSRF check then parsed the whole body to find it, before the cap was
+    looked at. On this route the check reads headers only, which is all the dropzone
+    sends, so the upload is refused unparsed either way."""
+    app.config["WTF_CSRF_ENABLED"] = True
+    as_role("visitor")
+    with client.session_transaction() as session:
+        session["csrf_token"] = "t" * 64
+
+    response = client.post(
+        "/analyze/query",
+        data={"csrf_token": "t" * 64, "options": "unmapped",
+              "file": (io.BytesIO(b"M" * (VISITOR_LIMIT + FORM_ALLOWANCE + 1)), "big.exe")},
+        content_type="multipart/form-data",
+    )
+
+    assert form_parses == []
+    assert response.status_code == 400
+
+
+def test_with_csrf_the_dropzone_upload_still_gets_through(app, client, as_role):
+    app.config["WTF_CSRF_ENABLED"] = True
+    as_role("visitor")
+    with client.session_transaction() as session:
+        session["csrf_token"] = "t" * 64
+
+    response = client.post(
+        "/analyze/query",
+        data={"options": "unmapped", "file": (io.BytesIO(b"M" * VISITOR_LIMIT), "sample.exe")},
+        content_type="multipart/form-data",
+        headers={"X-CSRF-Token": "t" * 64},
+    )
+
+    assert response.status_code == 202  # queued

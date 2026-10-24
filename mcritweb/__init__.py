@@ -259,6 +259,9 @@ def create_app(test_config=None, instance_path=None):
     # authenticates by `apitoken` header, never by the session cookie, so a
     # cross-site request has nothing to ride on. See mcritweb/csrf.py.
     csrf.exempt(api.bp)
+    # a token looked for in the form would have the whole upload parsed before
+    # analyze.query could refuse one over the caller's cap. See mcritweb/csrf.py.
+    csrf.header_only(analyze.query)
 
     db.init_app(app)
     db.migrate(app)
