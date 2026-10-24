@@ -9,7 +9,7 @@ unminified build for the minified one
 Bootstrap build for the minified one. That is still 156,958 bytes, 22,973 gzipped, and
 base.html loads it on every page as a render-blocking stylesheet, so the first paint
 waits for all of it. A fresh connection's first round trip carries about 14 KB. mcritweb
-uses a small part of Bootstrap: 566 of the build's 2,290 style rules keep a selector that
+uses a small part of Bootstrap: 551 of the build's 2,290 style rules keep a selector that
 can match something it renders.
 
 ## The rule
@@ -32,7 +32,7 @@ source, as `all.css` does for the icon subset.
 - **At-rules.** `@media` and `@supports` are cut inside and dropped when nothing is left.
   Any other at-rule, `@keyframes` for one, is kept whole.
 
-The cut is 53,323 bytes, 9,999 gzipped at the application's level. Bootstrap stays at
+The cut is 51,972 bytes, 9,846 gzipped at the application's level. Bootstrap stays at
 5.0.2, and nothing is restyled. In Chromium the computed style of every element and of its
 `::before` and `::after` is the same with the whole build and with the cut. That was
 checked on 22 pages, at 1440 and 390 px wide. Each page was read at rest, with the navbar's
