@@ -1,5 +1,5 @@
 import json
-import re
+import sqlite3
 
 import requests
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
@@ -11,7 +11,7 @@ from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_req
 from mcritweb.views.client import get_client
 from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
-from mcritweb.views.utility import forget_server_probe, get_session_user_id
+from mcritweb.views.utility import forget_server_probe, get_session_user_id, mcrit_server_required
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -25,15 +25,25 @@ def change_username():
     error_msg = None
     # cheapest check first, and the password before the lookup, so that whether a
     # name is taken is only ever answered to someone who proved who they are
-    if re.match(r"^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$", new_username) is None:
+    if not db.is_well_formed_username(new_username):
         error_msg = "Username has invalid format."
+    elif db.is_reserved_username(new_username):
+        error_msg = "Username is reserved."
     elif not check_password_hash(user_info.password, password):
         error_msg = 'Incorrect Password!'
     elif UserInfo.fromDb(username=new_username) is not None:
         error_msg = 'Username is already taken!'
     if error_msg is None:
+        old_username = user_info.username
         user_info.username = new_username
-        user_info.saveToDb()
+        try:
+            user_info.saveToDb()
+        except sqlite3.IntegrityError:
+            # the lookup above is not a lock: a registration or another rename can
+            # take the name before this write, and the UNIQUE column refuses it
+            user_info.username = old_username
+            error_msg = 'Username is already taken!'
+    if error_msg is None:
         flash('Username successfully changed', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')
@@ -55,8 +65,11 @@ def change_password():
         error_msg = 'Incorrect password!'
     if error_msg is None:
         user_info.password = generate_password_hash(new_password)
-        user_info.saveToDb(withPassword=True)
-        flash('Password successfully changed', category='success')
+        # the token is on /settings, so whoever could read that page with a stolen session
+        # could have copied it; it must not outlast the password change that ends the session
+        user_info.apitoken = generate_apitoken()
+        user_info.saveToDb()
+        flash('Password successfully changed. Your API token was replaced too; anything using the old one has to be updated.', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')
     return redirect(url_for('authentication.settings'))
@@ -305,28 +318,71 @@ def reset_server():
     return redirect(url_for('index'))
 
 
+def _redirect_to_scheduled_job(job_id, scheduled_message):
+    """Send the admin to the job they just scheduled, or say it was not scheduled.
+
+    A backend that refuses the request - out of workers, or simply older than the route -
+    answers None through McritClient, and url_for then raises a BuildError for the missing
+    job_id: a 500 on the admin page, where a message belongs. One that cannot be reached at
+    all raises instead, which `mcrit_server_required` on each route turns into its usual
+    message before the request is made. testRoutePolicy caught
+    it on the three routes below that mcrit 1.9.0 made possible; the three older ones had the
+    same hole and only ever avoided it because the backend answered.
+    """
+    if job_id is None:
+        flash('The backend did not accept the job, so nothing was scheduled.', category='error')
+        return redirect(url_for('admin.server'))
+    flash(scheduled_message, category='success')
+    return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
+
+
 @bp.route('/schedule_rebuild_index' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_rebuild_index():
     client = get_client()
-    job_id = client.rebuildIndex()
-    flash('A job for rebuilding the MinHash Index has been scheduled.', category='success')
-    return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
+    return _redirect_to_scheduled_job(client.rebuildIndex(), 'A job for rebuilding the MinHash Index has been scheduled.')
 
 
 @bp.route('/schedule_recalc_pichashes' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_recalc_pichashes():
     client = get_client()
-    job_id = client.recalculatePicHashes()
-    flash('A job for recalculating all PicHashes has been scheduled.', category='success')
-    return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
+    return _redirect_to_scheduled_job(client.recalculatePicHashes(), 'A job for recalculating all PicHashes has been scheduled.')
 
 
 @bp.route('/schedule_recalc_minhashes' , methods=('POST',))
 @admin_required
+@mcrit_server_required
 def schedule_recalc_minhashes():
     client = get_client()
-    job_id = client.recalculateMinHashes()
-    flash('A job for recalculating and indexing all MinHashes has been scheduled.', category='success')
-    return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
+    return _redirect_to_scheduled_job(client.recalculateMinHashes(), 'A job for recalculating and indexing all MinHashes has been scheduled.')
+
+
+# The three below arrived with mcrit 1.9.0. Until now they could only be started against the
+# backend directly, so an operator running MCRITweb had no way to repair a corpus from the
+# interface that told them it needed repairing - /status reports stale minhashes, the family
+# counters and the picblockhash index, and every one of the repairs was out of reach.
+@bp.route('/schedule_repair_minhashes' , methods=('POST',))
+@admin_required
+@mcrit_server_required
+def schedule_repair_minhashes():
+    client = get_client()
+    return _redirect_to_scheduled_job(client.repairMinHashes(), 'A job for repairing the MinHashes of samples hashed by an older smda has been scheduled.')
+
+
+@bp.route('/schedule_recompute_family_stats' , methods=('POST',))
+@admin_required
+@mcrit_server_required
+def schedule_recompute_family_stats():
+    client = get_client()
+    return _redirect_to_scheduled_job(client.recomputeFamilyStats(), 'A job for recomputing the family statistics has been scheduled.')
+
+
+@bp.route('/schedule_rebuild_picblockhash_index' , methods=('POST',))
+@admin_required
+@mcrit_server_required
+def schedule_rebuild_picblockhash_index():
+    client = get_client()
+    return _redirect_to_scheduled_job(client.rebuildPicBlockHashIndex(), 'A job for rebuilding the PicBlockHash index has been scheduled.')
