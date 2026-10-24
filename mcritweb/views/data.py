@@ -686,7 +686,10 @@ def match_functions(function_id_a, function_id_b):
 # download puts it: a cache filename match, a path handed to send_from_directory,
 # and a filename in the Content-Disposition header. Matched with fullmatch rather
 # than `$`, which would also accept a trailing newline - and a newline is exactly
-# what splits a response header in two.
+# what splits a response header in two. Every route that hands a job id from the
+# request to getJobData, getResultForJob or deleteJob checks it too: the backend
+# client puts it into its request path unquoted, where ".." resolves to the
+# backend's root and its answer was read as a job.
 JOB_ID_PATTERN = re.compile(r"[0-9a-fA-F]+")
 
 
@@ -746,6 +749,8 @@ def download_result(job_id):
 @mcrit_server_required
 # TODO:  refactor, simplify
 def result(job_id):
+    if not JOB_ID_PATTERN.fullmatch(job_id):
+        return render_template("result_invalid.html", job_id=job_id)
     client = get_client()
     # check if we have the respective report already locally cached
     result_json = load_cached_result(current_app, job_id)
@@ -1448,6 +1453,8 @@ LINKHUNTABLE_METHODS = (
 @mcrit_server_required
 # TODO:  refactor, simplify
 def linkhunt(job_id):
+    if not JOB_ID_PATTERN.fullmatch(job_id):
+        return render_template("result_invalid.html", job_id=job_id)
     client = get_client()
     # check if we have the respective report already locally cached
     result_json = load_cached_result(current_app, job_id)
@@ -1805,7 +1812,7 @@ def job_by_id(job_id):
     auto_refresh = parse_integer_query_param(request, "refresh") or 0
     auto_forward = parse_integer_query_param(request, "forward") or 0
 
-    job_info = client.getJobData(job_id)
+    job_info = client.getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if auto_refresh and job_info and job_info.is_failed:
         auto_refresh = 0
         suppress_processing_message = True
@@ -1896,7 +1903,7 @@ def job_overview_state(job_info):
 @mcrit_server_required
 def job_status(job_id):
     """The job overview's polling endpoint: one getJobData, as JSON."""
-    job_info = get_client().getJobData(job_id)
+    job_info = get_client().getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if job_info is None:
         return {"error": "unknown job"}, 404
     return job_overview_state(job_info)
@@ -1953,7 +1960,7 @@ def delete_job_by_id(job_id):
         if jobs:
             for job in jobs:
                 client.deleteJob(job.job_id)
-    else:
+    elif JOB_ID_PATTERN.fullmatch(job_id):
         client.deleteJob(job_id)
     return redirect(url_for("data.jobs"))
     
@@ -2204,7 +2211,7 @@ def query_report_sample_info(client, job_info):
 def promote_query(job_id):
     """Add the file a query was run for to the corpus, without a second upload."""
     client = get_client()
-    job_info = client.getJobData(job_id)
+    job_info = client.getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if job_info is None:
         flash("The given Job ID doesn't exist", category='error')
         return redirect(url_for('data.jobs'))
