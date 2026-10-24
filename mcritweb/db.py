@@ -128,12 +128,21 @@ class UserInfo:
         if self.user_id is None or self.username != self._stored.get("username"):
             # the UNIQUE column compares exactly, so "Alice" could sit next to "alice" in
             # the approval list and on labels. A new name is refused the same way when it
-            # differs from someone else's only in case; names already stored are left alone
+            # differs from someone else's only in case; names already stored are left alone.
+            # Nothing but this lookup enforces that, and a lookup is not a lock: two
+            # registrations of "Eve" and "eve" could both find the name free before either
+            # was written. So the write lock is taken first and held until the commit
+            # below, unless the caller holds it already - first-user registration does.
+            began = not database.in_transaction
+            if began:
+                database.execute("BEGIN IMMEDIATE;")
             clash = database.execute(
                 "SELECT 1 FROM user WHERE username = ? COLLATE NOCASE AND id IS NOT ? LIMIT 1;",
                 (self.username, self.user_id),
             ).fetchone()
             if clash:
+                if began:
+                    database.rollback()
                 raise sqlite3.IntegrityError("UNIQUE constraint failed: user.username (ignoring case)")
         if self.user_id is None:
             database.execute(

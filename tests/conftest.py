@@ -5,10 +5,12 @@ a fake MCRIT backend substituted through the MCRIT_CLIENT_FACTORY config key, so
 test needs a running mcrit-server. See issue #88.
 """
 
+import threading
+
 import pytest
 from werkzeug.security import generate_password_hash
 
-from mcritweb import create_app
+from mcritweb import create_app, db
 from mcritweb.db import ServerInfo, UserInfo, init_db
 from mcritweb.views.authentication import PASSWORD_MARK, password_mark
 
@@ -394,3 +396,34 @@ def session_cookie_for(app, user_id):
     with app.app_context():
         mark = password_mark(UserInfo.fromDb(user_id=user_id))
     return app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id, PASSWORD_MARK: mark})
+
+
+def hold_each_write_for_the_other(monkeypatch, *statements):
+    """Hold a request's SQL statement that starts with one of `statements` until a second
+    request has reached one of its own, for up to a second - so that both have made the
+    checks that come before their write.
+
+    A write that is checked first and then made without a lock lets both requests pass
+    the check before either has written. One that takes the write lock before its check
+    keeps the other out of its own, so the wait times out and the first goes on alone.
+    The statements are matched as sqlite3's trace callback reports them, with their
+    parameters filled in.
+    """
+    both_here = threading.Barrier(2, timeout=1)
+
+    def hold(statement):
+        if statement.startswith(statements):
+            try:
+                both_here.wait()
+            except threading.BrokenBarrierError:
+                # the other is kept out by a lock, or already gave up waiting here
+                pass
+
+    get_db = db.get_db
+
+    def get_held_db():
+        connection = get_db()
+        connection.set_trace_callback(hold)
+        return connection
+
+    monkeypatch.setattr(db, "get_db", get_held_db)
