@@ -1,8 +1,8 @@
-/*! jQuery UI - v1.13.1 - 2022-01-20
-* http://jqueryui.com
+/*! jQuery UI - v1.13.3 - 2024-04-26
+* https://jqueryui.com
 * Includes: widget.js, data.js, scroll-parent.js, ie.js, widgets/mouse.js, widgets/sortable.js
 * (cut from the full build by scripts/subset_jquery_ui.py)
-* Copyright jQuery Foundation and other contributors; Licensed MIT */
+* Copyright OpenJS Foundation and other contributors; Licensed MIT */
 
 ( function( factory ) {
 	"use strict";
@@ -21,22 +21,22 @@
 
 $.ui = $.ui || {};
 
-var version = $.ui.version = "1.13.1";
+var version = $.ui.version = "1.13.3";
 
 /*!
- * jQuery UI Widget 1.13.1
- * http://jqueryui.com
+ * jQuery UI Widget 1.13.3
+ * https://jqueryui.com
  *
- * Copyright jQuery Foundation and other contributors
+ * Copyright OpenJS Foundation and other contributors
  * Released under the MIT license.
- * http://jquery.org/license
+ * https://jquery.org/license
  */
 
 //>>label: Widget
 //>>group: Core
 //>>description: Provides a factory for creating stateful widgets with a common API.
-//>>docs: http://api.jqueryui.com/jQuery.widget/
-//>>demos: http://jqueryui.com/widget/
+//>>docs: https://api.jqueryui.com/jQuery.widget/
+//>>demos: https://jqueryui.com/widget/
 
 
 var widgetUuid = 0;
@@ -765,18 +765,18 @@ $.each( { show: "fadeIn", hide: "fadeOut" }, function( method, defaultEffect ) {
 var widget = $.widget;
 
 /*!
- * jQuery UI :data 1.13.1
- * http://jqueryui.com
+ * jQuery UI :data 1.13.3
+ * https://jqueryui.com
  *
- * Copyright jQuery Foundation and other contributors
+ * Copyright OpenJS Foundation and other contributors
  * Released under the MIT license.
- * http://jquery.org/license
+ * https://jquery.org/license
  */
 
 //>>label: :data Selector
 //>>group: Core
 //>>description: Selects elements which have data stored under the specified key.
-//>>docs: http://api.jqueryui.com/data-selector/
+//>>docs: https://api.jqueryui.com/data-selector/
 
 
 var data = $.extend( $.expr.pseudos, {
@@ -794,18 +794,18 @@ var data = $.extend( $.expr.pseudos, {
 } );
 
 /*!
- * jQuery UI Scroll Parent 1.13.1
- * http://jqueryui.com
+ * jQuery UI Scroll Parent 1.13.3
+ * https://jqueryui.com
  *
- * Copyright jQuery Foundation and other contributors
+ * Copyright OpenJS Foundation and other contributors
  * Released under the MIT license.
- * http://jquery.org/license
+ * https://jquery.org/license
  */
 
 //>>label: scrollParent
 //>>group: Core
 //>>description: Get the closest ancestor element that is scrollable.
-//>>docs: http://api.jqueryui.com/scrollParent/
+//>>docs: https://api.jqueryui.com/scrollParent/
 
 
 var scrollParent = $.fn.scrollParent = function( includeHidden ) {
@@ -830,18 +830,18 @@ var scrollParent = $.fn.scrollParent = function( includeHidden ) {
 var ie = $.ui.ie = !!/msie [\w.]+/.exec( navigator.userAgent.toLowerCase() );
 
 /*!
- * jQuery UI Mouse 1.13.1
- * http://jqueryui.com
+ * jQuery UI Mouse 1.13.3
+ * https://jqueryui.com
  *
- * Copyright jQuery Foundation and other contributors
+ * Copyright OpenJS Foundation and other contributors
  * Released under the MIT license.
- * http://jquery.org/license
+ * https://jquery.org/license
  */
 
 //>>label: Mouse
 //>>group: Widgets
 //>>description: Abstracts mouse-based interactions to assist in creating certain widgets.
-//>>docs: http://api.jqueryui.com/mouse/
+//>>docs: https://api.jqueryui.com/mouse/
 
 
 var mouseHandled = false;
@@ -850,7 +850,7 @@ $( document ).on( "mouseup", function() {
 } );
 
 var widgetsMouse = $.widget( "ui.mouse", {
-	version: "1.13.1",
+	version: "1.13.3",
 	options: {
 		cancel: "input, textarea, button, select, option",
 		distance: 1,
@@ -1047,24 +1047,24 @@ var widgetsMouse = $.widget( "ui.mouse", {
 } );
 
 /*!
- * jQuery UI Sortable 1.13.1
- * http://jqueryui.com
+ * jQuery UI Sortable 1.13.3
+ * https://jqueryui.com
  *
- * Copyright jQuery Foundation and other contributors
+ * Copyright OpenJS Foundation and other contributors
  * Released under the MIT license.
- * http://jquery.org/license
+ * https://jquery.org/license
  */
 
 //>>label: Sortable
 //>>group: Interactions
 //>>description: Enables items in a list to be sorted using the mouse.
-//>>docs: http://api.jqueryui.com/sortable/
-//>>demos: http://jqueryui.com/sortable/
+//>>docs: https://api.jqueryui.com/sortable/
+//>>demos: https://jqueryui.com/sortable/
 //>>css.structure: ../../themes/base/sortable.css
 
 
 var widgetsSortable = $.widget( "ui.sortable", $.ui.mouse, {
-	version: "1.13.1",
+	version: "1.13.3",
 	widgetEventPrefix: "sort",
 	ready: false,
 	options: {
