@@ -47,6 +47,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
 logging.disable(logging.CRITICAL)
 
 TEMPLATE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "mcritweb" / "templates"
+STATIC_ROOT = TEMPLATE_ROOT.parent / "static"
 BASE = TEMPLATE_ROOT / "base.html"
 
 #: assets base.html must not load, and where they belong instead
@@ -90,6 +91,13 @@ def code_of(path):
 
 def templates_containing(needle):
     return {path.name for path in TEMPLATE_ROOT.rglob("*.html") if needle in code_of(path)}
+
+
+@pytest.mark.parametrize("asset", ["jquery.dataTables.min.js", "dataTables.bootstrap5.min.js", "dataTables.bootstrap5.min.css"])
+def test_datatables_is_not_shipped(asset):
+    """Nothing loads DataTables any more, and unlike all.css or the full Bootstrap build it
+    is no subset's source, so the files went with it (#63's first item)."""
+    assert not (STATIC_ROOT / asset).exists()
 
 
 @pytest.mark.parametrize("asset", RETIRED)
