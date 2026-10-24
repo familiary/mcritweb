@@ -332,3 +332,21 @@ def test_a_unique_blocks_result_page_folds_its_requested_samples(client, as_role
     assert unfolded.startswith("<details><summary>samples 0–4, 999 (6)</summary>"), unfolded
     assert re.findall(r'/explore/samples/(\d+)"', unfolded) == ["0", "1", "2", "3", "4", "999"]
 
+
+def test_the_requested_samples_unfold_under_their_families(client, as_role, corpus_mcrit):
+    """By family, the way the jobs list groups a cross compare's samples (#226), and a
+    sample the backend has no entry for under "-". The families come from the entries the
+    page fetches for the samples' versions anyway, so it still asks for samples once."""
+    serve_sample_set_result(corpus_mcrit, [0, 1, 2, 3, 4, 999])
+    as_role("visitor")
+    corpus_mcrit.calls.clear()
+    unfolded = requested_samples(client)
+
+    lines = re.findall(r'<i class="fa-solid fa-bug " title="Family ID"></i> (.*?) \| <i class="fa-solid fa-virus " title="Sample ID"></i> (.*?) ?<br />', unfolded)
+    assert [(re.sub(r"<[^>]*>", "", family).strip(), re.findall(r'/explore/samples/(\d+)"', samples)) for family, samples in lines] == [
+        ("win.citadel", ["0", "1", "2"]),
+        ("win.vmzeus", ["3", "4"]),
+        ("-", ["999"]),
+    ]
+    sample_requests = [(name, args) for name, args, _ in corpus_mcrit.calls if name in ("getSamplesByIds", "getSampleById")]
+    assert sample_requests == [("getSamplesByIds", ([0, 1, 2, 3, 4, 999],))]
