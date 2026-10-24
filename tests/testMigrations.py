@@ -187,6 +187,24 @@ CREATE TABLE user_column_settings (
 );
 """
 
+# v1.6.0: the schema session_generation is migrated onto - v1.4.8's plus the two tables
+# v1.5.0 added, verbatim
+SCHEMA_V1_6_0 = SCHEMA_V1_4_8 + """
+CREATE TABLE login_attempt (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    remote_addr VARCHAR NOT NULL,
+    username VARCHAR,
+    attempted_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_login_attempt_addr_time ON login_attempt (remote_addr, attempted_at);
+
+CREATE TABLE query_upload (
+  job_id VARCHAR PRIMARY KEY,
+  filename VARCHAR NOT NULL
+);
+"""
+
 
 # --- helpers ---------------------------------------------------------------------
 
@@ -441,6 +459,21 @@ def test_a_v1_4_8_database_only_gains_query_upload(tmp_path):
     assert "query_upload" in _tables(db_path)
     assert _columns(db_path, "query_upload") == ["job_id", "filename"]
     assert _query(db_path, "SELECT user_id, samples_table_sample_id FROM user_column_settings") == [(1, 6)]
+
+
+def test_existing_users_gain_a_session_generation_of_0(tmp_path):
+    """The step logout's session generation needs (#284), from the schema it starts from,
+    and only once. Every account starts at 0 rather than NULL: NULL + 1 is NULL, so a
+    logout could never move a NULL generation on."""
+    db_path = _legacy_database(tmp_path, SCHEMA_V1_6_0)
+    _insert_legacy_user(db_path, "olduser", with_apitoken=True)
+    assert "session_generation" not in _columns(db_path, "user")
+
+    _run_migration(tmp_path, db_path)
+    _run_migration(tmp_path, db_path)
+
+    assert _query(db_path, "SELECT username, apitoken, session_generation FROM user") == [
+        ("olduser", "preexisting-token", 0)]
 
 
 def test_the_current_schema_is_a_no_op(tmp_path):

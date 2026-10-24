@@ -10,6 +10,7 @@ from werkzeug.security import generate_password_hash
 
 from mcritweb import create_app
 from mcritweb.db import ServerInfo, UserInfo, init_db
+from mcritweb.views.authentication import PASSWORD_MARK, password_mark
 
 #: The MinHash-relevant configuration this fake instance claims. `MinHashIndex.addImportData`
 #: compares an export's `config.shingler` / `config.minhash` against the receiving instance's
@@ -368,7 +369,28 @@ def as_role(client, make_user):
     """
     def _as_role(role="admin", username=None):
         user_id = make_user(role=role, username=username)
-        with client.session_transaction() as test_session:
-            test_session["user_id"] = user_id
+        log_in_as(client, user_id)
         return user_id
     return _as_role
+
+
+def log_in_as(client, user_id, **session_kwargs):
+    """Give `client` the session /login would have given `user_id`, without the password.
+
+    That is the account's id and the mark of the account as it is now: a session without
+    the mark is ended on its next request, as one from before marks existed would be.
+    `session_kwargs` go to `session_transaction`, e.g. `base_url`.
+    """
+    with client.application.app_context():
+        mark = password_mark(UserInfo.fromDb(user_id=user_id))
+    with client.session_transaction(**session_kwargs) as test_session:
+        test_session["user_id"] = user_id
+        test_session[PASSWORD_MARK] = mark
+
+
+def session_cookie_for(app, user_id):
+    """A signed session cookie for a browser, holding what `log_in_as` puts in a test
+    client's session."""
+    with app.app_context():
+        mark = password_mark(UserInfo.fromDb(user_id=user_id))
+    return app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id, PASSWORD_MARK: mark})

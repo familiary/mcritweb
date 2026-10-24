@@ -30,6 +30,7 @@ import re
 import unittest
 
 import pytest
+from conftest import log_in_as
 
 from mcritweb.views.cursor_pagination import SORT_MEMORY_SESSION_KEY, SORTABLE_FIELDS
 
@@ -110,8 +111,7 @@ def test_the_memory_is_per_session(client, app, as_role, fake_mcrit):
     client.get("/explore/samples?sort=filename&ascending=false")
 
     other_browser = app.test_client()
-    with other_browser.session_transaction() as other_session:
-        other_session["user_id"] = user_id
+    log_in_as(other_browser, user_id)
     other_browser.get("/explore/samples")
 
     assert last_search(fake_mcrit, "samples") == ("sample_id", True)

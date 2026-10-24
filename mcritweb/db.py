@@ -68,7 +68,8 @@ def generate_apitoken():
 
 class UserInfo:
 
-    #: The columns of `user` a UserInfo carries besides its id, as attribute names.
+    #: The columns of `user` a UserInfo carries besides its id, as attribute names. The
+    #: session generation is not among them: only endSessions writes it.
     COLUMNS = ("username", "password", "role", "registered", "last_login", "apitoken")
 
     def __init__(self) -> None:
@@ -80,6 +81,8 @@ class UserInfo:
         self.registered = None
         self.last_login = None
         self.apitoken = None
+        # what the column starts at, see endSessions
+        self.session_generation = 0
         # the values the row had when it was read, see saveToDb
         self._stored = {}
 
@@ -103,6 +106,7 @@ class UserInfo:
             if record["last_login"] != "no login":
                 user_info.last_login = parse_timestamp(record["last_login"])
             user_info.apitoken = record["apitoken"]
+            user_info.session_generation = record["session_generation"]
             user_info._stored = {column: getattr(user_info, column) for column in cls.COLUMNS}
         else:
             user_info = None
@@ -163,7 +167,19 @@ class UserInfo:
             database.execute("UPDATE user SET password = ? WHERE id = ? AND password = ?;",
                              (self.password, self.user_id, verified_password))
         database.commit()
-    
+
+    def endSessions(self):
+        """End every session of this account, wherever it is.
+
+        A session carries the generation it logged in under (see
+        authentication.password_mark), and this moves the account's on. Counted up in
+        the row rather than written from this copy, so two logouts at once cannot write
+        back the same number, or an older one that brings an ended session back.
+        """
+        database = get_db()
+        database.execute("UPDATE user SET session_generation = session_generation + 1 WHERE id = ?;", (self.user_id,))
+        database.commit()
+
     @property
     def registration_date(self):
         return self.registered.strftime("%Y-%m-%d")
@@ -762,6 +778,11 @@ def migrate(app_context):
                 # the token itself is deliberately not printed: it authenticates its
                 # owner to /api, and this line goes to the container log
                 print(f"EXECUTED MIGRATION: ADD APITOKEN TO USER_ID {user_id} FROM TABLE USER")
+        # since logout ends every session of the account (#284), users have a session
+        # generation; every existing row starts at 0
+        if "session_generation" not in user_table_columns:
+            db.execute('ALTER TABLE user ADD session_generation INTEGER NOT NULL DEFAULT 0')
+            print("EXECUTED MIGRATION: ADD SESSION_GENERATION TO TABLE USER")
         # since version v1.2.10, we have an additional server_token field, ensure it exists (empty)
         server_table_columns = list(map(lambda x: x[0], db.execute('SELECT * FROM server').description))
         if "server_token" not in server_table_columns:

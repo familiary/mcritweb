@@ -1,11 +1,13 @@
 #!/usr/bin/python
-"""A password change ends the account's other sessions.
+"""A password change ends the account's other sessions, and a logout ends all of them.
 
 The session is Flask's signed cookie, and nothing on the server tied it to the password
 it was issued for. A copy of the cookie - from a shared machine, a proxy log, a browser
 profile - kept working after its owner changed the password, for as long as Flask accepts
-the signature (PERMANENT_SESSION_LIFETIME, 31 days). Logging out clears only the browser's
-own copy, so that is still the case for logout: there is no server-side session to end.
+the signature (PERMANENT_SESSION_LIFETIME, 31 days). Logging out cleared only the
+browser's own copy, so the same copy outlived a logout too. There is still no server-side
+session to end; the account's session generation, folded into the mark every session
+carries, is what a logout moves on instead (#284).
 """
 
 import hashlib
@@ -89,18 +91,19 @@ def test_the_session_that_changed_the_password_stays_logged_in(app, carol):
         assert check_password_hash(UserInfo.fromDb(username="carol").password, NEW_PASSWORD)
 
 
-def test_a_session_from_before_the_mark_is_marked_and_then_ends_too(app, carol):
-    """A cookie issued before this change carries only user_id. It keeps working - every
-    user would otherwise be logged out by the upgrade - and is marked on its next request,
-    so a later password change ends it like any other."""
+def test_a_session_from_before_the_mark_is_ended(app, carol):
+    """A cookie issued before marks existed carries only user_id. It used to be given a
+    mark on its next request, whenever that came - so a copy left unused across a
+    password change was marked with the new password and kept working. Nothing in it
+    says which password it was issued for, so it is ended instead, and its user logs in
+    once more after the upgrade."""
     older = app.test_client()
     with older.session_transaction() as old_session:
         old_session["user_id"] = carol
-    assert is_logged_in(older)
-
-    change_password(logged_in(app))
 
     assert not is_logged_in(older)
+    with older.session_transaction() as old_session:
+        assert "user_id" not in old_session
 
 
 def test_the_cookie_carries_nothing_to_test_password_guesses_against(app, carol):
@@ -139,3 +142,35 @@ def test_a_failed_password_change_keeps_the_api_token(app, carol):
 
     with app.app_context():
         assert UserInfo.fromDb(username="carol").apitoken == "apitoken-carol"
+
+
+# --- logging out --------------------------------------------------------------------
+
+def test_a_copied_session_ends_when_its_owner_logs_out(app, carol):
+    owner = logged_in(app)
+    copy = copy_of(app, owner)
+    assert is_logged_in(copy)
+
+    owner.get("/logout")
+
+    assert not is_logged_in(copy)
+
+
+def test_logging_out_ends_the_other_logins_of_the_account_too(app, carol):
+    laptop = logged_in(app)
+    phone = logged_in(app)
+
+    laptop.get("/logout")
+
+    assert not is_logged_in(phone)
+    # and logging in again starts a session the logout does not reach
+    assert is_logged_in(logged_in(app))
+
+
+def test_logging_out_leaves_other_accounts_logged_in(app, carol):
+    boss = app.test_client()
+    boss.post("/login", data={"username": "boss", "inputPassword": "password"})
+
+    logged_in(app).get("/logout")
+
+    assert boss.get("/settings").status_code == 200

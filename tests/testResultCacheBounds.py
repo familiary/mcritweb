@@ -21,6 +21,7 @@ import os
 import unittest
 
 import pytest
+from conftest import log_in_as
 from fixtureData import job_id_of, load
 
 LOG = logging.getLogger(__name__)
@@ -352,8 +353,7 @@ def test_a_bound_given_as_text_is_enforced(tmp_path, fake_mcrit):
         user_info.saveToDb()
         user_id = UserInfo.fromDb(username="visitor").user_id
     client = application.test_client()
-    with client.session_transaction() as test_session:
-        test_session["user_id"] = user_id
+    log_in_as(client, user_id)
 
     for report in REPORTS[:2]:
         assert client.get(f"/data/result/{job_id_of(report)}").status_code == 200

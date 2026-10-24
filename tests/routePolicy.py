@@ -116,7 +116,10 @@ ROUTE_POLICY = {
     "dropzone.static": (PUBLIC, READ_ONLY),
 
     # --- authenticated, any role including 'pending' -----------------------------
-    "authentication.logout": (LOGGED_IN, WRITES_ON_GET),   # session teardown, by design
+    # session teardown, by design. It also moves the account's session generation on,
+    # which ends its sessions everywhere (#284) - so a link on another site, followed
+    # with the Lax cookie, logs the account out in every browser, not just this one
+    "authentication.logout": (LOGGED_IN, WRITES_ON_GET),
     "authentication.settings": (LOGGED_IN, READ_ONLY),
     "admin.change_username": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_password": (LOGGED_IN, WRITES_ON_POST),
