@@ -20,6 +20,7 @@ See issue #39.
 """
 
 import collections
+import copy
 import inspect
 import json
 import logging
@@ -275,3 +276,59 @@ def test_a_unique_blocks_job_page_keeps_every_sample_in_the_title(client, as_rol
     as_role("visitor")
     page = client.get(f"/data/jobs/{job_id_of('unique_blocks')}").get_data(as_text=True)
     assert 'title="getUniqueBlocks([0, 1, 2], 1)">UniqueBlocks | samples 0–2 (3) | family: 1<' in page
+
+
+def sample_set_job(job_id, sample_ids):
+    """The captured unique blocks job as requestUniqueBlocksForSamples queues one: the
+    sample ids alone, no family."""
+    document = json.loads((pathlib.Path(__file__).parent / "fixtures" / "unique_blocks.job.json").read_text())
+    document["_id"] = {"$oid": job_id}
+    document["payload"]["params"] = json.dumps({"0": sample_ids})
+    document["payload"]["descriptor"] = json.dumps(["getUniqueBlocks", {"0": sample_ids}, {}])
+    return document
+
+
+def test_the_jobs_list_names_a_unique_blocks_jobs_samples_like_its_task_row(client, as_role, corpus_mcrit, monkeypatch):
+    """The list printed the count and then every id; it prints the Task row's line now,
+    and the line's title holds the ids it used to print."""
+    job = Job(sample_set_job("6a74660af8b8d2c6f8366401", [0, 1, 2, 3, 4, 7, 9]), None)
+    monkeypatch.setattr(corpus_mcrit, "getQueueData", lambda *args, **kwargs: [job])
+    as_role("visitor")
+    page = client.get("/data/jobs?active=getUniqueBlocks").get_data(as_text=True)
+
+    assert 'UniqueBlocks | <span title="0, 1, 2, 3, 4, 7, 9">samples 0–4, 7, 9 (7)</span>' in page
+    assert page.count("0, 1, 2, 3, 4, 7, 9") == 1, "the ids are still listed outside the title"
+
+
+#: The sample set job the result page tests below are served under.
+SAMPLE_SET_JOB_ID = "6a74660af8b8d2c6f8366402"
+
+
+def serve_sample_set_result(corpus_mcrit, sample_ids):
+    """The captured report as a sample set job's over `sample_ids`, with a statistics row
+    for each of them, as mcrit writes one per requested sample."""
+    result = copy.deepcopy(corpus_mcrit._jobs[job_id_of("unique_blocks")][1])
+    by_sample_id = result["statistics"]["by_sample_id"]
+    for sample_id in sample_ids:
+        by_sample_id[str(sample_id)] = dict(by_sample_id["0"], sample_id=sample_id)
+    corpus_mcrit._jobs[SAMPLE_SET_JOB_ID] = (sample_set_job(SAMPLE_SET_JOB_ID, sample_ids), result)
+
+
+def requested_samples(client):
+    """What the result page's Requested Samples row unfolds into, whitespace collapsed."""
+    page = client.get(f"/data/result/{SAMPLE_SET_JOB_ID}").get_data(as_text=True)
+    row = page[page.index("Requested Samples"):]
+    row = re.sub(r"\s+", " ", row[:row.index("</tr>")])
+    return row[row.index("<details>"):row.index("</details>")]
+
+
+def test_a_unique_blocks_result_page_folds_its_requested_samples(client, as_role, corpus_mcrit):
+    """The Requested Samples row linked every id; it gives the Task row's line now, and
+    opens into every sample, still linked. 999 is a sample deleted since."""
+    serve_sample_set_result(corpus_mcrit, [0, 1, 2, 3, 4, 999])
+    as_role("visitor")
+    unfolded = requested_samples(client)
+
+    assert unfolded.startswith("<details><summary>samples 0–4, 999 (6)</summary>"), unfolded
+    assert re.findall(r'/explore/samples/(\d+)"', unfolded) == ["0", "1", "2", "3", "4", "999"]
+

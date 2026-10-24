@@ -93,7 +93,11 @@ Unique Blocks for {{ sample_ids|length }} Samples
     {% else %}
     <tr>
       <td valign="middle">Requested Samples</td>
-      <td valign="middle">{% for id in sample_ids %}{{ format_sample_id(id) }} {% endfor %}</td>
+      {# the line the job's Task row gives, folded the way linkhunt.html folds a long
+         cluster: open, it links every sample (issue #300) #}
+      <td valign="middle"><details><summary>{{ sample_ids|unique_blocks_samples }}</summary>
+        {% for id in sample_ids %}{{ format_sample_id(id) }} {% endfor %}
+      </details></td>
     </tr>
     {% endif %}
     <tr>

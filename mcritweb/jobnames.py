@@ -128,7 +128,8 @@ def _sample_word(count):
 #: A unique blocks job names its samples one by one, up to the 250 the selection page
 #: allows (`analyze.MAX_SELECTED_SAMPLES`) or a whole family's. The task line folds runs
 #: of consecutive ids into ranges, and past this many ranges and single ids it gives only
-#: the count; the row's title still carries the call with every id (issue #300).
+#: the count; the row's title still carries the call with every id (issue #300). The jobs
+#: list and the result page print the same line, through `unique_blocks_samples`.
 MAX_LISTED_SAMPLE_RUNS = 5
 
 
@@ -149,7 +150,9 @@ def _sample_ranges(sample_ids):
     return pieces
 
 
-def _unique_blocks_samples(sample_ids):
+def unique_blocks_samples(sample_ids):
+    """`samples 14–17, 20, 21, 30 (7)`, `sample 16` or `10 samples`: the samples of a
+    unique blocks job as its Task row names them."""
     if not sample_ids:
         return "no samples"
     # mcrit's server only queues ints here, parsed from the request path or read from a
@@ -184,7 +187,7 @@ def _task_details(job, positional):
     if method == "combineMatchesToCross" and isinstance(arg, dict):
         return _sample_word(len(arg))
     if method == "getUniqueBlocks" and isinstance(arg, list):
-        return _unique_blocks_samples(arg)
+        return unique_blocks_samples(arg)
     if method in ("deleteFamily", "modifyFamily"):
         return f"family {arg}" if arg is not None else None
     if method == "getMatchesForMappedBinary":
