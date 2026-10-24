@@ -144,7 +144,12 @@ The page is organized in collapsible sections:
 
 ![The MinHash and basic block sections](images/function_sections.png "The MinHash and basic block sections")
 
-The buttons in the top right corner open the analyze menu, lead to the function's sample and family, show the API usage and jump to the CFG.
+The buttons in the top right corner open the analyze menu, lead to the function's sample and family, rename the function, show the API usage and jump to the CFG.
+
+Contributors can rename a function; the MCRIT backend records every name as a label by the user who set it, so the *Function Labels* row keeps who named the function when (this needs an MCRIT backend of version 1.10.0 or newer, which MCRITweb checks through the backend's version, otherwise the button is disabled).
+The same operation is available to API tokens with the contributor role as `PUT /api/functions/<function_id>` with a `function_name` field:
+
+![Renaming a function](images/function_rename.png "Renaming a function")
 The analyze menu starts a 1vsN, 1vs1 or cross compare job for the sample, searches for all functions sharing the PicHash, or compares this function with any other stored function by its function_id:
 
 ![The analyze menu of a function](images/function_analyze_menu.png "The analyze menu of a function")
@@ -190,6 +195,7 @@ This usually delivers immediate results as the matching candidate are limited to
 When wanting to compare a group of samples among each others, use Cross-Compare.
 Technically, this will trigger 1vsN matching jobs for all selected samples but will also generate a comparison matrix for all samples.
 This matrix is automatically ordered using hierarchical clustering and its individual fields can be clicked to get to the respective 1vs1 comparison.
+The ordering buttons switch between that clustered order, ascending sample ID and family name, and the sample list can also be rearranged per drag and drop; whichever order is chosen applies to all six matrices.
 The view looks like this:
 
 ![An example for a cross matching matrix](images/cross_matrix.png "An example for a cross matching matrix")
@@ -384,6 +390,11 @@ Most operations in MCRIT are implemented as asynchronous jobs that are processed
 In this section, you can view all of these jobs, categorized by their type.
 
 ![An example for the job queue](images/jobs.png "An example for the job queue")
+
+The *User* column names who requested a job, as the MCRIT backend records it from the user MCRITweb acts for; the job page repeats it as *Requested by*.
+A backend that does not record it yet, or a job from before it did, shows a dash.
+
+![Who requested a job](images/jobs_owner.png "Who requested a job")
 
 
 ### User / Settings
