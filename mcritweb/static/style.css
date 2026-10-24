@@ -16,9 +16,40 @@ html {
     color: #377ba8;
     margin: 1rem 0;
   }
+
+  /* headings moved to h2/h3 for a correct outline keep their old look through Bootstrap's
+     .h3/.h4 classes, but those also reset the margin; restore the one above */
+  h2.h3, h2.h4, h3.h4 {
+    margin: 1rem 0;
+  }
   
   a {
     color: #377ba8;
+  }
+
+  /* rows tinted inline by score or selection: #377ba8 falls below 4.5:1 on the palest of
+     the 40% score tints (#99b4e3), this stays above it on every one of them */
+  tr[style*="background-color"] a {
+    color: #17466b;
+  }
+
+  /* a table link is often one digit or one icon; 24x24 is the WCAG 2.5.8 minimum target */
+  td > a:not(.btn) {
+    display: inline-block;
+    min-width: 24px;
+  }
+
+  /* the link hunt's cluster cell stacks four matches to a line, so its links sit one
+     21.6px line apart - closer than the 24px WCAG 2.5.8 asks - and the "N more" toggle
+     sits right under them; give that one cell 24px lines instead of every table */
+  .linkhunt-links a {
+    display: inline-block;
+    min-height: 24px;
+    line-height: 24px;
+  }
+  /* a summary keeps display: list-item, which is what draws its disclosure triangle */
+  .linkhunt-links summary {
+    line-height: 24px;
   }
   
   hr {
@@ -182,6 +213,34 @@ html {
   .pointer {
     cursor: pointer;
   }
+
+  /* Issue #41. A job's description can hold a long unbroken token: the filename of
+     an upload, a SHA-256, or the raw `job.parameters` string the fallback branch of
+     job_description prints for a method it does not recognise. With nowhere to break,
+     it pushes the column - and the table - wider than the viewport.
+     `anywhere` rather than `break-word` because it has to break a token that is alone
+     on its line, which is exactly this case. */
+  table.table td.job-description {
+    overflow-wrap: anywhere;
+  }
+
+  /* Same string, two more places it can widen the page. The job overview and progress
+     headings print the raw `job.parameters`, and a heading that overflows does not
+     enlarge its own bounding box - it just pushes documentElement.scrollWidth out, so
+     it is invisible to an element-overflow check and very visible to a reader. Scoped
+     to the content region so the navbar and the manual are untouched. */
+  section.content h1 {
+    overflow-wrap: anywhere;
+  }
+
+  /* And a failed job's error message is a backend traceback in a <pre>, which is
+     white-space: pre - so it never wraps whatever the cell around it does. The template
+     already meant to say this: it carries `<div white-space: pre-wrap;>`, which is
+     three invalid attributes rather than a style. */
+  table.table td .job-error {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
   /* The user manual, rendered from docs/manual/README.md by mcritweb/manual.py.
      Markdown output carries no Bootstrap classes, so the few elements it produces
      that need them are styled here rather than by post-processing the HTML. */
@@ -220,6 +279,30 @@ html {
 
   .manual h3, .manual h4, .manual h5 {
     margin-top: 1.25rem;
+  }
+
+  /* The MCRIT diagram is fetched separately from the result page that shows it, so
+     this fills the box the <img> has reserved (see templates/match_diagram.html)
+     until the pixels get there. The diagram is opaque, so it covers the caption once
+     it has loaded. */
+  .mcrit-diagram {
+    position: relative;
+    background-color: rgb(240, 240, 240);
+  }
+
+  .mcrit-diagram::before {
+    content: "rendering diagram\2026";
+    position: absolute;
+    top: 45%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: slategray;
+  }
+
+  .mcrit-diagram img {
+    position: relative;
+    display: block;
   }
 
 /* Issue #52. Both of these are sized by their content, so a narrow viewport wraps

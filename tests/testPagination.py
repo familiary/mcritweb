@@ -94,6 +94,8 @@ class PaginationTestSuite(unittest.TestCase):
 
 PAGINATED_PAGES = [
     ("/explore/samples", "CursorPagination"),
+    # a bare /data/jobs redirects to the URL naming its default tab (issue #36), carrying
+    # the query string across, so the tests below follow it to the page they mean
     ("/data/jobs", "Pagination"),
 ]
 
@@ -125,7 +127,7 @@ def pagination_links(response, path):
 def test_a_query_parameter_named_endpoint_does_not_break_the_page(client, as_role, path, pagination_class):
     """`url_for() got multiple values for argument 'endpoint'` -> HTTP 500."""
     as_role("admin")
-    response = client.get(f"{path}?endpoint=x")
+    response = client.get(f"{path}?endpoint=x", follow_redirects=True)
 
     assert response.status_code == 200, f"{pagination_class} page {path} died on ?endpoint="
     assert pagination_links(response, path), "no pagination links to check"
@@ -141,7 +143,7 @@ def test_a_reserved_underscore_parameter_does_not_break_the_page(client, as_role
     _scheme is not None`), so it rewrote every link as an absolute URL instead of
     raising."""
     as_role("admin")
-    response = client.get(f"{path}?{reserved}")
+    response = client.get(f"{path}?{reserved}", follow_redirects=True)
 
     assert response.status_code == 200, f"{pagination_class} page {path} died on ?{reserved}"
     links = pagination_links(response, path)
@@ -163,7 +165,7 @@ def test_external_cannot_be_turned_on_from_the_query_string(client, as_role, pat
     with client.session_transaction(base_url="http://attacker.example/") as session:
         session["user_id"] = user_id
 
-    response = client.get(f"{path}?_external=1", headers={"Host": "attacker.example"})
+    response = client.get(f"{path}?_external=1", headers={"Host": "attacker.example"}, follow_redirects=True)
 
     assert response.status_code == 200
     links = pagination_links(response, path)
@@ -177,7 +179,7 @@ def test_an_anchor_from_the_query_string_does_not_reach_the_links(client, as_rol
     """`_anchor` is a supported argument of the pagination macros, which is exactly
     why a visitor-supplied one must not be able to take its place."""
     as_role("admin")
-    response = client.get(f"{path}?_anchor=evil")
+    response = client.get(f"{path}?_anchor=evil", follow_redirects=True)
 
     assert response.status_code == 200
     assert not [link for link in pagination_links(response, path) if "#evil" in link]

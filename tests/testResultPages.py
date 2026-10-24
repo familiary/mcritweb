@@ -10,18 +10,25 @@ renderer that miscounts a filtered report, fails here rather than in a browser.
 The reports come from a live instance - see tests/fixtures/regenerate.py.
 """
 
+import collections
 import copy
+import html
 import json
 import logging
 import pathlib
 import re
+import types
 import unittest
+from html.parser import HTMLParser
 
 import pytest
 from fixtureData import CorpusMcritClient, job_id_of, load
+from flask import template_rendered
 from mcrit.queue.LocalQueue import Job
 from mcrit.storage.FunctionEntry import FunctionEntry
 from mcrit.storage.MatchingResult import MatchingResult
+
+from mcritweb.views.data import count_aggregated_function_matches, order_samples
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -32,6 +39,53 @@ logging.disable(logging.CRITICAL)
 def fake_mcrit(corpus_mcrit):
     """Wire the app in this module to the captured corpus (see conftest)."""
     return corpus_mcrit
+
+
+#: `<script>...</script>` as it comes off the rendered page. Used to lint the block
+#: that defines the clipboard helper, so an unrelated script is never the offender.
+SCRIPT_BLOCK = re.compile(r"<script\b[^>]*>(.*?)</script\s*>", re.IGNORECASE | re.DOTALL)
+
+#: The copy icon and the textarea it copies, tied together: a helper wired to the
+#: wrong id is as broken as no helper.
+COPY_ICON = re.compile(r"<i\b[^>]*onclick=\"copyTextAreaToClipboard\('#yara_text'\)\"")
+
+#: `// ...` to end of line. The helper's own comment names the old implementation on
+#: purpose, so the lint below reads the code with the comments taken out.
+LINE_COMMENT = re.compile(r"//[^\n]*")
+
+#: The shapes of the pre-#80 helper. It filled a detached textarea from
+#: `$(element).html()`, so what reached the clipboard was the rendered *markup*:
+#: HTML-escaped, and frozen at page load however the reader had edited the rule.
+COPIES_THE_MARKUP = ("copyElementToClipboard", ".html()", ".innerHTML")
+
+
+#: The Block column of the unique blocks table: a `/* ... */` comment and then the
+#: hex sequence in braces, which is what a reader copies into a YARA file.
+BLOCK_CELL = re.compile(r"<code style=\"white-space:pre\">(.*?)</code>", re.DOTALL)
+
+#: One byte of a YARA hex string: a pair of hex digits, or `??` for a wildcarded
+#: one. Anything else - an odd-length run, most of all - is a syntax error.
+HEX_TOKEN = re.compile(r"^(?:[0-9a-f]{2}|\?\?)+$")
+
+#: The rule's comment above each selected picblock, as `renderRule` writes it once
+#: `name_functions_in_rule` has been over it.
+RULE_PICBLOCK_COMMENT = re.compile(r"/\* picblockhash: (0x[0-9a-f]+) - coverage: \d+/\d+ samples(?P<tail>[^\n]*)")
+
+
+def statistics_table_of(page):
+    """The markup of the "Block Statistics across Samples" table."""
+    assert "Block Statistics across Samples" in page, "the statistics table is not on the page"
+    return page.split("Block Statistics across Samples")[1].split("</table>")[0]
+
+
+def hex_sequences_of(page):
+    """The `{ ... }` half of every Block cell on the page, unescaped."""
+    sequences = []
+    for cell in BLOCK_CELL.findall(page):
+        _, brace, sequence = html.unescape(cell).partition("{")
+        assert brace, "a Block cell carries no hex sequence"
+        sequences.append(sequence.rsplit("}", 1)[0])
+    return sequences
 
 
 @pytest.mark.parametrize(
@@ -194,6 +248,94 @@ def test_unique_blocks_page_paginates(client, as_role):
     assert first.status_code == 200
     assert second.status_code == 200
     assert first.data != second.data
+
+
+#: The filter values result_matches_for_sample_or_query starts from when the user has
+#: set none of their own - see UserFilters.toDict().
+NO_FILTERS = {
+    "filter_direct_min_score": None,
+    "filter_direct_nonlib_min_score": None,
+    "filter_frequency_min_score": None,
+    "filter_frequency_nonlib_min_score": None,
+    "filter_unique_only": None,
+    "filter_exclude_own_family": None,
+    "filter_family_name": None,
+    "filter_function_min_score": None,
+    "filter_function_max_score": None,
+    "filter_function_offset": None,
+    "filter_max_num_families": None,
+    "filter_min_num_samples": None,
+    "filter_max_num_samples": None,
+    "filter_exclude_library": None,
+    "filter_exclude_pic": None,
+    "filter_func_unique": None,
+}
+
+
+@pytest.mark.parametrize("report", ["matches_for_sample", "matches_for_sample_vs", "matches_for_query"])
+@pytest.mark.parametrize(
+    "narrow",
+    [
+        lambda result: None,
+        lambda result: result.filterToFamilyId(1),
+        lambda result: result.filterToSampleId(1),
+        lambda result: result.filterToFunctionId(sorted(result.function_id_to_family_ids_matched)[0]),
+        lambda result: result.filterToFunctionScore(min_score=99),
+        lambda result: result.excludeLibraryMatches(),
+    ],
+)
+def test_the_pagination_count_equals_the_aggregation_it_replaced(app, corpus_mcrit, report, narrow):
+    """The function pagination used to size itself with
+    len(getAggregatedFunctionMatches()), which aggregates every match in the report -
+    and threw the aggregation away, leaving the template to build it again for the
+    page slice. It groups by function_id and drops no group, so the row count is the
+    number of distinct function_ids. That is what count_aggregated_function_matches
+    returns; this is the claim, checked against the real reports. See issue #68.
+    """
+    matching_result = MatchingResult.fromDict(corpus_mcrit.getResultForJob(job_id_of(report)))
+    matching_result.setFilterValues(dict(NO_FILTERS))
+    with app.test_request_context("/"):
+        narrow(matching_result)
+
+        assert count_aggregated_function_matches(matching_result) == len(matching_result.getAggregatedFunctionMatches())
+        # and the whole-report total the "filtered" figure is printed against
+        assert count_aggregated_function_matches(matching_result, unfiltered=True) == len(
+            matching_result.getAggregatedFunctionMatches(unfiltered=True))
+
+
+def test_the_pagination_count_of_an_empty_report_is_zero(app, corpus_mcrit):
+    matching_result = MatchingResult.fromDict(corpus_mcrit.getResultForJob(job_id_of("matches_for_sample")))
+    matching_result.filtered_function_matches = []
+
+    assert count_aggregated_function_matches(matching_result) == 0
+
+
+def test_the_function_table_shows_as_many_rows_as_the_pagination_promises(client, as_role, corpus_mcrit):
+    """End to end: the count the pagination is built from has to be the number of rows
+    the table actually produces.
+
+    Asserted by walking every page of the table and counting the rendered rows, rather
+    than by re-deriving the number - a count that agrees with a re-derivation of itself
+    would agree with it whether or not the table means the same thing.
+    """
+    as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+    expected = len({match.function_id for match in MatchingResult.fromDict(corpus_mcrit.getResultForJob(job_id)).function_matches})
+
+    rendered = set()
+    for page in range(1, 20):
+        response = client.get(f"/data/result/{job_id}?funp={page}&funl=100")
+        assert response.status_code == 200
+        assert b"are corrupted" not in response.data
+        # the per-row filter anchor, which only the aggregated function table draws -
+        # counting the id links instead would also count the family and library tables
+        # that share the page
+        rows = set(re.findall(rb"funid=(\d+)&amp;samp=1&amp;funp=1#function-matches", response.data))
+        if not rows:
+            break
+        rendered |= rows
+
+    assert len(rendered) == expected, f"the table produced {len(rendered)} rows for a count of {expected}"
 
 
 # --- the sample-filtered function table ------------------------------------------
@@ -404,8 +546,9 @@ def test_the_sample_filter_looks_the_sample_up_once(client, as_role, widened_cor
     response = client.get(f"/data/result/{job_id_of(report)}?samid={sample_id}")
     assert response.status_code == 200
     assert b"are corrupted" not in response.data and b"Offset B" in response.data
-    # the diagram was drawn on this request, off the reference sample's functions
-    assert any(name == "getFunctionsBySampleId" for name, _, _ in widened_corpus_mcrit.calls)
+    # the diagram is drawn by its own request now (#145), so the page reads no
+    # functions of the reference sample for it
+    assert not any(name == "getFunctionsBySampleId" for name, _, _ in widened_corpus_mcrit.calls)
     assert _sample_lookups(widened_corpus_mcrit) == [("getSampleById", (sample_id,))]
 
 
@@ -550,6 +693,562 @@ def test_job_page_renders_for_a_finished_job(client, as_role, report):
     as_role("visitor")
     response = client.get(f"/data/jobs/{job_id_of(report)}")
     assert response.status_code == 200
+
+
+def test_unique_blocks_statistics_carries_a_sample_version(client, as_role):
+    """The report names samples by id only - `statistics["by_sample_id"]` is block
+    counts - so the version has to be looked up on the backend (issue #80)."""
+    as_role("visitor")
+    response = client.get(f"/data/result/{job_id_of('unique_blocks')}")
+
+    assert response.status_code == 200
+    statistics_table = statistics_table_of(response.data.decode())
+    assert ">Version<" in statistics_table
+    # the versions of the three win.citadel samples the captured report covers
+    for version in ("1.3.5.1", "1.3.4.0", "0.0.1.1"):
+        assert version in statistics_table, f"{version} missing from the statistics table"
+
+
+def test_the_yara_copy_icon_is_wired_to_the_textareas_value(client, as_role):
+    """Issue #80: the copy icon used to copy `$(element).html()` out of a detached
+    textarea, so it handed back the rendered markup - HTML entities for `& < >`, and
+    none of the edits the reader had made to a rule that is deliberately editable.
+
+    A lint, because it is what CI can run: `tests/testBrowser.py` clicks this icon in
+    Chromium and reads the clipboard back, but playwright is not a dependency of this
+    project and CI does not install it, so that module skips there. Without something
+    here the old implementation can be restored verbatim and the suite stays green.
+    """
+    as_role("visitor")
+    response = client.get(f"/data/result/{job_id_of('unique_blocks')}?tab=yara")
+    page = response.data.decode()
+
+    assert response.status_code == 200
+    assert 'id="yara_text"' in page, "the rule textarea the icon names is not on the page"
+    assert COPY_ICON.search(page), "no copy icon calls copyTextAreaToClipboard on #yara_text"
+
+    # base.html carries a `copy_to_clipboard` of its own, hence the camel-cased
+    # needle: it matches this page's helper and the pre-#80 one, and nothing else.
+    helpers = [body for body in SCRIPT_BLOCK.findall(page) if "ToClipboard" in body]
+    assert len(helpers) == 1, f"expected one YARA clipboard helper on the page, found {len(helpers)}"
+    code = LINE_COMMENT.sub("", helpers[0])
+    assert "textarea.value" in code, "the clipboard helper never reads the textarea's value"
+    for shape in COPIES_THE_MARKUP:
+        assert shape not in code, f"the clipboard helper reads {shape} - that is the markup, not the value"
+
+
+def test_a_long_block_stays_valid_yara_when_it_wraps(client, as_role):
+    """Issue #80, "copy to clipboard break with extensively long yara strings".
+
+    The Block column is YARA syntax and is there to be copied out. It used to be
+    wrapped by breaking every 80th character, which lands mid-byte far more often
+    than not: 41 of the 51 sequences in the captured report were cut inside a
+    token and 23 of those left an odd-length run like "6a3", which no YARA
+    compiler will take. Short sequences never wrapped, so the damage only showed
+    on the long ones the issue names.
+
+    The page's own block-length filter is what puts those on the first page: the
+    default order is by score, and the hundred highest-scoring blocks of the
+    captured report are all short enough that nothing wraps at all.
+    """
+    as_role("visitor")
+    response = client.get(f"/data/result/{job_id_of('unique_blocks')}?tab=blocks&min_block_length=20")
+
+    assert response.status_code == 200
+    sequences = hex_sequences_of(response.data.decode())
+    assert sequences, "no blocks rendered, so nothing was checked"
+    wrapped = [sequence for sequence in sequences if "\n" in sequence]
+    assert len(wrapped) == len(sequences) == 18, "the filtered page is no longer the eighteen long blocks it was"
+    for sequence in wrapped:
+        for token in sequence.split():
+            assert HEX_TOKEN.match(token), f"{token!r} is not a YARA hex byte, in: {sequence!r}"
+
+
+def test_the_yara_rule_names_the_function_each_picblock_came_from(client, as_role):
+    """Issue #80, "maybe include function_id ... (more robustness)".
+
+    mcrit picks the cover blind to which function a block sits in, so a rule can
+    quietly end up fingerprinting one function - and `7 of them` then dies with
+    the next recompile of it. The captured report spreads its ten blocks over
+    eight functions (seven before #184 sorted the blocks ahead of the cover);
+    naming them is what lets a reader see that at all.
+    """
+    as_role("visitor")
+    response = client.get(f"/data/result/{job_id_of('unique_blocks')}?tab=yara")
+    page = html.unescape(response.data.decode())
+
+    assert response.status_code == 200
+    comments = RULE_PICBLOCK_COMMENT.findall(page)
+    assert len(comments) == 10, f"expected the ten picblocks of the captured rule, found {len(comments)}"
+    for pichash, tail in comments:
+        assert tail.startswith(", function_id: "), f"{pichash} does not name the function it came from"
+    # and the annotation is per block, not one id repeated over all of them
+    assert len({tail for _, tail in comments}) == 8
+
+
+def test_unique_blocks_statistics_table_carries_the_sorting_markup(client, as_role):
+    """A markup lint, and named as one: it reads the attributes the sorting script
+    reads and says nothing about what a click does. Deleting the script outright
+    leaves this green, which is exactly the limit of what an HTML assertion can
+    reach.
+
+    `tests/testBrowser.py` is where the headers get clicked. That module needs
+    playwright, which is not a dependency of this project and which CI does not
+    install, so this is the half of the cover CI keeps.
+
+    Worth linting even so: a formatted cell reads "2844 (66.76%)", which is not a
+    number, so the raw count has to travel beside it or the column cannot be
+    ordered at all.
+    """
+    as_role("visitor")
+    response = client.get(f"/data/result/{job_id_of('unique_blocks')}")
+    page = response.data.decode()
+
+    assert response.status_code == 200
+    statistics_table = statistics_table_of(page)
+    assert 'class="table table-hover sortable-table"' in statistics_table, "the sorting script only touches tables marked sortable-table"
+    # one text column, Version, and one per count
+    assert statistics_table.count('data-sort="text"') == 1
+    assert statistics_table.count('data-sort="number"') == 4
+    # the raw counts of sample 0, beside the cells that render them formatted
+    for count in ("4260", "2844", "611"):
+        assert f'data-sort-value="{count}"' in statistics_table, f"{count} carries no sortable value"
+    assert any("sortable-table" in body for body in SCRIPT_BLOCK.findall(page)), "no script on the page acts on the marked tables"
+
+
+def test_unique_blocks_family_page_reads_the_versions_off_the_family(client, as_role, fake_mcrit):
+    """`getFamily` answers with the family's samples, and `result_unique_blocks` is
+    holding that entry before it builds the statistics table - so the Version column
+    of a family job costs no request of its own.
+
+    Asserted on the rendered page rather than on `get_sample_versions` directly,
+    because the unit test below can only say the helper prefers the family; it
+    cannot say the view hands it a family that has any samples in it. That is a
+    property of the backend, and it is what this one pins down.
+    """
+    as_role("visitor")
+    fake_mcrit.calls.clear()
+
+    response = client.get(f"/data/result/{job_id_of('unique_blocks')}")
+
+    assert response.status_code == 200
+    requested = collections.Counter(name for name, _, _ in fake_mcrit.calls)
+    assert requested["getFamily"] == 1
+    assert requested["getSampleById"] == 0, "the family already carried the samples, so nothing had to be fetched by id"
+    assert requested["getSamplesByIds"] == 0
+    # and the column is populated, so "no requests" cannot mean "no versions"
+    assert "1.3.5.1" in statistics_table_of(response.data.decode())
+
+
+def test_the_corpus_answers_the_two_family_endpoints_differently(corpus_mcrit):
+    """A guard on the fixture the test above stands on.
+
+    `/families` and `/families/{id}` do not return the same entry: storage does not
+    keep a family's sample list, so the collection cannot carry one, and only
+    `FamilyResource.on_get` fills `samples` in - for one family, and only when asked.
+    Serving the richer shape from both would put samples somewhere the real backend
+    never does, and a view leaning on that would pass here and fail in a browser.
+    """
+    assert corpus_mcrit.getFamily(1).samples, "a single family must arrive with its samples"
+    assert corpus_mcrit.getFamily(1, with_samples=False).samples is None
+    assert all(entry.samples is None for entry in corpus_mcrit.getFamilies().values())
+
+
+def test_unique_blocks_page_survives_a_backend_that_lost_a_sample(client, as_role, fake_mcrit):
+    """A sample the family no longer lists falls through to a lookup by id, and a
+    backend that cannot resolve it answers None. The version column has nothing to
+    show for that row, which is not a reason to lose the whole report."""
+    as_role("visitor")
+    family = fake_mcrit.getFamily(1)
+    assert family.samples, "the captured family carries no samples - see tests/fixtures/regenerate.py"
+    family.samples = {key: entry for key, entry in family.samples.items() if entry.sample_id != 2}
+    # the batch answers nothing for it, and neither does the per-id fallback behind it
+    fake_mcrit.getSamplesByIds = lambda *args, **kwargs: {}
+    fake_mcrit.getSampleById = lambda sample_id, *args, **kwargs: None
+
+    response = client.get(f"/data/result/{job_id_of('unique_blocks')}")
+
+    assert response.status_code == 200
+    statistics_table = statistics_table_of(response.data.decode())
+    assert "1.3.5.1" in statistics_table, "the samples the family still lists lost their version"
+    assert "0.0.1.1" not in statistics_table, "the sample nothing could resolve was given a version anyway"
+
+
+class _StubSample:
+    def __init__(self, sample_id, version):
+        self.sample_id = sample_id
+        self.version = version
+
+
+class _StubFamily:
+    def __init__(self, samples=None):
+        self.samples = samples
+
+
+class _StubEntries:
+    """Stands in for `get_sample_entries`: answers from a dict and records each batch."""
+
+    def __init__(self, samples):
+        self.samples = samples
+        self.batches = []
+
+    def __call__(self, sample_ids):
+        self.batches.append(list(sample_ids))
+        return {sample_id: self.samples.get(sample_id) for sample_id in sample_ids}
+
+
+def test_sample_versions_come_from_the_family_without_extra_requests(monkeypatch):
+    """getFamily already answers with the family's samples, and result_unique_blocks
+    has that entry in hand before the statistics table is built."""
+    from mcritweb.views import data
+
+    entries = _StubEntries({})
+    monkeypatch.setattr(data, "get_sample_entries", entries)
+    family = _StubFamily({"0": _StubSample(0, "1.0"), "1": _StubSample(1, "2.0")})
+
+    assert data.get_sample_versions(family, [0, 1]) == {0: "1.0", 1: "2.0"}
+    assert entries.batches == [[]]
+
+
+def test_sample_versions_fetch_the_rest_in_one_batch(monkeypatch):
+    """The sample-job case has no family, and a backend answering a family without
+    its samples lands here too. The rows go to the backend as one batch (#191),
+    not one request each."""
+    from mcritweb.views import data
+
+    entries = _StubEntries({7: _StubSample(7, "3.x"), 8: _StubSample(8, "4.x")})
+    monkeypatch.setattr(data, "get_sample_entries", entries)
+
+    assert data.get_sample_versions(None, [7, 8]) == {7: "3.x", 8: "4.x"}
+    assert entries.batches == [[7, 8]]
+
+
+def test_sample_versions_omit_a_sample_the_backend_no_longer_has(monkeypatch):
+    from mcritweb.views import data
+
+    entries = _StubEntries({})
+    monkeypatch.setattr(data, "get_sample_entries", entries)
+
+    assert data.get_sample_versions(_StubFamily(None), [7]) == {}
+    assert entries.batches == [[7]]
+
+
+#: (report fixture, query string, the template the request has to reach). `data.result`
+#: dispatches on the query parameters, so `?famid=` / `?samid=` / `?funid=` are the only
+#: way to reach three of the five result templates that render a score - parametrising
+#: over reports alone renders `result_compare_all.html` twice and calls it coverage.
+#: The ids are the captured 1-vs-1 report's own: it matched samples 1 and 3, function 880
+#: is one of its matches, and its by-id function pool is complete - the 1-vs-N report's is
+#: not, so ?samid= and ?funid= land on result_corrupted.html there (fixtures/README.md).
+RESULT_PAGES = [
+    ("matches_for_sample", "", "result_compare_all.html"),
+    ("matches_for_query", "", "result_compare_all.html"),
+    ("matches_for_sample_vs", "", "result_compare_vs.html"),
+    ("matches_for_sample", "?famid=1", "result_compare_family.html"),
+    ("matches_for_sample_vs", "?samid=3", "result_compare_sample.html"),
+    ("matches_for_sample_vs", "?funid=880", "result_compare_function.html"),
+]
+
+#: result_compare_function.html is the one of them that carries no sample-level table.
+SAMPLE_SCORE_PAGES = [page for page in RESULT_PAGES if page[2] != "result_compare_function.html"]
+
+
+@pytest.fixture
+def renders(app):
+    """(template name, context) for every template rendered during a request.
+
+    The function-match tables render their score bare, so there is no tooltip to read
+    the exact value back out of the page with - it has to come from the context the
+    template was handed. Recording it also lets a test say which template it meant to
+    exercise, rather than trusting a query parameter to have dispatched where it looks.
+
+    `record` has to stay referenced for the length of the test - blinker holds its
+    receivers weakly, and a receiver nobody else keeps is collected and never called.
+    The generator frame this fixture suspends in is what keeps it alive.
+    """
+    recorded = []
+
+    def record(sender, template, context, **extra):
+        recorded.append((template.name, context))
+
+    template_rendered.connect(record, app)
+    try:
+        yield recorded
+    finally:
+        template_rendered.disconnect(record, app)
+
+
+class _TableReader(HTMLParser):
+    """Every <table> on a page, as a list of rows of cell text.
+
+    Stacked rather than flat because a table macro nested in a cell would otherwise
+    hand its rows to whichever table happened to be open last, and a cell would be
+    read out of the wrong column without anything looking wrong.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.tables = []
+        self._open_tables = []
+        self._open_rows = []
+        self._open_cells = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "table":
+            self._open_tables.append([])
+        elif tag == "tr" and self._open_tables:
+            self._open_rows.append([])
+        elif tag in ("td", "th") and self._open_rows:
+            self._open_cells.append([])
+
+    def handle_endtag(self, tag):
+        if tag == "table" and self._open_tables:
+            self.tables.append(self._open_tables.pop())
+        elif tag == "tr" and self._open_rows:
+            row = self._open_rows.pop()
+            if self._open_tables:
+                self._open_tables[-1].append(row)
+        elif tag in ("td", "th") and self._open_cells:
+            cell = "".join(self._open_cells.pop()).strip()
+            if self._open_rows:
+                self._open_rows[-1].append(cell)
+
+    def handle_data(self, data):
+        if self._open_cells:
+            self._open_cells[-1].append(data)
+
+
+def column_under(page, header):
+    """Every cell below the column headed `header`, located the way a reader locates it.
+
+    Rows of a different width than the header row are skipped - the sample tables put a
+    `colspan` header row above their own, and it is not a row of cells.
+    """
+    reader = _TableReader()
+    reader.feed(page)
+    cells = []
+    for rows in reader.tables:
+        for index, row in enumerate(rows):
+            if header in row:
+                position, width = row.index(header), len(row)
+                cells += [below[position] for below in rows[index + 1:] if len(below) == width]
+                break
+    return cells
+
+
+def score_column(page):
+    """The score column of the function-match table: headed "Best Score" where the table
+    aggregates a function's matches, and "Score" where it lists them one by one."""
+    for header in ("Best Score", "Score"):
+        cells = column_under(page, header)
+        if cells:
+            return cells
+    return []
+
+
+def function_match_scores(template, context):
+    """The scores that template's function-match table was handed, in row order."""
+    matching_result, funp = context["matching_result"], context["funp"]
+    if template in ("result_compare_all.html", "result_compare_family.html"):
+        return [aggregate["best_score"] for aggregate in matching_result.getAggregatedFunctionMatches(funp.start_index, funp.limit)]
+    return [matched_function.matched_score for matched_function in matching_result.getFunctionsSlice(funp.start_index, funp.limit)]
+
+
+@pytest.mark.parametrize("report,query,template", RESULT_PAGES)
+def test_function_score_column_rounds_rather_than_truncates(client, as_role, renders, report, query, template):
+    """The function-match table truncated its score the same way the sample columns did.
+
+    `MatchedFunctionEntry.matched_score` is a float and `MatchingResult` maxes it into
+    `best_score`, so `%d` showed 93.75 as 93 - issue #7 again, one table lower on the
+    same page, in a column that is active by default and needs no query parameter.
+
+    These cells carry no tooltip and are marked up exactly like the byte counts beside
+    them, so they are found by the header over the column and checked against the value
+    the render context holds, which is the score itself rather than a rounding of it.
+    """
+    as_role("visitor")
+    response = client.get(f"/data/result/{job_id_of(report)}{query}")
+    assert response.status_code == 200
+    assert renders, f"{report}{query} rendered no template at all"
+    assert renders[-1][0] == template, f"{report}{query} rendered {renders[-1][0]}, not {template}"
+
+    exact = function_match_scores(*renders[-1])
+    shown = score_column(response.data.decode())
+    assert exact, f"{template} rendered no function matches to check"
+    assert len(shown) == len(exact), f"{template}: {len(shown)} score cells for {len(exact)} function matches"
+
+    not_rounded = [(score, cell) for score, cell in zip(exact, shown) if int(cell) != round(score)]
+    assert not not_rounded, f"{template}: score cells not rounded: {not_rounded}"
+
+
+# every sample score cell renders the exact percentage into its hover text and an integer
+# into the cell itself:  ... Percent: 85.88%">  85</span>
+SCORE_CELL = re.compile(r"Percent:\s*(\d+\.\d+)%\">\s*(-?\d+)\s*</span>")
+
+
+def score_cells(page):
+    """(exact percent, integer shown) for every score cell on a rendered page."""
+    return [
+        (float(percent), int(shown))
+        for percent, shown in SCORE_CELL.findall(page)
+    ]
+
+
+@pytest.mark.parametrize("report,query,template", SAMPLE_SCORE_PAGES)
+def test_score_columns_round_rather_than_truncate(client, as_role, renders, report, query, template):
+    """`%d` truncates toward zero, so a sample scoring 85.88 showed as 85 - a whole
+    point below what the tooltip on the same cell says, and 0.76 showed as 0 next to
+    a neighbour at 1.04 that had scored barely more (issue #7).
+
+    The assertion below is a half-unit tolerance rather than an equality because the
+    tooltip is the score rounded to two decimals rather than the score itself; see the
+    comment on TOOLTIP_PRECISION for why that makes an equality wrong here.
+    """
+    as_role("visitor")
+    response = client.get(f"/data/result/{job_id_of(report)}{query}")
+    assert response.status_code == 200
+    assert renders, f"{report}{query} rendered no template at all"
+    assert renders[-1][0] == template, f"{report}{query} rendered {renders[-1][0]}, not {template}"
+
+    cells = score_cells(response.data.decode())
+    assert cells, f"{report}{query} rendered no score cells to check"
+    # The tooltip is the score to two decimals, so it is not the source value: a score
+    # of 2.501 renders as tooltip "2.50" and cell "3", and asserting shown == round(2.50)
+    # would fail on a correct page. What the tooltip does pin is an interval - the score
+    # is within 0.005 of it - so the cell must be within half a unit of that interval.
+    # Truncation is caught all the same: it is off by the whole fractional part, and
+    # these reports carry plenty above 0.505 (85.88, 82.70, 42.81, 60.99).
+    TOOLTIP_PRECISION = 0.005
+    not_rounded = [(exact, shown) for exact, shown in cells if abs(shown - exact) > 0.5 + TOOLTIP_PRECISION]
+    assert not not_rounded, f"{report}{query}: score cells not rounded: {not_rounded}"
+
+
+# the same hover text states a fraction above its percentage, and the percentage has to
+# be that fraction:  ... Bytes: 130682.88 / 152337.00 &#10;Percent: 85.79%
+SCORE_TOOLTIP = re.compile(r"Bytes:\s*(-?\d+\.\d+)\s*/\s*(\d+\.\d+)\s*&#10;Percent:\s*(-?\d+\.\d+)%")
+
+#: Both numbers in the fraction and the percentage itself are rendered to two decimals,
+#: so the quotient can miss the stated percentage by the percentage's own rounding. The
+#: numerator's rounding contributes ~4e-8 relative on these reports and is ignored.
+TWO_DECIMALS = 0.005 + 1e-6
+
+
+@pytest.mark.parametrize("report,query,template", SAMPLE_SCORE_PAGES)
+def test_score_tooltips_divide_by_the_total_their_percentage_uses(client, as_role, renders, report, query, template):
+    """The hover text used to print the sample's binweight as the divisor while
+    stating a percentage taken against a different total - the matchable bytes, or
+    for the `nonlib_` columns the matchable bytes minus the library-matching ones.
+    On the top match of `matches_for_sample` it offered 130682.88 / 155065 = 84.28
+    and then said 85.79%.
+
+    That is what sets a reader's expectation, and issue #7 is a report of the value
+    being "too far from the expected value" - so an inconsistency here is the defect,
+    not a cosmetic one. See docs/adr/0009-nonlib-frequency-score.md.
+    """
+    as_role("visitor")
+    response = client.get(f"/data/result/{job_id_of(report)}{query}")
+    assert response.status_code == 200
+    assert renders and renders[-1][0] == template, f"{report}{query} did not render {template}"
+
+    page = response.data.decode()
+    tooltips = SCORE_TOOLTIP.findall(page)
+    assert tooltips, f"{report}{query} rendered no score tooltip to check"
+
+    inconsistent = [
+        (numerator, divisor, percent)
+        for numerator, divisor, percent in (
+            (float(a), float(b), float(c)) for a, b, c in tooltips
+        )
+        if abs(100.0 * numerator / divisor - percent) > TWO_DECIMALS
+    ]
+    assert not inconsistent, (
+        f"{report}{query}: hover text states a fraction that is not its percentage: {inconsistent}"
+    )
+
+    # A report whose functions were all matchable and none library-matched would make
+    # the check above pass against the binweight too, so pin that the divisor actually
+    # moved off it. None of the three fixtures is that report.
+    binweight = renders[-1][1]["matching_result"].reference_sample_entry.binweight
+    assert any(float(divisor) != binweight for _, divisor, _ in tooltips), (
+        f"{report}{query}: every score tooltip still divides by the sample binweight {binweight}"
+    )
+
+
+# --- the cross-compare page orders its samples in one pass -------------------------
+
+class WalkCountingList(list):
+    """A list that records how often something walked it end to end."""
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.walks = 0
+
+    def __iter__(self):
+        self.walks += 1
+        return super().__iter__()
+
+
+def test_ordering_samples_walks_the_sample_list_once():
+    """One pass to index the samples, then a lookup per position.
+
+    Scanning the list for each position instead - which is what this replaced - walks
+    it once per sample, and the page repeats the whole ordering for every matching
+    method. That is the O(n^2) issue #68 asks about; timing it would be flaky, so
+    count the passes.
+    """
+    samples = WalkCountingList(types.SimpleNamespace(sample_id=sample_id) for sample_id in range(50))
+
+    ordered = order_samples(samples, [str(sample_id) for sample_id in reversed(range(50))])
+
+    assert [sample.sample_id for sample in ordered] == list(reversed(range(50)))
+    assert samples.walks == 1, f"the sample list was walked {samples.walks} times"
+
+
+def test_a_custom_order_naming_a_sample_twice_is_refused():
+    """Each repetition adds a row and a column, so a long `?custom=` of one id would
+    grow the page with the square of the query."""
+    samples = [types.SimpleNamespace(sample_id=sample_id) for sample_id in range(3)]
+
+    assert order_samples(samples, ["0", "1", "0"]) is None
+    assert [sample.sample_id for sample in order_samples(samples, ["2", "0", "1"])] == [2, 0, 1]
+
+
+def test_the_page_refuses_a_custom_order_with_a_repeated_sample(client, as_role):
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+    sample_id = re.search(r'<td class="id clickable"[^>]*>\s*(\d+)\s*</td>', client.get(f"/data/result/{job_id}").data.decode()).group(1)
+
+    response = client.get(f"/data/result/{job_id}?custom=" + ",".join([sample_id] * 200))
+
+    assert response.status_code == 200
+    assert b"repeated or not part of the cross compare" in response.data
+    assert len(response.data) < 100_000
+
+def test_ordering_samples_reports_an_id_that_is_not_there():
+    samples = [types.SimpleNamespace(sample_id=sample_id) for sample_id in range(3)]
+
+    assert order_samples(samples, ["2", "9"]) is None
+
+
+def test_cross_compare_honours_a_custom_order(client, as_role):
+    """The behaviour the one-pass ordering has to keep: `?custom=` reorders the rows."""
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+    default = client.get(f"/data/result/{job_id}")
+    reordered = client.get(f"/data/result/{job_id}?custom=1,0,2,4,6")
+
+    assert default.status_code == 200
+    assert reordered.status_code == 200
+    assert b"are corrupted" not in reordered.data
+    assert reordered.data != default.data
+
+
+def test_cross_compare_rejects_a_custom_order_naming_an_unknown_sample(client, as_role):
+    as_role("visitor")
+    response = client.get(f"/data/result/{job_id_of('cross_compare')}?custom=1,0,9999")
+
+    assert response.status_code == 200
+    assert b"are corrupted" in response.data
 
 
 # --- downloading the raw report (issue #75) ---------------------------------------
@@ -723,7 +1422,7 @@ def test_cached_result_lookup_matches_whole_job_ids_only(app):
 
     Same reason as above: every route-level test is already satisfied by the "no
     such job" gate, so none of them would notice this widening back into the
-    substring match `load_cached_result` uses.
+    substring match `load_cached_result` used to make.
     """
     from mcritweb.views.data import find_cached_result_filename
 
@@ -737,6 +1436,14 @@ def test_cached_result_lookup_matches_whole_job_ids_only(app):
     assert find_cached_result_filename(app, "6a7464") is None
     assert find_cached_result_filename(app, "f8b8d2c6f836649a") is None
     assert find_cached_result_filename(app, "") is None
+
+    # a local queue's uuid4 ids have dashes of their own, so the tail of one is also a
+    # "-<id>.json" suffix of the file - only the length tells them apart
+    uuid_job_id = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+    (cache_path / f"20260808-104636-{uuid_job_id}.json").write_text("{}")
+    assert find_cached_result_filename(app, uuid_job_id) == f"20260808-104636-{uuid_job_id}.json"
+    assert find_cached_result_filename(app, "0305e82c3301") is None
+    assert find_cached_result_filename(app, "9a0c-0305e82c3301") is None
 
 #: One function from each reference sample - the only pool that keeps a control flow
 #: graph, so the only one the comparison page can build its two panels from.
@@ -760,7 +1467,9 @@ def test_the_function_comparison_page_shows_the_overall_match_score(function_vs_
 
     shown = re.search(r"Match Score:(?:\s|<[^>]*>)*(\d+)", function_vs_page)
     assert shown, "the comparison page shows no match score"
-    assert int(shown.group(1)) == int(expected)
+    # rounded to the nearest whole number rather than truncated, like every other score
+    # column (issue #7): "%.0f" and round() both take a tie to the even neighbour
+    assert int(shown.group(1)) == round(expected)
 
 
 def test_the_loop_boundary_control_is_live(function_vs_page):
@@ -771,6 +1480,174 @@ def test_the_loop_boundary_control_is_live(function_vs_page):
     assert checkbox, "the loop boundary control is gone"
     assert "disabled" not in checkbox.group(0)
     assert "checked" in checkbox.group(0), "boundaries are meant to start visible"
+
+
+# --- #42: ordering of the cross compare matrix ------------------------------------
+#
+# The five corpus samples of the captured cross compare, and what each ordering has
+# to produce out of them:
+#
+#   id  family       version
+#    0  win.citadel  1.3.5.1
+#    1  win.citadel  1.3.4.0
+#    2  win.citadel  0.0.1.1
+#    4  win.vmzeus   3.x
+#    6  win.dridex   (none)
+
+#: What the backend clustered, i.e. the order the page shows when nothing is asked for.
+CLUSTERED_ORDER = ["6", "4", "2", "0", "1"]
+SAMPLE_ID_ORDER = ["0", "1", "2", "4", "6"]
+FAMILY_ORDER = ["2", "1", "0", "6", "4"]
+
+#: Every matrix on the page. The order is applied to all of them identically - it is
+#: one global order, not a per-tab one - so a test that only looked at the active tab
+#: would miss five sixths of the change.
+CROSS_METHODS = {
+    "unweighted",
+    "score_weighted",
+    "frequency_weighted",
+    "nonlib_unweighted",
+    "nonlib_score_weighted",
+    "nonlib_frequency_weighted",
+}
+
+
+def cross_compare_page(client, query=""):
+    response = client.get(f"/data/result/{job_id_of('cross_compare')}{query}")
+    assert response.status_code == 200
+    return response.data.decode()
+
+
+def sortable_order(html):
+    """Sample ids of the drag-and-drop list, which has to mirror what is on screen -
+    otherwise a drag starts from an order the user is not looking at."""
+    block = re.search(r'id="sortable">(.*?)</ul>', html, re.S)
+    assert block is not None, "the cross compare page has no drag-and-drop list"
+    return [item.split()[0] for item in re.findall(r"<li>(.*?)</li>", block.group(1), re.S)]
+
+
+def matrix_orders(html):
+    """method -> the sample id order of that matrix's rows.
+
+    Only one matrix is rendered (#213); the others are filled in the browser on first
+    click from the page's `cross-lazy-panes` JSON, so their order is read from there."""
+    panes = re.finditer(r'id="pills-(\w+)" role="tabpanel"(.*?)(?=<div class="tab-pane|\Z)', html, re.S)
+    orders = {
+        pane.group(1): re.findall(r'<td class="id clickable"[^>]*>\s*(\d+)\s*</td>', pane.group(2))
+        for pane in panes
+    }
+    lazy = re.search(r'<script type="application/json" id="cross-lazy-panes">(.*?)</script>', html, re.S)
+    if lazy is not None:
+        for method, pane in json.loads(lazy.group(1))["panes"].items():
+            assert not orders.get(method), f"matrix {method} is both rendered and lazy"
+            orders[method] = [str(sample_id) for sample_id in pane["order"]]
+    return orders
+
+
+def active_ordering_button(html):
+    """Which of the three ordering buttons is rendered as pressed, by the order its own
+    onclick asks for. `None` when none is - which is what a drag order looks like."""
+    pressed = re.findall(r"<button onclick=\"[^\"]*[?&;]order=(\w+)[^\"]*\"[^>]*aria-pressed=\"true\"", html)
+    assert len(pressed) <= 1, f"more than one ordering button is pressed: {pressed}"
+    return pressed[0] if pressed else None
+
+
+def assert_page_is_ordered(html, expected):
+    assert sortable_order(html) == expected
+    orders = matrix_orders(html)
+    assert set(orders) == CROSS_METHODS, "not every matrix was found on the page"
+    for method, order in orders.items():
+        assert order == expected, f"matrix {method} is not in the requested order"
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("", CLUSTERED_ORDER),
+        ("?order=clustered", CLUSTERED_ORDER),
+        ("?order=sample_id", SAMPLE_ID_ORDER),
+        ("?order=family", FAMILY_ORDER),
+    ],
+)
+def test_cross_compare_renders_in_the_requested_named_order(client, as_role, query, expected):
+    as_role("visitor")
+    assert_page_is_ordered(cross_compare_page(client, query), expected)
+
+
+def test_the_reset_button_asks_for_the_page_without_an_order(client, as_role):
+    """Issue #42 (a), which was already implemented: dropping the parameters is the
+    reset, because the view falls back to the backend's clustered_sequence."""
+    as_role("visitor")
+    html = cross_compare_page(client)
+    assert f"window.location.href='/data/result/{job_id_of('cross_compare')}'" in html
+    assert_page_is_ordered(html, CLUSTERED_ORDER)
+
+
+def test_the_named_orderings_are_offered_on_the_page(client, as_role):
+    as_role("visitor")
+    html = cross_compare_page(client)
+    for ordering in ("clustered", "sample_id", "family"):
+        assert f"/data/result/{job_id_of('cross_compare')}?order={ordering}" in html
+    assert html.count('aria-pressed="true"') == 1, "exactly one ordering is the active one"
+
+
+def test_a_dragged_order_marks_none_of_the_named_orderings_active(client, as_role):
+    """A ?custom= order is none of them, and saying otherwise would tell the user the
+    matrix is in an order it is not in."""
+    as_role("visitor")
+    assert 'aria-pressed="true"' not in cross_compare_page(client, "?custom=1,0,2,4,6")
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["", "bogus", "Family", "sample_id%20", "clustered%2Cfamily", "../../etc/passwd", "family%3Bdrop"],
+)
+def test_an_ordering_nobody_offers_falls_back_to_the_clustered_one(client, as_role, value):
+    as_role("visitor")
+    html = cross_compare_page(client, f"?order={value}")
+    assert_page_is_ordered(html, CLUSTERED_ORDER)
+    # the buttons have to agree with the matrix. Falling back silently and then
+    # highlighting nothing would tell the user the page is in a drag order it is not in.
+    assert active_ordering_button(html) == "clustered"
+
+
+def test_the_ordering_parameter_never_reaches_the_page(client, as_role):
+    """It is a query parameter that decides what a template renders, so the thing to
+    check is that its raw value is not one of the things rendered."""
+    as_role("visitor")
+    response = client.get(
+        f"/data/result/{job_id_of('cross_compare')}?order=%22%3E%3Cscript%3Ealert%281%29%3C/script%3E"
+    )
+    assert response.status_code == 200
+    assert b"alert(1)" not in response.data
+    assert b"alert%281%29" not in response.data
+
+
+def test_a_custom_order_still_works(client, as_role):
+    """Backward compatibility: ?custom= is what the drag-and-drop list produces and
+    what any already-bookmarked link carries."""
+    as_role("visitor")
+    assert_page_is_ordered(cross_compare_page(client, "?custom=1,0,2,4,6"), ["1", "0", "2", "4", "6"])
+
+
+def test_a_custom_order_wins_over_a_named_one(client, as_role):
+    """A drag is the more specific statement of intent, and it is what `changeorder()`
+    sends - it builds a ?custom= link and does not carry the ?order= over."""
+    as_role("visitor")
+    assert_page_is_ordered(
+        cross_compare_page(client, "?order=family&custom=1,0,2,4,6"), ["1", "0", "2", "4", "6"]
+    )
+
+
+def test_a_custom_order_naming_a_sample_outside_the_job_says_which_job(client, as_role):
+    """The corrupted page needs the job to offer its "delete job data" button; this
+    path used to hand it the report instead, rendering "Results for Job:  " and a
+    data-post of /data/jobs//delete."""
+    as_role("visitor")
+    response = client.get(f"/data/result/{job_id_of('cross_compare')}?custom=1,0,2,4,999")
+    assert response.status_code == 200
+    assert b"are corrupted" in response.data
+    assert job_id_of("cross_compare").encode() in response.data
 
 
 if __name__ == "__main__":

@@ -1,11 +1,10 @@
 import re
 
 from flask import Blueprint, Response, abort, current_app, g, request
-from smda.common.SmdaReport import SmdaReport
 
 from mcritweb.views.authentication import token_required
 from mcritweb.views.client import get_client
-from mcritweb.views.utility import get_username, mcrit_server_required
+from mcritweb.views.utility import get_username, mcrit_server_required, read_smda_report
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -15,11 +14,30 @@ bp = Blueprint('api', __name__, url_prefix='/api')
 # read or a job submission, which the UI grants to visitors.
 CONTRIBUTOR_ONLY = [
     (re.compile("samples$"), "POST"),   # addReport
+    (re.compile(r"functions/\d+$"), "PUT"),   # modifyFunction (explore.modifyFunction is contributor_required)
 ]
 
 
 def requires_contributor(api_path, method):
     return any(pattern.match(api_path) and method == verb for pattern, verb in CONTRIBUTOR_ONLY)
+
+def exceeds_query_upload_limit():
+    """The per-role cap `analyze.query` puts on what may be queried (#19). A token
+    carries the same authority as its owner's browser, so the API applies it too.
+
+    The declared Content-Length is checked, so an oversized body is refused without
+    being read. The server hands the app no more than that many bytes, so a body that
+    claims less cannot be larger. A chunked body declares nothing, and only reading it
+    would tell its size, so a capped role is refused one. McritClient always declares a
+    length: it sends bytes through `requests`. (Reading it up to the cap would need
+    `request.max_content_length` set per request, which Flask allows only from 3.1;
+    requirements.txt allows 3.0.)"""
+    role_limit = current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.api_user.role)
+    if role_limit is None:
+        return False
+    if request.content_length is None:
+        return True
+    return request.content_length > role_limit
 
 def nullable_int(x):
     try:
@@ -61,11 +79,15 @@ def handle_raw_response(response):
     return Response(status=response.status_code)
 
 
-@bp.route('/<path:api_path>', methods=['GET','POST'])
+@bp.route('/<path:api_path>', methods=['GET','POST','PUT'])
 @token_required
 @mcrit_server_required
 def api_router(api_path):
     api_path = api_path.rstrip("/")
+    # PUT is routed here for modifyFunction only; every other branch below reads or
+    # submits and ignores the method, so a PUT to it would be answered as a GET
+    if request.method == "PUT" and not re.match(r"functions/\d+$", api_path):
+        abort(405)
     if requires_contributor(api_path, request.method) and g.api_user.role not in ('contributor', 'admin'):
         abort(403)
     username = get_username(request)
@@ -97,8 +119,9 @@ def api_router(api_path):
                 pass
             return handle_raw_response(client.getSamples(forward_start, forward_limit))
         elif request.method == 'POST':
-            smda_report_body = request.get_json(force=True)
-            smda_report = SmdaReport.fromDict(smda_report_body)
+            smda_report = read_smda_report(request.get_data())
+            if smda_report is None:
+                return Response(status=400)
             return handle_raw_response(client.addReport(smda_report))
     # getFamily, isFamilyId
     elif re_match := re.match(r"families/(?P<family_id>\d+)$", api_path):
@@ -108,9 +131,17 @@ def api_router(api_path):
     # getFamilies
     elif re_match := re.match(r"families$", api_path):
         return handle_raw_response(client.getFamilies())
-    # getFunctionById, isFunctionId
+    # getFunctionById, isFunctionId; modifyFunction by PUT (fkie-cad/mcritweb#72)
     elif re_match := re.match(r"functions/(?P<function_id>\d+)$", api_path):
         function_id = int(re_match.group("function_id"))
+        if request.method == "PUT":
+            if not callable(getattr(client, "modifyFunction", None)):
+                abort(501)
+            body = request.get_json(silent=True) or request.form
+            function_name = body.get("function_name") if hasattr(body, "get") else None
+            if not isinstance(function_name, str):
+                abort(400)
+            return handle_raw_response(client.modifyFunction(function_id, function_name))
         forward_with_xcfg = request.args.get("with_xcfg", "").lower() in ["1", "true"]
         return handle_raw_response(client.getFunctionById(function_id, with_xcfg=forward_with_xcfg))
     # getFunctions
@@ -149,8 +180,14 @@ def api_router(api_path):
         return handle_raw_response(fetch_many(entry_ids))
     # getMatchesForSmdaFunction
     elif re_match := re.match(r"query/function$", api_path):
-        smda_report_body = request.get_json(force=True)
-        smda_report = SmdaReport.fromDict(smda_report_body)
+        if exceeds_query_upload_limit():
+            return Response(status=403)
+        # not a report, or nested deeper than json can follow: fromDict, or get_json
+        # on the nesting, raised and the router answered a 500. After the cap, which
+        # reads no further than it needs to
+        smda_report = read_smda_report(request.get_data())
+        if smda_report is None:
+            return Response(status=400)
         return handle_raw_response(client.getMatchesForSmdaFunction(smda_report))
     # getMatchesForPicHash
     elif re_match := re.match(r"query/pichash/(?P<pichash>[0-9a-fA-F]{16})(?P<as_summary>/summary)?$", api_path):
@@ -235,6 +272,8 @@ def api_router(api_path):
         return handle_raw_response(client.getVersion())
     # requestMatchesForMappedBinary, requestMatchesForUnmappedBinary
     elif re_match := re.match(r"query/binary(/mapped/\d+)?$", api_path):
+        if exceeds_query_upload_limit():
+            return Response(status=403)
         binary = request.get_data()
         request_args = request.args
         minhash_threshold = request_args.get("minhash_threshold", default=None, type=nullable_int)
