@@ -558,11 +558,15 @@ def import_complete():
 EXPORT_ENVELOPE = (b'{"status": "successful", "data": ', b"}")
 #: The size of the pieces a passed-through export is sent in.
 EXPORT_CHUNK_SIZE = 1 << 20
+#: How many samples an export holds, read off its first bytes: MinHashIndex.getExportData
+#: puts its counts first, as a flat object, and the backend keeps that order on the wire.
+EXPORT_SAMPLE_COUNT_RE = re.compile(rb'\{"content": \{[^{}]*"num_samples": ([0-9]+)')
 
 
-def fetch_export(sample_ids=None):
+def fetch_export(sample_ids=None, require_samples=False):
     """The export of `sample_ids` (every sample for None) as its JSON bytes in pieces, with
-    their total length, or None when the backend did not export.
+    their total length, or None when the backend did not export - or, with
+    `require_samples`, exported no sample at all.
 
     Parsing a whole-corpus export into a dict and serialising it again held both at once
     (#202). Asked in raw mode, the client hands over the backend's response, and the
@@ -573,6 +577,8 @@ def fetch_export(sample_ids=None):
     """
     exported = get_client(raw_responses=True).getExportData(sample_ids)
     if isinstance(exported, dict):
+        if require_samples and not exported.get("content", {}).get("num_samples"):
+            return None
         serialised = json.dumps(exported).encode("utf-8")
         return [serialised], len(serialised)
     if exported is None or exported.status_code != 200:
@@ -582,6 +588,12 @@ def fetch_export(sample_ids=None):
     # a failed export answers its own envelope, `"status": "failed"`
     if not (body.startswith(head) and body.endswith(tail)):
         return None
+    if require_samples:
+        sample_count = EXPORT_SAMPLE_COUNT_RE.match(body, len(head))
+        # an export that does not open with its counts is passed on rather than refused:
+        # it was asked for by id, so it is not every sample whatever it holds
+        if sample_count is not None and not int(sample_count.group(1)):
+            return None
     export = memoryview(body)[len(head):len(body) - len(tail)]
     pieces = (bytes(export[offset:offset + EXPORT_CHUNK_SIZE]) for offset in range(0, len(export), EXPORT_CHUNK_SIZE))
     return pieces, len(export)
@@ -644,16 +656,11 @@ def specific_export(type, item_id):
     if type == 'samples':
         # the backend leaves out a sample_id it does not know, so the export itself says
         # whether there was one
-        export_data = client.getExportData([int(item_id)])
-        if not export_data or not export_data["content"]["num_samples"]:
+        export_file = fetch_export([int(item_id)], require_samples=True)
+        if export_file is None:
             flash(f'MCRIT did not export sample "{item_id}" - it may not exist, or MCRIT could not export it.', category='error')
             return redirect(url_for('data.export_view'))
-        export_file = json.dumps(export_data)
-        return Response(
-            export_file,
-            mimetype='application/json',
-            headers={"Content-disposition":
-                    "attachment; filename=export_samples.json"})
+        return export_download(export_file, "export_samples.json")
     # <type> is unconstrained, so anything but the two known values used to fall off
     # the end of this function and return None, which Flask answers with a 500
     flash(f'"{type}" cannot be exported - use "family" or "samples".', category='error')
