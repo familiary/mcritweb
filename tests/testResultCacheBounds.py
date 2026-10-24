@@ -165,6 +165,7 @@ def test_a_download_whose_cached_file_vanishes_after_the_check_is_fetched_instea
     client.get(f"/data/result/{job_id}")
 
     def evicted_before_the_open(*args, **kwargs):
+        os.remove(os.sep.join(args[:2]))
         raise FileNotFoundError(args[1])
 
     monkeypatch.setattr("mcritweb.views.data.send_from_directory", evicted_before_the_open)

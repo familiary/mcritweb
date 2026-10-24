@@ -15,7 +15,9 @@ import os
 import unittest
 
 import pytest
+from fixtureData import job_id_of, load
 
+import mcritweb.views.data as data_views
 from mcritweb.views.data import cache_result, load_cached_result
 
 LOG = logging.getLogger(__name__)
@@ -120,6 +122,63 @@ def test_an_unreadable_cache_file_does_not_need_an_app_context(app):
     reach for `current_app`."""
     write_cached(app, f"20260806-104636-{JOB_ID}.json", '{"report": "truncat')
     assert load_cached_result(app, JOB_ID) == {}
+
+
+def fetches_of(corpus_mcrit, job_id):
+    return [call for call in corpus_mcrit.calls if call[0] == "getResultForJob" and call[1][0] == job_id]
+
+
+def test_a_download_does_not_serve_a_report_cut_short(client, as_role, app, corpus_mcrit):
+    """The page skips a cached report that does not parse, and the download streamed it
+    as it was. This one is what the writer before atomic writes - json.dump with
+    indent=1, straight into the cache - leaves behind when the process dies halfway."""
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+    pretty = json.dumps(load("cross_compare.result"), indent=1)
+    write_cached(app, f"20250101-000000-{job_id}.json", pretty[:len(pretty) // 2])
+
+    response = client.get(f"/data/result/{job_id}/download")
+
+    assert response.status_code == 200
+    assert json.loads(response.data) == load("cross_compare.result")
+    assert len(fetches_of(corpus_mcrit, job_id)) == 1
+
+
+def test_a_pretty_printed_report_is_downloaded_from_the_cache_and_kept_compact(client, as_role, app, corpus_mcrit):
+    """A whole one costs a parse rather than a fetch, and only once: it is cached again
+    compact, and that copy is what the next download streams."""
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+    write_cached(app, f"20250101-000000-{job_id}.json", json.dumps(load("cross_compare.result"), indent=1))
+
+    first = client.get(f"/data/result/{job_id}/download")
+    second = client.get(f"/data/result/{job_id}/download")
+
+    assert json.loads(first.data) == load("cross_compare.result")
+    assert fetches_of(corpus_mcrit, job_id) == []
+    assert len(os.listdir(results_dir(app))) == 2
+    assert second.data == first.data and b"\n" not in second.data
+
+
+def test_a_compact_report_is_downloaded_without_being_parsed(client, as_role, app, monkeypatch):
+    """What checking for a report cut short must not cost: one this version cached is
+    complete by construction, and is streamed as it lies."""
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+    client.get(f"/data/result/{job_id}")
+    [filename] = os.listdir(results_dir(app))
+    with open(os.sep.join([results_dir(app), filename]), "rb") as fin:
+        on_disk = fin.read()
+
+    def parsed(*args, **kwargs):
+        raise AssertionError("the cached report was parsed to be downloaded")
+
+    monkeypatch.setattr(data_views, "load_cached_result", parsed)
+    monkeypatch.setattr(data_views.json, "load", parsed)
+    response = client.get(f"/data/result/{job_id}/download")
+
+    assert response.status_code == 200
+    assert response.data == on_disk
 
 
 def test_only_the_report_for_this_job_is_read(app, monkeypatch):

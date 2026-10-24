@@ -90,6 +90,8 @@ DIAGRAM_FILENAME_RE = re.compile(
 
 #: The width of the strftime prefix cache_result puts in front of the job id.
 CACHE_TIMESTAMP_LENGTH = len("20260806-104636")
+#: How a report that is not pretty-printed begins, which an indent=1 one never does.
+UNINDENTED_REPORT_STARTS = (b'{"', b"{}")
 
 
 def quote_backend_query_value(value):
@@ -199,13 +201,21 @@ def load_cached_result(app, job_id):
 
 
 def find_cached_result_filename(app, job_id):
-    """Name of the newest cached report for a job, or None if none is cached.
+    """Name of the newest cached report for a job that can be served unread, or None.
 
     Matches the whole `<timestamp>-<job_id>.json` name that cache_result writes, as
     load_cached_result does: this file is handed to the caller as-is, so a short or
     crafted job_id must not be able to select a report that merely contains it. The
     timestamp prefix sorts chronologically, so the newest capture wins for a job that
     has been fetched more than once.
+
+    Unread also means unchecked, so only a compact report qualifies. cache_result has
+    written compact only for as long as it has written through write_atomically - the
+    two reached master in one merge - so a compact file was renamed into place whole,
+    and its first two bytes say so. A pretty-printed one was written in place by an
+    older version and may have been cut short by a crash; only parsing it can tell,
+    which would double the cost of every download, so it is left to the caller to load
+    like any other cached report.
     """
     cache_path = os.sep.join([app.instance_path, "cache", "results"])
     suffix = f"-{job_id}.json"
@@ -213,7 +223,15 @@ def find_cached_result_filename(app, job_id):
     # a uuid4 job id - which has dashes of its own - select another job's report
     expected_length = CACHE_TIMESTAMP_LENGTH + len(suffix)
     candidates = [filename for filename in os.listdir(cache_path) if len(filename) == expected_length and filename.endswith(suffix)]
-    return max(candidates) if candidates else None
+    for filename in sorted(candidates, reverse=True):
+        try:
+            with open(os.sep.join([cache_path, filename]), "rb") as fin:
+                if fin.read(2) in UNINDENTED_REPORT_STARTS:
+                    return filename
+        except OSError:
+            # evicted since the listing, or unreadable: not one to hand out either way
+            continue
+    return None
 
 
 def cache_result(app, job_info, matching_result):
@@ -223,7 +241,9 @@ def cache_result(app, job_info, matching_result):
         # the filename is only second-resolution, so two requests for the same job can
         # pick the same one - write elsewhere and rename, or a reader gets half a file
         # compact: the file is only ever parsed, or streamed as the download, and
-        # indentation made it about 1.5 times the size on disk and on the wire
+        # indentation made it about 1.5 times the size on disk and on the wire. The
+        # download streams a compact file unchecked (find_cached_result_filename), so
+        # never write one other than through write_atomically
         write_atomically(app, cache_path, timestamped_filename, lambda fout: json.dump(matching_result, fout, separators=(",", ":")), "w")
         try:
             trim_result_cache(app)
@@ -723,7 +743,10 @@ def download_result(job_id):
             # happened before send_from_directory checked for the file, and the bare
             # error if it happened between that check and the open. Fetch it again.
             pass
-    result_json = client.getResultForJob(job_id)
+    # what is cached but was not served is pretty-printed, from before writes were
+    # atomic: loading it is the check, a file cut short is skipped, and caching it
+    # again below makes it one the next download streams
+    result_json = load_cached_result(current_app, job_id) or client.getResultForJob(job_id)
     if not result_json:
         # unfinished, failed, or a job type that produces nothing - the report page
         # already knows how to tell those apart, so let it do the talking
