@@ -38,7 +38,7 @@ DEFAULT_FILTERS = {
 }
 
 #: The body of the link cluster table.
-CLUSTER_TABLE = re.compile(r"Link Clusters</h4>.*?<tbody>(.*?)</tbody>", re.S)
+CLUSTER_TABLE = re.compile(r"Link Clusters</h\d>.*?<tbody>(.*?)</tbody>", re.S)
 
 
 @pytest.fixture
