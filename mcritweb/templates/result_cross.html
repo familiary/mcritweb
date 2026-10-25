@@ -44,7 +44,11 @@
         <td class="" style="padding: 0 5px; font-size: 13px;color: black">{{sample.statistics['num_functions']}}</td>
       {# a pane filled in the browser writes its own score line into data-hint, see the script at the end #}
       {% for sample2 in samples %}
-        <td><span onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}'";" class="hint--top" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
+        {# a pair without matches links nowhere: the row's report has no entry for the column's
+           sample, so its page would list nothing and its diagram would 404, as
+           data.render_missing_match_diagram draws none for it. The diagonal is always such a
+           pair, since mcrit counts a sample's matches with itself apart #}
+        <td><span{% if matching_matches[sample.sample_id|string][sample2.sample_id|string] %} onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}'";"{% endif %} class="hint--top" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
             style="background-color: #{{ score_to_color(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }}; width: 25px; height: 25px; "></span>
         </td>
       {% endfor %}
