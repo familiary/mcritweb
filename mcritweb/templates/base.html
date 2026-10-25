@@ -6,6 +6,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# scale the text with the size the reader set for the whole system, on Android and
+     ChromeOS: the browser scales the root font size, and the pages size their text in rem
+     and em. Read by Chrome and Edge, ignored elsewhere. #}
+  <meta name="text-scale" content="scale">
   {# the colour theme (#70, mcritweb/theme.py). This tells the browser which scheme to
      paint the canvas, scrollbars and form controls in before any stylesheet arrives #}
   <meta name="color-scheme" content="{{ theme_color_scheme }}">
@@ -188,7 +192,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='theme-dark.css') }}" media="{{ theme_dark_media }}">
   {% endif %}
 </head>
-<body style="font-family: sans-serif">
+<body>
   {# the first stop of the Tab key, past the logos and the menus to the page's own content;
      out of sight until it has focus (style.css) #}
   <a class="skip-link" href="#content">Skip to main content</a>

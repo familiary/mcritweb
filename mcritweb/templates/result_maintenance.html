@@ -36,6 +36,7 @@ Updated functions: {{ result['minhash_functions_indexed'] }}
     Families: {{ result['num_families'] }} | corrected: {{ result['num_families_corrected'] }} | created for samples that referenced a missing family: {{ result['num_families_created'] }}
 </p>
 {% if result['corrections'] %}
+<div class="table-scroll">
 <table class="table table-sm">
   <caption class="visually-hidden">Corrected families</caption>
   <thead><tr><th>Family</th><th>Samples before &rarr; after</th><th>Functions before &rarr; after</th><th>Library samples before &rarr; after</th></tr></thead>
@@ -50,6 +51,7 @@ Updated functions: {{ result['minhash_functions_indexed'] }}
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% endif %}
 {% elif job_info.parameters == "rebuildPicBlockHashIndex()" %}
 <p>

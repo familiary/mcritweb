@@ -74,6 +74,7 @@ Results for Job: {{ job_info.job_id }}
   </div>
 </form>
 {{ set_pagination_params(famp, _anchor="family-matches") }}
+<div class="table-scroll">
 <table class="table table-hover">
   <caption class="visually-hidden">Best family matches</caption>
   <thead class="table-light">
@@ -89,12 +90,14 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
   </table>
+  </div>
 
   {{ pagination_widget(famp, _label="family matches", _anchor="family-matches")}}
 
   <h2 class="h3" id="library-matches">Best Library Matches</h2>
 <p>total: {{ libp.max_value }}{% if libp.max_value > 0 %}, showing: {{ 1 + libp.start_index }} - {{ libp.end_index }}{% endif %} (filtered: {{ matching_result.num_original_library_matches - libp.max_value}})</p>
 {{ set_pagination_params(libp, _anchor="library-matches") }}
+<div class="table-scroll">
 <table class="table table-hover">
   <caption class="visually-hidden">Best library matches</caption>
   <thead class="table-light">
@@ -110,6 +113,7 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
 </table>
+</div>
 
 {{ pagination_widget(libp, _label="library matches", _anchor="library-matches")}}
 
@@ -139,6 +143,7 @@ Results for Job: {{ job_info.job_id }}
     </div>
 </form>
 {{ set_pagination_params(funp, _anchor="function-matches") }}
+<div class="table-scroll table-deferred" style="contain-intrinsic-block-size: auto calc({{ function_rows|length }} * (2.35rem + 1px) + 3rem)">
 <table class="table table-hover">
   <caption class="visually-hidden">Function matches</caption>
   <thead class="table-light">
@@ -154,6 +159,7 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
   </table>
+  </div>
   {{ pagination_widget(funp, _label="function matches", _anchor="function-matches")}}
 
 <h2 class="h3">Matching Method Statistics </h2>

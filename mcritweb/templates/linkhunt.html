@@ -49,29 +49,30 @@ LinkHunt for Job: {{ job_info.job_id }}
 <p>These are clusters of matches with another single family where all functions have a direct code CFG relationship (calls, jumps, ...) among them. Bold matches are also unique with this other family.</p>
 {# a cluster can hold any number of links, so only the first few are shown open #}
 {% set shown_links = 8 %}
+<div class="table-scroll">
 <table class="table table-hover">
   <caption class="visually-hidden">Link clusters</caption>
   <thead class="table-light">
     <tr>
-      <th style="text-align: right;" scope="col">Rank</th>
-      <th style="text-align: right;" scope="col">Clusterscore</th>
-      <th style="text-align: right;" scope="col">Best Linkscore</th>
-      <th style="text-align: right;" scope="col">Family</th>
-      <th style="text-align: right;" scope="col">Cluster Size</th>
-      <th style="text-align: right;" scope="col">Unique Matches</th>
-      <th style="text-align: right;" scope="col">Functions</th>
+      <th class="text-end" scope="col">Rank</th>
+      <th class="text-end" scope="col">Clusterscore</th>
+      <th class="text-end" scope="col">Best Linkscore</th>
+      <th class="text-end" scope="col">Family</th>
+      <th class="text-end" scope="col">Cluster Size</th>
+      <th class="text-end" scope="col">Unique Matches</th>
+      <th class="text-end" scope="col">Functions</th>
     </tr>
   </thead>
   <tbody>
     {% for cluster_entry in lc[clup.start_index:clup.start_index+clup.limit] %}
     <tr style="background-color: {{ scp.getMatchTintByScore100(cluster_entry['max_score']) }}">
-      <td style="text-align: right;" valign="middle">{{ clup.start_index + loop.index }}</td>
-      <td style="text-align: right;" valign="middle">{{ "%7.2f"|format(cluster_entry['score']) }}</td>
-      <td style="text-align: right;" valign="middle">{{ "%7.2f"|format(cluster_entry['max_score']) }}</td>
-      <td style="text-align: right;" valign="middle"><i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i>({{ cluster_entry['family_id'] }}) {{ format_family_name(cluster_entry['family'], cluster_entry['family_id']) }}</td>
-      <td style="text-align: right;" valign="middle">{{ "%d"|format(cluster_entry['links']|length) }}</td>
-      <td style="text-align: right;" valign="middle">{{ "%d"|format(cluster_entry['unique_matches']|length) }}</td>
-      <td style="text-align: right;" valign="middle" class="linkhunt-links">
+      <td class="text-end" valign="middle">{{ clup.start_index + loop.index }}</td>
+      <td class="text-end" valign="middle">{{ "%7.2f"|format(cluster_entry['score']) }}</td>
+      <td class="text-end" valign="middle">{{ "%7.2f"|format(cluster_entry['max_score']) }}</td>
+      <td class="text-end" valign="middle"><i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i>({{ cluster_entry['family_id'] }}) {{ format_family_name(cluster_entry['family'], cluster_entry['family_id']) }}</td>
+      <td class="text-end" valign="middle">{{ "%d"|format(cluster_entry['links']|length) }}</td>
+      <td class="text-end" valign="middle">{{ "%d"|format(cluster_entry['unique_matches']|length) }}</td>
+      <td valign="middle" class="text-end linkhunt-links">
         {% for link_entry in cluster_entry["links"] %}
           {% if loop.index == shown_links + 1 %}
           <details><summary>{{ loop.length - shown_links }} more</summary>
@@ -98,35 +99,37 @@ LinkHunt for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
 </table>
+</div>
 {{ pagination_widget(clup, _label="link clusters", _anchor="linkhunt-clusters")}}
 <h3 class="h4" id="linkhunt-links">Individual Links</h3>
 <p>Family-unique matches in bold.</p>
+<div class="table-scroll">
 <table class="table table-hover">
   <caption class="visually-hidden">Individual links</caption>
     <thead class="table-light">
       <tr>
-        <th style="text-align: right;" scope="col">Rank</th>
-        <th style="text-align: right;" scope="col">Linkscore</th>
-        <th style="text-align: right;" scope="col">Function ID</th>
-        <th style="text-align: right;" scope="col">Offset</th>
-        <th style="text-align: right;" scope="col">Bytes</th>
-        <th style="text-align: right;" scope="col">Family</th>
-        <th style="text-align: right;" scope="col">Sample ID</th>
-        <th style="text-align: right;" scope="col">Function ID</th>
-        <th style="text-align: right;" scope="col">Match Score</th>
+        <th class="text-end" scope="col">Rank</th>
+        <th class="text-end" scope="col">Linkscore</th>
+        <th class="text-end" scope="col">Function ID</th>
+        <th class="text-end" scope="col">Offset</th>
+        <th class="text-end" scope="col">Bytes</th>
+        <th class="text-end" scope="col">Family</th>
+        <th class="text-end" scope="col">Sample ID</th>
+        <th class="text-end" scope="col">Function ID</th>
+        <th class="text-end" scope="col">Match Score</th>
       </tr>
     </thead>
     <tbody>
       {% for link_entry in lhr[funp.start_index:funp.start_index+funp.limit] %}
       <tr style="background-color: {{ scp.getMatchTintByScore100(link_entry.matched_link_score) }}">
-        <td style="text-align: right;" valign="middle">{{ funp.start_index + loop.index }}</td>
-        <td style="text-align: right;" valign="middle">{{ "%5.2f"|format(link_entry.matched_link_score) }}</td>
-        <td style="text-align: right;" valign="middle" class="id"><a href="{{ url_for('explore.function_by_id', function_id=link_entry.function_id * -1 if matching_result.is_query else link_entry.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ link_entry.function_id }}</a></td>
-        <td style="text-align: right;" valign="middle">0x{{ "%x"|format(link_entry.offset) }}</td>
-        <td style="text-align: right;" valign="middle">{{ "%d"|format(link_entry.num_bytes) }}</td>
-        <td style="text-align: right;" valign="middle"><i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i>({{ link_entry.matched_family_id }}) {{ format_family_name(link_entry.matched_family, link_entry.matched_family_id) }}</td>
-        <td style="text-align: right;" valign="middle">{{ link_entry.matched_sample_id }}</td>
-        <td style="text-align: right;" valign="middle">
+        <td class="text-end" valign="middle">{{ funp.start_index + loop.index }}</td>
+        <td class="text-end" valign="middle">{{ "%5.2f"|format(link_entry.matched_link_score) }}</td>
+        <td valign="middle" class="text-end id"><a href="{{ url_for('explore.function_by_id', function_id=link_entry.function_id * -1 if matching_result.is_query else link_entry.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ link_entry.function_id }}</a></td>
+        <td class="text-end" valign="middle">0x{{ "%x"|format(link_entry.offset) }}</td>
+        <td class="text-end" valign="middle">{{ "%d"|format(link_entry.num_bytes) }}</td>
+        <td class="text-end" valign="middle"><i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i>({{ link_entry.matched_family_id }}) {{ format_family_name(link_entry.matched_family, link_entry.matched_family_id) }}</td>
+        <td class="text-end" valign="middle">{{ link_entry.matched_sample_id }}</td>
+        <td class="text-end" valign="middle">
           <a href="{{ url_for('explore.function_by_id', function_id=link_entry.matched_function_id) }}">
           {% if link_entry.matched_unique %}
           <b style="color: var(--text-strong);">{{ link_entry.matched_function_id }}<span class="visually-hidden"> (unique)</span></b>
@@ -134,11 +137,12 @@ LinkHunt for Job: {{ job_info.job_id }}
           {{ link_entry.matched_function_id }}
           {% endif %}
         </a>{% if not matching_result.is_query %}&nbsp;<a aria-label="Compare function {{ link_entry.function_id }} with function {{ link_entry.matched_function_id }}" title="Compare function {{ link_entry.function_id }} with function {{ link_entry.matched_function_id }}" target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare" aria-hidden="true"></i></a>{% endif %}</td>
-        <td style="text-align: right;" valign="middle">{{ "%5.2f"|format(link_entry.matched_score) }}</td>
+        <td class="text-end" valign="middle">{{ "%5.2f"|format(link_entry.matched_score) }}</td>
      </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {{ pagination_widget(funp, _label="individual links", _anchor="linkhunt-links")}}
 
 {% endblock %}

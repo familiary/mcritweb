@@ -24,6 +24,7 @@ Results for Job: {{ job_info.job_id }}
   ) }}
 
 <h2 class="h3">Similarity Scores</h2>
+<div class="table-scroll">
 <table class="table table-hover">
   <caption class="visually-hidden">Similarity scores</caption>
   <thead class="table-light">
@@ -39,6 +40,7 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
   </table>
+  </div>
 
 <h2 class="h3" id="function-matches">Function Matches</h2>
 <p>selection: {{ funp.max_value }}, showing: {{ 1 + funp.start_index }} - {{ funp.end_index }} (filtered: {{ matching_result.num_original_function_matches - funp.max_value}})</p>
@@ -54,6 +56,7 @@ Results for Job: {{ job_info.job_id }}
   </div>
 </form>
 {{ set_pagination_params(funp, _anchor="function-matches") }}
+<div class="table-scroll table-deferred" style="contain-intrinsic-block-size: auto calc({{ function_rows|length }} * (2.35rem + 1px) + 3rem)">
 <table class="table table-hover">
   <caption class="visually-hidden">Function matches</caption>
   <thead class="table-light">
@@ -69,6 +72,7 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
   </table>
+  </div>
   {{ pagination_widget(funp, _label="function matches", _anchor="function-matches")}}
 
 

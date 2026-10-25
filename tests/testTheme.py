@@ -2107,9 +2107,11 @@ def test_every_template_is_free_of_colour_literals_and_the_scan_looked():
     assert problems == [], "a colour written into a template; give it a name in static/style.css and static/theme-dark.css:\n" + "\n".join(problems)
     # what it looked at on the day this was written was 67 templates, 468 style attributes, 572
     # declarations, 439 script strings and 2046 Jinja strings: a third of that is a floor a scan
-    # that has stopped looking falls below, and ordinary edits do not
+    # that has stopped looking falls below, and ordinary edits do not. (The style attributes
+    # that classes say now - alignment, status colours, the matrix's sizes - are fewer, 138 of
+    # them and 180 declarations, and the floors are a quarter of what it first saw.)
     assert len(paths) >= 50
-    assert counts["style attributes"] >= 150 and counts["declarations"] >= 190 and counts["script strings"] >= 140 and counts["Jinja strings"] >= 680, counts
+    assert counts["style attributes"] >= 115 and counts["declarations"] >= 140 and counts["script strings"] >= 140 and counts["Jinja strings"] >= 680, counts
 
 
 def test_every_project_stylesheet_is_free_of_colour_literals_outside_the_palette():

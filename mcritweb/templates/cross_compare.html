@@ -141,6 +141,7 @@ function handleSliderChange(val) {
 {{ compare_nav("cross") }}
 <h1>Cross Compare</h1>
 <div>
+  <div class="table-scroll">
   <table class="table table-hover">
     <caption class="visually-hidden">Selected samples</caption>
     <thead class="table-light">
@@ -173,6 +174,7 @@ function handleSliderChange(val) {
     </tbody>
     {% endif %}
   </table>
+  </div>
   {% if not selected_ids %}
   <div class="text-center">
   <h2 class="h4">Selected samples will show here</h2>
@@ -191,6 +193,7 @@ function handleSliderChange(val) {
 
   {% if samples %}
   {{ set_pagination_params(pagination, _anchor="Search", _js_argument_provider="fetchState") }}
+  <div class="table-scroll">
   <table class="table table-hover">
     <caption class="visually-hidden">Samples to select</caption>
       <thead class="table-light">
@@ -212,6 +215,7 @@ function handleSliderChange(val) {
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {{ pagination_widget(pagination, _label="samples") }}
     <div class="text-center">
     <div class="form-group">

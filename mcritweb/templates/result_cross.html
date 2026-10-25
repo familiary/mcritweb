@@ -1,20 +1,20 @@
 {% macro cross_table(method, samples, matching_percent, matching_matches, fifth_indices, job_info) %}
 
-  <table>
+  <table class="cross-matrix">
     {# what the table is, for a screen reader moving between the tables of the page; a pane
        filled in the browser clones it with the rest (see the script at the end) #}
     <caption class="visually-hidden">MCRIT score of each pair of samples, the row's sample against the column's. The arrow keys move between the scores, and Enter opens the report of a pair with matches.</caption>
     {# header cells, so every cell below has one (axe's td-has-header); normal weight,
        because they looked like the rest of the table when they were <td> #}
     <tr>
-      <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">#</th>
-      <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">family</th>
-      <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">version</th>
+      <th scope="col">#</th>
+      <th scope="col">family</th>
+      <th scope="col">version</th>
       <th scope="col"><span class="visually-hidden">Actions</span></th>
-        <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">ID</th>
-        <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">Bit</th>
-        <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">FNs</th>
-        <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal" colspan="{{ samples|length }}">Matrix</th>
+        <th scope="col">ID</th>
+        <th scope="col">Bit</th>
+        <th scope="col">FNs</th>
+        <th scope="col" colspan="{{ samples|length }}">Matrix</th>
     </tr>
     
     <tr>
@@ -29,7 +29,7 @@
        every fifth shows its sample id, as the axis label it was #}
     {% for column_sample in samples %}
       {% if column_sample.sample_id in fifth_indices %}
-        <th scope="col" class="matrix-col" style="font-size: 10px; font-weight: normal; text-align: center; color: var(--text-strong)">{{ column_sample.sample_id }}</th>
+        <th scope="col" class="matrix-col cross-index text-center">{{ column_sample.sample_id }}</th>
       {% else %}
         <th scope="col" class="matrix-col"><span class="visually-hidden">{{ column_sample.sample_id }}</span></th>
       {% endif %}
@@ -39,16 +39,16 @@
     {% for sample in samples %}
       {% set outer_loop = loop %}
       <tr class="sample-row" style="border: 0; line-height: 0.7em;" data-hint-sample="{{ sample.sample_id }}: {{sample.sha256[:8]}} -- {{ sample.family }} {{ sample.version }} -- ({{sample.statistics['num_functions']}} func)">
-        <td class="sha256" style="font-size: 13px; min-width: 100px;">{{ format_sha_short_clipboard(sample.sha256) }}</td>
-        <td class="" style="padding: 0 5px; font-size: 13px">{{sample.family}}</td>
-        <td class="" style="padding: 0 5px; font-size: 13px">{{sample.version}}</td>
+        <td class="sha256" style="min-width: 100px;">{{ format_sha_short_clipboard(sample.sha256) }}</td>
+        <td class="cross-label" style="padding: 0 5px">{{sample.family}}</td>
+        <td class="cross-label" style="padding: 0 5px">{{sample.version}}</td>
         <td><button type="button" aria-label="Edit sample {{ sample.sample_id }}" title="Edit sample {{ sample.sample_id }}" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></button></td>
         {# the row's sample, and a link to its own report: the cell itself was the link, which
            only a mouse could follow #}
         {% set row_job_id = sample_to_job_id.get(sample.sample_id|string) %}
-        <th scope="row" class="id" style="padding: 0 5px; font-size: 13px; font-weight: normal">{% if row_job_id %}<a href="{{ url_for('data.result', job_id=row_job_id) }}">{{ sample.sample_id }}</a>{% else %}{{ sample.sample_id }}{% endif %}</th>
-        <td class="" style="padding: 0 5px; font-size: 13px">{{sample.bitness}}</td>
-        <td class="" style="padding: 0 5px; font-size: 13px; color: var(--text-strong)">{{sample.statistics['num_functions']}}</td>
+        <th scope="row" class="id" style="padding: 0 5px">{% if row_job_id %}<a href="{{ url_for('data.result', job_id=row_job_id) }}">{{ sample.sample_id }}</a>{% else %}{{ sample.sample_id }}{% endif %}</th>
+        <td class="cross-label" style="padding: 0 5px">{{sample.bitness}}</td>
+        <td class="cross-label" style="padding: 0 5px; color: var(--text-strong)">{{sample.statistics['num_functions']}}</td>
       {# a pane filled in the browser writes its own score line into data-hint, see the script at the end #}
       {% for sample2 in samples %}
         {# a pair without matches links nowhere: the row's report has no entry for the column's
@@ -310,13 +310,13 @@ Results for Job: {{ job_info.job_id }}
     {% for method in matching_percent.keys() %}
       {% if method == rendered_method %}
       <div class="tab-pane fade show active" id="pills-{{ method }}" role="tabpanel" aria-labelledby="pills-{{ method }}-tab">
-          <div class="d-flex justify-content-center overflow-auto cross-pane-body">
+          <div class="overflow-auto cross-pane-body">
             {{ cross_table(method, samples[method], matching_percent[method], matching_matches[method], sample_indices[method], job_info) }}
           </div>
       </div>
       {% else %}
       <div class="tab-pane fade" id="pills-{{ method }}" role="tabpanel" aria-labelledby="pills-{{ method }}-tab" data-lazy-method="{{ method }}">
-          <div class="d-flex justify-content-center overflow-auto cross-pane-body"></div>
+          <div class="overflow-auto cross-pane-body"></div>
       </div>
       {% endif %}
     {% endfor %}

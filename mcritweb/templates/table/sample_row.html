@@ -4,6 +4,8 @@
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro sample_row_std_js() %}
+{# the Analyze menu of a row, out of reach of the box that scrolls the table #}
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='table_scroll.js')|tojson }})</script>
 <script nonce="{{ csp_nonce() }}">
   var button_clicked = false;
   
@@ -104,13 +106,13 @@
           Filename
         {% endcall %}
       {% elif column_type == "bitness" and not compact_view %}
-        <th style="text-align: right;" scope="col">Bitness</th>
+        <th class="text-end" scope="col">Bitness</th>
       {% elif column_type == "num_functions" %}
         {% call sortable_header_col(sort_pagination, "statistics.num_functions", align="right") %}
           Functions
         {% endcall %}
       {% elif column_type == "is_library" %}
-        <th style="text-align: right;" scope="col">Library</th>
+        <th class="text-end" scope="col">Library</th>
       {% endif %}
     {% endfor %}
     {% if show_hint %}
@@ -167,7 +169,7 @@
              its name (WCAG 2.5.3) #}
           <button type="button" title="Analyze" class="btn btn-outline-dark btn-sm dropdown-toggle" id="sample_{{ sample.sample_id }}_analyze" data-bs-toggle="dropdown" aria-expanded="false">
             {% if job_collection and matching_jobs %}
-            <i style="color: var(--status-yes);" class="fa-solid fa-flask" aria-hidden="true"></i><span class="visually-hidden">Analyze sample {{ sample.sample_id }}, matching jobs:</span>&nbsp;{{ matching_jobs | length}}
+            <i class="status-yes fa-solid fa-flask" aria-hidden="true"></i><span class="visually-hidden">Analyze sample {{ sample.sample_id }}, matching jobs:</span>&nbsp;{{ matching_jobs | length}}
             {% else %}
             <i class="fa-solid fa-flask" aria-hidden="true"></i><span class="visually-hidden">Analyze sample {{ sample.sample_id }}</span>
             {% endif %}
