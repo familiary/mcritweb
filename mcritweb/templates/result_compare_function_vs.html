@@ -196,7 +196,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
             <div id="loading_a" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:#3f51b5 ; ">
             Loading. Please Wait!
             </div>
-            <svg id="graphContainer_a">
+            <svg id="graphContainer_a" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
             <g/>
             </svg>
         </div>
@@ -207,7 +207,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
             <div id="loading_b" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:#3f51b5 ; ">
             Loading. Please Wait!
             </div>
-            <svg id="graphContainer_b">
+            <svg id="graphContainer_b" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
             <g/>
             </svg>
         </div>
@@ -222,7 +222,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
         <div id="combined_error" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:darkred;">
         The combined graph could not be loaded.
         </div>
-        <svg id="graphContainer_c">
+        <svg id="graphContainer_c" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
         <g/>
         </svg>
     </div>

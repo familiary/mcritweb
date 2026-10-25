@@ -279,7 +279,8 @@ def viewer_requests(page):
 def test_the_viewer_is_loaded_only_once_the_graphs_are_wanted(browser_page, live_server, thrown, viewport):
     """The viewer is 698 KB of script, 178 KB gzipped, that only the graphs use, and evaluating it held
     the main thread while the page loaded. Nothing of it is requested until the graphs come
-    into view, and then each script once."""
+    into view, and then each script once, and dagre-d3 once more by each of the two layout
+    workers (layout_worker.js imports it; the browser has it in its cache by then)."""
     browser_page.set_viewport_size(viewport)
     requests = viewer_requests(browser_page)
     browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
@@ -289,7 +290,7 @@ def test_the_viewer_is_loaded_only_once_the_graphs_are_wanted(browser_page, live
     scroll_to_the_graphs(browser_page)
     for panel in ("a", "b"):
         browser_page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
-    assert sorted(requests) == sorted(VIEWER)
+    assert sorted(requests) == sorted(VIEWER + ["trace_CFG/lib/dagre-d3.min.js"] * 2)
     assert thrown == []
 
 
@@ -587,6 +588,253 @@ def test_the_checkbox_takes_the_boundaries_off_and_puts_them_back(comparison_pag
     checkbox.check()
     assert "none" not in displays()
     assert len(displays()) == 2, "re-drawing a panel left it with two boundary groups"
+
+
+# --- the layout in a worker ------------------------------------------------------------------
+
+#: every block and edge as drawn: the node's id, its translate and its rect's size, and each
+#: edge's path, per panel
+DRAWING = """(panel) => JSON.stringify([
+    [...document.querySelectorAll('#graphContainer_' + panel + ' g.node')].map(n => [n.__data__, n.getAttribute('transform'),
+        ...['x', 'y', 'width', 'height'].map(a => n.querySelector('rect').getAttribute(a))]),
+    [...document.querySelectorAll('#graphContainer_' + panel + ' g.edgePath path')].map(p => [p.parentNode.__data__, p.getAttribute('d')]),
+])"""
+
+
+#: the three graphs: the two functions side by side, and the combined one
+GRAPHS = ("a", "b", "c")
+
+
+def drawn_graphs(page, panels):
+    for panel in panels:
+        page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
+    return {panel: page.evaluate(DRAWING, panel) for panel in panels}
+
+
+def layout_workers(page):
+    started = []
+    page.on("worker", lambda worker: started.append(worker.url))
+    return started
+
+
+def open_and_draw(page, live_server, panels=("a", "b")):
+    """The page with its graphs drawn, the combined one too when it is asked for."""
+    page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    scroll_to_the_graphs(page)
+    drawing = drawn_graphs(page, [p for p in panels if p != "c"])
+    if "c" in panels:
+        page.wait_for_function("!document.getElementById('viewCombined').disabled")
+        page.click("#viewCombined")
+        drawing.update(drawn_graphs(page, ["c"]))
+    return drawing
+
+
+def test_each_graph_is_laid_out_in_a_worker(browser_page, live_server, thrown):
+    workers = layout_workers(browser_page)
+    open_and_draw(browser_page, live_server)
+    assert [url.rsplit("/", 1)[1] for url in workers] == ["layout_worker.js"] * 2
+
+    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    browser_page.click("#viewCombined")
+    browser_page.wait_for_selector("#graphContainer_c g.node", state="attached")
+    assert len(workers) == 3
+    assert thrown == []
+
+
+def test_the_drawing_is_the_worker_s_layout(browser_page, live_server, thrown):
+    """A worker that moves every block 1000 to the right: the blocks of all three graphs are
+    drawn there, so it is the worker's layout that is drawn, not one the page made itself."""
+    def shifted(route):
+        response = route.fetch()
+        body = response.text().replace(
+            "var answer = dagreD3.json.encode(laidOut);",
+            "laidOut.eachNode(function (id, value) { value.x += 1000; }); var answer = dagreD3.json.encode(laidOut);")
+        assert "value.x += 1000" in body
+        route.fulfill(response=response, body=body)
+    browser_page.route("**/static/trace_CFG/layout_worker.js", shifted)
+    drawing = open_and_draw(browser_page, live_server, GRAPHS)
+    for panel in GRAPHS:
+        xs = browser_page.evaluate(f"[...document.querySelectorAll('#graphContainer_{panel} g.node')]"
+                                   ".map(n => parseFloat(n.getAttribute('transform').split('(')[1]))")
+        assert min(xs) >= 1000, (panel, drawing[panel][:200])
+    assert thrown == []
+
+
+def test_the_worker_s_drawing_is_the_one_the_page_made_itself(browser_page, live_server):
+    """Sizes as well as positions, for all three graphs: the renderer writes the sizes it
+    measures into the graph it is given, and a block drawn from a value that has one is drawn
+    at that size. One page lays the graphs out in workers, the other, without the worker's
+    script, on the page."""
+    workers = layout_workers(browser_page)
+    in_worker = open_and_draw(browser_page, live_server, GRAPHS)
+    assert len(workers) == 3
+
+    on_page = browser_page.context.new_page()
+    refused = []
+
+    def missing(route):
+        refused.append(route.request.url)
+        route.fulfill(status=404, body="")
+    on_page.route("**/static/trace_CFG/layout_worker.js", missing)
+    assert open_and_draw(on_page, live_server, GRAPHS) == in_worker
+    assert len(refused) == 3
+
+
+def combined_fit(page):
+    """The combined graph's scale, and whether the graph is inside its pane."""
+    return page.evaluate("""() => { const svg = document.getElementById('graphContainer_c'), g = svg.querySelector('g');
+        const pane = svg.getBoundingClientRect(), graph = g.getBoundingClientRect();
+        return {scale: d3.transform(g.getAttribute('transform')).scale[0],
+                inside: graph.width > 0 && graph.width <= pane.width + 1 && graph.height <= pane.height + 1}; }""")
+
+
+@pytest.mark.parametrize("comes_back", ["fetched", "laid-out"])
+def test_a_combined_graph_that_comes_back_while_side_by_side_is_shown_is_drawn_when_combined_is(
+        browser_page, live_server, thrown, comes_back):
+    """The blocks are measured, and the graph fitted, from what its pane shows. The combined
+    graph came back while the reader had gone back to side by side, was measured and fitted in a
+    hidden pane, and was drawn at scale(-Infinity), off the pane once it was shown. The worker
+    adds its layout to the time it takes, so it is now measured and drawn only once its pane is
+    shown, whether its dot graph or its layout comes back while it is not."""
+    held = []
+
+    def until_held():
+        for _ in range(200):
+            if held:
+                return
+            browser_page.wait_for_timeout(50)
+        raise AssertionError("nothing was held")
+    if comes_back == "fetched":
+        browser_page.route("**/explore/fetchCombinedDotGraph/**", lambda route: held.append(route))
+    else:
+        # a worker that, its layout made, waits for the test before it answers
+        def waiting(route):
+            response = route.fetch()
+            body = response.text().replace(
+                "self.postMessage({ graph: answer });",
+                "fetch('/static/layout-answer-released').then(function () { self.postMessage({ graph: answer }); });")
+            assert "layout-answer-released" in body
+            route.fulfill(response=response, body=body)
+    reference = open_and_draw(browser_page, live_server)
+    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    if comes_back == "laid-out":
+        # the two graphs side by side are drawn; only the combined one's answer is held
+        closed = []
+        browser_page.on("worker", lambda worker: worker.on("close", lambda _: closed.append(worker.url)))
+        browser_page.route("**/static/trace_CFG/layout_worker.js", waiting)
+        browser_page.route("**/static/layout-answer-released", lambda route: held.append(route))
+        browser_page.click("#viewCombined")
+        until_held()
+        browser_page.click("#viewSideBySide")
+        held[0].fulfill(status=200, body="")
+        # the page ends the worker when its answer comes, before it goes on with it
+        for _ in range(200):
+            if closed:
+                break
+            browser_page.wait_for_timeout(50)
+        assert closed, "the worker's answer did not come"
+    else:
+        browser_page.click("#viewCombined")
+        until_held()
+        browser_page.click("#viewSideBySide")
+        # the graph is parsed, and its next step waits for the pane, in the same task
+        browser_page.evaluate("""() => { const parse = graphlibDot.parse;
+            graphlibDot.parse = function () { window.mcritCombinedParsed = true; return parse.apply(this, arguments); }; }""")
+        held[0].continue_()
+        browser_page.wait_for_function("window.mcritCombinedParsed === true")
+    assert browser_page.evaluate("document.querySelectorAll('#graphContainer_c g.node').length") == 0
+    assert drawn_graphs(browser_page, ["a", "b"]) == reference
+
+    browser_page.click("#viewCombined")
+    browser_page.wait_for_selector("#graphContainer_c g.node", state="attached")
+    fit = combined_fit(browser_page)
+    assert 0 < fit["scale"] < float("inf") and fit["inside"], fit
+    # and laid out from blocks measured in the shown pane: drawn as on a page that showed it throughout
+    shown_throughout = browser_page.context.new_page()
+    try:
+        assert drawn_graphs(browser_page, ["c"]) == {"c": open_and_draw(shown_throughout, live_server, GRAPHS)["c"]}
+    finally:
+        shown_throughout.close()
+    assert thrown == []
+
+
+@pytest.mark.parametrize("failure", ["http-500", "not-a-graph"])
+def test_a_combined_load_that_fails_says_so_and_the_next_press_loads_it_again(browser_page, live_server, thrown, failure):
+    """A failed fetch says so; an answer that is not a dot graph, such as the login page of a
+    lapsed session, fails to parse and now says so too. Either way the note goes and the next
+    press of Combined fetches the graph again; the parse failure had left the note up, and
+    Combined doing nothing, once the layout moved to the worker. The message goes when the next
+    load starts: the note, out of the pane's flow, stands where it stands."""
+    answered = []
+
+    def first_fails(route):
+        answered.append(route.request.url)
+        if len(answered) > 1:
+            route.continue_()
+        elif failure == "http-500":
+            route.fulfill(status=500, body="down")
+        else:
+            route.fulfill(status=200, content_type="text/html", body="<html><body>Log in</body></html>")
+    browser_page.route("**/explore/fetchCombinedDotGraph/**", first_fails)
+    open_and_draw(browser_page, live_server)
+    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    browser_page.click("#viewCombined")
+    browser_page.wait_for_function("document.getElementById('loading_c').classList.contains('hidden')")
+    assert browser_page.is_visible("#combined_error")
+    assert len(answered) == 1
+
+    browser_page.click("#viewSideBySide")
+    browser_page.click("#viewCombined")
+    assert not browser_page.is_visible("#combined_error")
+    browser_page.wait_for_selector("#graphContainer_c g.node", state="attached")
+    assert not browser_page.is_visible("#combined_error")
+    assert len(answered) == 2
+    if failure == "not-a-graph":
+        assert thrown, "the parse of the login page did not fail"
+    else:
+        # Chromium logs the failed fetch itself
+        assert [error for error in thrown if not error.startswith("Failed to load resource")] == []
+
+
+def test_the_combined_graph_is_drawn_where_its_pane_showed_it_loading(browser_page, live_server, thrown):
+    """The "Loading" note stood in the pane's flow, 400 px down, and the graph moved up by as much
+    when it went. Drawn seconds after the click now that the layout is in a worker, the move
+    counted as a layout shift (0.26 for 549/2356 on the live corpus); the note is now out of the
+    flow, and the graph is drawn where its pane was while the note showed."""
+    open_and_draw(browser_page, live_server)
+    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+
+    def late(route):
+        response = route.fetch()
+        body = response.text().replace("self.postMessage({ graph: answer });",
+                                       "setTimeout(function () { self.postMessage({ graph: answer }); }, 1000);")
+        route.fulfill(response=response, body=body)
+    browser_page.route("**/static/trace_CFG/layout_worker.js", late)
+    top = "document.getElementById('graphContainer_c').getBoundingClientRect().top"
+    browser_page.click("#viewCombined")
+    browser_page.wait_for_selector("#loading_c", state="visible")
+    while_loading = browser_page.evaluate(top)
+    browser_page.wait_for_selector("#graphContainer_c g.node", state="attached")
+    browser_page.wait_for_function("document.getElementById('loading_c').classList.contains('hidden')")
+    assert browser_page.evaluate(top) == while_loading
+    assert thrown == []
+
+
+@pytest.mark.parametrize("worker", ["missing", "failing"])
+def test_without_a_working_worker_the_page_lays_the_graphs_out_itself(browser_page, live_server, thrown, worker):
+    if worker == "missing":
+        browser_page.route("**/static/trace_CFG/layout_worker.js", lambda route: route.fulfill(status=404, body=""))
+    else:
+        browser_page.route("**/static/trace_CFG/layout_worker.js", lambda route: route.fulfill(
+            content_type="application/javascript",
+            body="self.onmessage = function () { self.postMessage({ error: 'injected layout failure' }); };"))
+    drawing = open_and_draw(browser_page, live_server)
+    assert all(drawing[panel] != "[[],[]]" for panel in ("a", "b"))
+    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    browser_page.click("#viewCombined")
+    browser_page.wait_for_selector("#graphContainer_c g.node", state="attached")
+    # Chromium logs the missing worker script itself as an error
+    assert [error for error in thrown if not error.startswith("Failed to load resource")] == []
 
 
 # --- the hover, tooltip and edge-click handlers ---------------------------------
