@@ -200,13 +200,16 @@ def test_a_dragged_file_opens_the_drop_overlay(open_as, live_server):
 
 
 def test_the_upload_page_wires_its_form(open_as, live_server):
-    """The page that loads Dropzone up front: mcritInitDropzone waits in whenReady and
-    has to find the form Dropzone discovered on its own DOMContentLoaded listener."""
+    """The page whose content the drop zone is: Dropzone is queued, dropzone_attach.js
+    attaches the form with the page's options, and mcritInitDropzone, waiting in
+    whenReady, has to find it attached once."""
     page = ready(open_as("contributor"), f"{live_server}/analyze/query")
 
     assert page.evaluate("() => !!jQuery._data(document.getElementById('submit-dropzone'), 'events').click")
-    # a plain script here, Dropzone ran before the queued jQuery and attached no plugin
-    assert page.evaluate("() => typeof jQuery.fn.dropzone") == "undefined"
+    assert page.evaluate("() => Dropzone.instances.length") == 1
+    assert page.evaluate("() => Dropzone.forElement('#myDropzone').options.autoProcessQueue") is False
+    # queued after jQuery, Dropzone finds it and attaches its plugin, as on the overlay
+    assert page.evaluate("() => typeof jQuery.fn.dropzone") == "function"
     page.check("#dumped")
     page.wait_for_selector("#extendedFields", state="visible")
     assert page.errors == []

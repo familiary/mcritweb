@@ -4,12 +4,18 @@
 {# `lazy`: the overlay of base.html uses it. The stylesheet and the library are then
    fetched by mcritLoadDropzone() (static/upload_form.js) on the first drag instead of
    with every page, and the form's handlers wait in mcritInitDropzone() until it has.
-   Issue #63. #}
+   Without it, on the query and submit pages, the library is queued with later() and
+   static/dropzone_attach.js attaches the form once it is in. Issue #63. #}
 {% macro submit_or_query_dropzone_js(select_form_type=False, lazy=False) %}
 {% if not lazy %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
 {% endif %}
 {{ dropzone.style('border: 2px dashed black; margin: 30%; min-height: 200px;border-radius: 25px; background: rgb(240, 240, 240);') }}
+{% if not lazy %}
+{# the library, after the first paint, and what attaches the form, right behind it #}
+<script>later({{ url_for('static', filename='dropzone.js')|tojson }})</script>
+<script>later({{ url_for('static', filename='dropzone_attach.js')|tojson }})</script>
+{% endif %}
 {# the form's behaviour, and the drop overlay's: static/upload_form.js, queued (ADR-0021).
    The slider's label stays here, so that it follows the slider before the file has run. #}
 <script>later({{ url_for('static', filename='upload_form.js')|tojson }})</script>
@@ -41,9 +47,10 @@ function handleSliderChange_dropzone(val) {
   {{ dropzone.create(action=target_link)|replace('class="dropzone"'|safe, 'class="dropzone-pending"'|safe) }}
   {{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_options='autoProcessQueue: false')|replace('Dropzone.options.myDropzone ='|safe, 'window.mcritDropzoneOptions ='|safe) }}
 {% else %}
+  {# the form keeps its class, so that it looks as it will from the first paint;
+     static/dropzone_attach.js attaches it before auto-discovery can #}
   {{ dropzone.create(action=target_link) }}
-  <script src="{{ url_for('static', filename='dropzone.js') }}"></script>
-  {{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_options='autoProcessQueue: false') }}
+  {{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_options='autoProcessQueue: false')|replace('Dropzone.options.myDropzone ='|safe, 'window.mcritDropzoneOptions ='|safe) }}
 {% endif %}
   {# what static/upload_form.js needs from the template: where to ask about a dropped
      file, and on the overlay, where Dropzone is fetched from on the first drag #}
