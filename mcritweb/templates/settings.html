@@ -45,7 +45,7 @@ Settings
     <button class="nav-link" id="pills-theme-tab" data-bs-toggle="pill" data-bs-target="#pills-theme" type="button" role="tab" aria-controls="pills-theme" aria-selected="false">Change theme</button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="pills-delete-account-tab" data-bs-toggle="pill" data-bs-target="#pills-delete-account" type="button" role="tab" aria-controls="pills-delete-account" aria-selected="false">Delete account</button>
+    <button class="nav-link{% if open_tab == 'delete-account' %} active{% endif %}" id="pills-delete-account-tab" data-bs-toggle="pill" data-bs-target="#pills-delete-account" type="button" role="tab" aria-controls="pills-delete-account" aria-selected="{{ 'true' if open_tab == 'delete-account' else 'false' }}">Delete account</button>
   </li>
 </ul>
 <div class="tab-content" id="pills-tabContent">
@@ -332,18 +332,23 @@ Settings
   {# offered to every role, pending included: what the account holds is its owner's, and
      deleting it should not need an admin. The root account is the one the instance keeps
      as its admin, so it is told why instead, as is an admin with no other admin beside it #}
-  <div class="tab-pane fade" id="pills-delete-account" role="tabpanel" aria-labelledby="pills-delete-account-tab">
+  <div class="tab-pane fade{% if open_tab == 'delete-account' %} show active{% endif %}" id="pills-delete-account" role="tabpanel" aria-labelledby="pills-delete-account-tab">
     {% if user_info.is_root %}
     <p>This account cannot be deleted. It is the first account registered here, which stays an administrator so that the instance always has one: the users page cannot demote or delete it either.</p>
     {% elif only_admin %}
     <p>This account cannot be deleted. It is the only administrator, and the instance needs one. Make another account an administrator on the users page first.</p>
     {% else %}
-    <form action="{{ url_for('authentication.delete_account') }}" method="post" class="text-start d-inline-block">
+    <form action="{{ url_for('authentication.delete_account') }}" method="post" class="text-start d-inline-block" aria-describedby="delete-account-required">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      {{ required_note("delete-account-required") }}
       <p id="delete_account_effect">Deleting your account removes your username, password, API token and preferences from this instance, and signs you out everywhere. It cannot be undone. Samples and families you added and jobs you started stay on the MCRIT backend, where a job can still show the username it was requested under.</p>
       <div class="mb-3">
         <label for="delete_account_password" class="form-label">Your current password</label>
-        <input type="password" name="password" id="delete_account_password" class="form-control" autocomplete="current-password" aria-describedby="delete_account_effect" required>
+        <div class="password-field">
+          <input type="password" name="password" id="delete_account_password" class="form-control" autocomplete="current-password" enterkeyhint="done" required{{ error_attrs(form_error, "delete_account_password", hint="delete_account_effect") }}{% if form_error and "delete_account_password" in form_error.fields %} autofocus{% endif %}>
+          {{ password_toggle("delete_account_password") }}
+        </div>
+        {{ error_message(form_error, "delete_account_password") }}
       </div>
       <button type="submit" class="btn btn-danger">Delete my account</button>
     </form>
