@@ -5,6 +5,10 @@ Import
 {% block style %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
 {{ dropzone.style('border: 2px dashed var(--dropzone-border); margin: 10%; min-height: 400px;border-radius: 25px; background: var(--surface-chrome);') }}
+{# queued, as on the query and submit pages: static/dropzone_attach.js attaches the zone
+   with the options parked below once the library is in #}
+<script>later({{ url_for('static', filename='dropzone.js')|tojson }})</script>
+<script>later({{ url_for('static', filename='dropzone_attach.js')|tojson }})</script>
 {% endblock %}
 {% set suppress_dropzone_overlay=true %}
 {% block content %}
@@ -15,7 +19,6 @@ Import
       <span id="import-status-text"></span>
     </div>
 </div>
-<script src="{{ url_for('static', filename='dropzone.js') }}"></script>
 {% set import_status_js %}
     // An import is one blocking request: MCRIT's /import is not queued and returns no
     // job_id, so there is no job for job_in_progress.html to draw a real percentage
@@ -110,5 +113,5 @@ Import
       window.location = {{ url_for('data.import_complete')|tojson }};
     });
 {% endset %}
-{{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_init=import_status_js) }}
+{{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_init=import_status_js)|replace('Dropzone.options.myDropzone ='|safe, 'window.mcritDropzoneOptions ='|safe) }}
 {% endblock %}
