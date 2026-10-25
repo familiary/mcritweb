@@ -644,12 +644,20 @@
   content: "\f05a"; }
 
 
+.fa-sliders::before {
+  content: "\f1de"; }
+
+
 .fa-flask::before {
   content: "\f0c3"; }
 
 
 .fa-house::before {
   content: "\f015"; }
+
+
+.fa-rotate-right::before {
+  content: "\f2f9"; }
 
 
 .fa-bug::before {
