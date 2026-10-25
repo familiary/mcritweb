@@ -567,3 +567,13 @@ form.form-inline input {
     transition: none;
   }
 }
+
+/* The arrow of a column that sorts but is not sorted is faint by design, 2.1:1 on the light
+   table head, and it is the only sign that the column sorts. A reader who has asked for more
+   contrast gets it at full strength; it still differs from the sorted column's arrow in shape,
+   both ways against one */
+@media (prefers-contrast: more) {
+  .fa-sort {
+    color: var(--sort-active);
+  }
+}

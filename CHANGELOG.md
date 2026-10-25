@@ -164,6 +164,9 @@ rather than reconstructing it from the commit log at release time.
   waits, and the score tooltips appear at once instead of sliding into place.
 - In the dark theme, the progress bar of a file waiting in the drop zone is dark too; Dropzone drew
   it as a bright white bar in the dark preview card.
+- A reader who has asked the system for more contrast sees the arrow of a column that sorts but is
+  not sorted at full strength. It is faint by design, 2.1:1 on the light table head, and it is the
+  only sign that a column sorts.
 
 ### Security
 

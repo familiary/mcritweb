@@ -314,7 +314,8 @@ PROBE = "(allowed, iconExceptions) => {" + HELPERS + r"""
 
 #: Icons the 3:1 is not asked of, and why: the idle arrow of a sortable column head. It says
 #: "this column sorts", beside a label that says which column, at 2.93:1 on the head in dark
-#: against the 2.09:1 master drew it with in light (testTheme.py holds dark above light).
+#: against the 2.09:1 master drew it with in light (testTheme.py holds dark above light). A reader
+#: who asks for more contrast gets it at 3:1 or more (test_asking_for_more_contrast_...).
 ICON_EXCEPTIONS = [".fa-sort"]
 
 #: Elements that may paint a light background in the dark theme, and why.
@@ -1476,3 +1477,20 @@ def test_a_file_waiting_to_be_uploaded_is_drawn_on_the_dark_palette(open_in):
     assert page.locator(".dropzone .dz-preview .dz-progress").is_visible()
     assert report["light"] == [], "elements whose background is lighter than 0.4:\n" + listed(report["light"])
     assert report["text"] == [], "text below 4.5:1:\n" + listed(report["text"])
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_asking_for_more_contrast_brings_the_idle_sort_arrow_to_3_to_1(open_in, theme):
+    """The arrow of a column that sorts but is not sorted is faint by design (ICON_EXCEPTIONS): 2.1:1
+    on the light table head. It is the only sign that the column sorts, and a reader who has asked
+    the system for more contrast (prefers-contrast: more) is asking for exactly this."""
+    page = open_in(theme, "/explore/samples", "table.table tbody tr", contrast="more")
+    arrows = page.locator("th .fa-sort:visible")
+    assert arrows.count() >= 1, "the samples list has no column that sorts and is not sorted"
+
+    found = arrows.first.evaluate("(arrow) => {" + HELPERS + """
+      const under = background(arrow).rgb;
+      return ratio(over(parse(getComputedStyle(arrow).color), under), under);
+    }""")
+
+    assert found >= 3, f"the idle sort arrow is {found:.2f}:1"
