@@ -1278,6 +1278,25 @@ def test_in_forced_colours_the_current_tab_and_page_are_marked(open_in, theme, w
     assert pixels_apart(before, picture_of(page, current, pad=8)) >= 20, f"focusing {what} changes nothing on the screen"
 
 
+@pytest.mark.parametrize("palette", ["light", "dark"])
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_in_forced_colours_the_close_cross_of_a_dialog_is_drawn(open_in, theme, palette):
+    """Bootstrap draws the cross as a black image, which forced colours keep as it is: black on the
+    black canvas of a dark palette. The dark theme inverts it, so there it was white on the white
+    canvas of a light palette instead. Either way the one visible way out of the dialog was gone."""
+    page = open_in(theme, "/explore/samples", "table.table tbody tr", forced_colors="active", color_scheme=palette)
+    # Dropzone is fetched on the first drag (#126); the dialog's zone is one only after that
+    page.evaluate("new Promise((resolve) => mcritLoadDropzone(resolve))")
+    page.evaluate("$('#submitFileModal').modal('show')")
+    page.wait_for_selector("#submitFileModal.show")
+    page.wait_for_function("getComputedStyle(document.querySelector('#submitFileModal')).opacity === '1'")
+    calm(page)
+    cross = page.locator("#submitFileModal .btn-close")
+    ground = tuple(round(channel) for channel in as_rgb(computed(page, "#submitFileModal .modal-content", "background-color")[0]))
+
+    assert pixels_off(picture_of(page, cross), ground) >= 20, f"the close cross is not drawn on rgb{ground}"
+
+
 @pytest.mark.parametrize("theme", ["light", "dark"])
 def test_in_forced_colours_a_page_link_that_leads_nowhere_looks_it(open_in, theme):
     """On the first page, "First page" and "Previous page" go nowhere; forced colours drew them in the

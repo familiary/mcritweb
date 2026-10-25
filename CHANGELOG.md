@@ -133,9 +133,11 @@ rather than reconstructing it from the commit log at release time.
 - Windows' contrast themes (forced colours) no longer hide what Bootstrap draws with fills and
   shadows. A ticked checkbox or chosen radio button looked empty, the MinHash slider vanished, the
   keyboard's focus did not show on buttons, fields, the pager or accordion headers, the current tab
-  and page looked like the others, and the cross compare matrix and the CFG comparison's legend
-  were blank. Each now has something the forced palette keeps: the browser's own boxes, outlines
-  in the user's highlight colour, and the data colours left as they are.
+  and page looked like the others, the cross compare matrix and the CFG comparison's legend were
+  blank, and a dialog's close cross vanished on a dark palette (on a light one, in the dark theme).
+  Each now has something the forced palette keeps: the browser's own boxes, outlines in the user's
+  highlight colour, a cross in the user's button text colour, and the data colours left as they
+  are.
 - In the light theme, the edges of fields, check boxes and radio buttons, and the ring the
   keyboard's focus draws, can be seen: Bootstrap's grey edge was 1.5:1 against the page (a check
   box's 1.8:1) and its focus ring 1.4:1, where WCAG asks 3:1. They are 3.2:1 or more now, on the

@@ -446,6 +446,23 @@ form.form-inline input {
     border: 1px solid CanvasText;
   }
 
+  /* a dialog's close cross is a black image, which the palette keeps as it is (and the dark
+     theme inverts): black on the canvas of a dark palette, white on a light one's. Here the
+     same cross is a mask over the palette's button text, at full strength */
+  :root button.btn-close {
+    background-image: none;
+    filter: none;
+    opacity: 1;
+  }
+  :root button.btn-close::before {
+    content: "";
+    display: block;
+    width: 1em;
+    height: 1em;
+    background-color: ButtonText;
+    mask: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'%3e%3cpath d='M.293.293a1 1 0 011.414 0L8 6.586 14.293.293a1 1 0 111.414 1.414L9.414 8l6.293 6.293a1 1 0 01-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 01-1.414-1.414L6.586 8 .293 1.707a1 1 0 010-1.414z'/%3e%3c/svg%3e") center / 1em auto no-repeat;
+  }
+
   /* the current tab and page were a fill (and in the dark theme an underline drawn as a box
      shadow); a page link that leads nowhere looked like one that does (that rule outranks
      theme-dark.css's the same way as the slider's) */
