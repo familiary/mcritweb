@@ -70,7 +70,6 @@ Results for Job: {{ job_info.job_id }}
    like the jQuery it extends, and so it runs after it and before Bootstrap - see base.html.
    jquery-ui-sortable.js is jQuery UI cut down to the sortable widget and what it is built
    on (scripts/subset_jquery_ui.py), 76 KB of the full build's 529. #}
-<link rel="stylesheet" href="{{ url_for('static', filename='jquery-ui.css') }}">
 <script>later({{ url_for('static', filename='jquery-ui-sortable.js')|tojson }})</script>
 
 <script>

@@ -53,14 +53,14 @@ BASE = TEMPLATE_ROOT / "base.html"
 #: assets base.html must not load, and where they belong instead
 PAGE_SPECIFIC = {
     "jquery-ui-sortable.js": "result_cross.html",
-    "jquery-ui.css": "result_cross.html",
 }
 
 #: assets no template should load at all any more. dropzone.min.js is stock 5.9.2,
 #: without the patch in dropzone.js that sends the head of a dropped file for the
 #: pre-fill (AGENTS.md); all.css, bootstrap.css and jquery-ui.js are the full builds the
-#: subsets and the minified file replaced (issue #63)
-RETIRED = ["jquery.dataTables.min.js", "dataTables.bootstrap5.min.js", "dataTables.bootstrap5.min.css", "dropzone.min.js", "css/all.css", "css/bootstrap.css", "jquery-ui.js"]
+#: subsets and the minified file replaced (issue #63); jquery-ui.css is the whole theme,
+#: of which the cross compare uses one rule, now in style.css
+RETIRED = ["jquery.dataTables.min.js", "dataTables.bootstrap5.min.js", "dataTables.bootstrap5.min.css", "dropzone.min.js", "css/all.css", "css/bootstrap.css", "jquery-ui.js", "jquery-ui.css"]
 
 
 @pytest.mark.parametrize("asset", sorted(PAGE_SPECIFIC))
@@ -294,8 +294,16 @@ class TestTheCrossComparePage:
     def test_it_ships_the_library_it_calls(self, client, as_role):
         page = self.rendered(client, as_role)
         assert "jquery-ui-sortable.js" in page
-        assert "jquery-ui.css" in page
         assert ".sortable()" in page
+
+    def test_it_takes_the_one_jquery_ui_rule_it_needs_from_style_css(self, client, as_role):
+        """jquery-ui.css is 375 rules and 36 KB (8 KB gzipped) of render-blocking CSS, and
+        on this page exactly one of them matches anything: the touch-action of the sortable
+        list's handles. That rule is in style.css, which every page loads anyway."""
+        page = self.rendered(client, as_role)
+        assert "jquery-ui.css" not in page
+        style = (STATIC_ROOT / "style.css").read_text()
+        assert re.search(r"\.ui-sortable-handle\s*\{\s*touch-action:\s*none;\s*\}", style)
 
     def test_jquery_reaches_the_page_before_jquery_ui(self, client, as_role):
         page = self.rendered(client, as_role)

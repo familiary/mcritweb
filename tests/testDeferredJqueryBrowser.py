@@ -180,6 +180,16 @@ def test_a_sample_dragged_in_the_list_moves(open_as, live_server):
     assert page.errors == []
 
 
+def test_the_list_items_keep_jquery_uis_touch_action(open_as, live_server):
+    """The page no longer links jquery-ui.css for the one rule of it that applies here, and
+    style.css carries that rule: every item jQuery UI made a handle has it."""
+    page = ready(open_as("visitor"), f"{live_server}/data/result/{job_id_of('cross_compare')}")
+    assert not page.evaluate("() => [...document.styleSheets].some(sheet => (sheet.href || '').includes('jquery-ui'))")
+    assert page.evaluate("""() => [...document.querySelectorAll('#sortable li')]
+        .every(item => item.classList.contains('ui-sortable-handle') && getComputedStyle(item).touchAction === 'none')""")
+    assert page.errors == []
+
+
 def test_the_settings_lists_are_sortable(open_as, live_server):
     page = ready(open_as("visitor"), f"{live_server}/settings")
 
