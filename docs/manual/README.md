@@ -74,6 +74,14 @@ on the search page and on the family, sample and function listings. An exact hit
 listed once, at the top of the first page of results; paging onwards shows the text hits
 alone.
 
+On a sample's page, the family list, the sample list and a family's page, the table
+follows the search box as you type: it updates once you pause, without reloading the
+page, and Enter still loads the page as before. On a sample's page a term that is only a
+hex number, such as `0x6840`, finds the function at that offset, as `offset:0x6840` does;
+any other term is searched as typed, so a part of a name finds the functions with that
+name. The function list and the combined search page wait for Enter, for the reason
+below.
+
 The result tables can be sorted by clicking a column header.
 The sort order you last chose is remembered separately for families, samples, and functions, and stays in effect for the rest of your browser session - a new search or a return to one of the lists keeps it, while logging out clears it.
 A link that already carries sort parameters always wins over the remembered order, so a shared URL shows everyone the same table.

@@ -623,6 +623,18 @@ def family_by_id(family_id):
         return redirect(url_for('explore.families'))
 
 
+# On a sample's page a function is looked up by its name or its offset. A typed name
+# already works, as a bare term matches function names; a bare hex number was matched
+# against names too and found nothing, so it is taken as the offset it is.
+SAMPLE_OFFSET_TERM = re.compile(r"0[xX][0-9a-fA-F]+")
+
+
+def sample_function_query(sample_id, typed):
+    if SAMPLE_OFFSET_TERM.fullmatch(typed.strip()):
+        typed = f"offset:{typed.strip()}"
+    return f"sample_id:{sample_id} {typed}"
+
+
 @bp.route('/samples/<int(signed=True):sample_id>')
 @visitor_required
 @mcrit_server_required
@@ -633,7 +645,7 @@ def sample_by_id(sample_id):
         if sample_id < 0:
             return render_template("single_query_sample.html", entry=sample_entry)
         original_query = request.args.get('query', "")
-        query = f"sample_id:{sample_id} {original_query}"
+        query = sample_function_query(sample_id, original_query)
         functions = []
         # bound up front: the job table below is read outside the branch that fills it,
         # and a failed function search left the name undefined - a 500 on the page that

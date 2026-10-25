@@ -7,8 +7,13 @@
   var button_clicked = false;
   
   whenReady(function(){
-    var editSampleModal = document.getElementById('editSampleModal');
-    editSampleModal?.addEventListener('show.bs.modal', function (event) {
+    // delegated, so the listener holds whichever modal the page has, including one a
+    // live search (live_search.js) brings in; Bootstrap's modal events bubble
+    document.addEventListener('show.bs.modal', function (event) {
+    var editSampleModal = event.target;
+    if (editSampleModal.id !== 'editSampleModal') {
+      return;
+    }
     // Button that triggered the modal
     var button = event.relatedTarget;
     // Extract info from data-bs-* attributes
@@ -39,7 +44,8 @@
     // and a click before the deferred jQuery had run set it with no handler there yet:
     // left set, the next row click would open a menu instead of the sample (ADR-0018)
     button_clicked = false;
-    $("tr.sample-row").click(function(e){
+    // delegated, so rows a live search swaps in follow too
+    $(document).on("click", "tr.sample-row", function(e){
     if(event.target.id.includes("_edit")) {
     }
     else if(button_clicked) {
