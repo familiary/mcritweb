@@ -40,22 +40,28 @@ MISSING_MANUAL = Markup(
     "this usually means the checkout is incomplete.</p>"
 )
 
-#: A screenshot's source as the markdown writes it, `src="images/x.png"`.
+#: A screenshot's source as the markdown writes it, `src="images/x.png"` or `x.webp`.
 SCREENSHOT_SOURCE = re.compile(r'src="images/([^"/]+)"')
 
 _cache = {}
 
 
-def _png_size(path):
-    """(width, height) from a PNG's header, or None if the file is missing or not a PNG."""
+def _image_size(path):
+    """(width, height) from a PNG's or a lossless WebP's header, or None if the file is
+    missing or neither. A lossless WebP keeps them in its first chunk, VP8L, as 14 bits
+    each, less one. A lossy or extended WebP is not read: no screenshot is one, and
+    test_every_screenshot_carries_the_size_of_its_file fails if one comes along."""
     try:
         with open(path, "rb") as f:
-            head = f.read(24)
+            head = f.read(25)
     except OSError:
         return None
-    if len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
-        return None
-    return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+    if len(head) >= 24 and head[:8] == b"\x89PNG\r\n\x1a\n" and head[12:16] == b"IHDR":
+        return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+    if len(head) == 25 and head[:4] == b"RIFF" and head[8:16] == b"WEBPVP8L" and head[20] == 0x2F:
+        bits = int.from_bytes(head[21:25], "little")
+        return (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
+    return None
 
 
 def _with_size(match):
@@ -63,7 +69,7 @@ def _with_size(match):
     # ones loading next to a /help#section target push the section away after the
     # browser has scrolled to it. With width and height, and `height: auto` in
     # style.css, the space is reserved before the image loads.
-    size = _png_size(IMAGE_DIRECTORY / match.group(1))
+    size = _image_size(IMAGE_DIRECTORY / match.group(1))
     if size is None:
         return match.group(0)
     return f'{match.group(0)} width="{size[0]}" height="{size[1]}"'

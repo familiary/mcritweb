@@ -12,6 +12,7 @@ several of these tests read the repository rather than a response.
 """
 
 import logging
+import mimetypes
 import pathlib
 import re
 import unittest
@@ -203,11 +204,63 @@ def test_every_screenshot_carries_the_size_of_its_file():
     """A lazy screenshot without a size is a 2px placeholder until it loads, so the
     ones arriving next to a /help#section target pushed that section 4,000+ px away
     after the browser had scrolled to it."""
-    from mcritweb.manual import IMAGE_DIRECTORY, _png_size
+    from mcritweb.manual import IMAGE_DIRECTORY, _image_size
 
     images = re.findall(r"<img [^>]*>", str(render("/help/images/")))
     assert images
     for image in images:
         name = re.search(r'src="/help/images/([^"]+)"', image).group(1)
-        width, height = _png_size(IMAGE_DIRECTORY / name)
+        width, height = _image_size(IMAGE_DIRECTORY / name)
         assert f'width="{width}" height="{height}"' in image, image
+
+
+def test_the_first_screenshot_is_a_lossless_webp():
+    """It is /help's largest paint on a phone. In 254 colours, as a lossless WebP, it is
+    20,670 bytes; the PNG was 88,783."""
+    images = re.findall(r"<img [^>]*>", str(render("/help/images/")))
+    assert 'src="/help/images/first_login.webp"' in images[0], images[0]
+    assert (MANUAL_PATH.parent / "images" / "first_login.webp").read_bytes()[12:16] == b"VP8L"
+
+
+def test_a_webp_screenshot_is_served_as_one(client):
+    response = client.get("/help/images/first_login.webp")
+    assert response.status_code == 200
+    assert response.mimetype == "image/webp"
+
+
+@pytest.fixture
+def no_system_mime_types(monkeypatch):
+    """What mimetypes knows on an image without /etc/mime.types under a Python whose own
+    table lacks the type, such as python:3.12-slim: nothing about either file here."""
+    empty = mimetypes.MimeTypes()
+    empty.types_map = ({}, {})
+    empty.types_map_inv = ({}, {})
+    monkeypatch.setattr(mimetypes, "_db", empty)
+
+
+def test_webp_and_woff2_are_served_as_such_without_system_mime_types(no_system_mime_types, request):
+    """Served as application/octet-stream, nosniff makes the browser refuse both."""
+    assert mimetypes.guess_type("first_login.webp")[0] is None
+    assert mimetypes.guess_type("fa-solid-900.woff2")[0] is None
+    # the app, created only now, registers the two types itself
+    client = request.getfixturevalue("client")
+
+    assert client.get("/help/images/first_login.webp").mimetype == "image/webp"
+    assert client.get("/static/webfonts/fa-solid-900.woff2").mimetype == "font/woff2"
+
+
+def test_the_size_is_read_from_a_lossless_webp_header(tmp_path):
+    """Width and height less one, 14 bits each, after the VP8L signature byte."""
+    from mcritweb.manual import _image_size
+
+    def webp(width, height, riff=b"RIFF", chunk=b"VP8L", signature=b"\x2f"):
+        bits = (width - 1) | (height - 1) << 14
+        return riff + (0).to_bytes(4, "little") + b"WEBP" + chunk + (0).to_bytes(4, "little") + signature + bits.to_bytes(4, "little")
+
+    for (width, height) in ((1267, 793), (16384, 9000), (1, 16384)):
+        (tmp_path / "a.webp").write_bytes(webp(width, height))
+        assert _image_size(tmp_path / "a.webp") == (width, height)
+    for name, wrong in (("lossy", {"chunk": b"VP8 "}), ("signature", {"signature": b"\x2e"}), ("riff", {"riff": b"RIFX"})):
+        (tmp_path / f"{name}.webp").write_bytes(webp(1267, 793, **wrong))
+        assert _image_size(tmp_path / f"{name}.webp") is None, name
+    assert _image_size(tmp_path / "missing.webp") is None
