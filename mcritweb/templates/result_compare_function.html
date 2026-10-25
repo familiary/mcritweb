@@ -1,5 +1,5 @@
 {% from 'table/match_diagram.html' import match_diagram %}
-{% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
+{% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params, sortable_header_col %}
 {% from 'table/column_table.html' import sample_column_table, matching_result_job_column_table %}
 {% from 'table/matching_statistics_table.html' import matching_statistics_table %}
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
@@ -44,6 +44,7 @@ Results for Job: {{ job_info.job_id }}
     <button type="submit" class="btn btn-primary">filter</button>
   </div>
 </form>
+{{ set_pagination_params(funp, _anchor="function-matches") }}
 <table class="table table-hover">
   <thead class="thead-light">
     <tr>
@@ -52,33 +53,33 @@ Results for Job: {{ job_info.job_id }}
     {% endif %}
     {% for column_type in ucs_functions %}
       {% if column_type == "function_id_a" %}
-      <th scope="col">Function A&nbsp;<i class="fa-solid fa-project-diagram " title="Function ID"></th>
+      {% call sortable_header_col(funp, "function_id_a") %}Function A&nbsp;<i class="fa-solid fa-project-diagram " title="Function ID"></i>{% endcall %}
       {% elif column_type == "offset_a" %}
-      <th style="text-align: right;" scope="col">Offset A</th>
+      {% call sortable_header_col(funp, "offset_a", align="right") %}Offset A{% endcall %}
       {% elif column_type == "offset_b" %}
-      <th style="text-align: right;" scope="col">Offset B</th>
+      {% call sortable_header_col(funp, "offset_b", align="right") %}Offset B{% endcall %}
       {% elif column_type == "function_id_b" %}
-      <th style="text-align: right;" scope="col">Function B&nbsp;<i class="fa-solid fa-project-diagram " title="Function ID"></th>
+      {% call sortable_header_col(funp, "function_id_b", align="right") %}Function B&nbsp;<i class="fa-solid fa-project-diagram " title="Function ID"></i>{% endcall %}
       {% elif column_type == "family_name_b" %}
-      <th style="text-align: right;" scope="col">Family B&nbsp;<i class="fa-solid fa-bug " title="Family ID"></th>
+      {% call sortable_header_col(funp, "family_name_b", align="right") %}Family B&nbsp;<i class="fa-solid fa-bug " title="Family ID"></i>{% endcall %}
       {% elif column_type == "sample_id_b" %}
-      <th style="text-align: right;" scope="col">Sample B&nbsp;<i class="fa-solid fa-virus" title="Sample ID"></th>
+      {% call sortable_header_col(funp, "sample_id_b", align="right") %}Sample B&nbsp;<i class="fa-solid fa-virus" title="Sample ID"></i>{% endcall %}
       {% elif column_type == "best_score" %}
-      <th style="text-align: right;" scope="col">Score</th>
+      {% call sortable_header_col(funp, "best_score", align="right") %}Score{% endcall %}
       {% elif column_type == "is_minhash_match" %}
-      <th style="text-align: center;" scope="col">Min</th>
+      {% call sortable_header_col(funp, "is_minhash_match", align="center") %}Min{% endcall %}
       {% elif column_type == "is_pichash_match" %}
-      <th style="text-align: center;" scope="col">Pic</th>
+      {% call sortable_header_col(funp, "is_pichash_match", align="center") %}Pic{% endcall %}
       {% elif column_type == "is_library_match" %}
-      <th style="text-align: center;" scope="col">Lib</th>
+      {% call sortable_header_col(funp, "is_library_match", align="center") %}Lib{% endcall %}
       {% elif column_type == "is_unique_match" %}
-      <th style="text-align: center;" scope="col">Uniq</th>
+      {% call sortable_header_col(funp, "is_unique_match", align="center") %}Uniq{% endcall %}
       {% endif %}
     {% endfor %}
     </tr>
   </thead>
   <tbody>
-    {% for matched_function in matching_result.getFunctionsSlice(funp.start_index, funp.limit) %}
+    {% for matched_function in function_rows %}
     <tr style="background-color:#{{ scp.getMatchHexColorFromResult(matched_function, 'matched_score', scale=50) }}">
       {% for column_type in ucs_functions %}
       {% if column_type == "function_id_a" %}
