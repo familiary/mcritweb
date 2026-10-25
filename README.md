@@ -79,6 +79,16 @@ One rough edge, noted rather than fixed: Werkzeug parses `X-Forwarded-For` as a 
 
 Every call MCRITweb makes to the MCRIT backend is bounded by `MCRIT_CLIENT_TIMEOUT`, a `(connect, read)` pair in seconds that defaults to `(10, 280)`. Without it a backend that is down or hung held a gunicorn request thread indefinitely, since gunicorn's own timeout does not reclaim a thread under the `gthread` worker. The read bound sits under the 300 s that docker-mcrit's NGINX waits, so a slow backend ends in MCRITweb's error page rather than a proxy 504. Raise both together if long synchronous calls - a whole-corpus import or export through the API passthrough - need more, or set the read to `None` in `instance/config.py` to wait indefinitely. It takes effect with an MCRIT release whose `McritClient` supports a timeout; an older one ignores it.
 
+### SQLite database
+
+MCRITweb keeps its users, their settings and the backend address in `instance/mcritweb.sqlite`. The file runs in SQLite's WAL mode, which MCRITweb switches on at startup and SQLite then keeps in the file, so the two gunicorn workers docker-mcrit starts can read while the other writes. In WAL mode two more files live next to it, `mcritweb.sqlite-wal` and `mcritweb.sqlite-shm`, and recent changes can sit in the `-wal` file until SQLite folds them in. So back the database up through SQLite's backup API, which is safe while MCRITweb runs - the docker-mcrit image has Python but no `sqlite3` shell:
+
+```
+python3 -c "import sqlite3; sqlite3.connect('instance/mcritweb.sqlite').backup(sqlite3.connect('mcritweb-backup.sqlite'))"
+```
+
+or stop MCRITweb and copy all three files together. WAL needs `instance/` on a local filesystem, as docker-mcrit's bind mount is; it does not work on a network share.
+
 ## Version History
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.

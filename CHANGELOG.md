@@ -76,6 +76,11 @@ rather than reconstructing it from the commit log at release time.
 - Heading levels, labels, contrast and link target sizes, from the Lighthouse accessibility and
   SEO audits (#244).
 - Searches are read through one adapter, `views/search.py` (#174).
+- The SQLite database runs in WAL mode, switched on at the first start after upgrading and then kept
+  in the file, so a write in one gunicorn worker no longer holds up reads in the other, nor a read a
+  write. **Backups of `instance/` change:** `mcritweb.sqlite-wal` and `mcritweb.sqlite-shm` now sit
+  next to `mcritweb.sqlite`, and copying `mcritweb.sqlite` alone while MCRITweb runs can miss the
+  latest changes; see "SQLite database" in `README.md`.
 
 ### Fixed
 
@@ -83,6 +88,20 @@ rather than reconstructing it from the commit log at release time.
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files
   are written atomically (#145).
+- The generated `instance/secret_key` is written atomically. When two gunicorn workers started
+  without the file, each could keep a key of its own, and a login or CSRF token from one worker was
+  then refused by the other until a restart. A fresh docker-mcrit install was not affected, because
+  `flask init-db` creates the key before gunicorn starts; upgrading from before 1.4.4, or starting
+  after the key file was deleted, was. An explicit `SECRET_KEY` in `instance/config.py` is
+  unaffected.
+
+### Security
+
+- jQuery UI goes from 1.13.1 to 1.13.3, which fixes CVE-2022-31160: a `checkboxradio` widget re-read
+  its label's escaped text as HTML on refresh. MCRITweb creates no checkboxradio, so no page of its
+  own reached the flaw, but the library is loaded on every page. The only jQuery UI widget MCRITweb
+  uses, the sortable sample order on cross compare results, behaves as before. Static files only;
+  nothing to do beyond deploying the new code.
 
 ## [1.6.0] - 2026-10-16
 
