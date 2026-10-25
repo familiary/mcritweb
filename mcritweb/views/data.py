@@ -1995,6 +1995,10 @@ def delete_job_by_id(job_id):
 # would believe they had rerun what is on screen. So every step below refuses rather
 # than guesses, and a parameter that cannot be read disqualifies the whole rerun
 # instead of being dropped from it.
+#
+# All of this is the fallback. A McritClient with requestJobRerun asks mcrit to rerun
+# the job from what it stored, which covers the queries and unique blocks as well; see
+# server_reruns and SERVER_RERUNNABLE_METHODS.
 
 #: job method -> the McritClient method that submits it again.
 RERUNNABLE_METHODS = {
@@ -2216,8 +2220,53 @@ def has_run_its_course(job_info):
         return False
 
 
+#: The analyses mcrit reruns itself, its MinHashIndex.RERUNNABLE_METHODS
+#: (familiary/mcrit#311): every method that analyses the collection, the queries, unique
+#: blocks and 1-vs-group comparisons that RERUNNABLE_METHODS cannot rebuild included, and
+#: none that changes it. The backend checks the job again and refuses what it will not
+#: rerun; this decides where the button is offered.
+SERVER_RERUNNABLE_METHODS = frozenset({
+    "getMatchesForSample",
+    "getMatchesForSampleVs",
+    "getMatchesForSampleVsGroup",
+    "getMatchesForSmdaReport",
+    "getMatchesForMappedBinary",
+    "getMatchesForUnmappedBinary",
+    "getUniqueBlocks",
+    "combineMatchesToCross",
+})
+
+
+def server_reruns():
+    """Whether the installed McritClient can ask the backend to rerun a job itself, by
+    `requestJobRerun` (POST /jobs/<job_id>/rerun, familiary/mcrit#311). The backend
+    queues the job again from the payload it stored, input files included, so it covers
+    every analysis rather than the three rerun_request can rebuild from parameters.
+
+    Asked of the class, as client_takes asks it about keywords, by both the button
+    (is_rerunnable) and the route, so the two agree."""
+    return callable(getattr(McritClient, "requestJobRerun", None))
+
+
+def has_stopped(job_info):
+    """Finished, failed or terminated: the states mcrit reruns a job from."""
+    if has_run_its_course(job_info):
+        return True
+    try:
+        return bool(job_info.is_terminated)
+    except (AttributeError, KeyError, TypeError):
+        return False
+
+
 def is_rerunnable(job_info, child_jobs=None):
-    """Whether to offer a rerun of this job on its page."""
+    """Whether to offer a rerun of this job on its page: any analysis that has stopped
+    where the backend reruns jobs itself, else one whose request rerun_request rebuilds."""
+    if server_reruns():
+        try:
+            method = job_info.method
+        except (AttributeError, KeyError, TypeError):
+            return False
+        return method in SERVER_RERUNNABLE_METHODS and has_stopped(job_info)
     if not has_run_its_course(job_info):
         return False
     return rerun_request(job_info, child_jobs) is not None
@@ -2295,15 +2344,32 @@ def rerun_job_by_id(job_id):
 
     Visitor, because it grants nothing a visitor does not already have - the same three
     requests are reachable from /analyze/compare/<id>, /analyze/compare/<a>/<b> and
-    /analyze/start_cross_compare, `rematch` included.
+    /analyze/start_cross_compare, `rematch` included, and the analyses mcrit reruns
+    itself from the analyze pages too. A rerun query resends no upload, so the role's
+    QUERY_UPLOAD_LIMITS has nothing to measure; it does repeat a stored query that is
+    larger than the role could have uploaded.
 
-    Nothing from the request is forwarded to the backend except `job_id` itself, which
-    goes to the same getJobData that `job_by_id` already calls for any visitor, and only
-    once it is a job id by JOB_ID_PATTERN, as there. What is submitted is rebuilt here
-    from the stored job, not from anything the caller sent.
+    Nothing from the request is forwarded to the backend except `job_id` itself, and
+    only once it is a job id by JOB_ID_PATTERN, as in `job_by_id`. Where the installed
+    client has `requestJobRerun` (see server_reruns) the backend reruns the job from
+    what it stored; otherwise what is submitted is rebuilt here from the stored job, read
+    with the same getJobData that `job_by_id` already calls for any visitor, and not from
+    anything the caller sent.
     """
     client = get_client()
-    job_info = client.getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
+    if not JOB_ID_PATTERN.fullmatch(job_id):
+        flash('There is no job with that id.', category='error')
+        return redirect(url_for('data.jobs'))
+    if server_reruns():
+        # mcrit checks the job as the rebuild below does, and answers None for one it does
+        # not know, one still queued or running, one that is no analysis and one whose
+        # input file is no longer stored
+        new_job_id = client.requestJobRerun(job_id)
+        if not new_job_id:
+            flash('The backend did not rerun this job. It reruns an analysis that has finished, failed or been terminated, while it still has the input.', category='error')
+            return redirect(url_for('data.job_by_id', job_id=job_id))
+        return redirect(url_for('data.job_by_id', job_id=new_job_id, refresh=3))
+    job_info = client.getJobData(job_id)
     if job_info is None:
         flash('There is no job with that id.', category='error')
         return redirect(url_for('data.jobs'))

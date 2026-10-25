@@ -44,6 +44,9 @@ from fixtureData import (
     make_cross_children_current,
     remove_job,
 )
+from mcrit.client.McritClient import McritClient
+
+import mcritweb.views.data as data_views
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -75,6 +78,19 @@ def fake_mcrit(corpus_mcrit):
 
 def queued_calls(fake):
     return [call for call in fake.calls if call[0] in QUEUEING_METHODS]
+
+
+#: McritClient as installed, less the rerun mcrit does itself (familiary/mcrit#311).
+McritClientWithoutRerun = type("McritClient", (McritClient,), {"requestJobRerun": None})
+
+
+@pytest.fixture(autouse=True)
+def client_without_server_rerun(monkeypatch):
+    """Most of this module pins the rebuild from parameters, which runs where the
+    installed McritClient cannot ask the backend to rerun a job; pinned, so that an mcrit
+    with requestJobRerun installed later does not move those tests to the other path.
+    The tests of that path install a client with it (`server_rerun`)."""
+    monkeypatch.setattr(data_views, "McritClient", McritClientWithoutRerun)
 
 
 def rerun_button_for(page, job_id):
@@ -528,6 +544,121 @@ def test_an_older_client_is_not_asked_for_knobs_it_does_not_take(client, as_role
 
     assert not rerun_button_for(page, job_id)
     assert queued_calls(fake_mcrit) == []
+
+
+
+# --- a backend that reruns a job itself ---------------------------------------------
+#
+# familiary/mcrit#311 adds POST /jobs/<job_id>/rerun and McritClient.requestJobRerun:
+# the backend queues the job again from the payload it stored, input files included,
+# and answers the new job id, or None for a job it does not know or will not rerun.
+
+class McritClientWithRerun(McritClient):
+    def requestJobRerun(self, job_id):
+        raise AssertionError("only asked whether the client has it")
+
+
+@pytest.fixture
+def server_rerun(monkeypatch, fake_mcrit):
+    """An installed McritClient with requestJobRerun, and a backend answering it."""
+    monkeypatch.setattr(data_views, "McritClient", McritClientWithRerun)
+
+    def _rerun(job_id):
+        fake_mcrit._record("requestJobRerun", job_id)
+        return NEW_JOB_ID
+    fake_mcrit.requestJobRerun = _rerun
+    return fake_mcrit
+
+
+def server_reruns_asked(fake):
+    return [call for call in fake.calls if call[0] == "requestJobRerun"]
+
+
+@pytest.mark.parametrize("report", ["matches_for_sample", "cross_compare", "matches_for_query", "unique_blocks"])
+def test_a_backend_that_reruns_jobs_is_asked_to_rerun_the_job(client, as_role, server_rerun, report):
+    """Every analysis, the queries and unique blocks the rebuild cannot resend included,
+    and the request is not rebuilt here as well."""
+    as_role("visitor")
+    job_id = job_id_of(report)
+
+    response = client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert server_reruns_asked(server_rerun) == [("requestJobRerun", (job_id,), {})]
+    assert queued_calls(server_rerun) == []
+    assert response.headers["Location"] == f"/data/jobs/{NEW_JOB_ID}?refresh=3"
+
+
+def test_a_rerun_the_backend_refuses_stays_on_the_job_and_says_so(client, as_role, server_rerun):
+    """None, for a job that is queued or running, is no analysis, or whose input file
+    is gone. Redirecting on it builds /data/jobs/None."""
+    as_role("visitor")
+    server_rerun.requestJobRerun = lambda job_id: None
+    job_id = job_id_of("matches_for_query")
+
+    response = client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert response.headers["Location"] == f"/data/jobs/{job_id}"
+    page = client.get(response.headers["Location"]).get_data(as_text=True)
+    assert "The backend did not rerun this job." in page
+    assert queued_calls(server_rerun) == []
+
+
+def test_a_backend_that_reruns_jobs_is_not_asked_about_an_id_that_is_not_one(client, as_role, server_rerun):
+    as_role("visitor")
+    server_rerun.calls.clear()
+
+    response = client.post("/data/jobs/%2E%2E/rerun")
+
+    assert response.headers["Location"] == "/data/jobs"
+    assert server_rerun.calls == []
+
+
+@pytest.mark.parametrize("report", ["matches_for_query", "unique_blocks"])
+def test_a_backend_that_reruns_jobs_has_the_button_on_every_analysis(client, as_role, server_rerun, report):
+    as_role("visitor")
+    job_id = job_id_of(report)
+    page = client.get(f"/data/jobs/{job_id}").get_data(as_text=True)
+
+    assert rerun_button_for(page, job_id), f"{report} was not offered the rerun the backend can do"
+
+
+def test_a_backend_that_reruns_jobs_has_the_button_on_a_terminated_job(client, as_role, server_rerun):
+    """mcrit reruns a finished, failed or terminated job; the rebuild only the first two."""
+    as_role("visitor")
+    terminated = altered_job("matches_for_sample", "ddddddddddddddddddddddd1")
+    terminated["finished_at"] = None
+    terminated["terminated"] = True
+    job_id = inject_job(server_rerun, terminated)
+
+    page = client.get(f"/data/jobs/{job_id}").get_data(as_text=True)
+
+    assert rerun_button_for(page, job_id)
+
+
+def test_a_backend_that_reruns_jobs_still_has_no_button_on_a_running_job_or_a_collection_change(client, as_role, server_rerun):
+    as_role("visitor")
+    running = altered_job("matches_for_query", "ddddddddddddddddddddddd2")
+    running["finished_at"] = None
+    running["progress"] = 0.5
+    collection_job = next(entry["_id"]["$oid"] for entry in server_rerun._queue if entry["payload"]["method"] == "addBinarySample")
+
+    for job_id in (inject_job(server_rerun, running), collection_job):
+        page = client.get(f"/data/jobs/{job_id}").get_data(as_text=True)
+        assert not rerun_button_for(page, job_id), job_id
+
+
+def test_without_requestJobRerun_the_request_is_rebuilt_as_before(client, as_role, fake_mcrit):
+    """Asked of the installed client, which is what the button asks as well: a backend
+    client that only happens to answer the name is not one that has it."""
+    as_role("visitor")
+    fake_mcrit.requestJobRerun = lambda job_id: pytest.fail("asked a client without requestJobRerun")
+    job_id = job_id_of("unique_blocks")
+
+    page = client.get(f"/data/jobs/{job_id}").get_data(as_text=True)
+    client.post(f"/data/jobs/{job_id_of('matches_for_sample')}/rerun")
+
+    assert not rerun_button_for(page, job_id)
+    assert [call[0] for call in queued_calls(fake_mcrit)] == ["requestMatchesForSample"]
 
 
 if __name__ == "__main__":
