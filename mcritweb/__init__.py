@@ -102,7 +102,7 @@ def create_app(test_config=None, instance_path=None):
         describable_jobs,
         ensure_local_data_paths,
         forget_server_probe,
-        get_mcritweb_version_from_setup,
+        get_mcritweb_version,
         job_is_describable,
     )
 
@@ -268,7 +268,7 @@ def create_app(test_config=None, instance_path=None):
     app.register_blueprint(administration.bp)
     app.register_blueprint(data.bp)
     app.register_blueprint(api.bp)
-    app.config['MCRITWEB_VERSION'] = get_mcritweb_version_from_setup()
+    app.config['MCRITWEB_VERSION'] = get_mcritweb_version()
     app.config['DROPZONE_DEFAULT_MESSAGE'] = "Drop file or click here to import"
     app.config['DROPZONE_ALLOWED_FILE_CUSTOM'] = True
     app.config['DROPZONE_ALLOWED_FILE_TYPE'] = ""

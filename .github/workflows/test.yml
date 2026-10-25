@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
+    branches: [master]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,18 +17,27 @@ jobs:
   lint:
     name: Ruff
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       # note: unlike mcrit, we do not run `ruff format --check` - this codebase has never
       # been formatted and reflowing it would bury the history of every file
-      - name: Install Ruff
-        run: python -m pip install --upgrade pip "ruff==0.16.0"
+      - name: Install lint tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
 
       - name: Lint
         run: ruff check .
@@ -34,6 +45,7 @@ jobs:
   unit:
     name: Unit tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     strategy:
       fail-fast: false
@@ -45,24 +57,21 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: pyproject.toml
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-          python -m pip install -e . --no-deps
-          # pytest is not a runtime dependency, so it is deliberately not in
-          # requirements.txt. It used to arrive with mcrit; mcrit declares it under its
-          # `dev` extra now, so it has to be installed here - pinned, like ruff above.
-          python -m pip install "pytest==9.1.1" "pytest-cov==7.1.0"
+          python -m pip install -e ".[dev]"
 
       - name: Run unit tests
         run: python -m pytest

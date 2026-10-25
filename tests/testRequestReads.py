@@ -231,7 +231,7 @@ def test_the_settings_page_uses_the_user_the_hook_loaded(client, as_role, statem
                                        ("/admin/change_server", {"mcrit_server_url": "http://127.0.0.1:8000",
                                                                  "mcrit_server_token": ""})])
 def test_the_server_page_shows_the_version_the_app_started_with(app, client, as_role, path, data):
-    """create_app reads setup.py once; the admin pages used to read it again."""
+    """create_app reads the version from pyproject.toml once; the admin pages used to read it again."""
     as_role("admin")
     app.config["MCRITWEB_VERSION"] = "9.8.7"
 
