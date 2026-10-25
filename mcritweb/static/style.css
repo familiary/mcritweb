@@ -494,3 +494,38 @@ span[data-hint]:not(.score-swatch) {
     }
   }
 }
+
+/* the status message of static/status_message.js, at the foot of the window. It is on the
+   page from the start, so that a screen reader is listening to it, and has no size while it
+   is empty. Where the browser has popovers it is one, which these rules restyle from the
+   browser's own: the top layer keeps it above an open dialog's backdrop */
+.status-message {
+  position: fixed;
+  inset: auto 1rem 1rem auto;
+  z-index: 1090;
+  max-width: calc(100vw - 2rem);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  color: var(--text-body);
+  background: none;
+}
+.status-message.status-message-shown {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.25rem;
+  background-color: var(--surface-info);
+}
+/* what to copy by hand when the copy could not be made */
+.status-message-value:not(:empty) {
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+.status-message .btn-close {
+  margin: 0 0 0 auto;
+}

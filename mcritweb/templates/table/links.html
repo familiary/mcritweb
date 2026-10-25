@@ -58,11 +58,11 @@
   <a href="{{ url_for('explore.function_by_id', function_id=function_id) }}">{{ function_id }}</a>
 {%- endmacro -%}
 
-{%- macro clipboard_btn(clipboard_value) -%}
+{%- macro clipboard_btn(clipboard_value, label="Copy to Clipboard") -%}
   {# the value travels in a data attribute rather than as a quoted JS literal: the HTML
      parser decodes &#39; back to ' before the handler is compiled as script, so a value
      containing a quote used to break out of it - see issues #40 and #85 #}
-  <button class="btn btn-light btn-sm btn-clipboard" title="Copy to Clipboard" data-bs-toggle="tooltip" data-toggle="tooltip" data-clipboard-value="{{ clipboard_value }}" onclick="copy_to_clipboard(this)"><i class="fa-regular fa-copy"></i></button>
+  <button type="button" class="btn btn-light btn-sm btn-clipboard" title="{{ label }}" data-bs-toggle="tooltip" data-toggle="tooltip" data-clipboard-value="{{ clipboard_value }}" onclick="copy_to_clipboard(this)"><i class="fa-regular fa-copy"></i></button>
 {%- endmacro -%}
 
 {%- macro clipboard_js() -%}
@@ -71,14 +71,54 @@ whenReady(function () {
   $('[data-bs-toggle="tooltip"], [data-toggle="tooltip"]').tooltip()
 })
 function copy_to_clipboard(btn){
-  navigator.clipboard.writeText(btn.getAttribute('data-clipboard-value') || "");
-  // the confirmation is the tooltip Bootstrap builds, which a click right after the page is
-  // painted can come before; the copy above needs neither
-  whenReady(function () {
-    $(btn).attr('data-bs-original-title', "Copied!");
-    bootstrap.Tooltip.getInstance(btn).show();
-    $(btn).attr('data-bs-original-title', "Copy to Clipboard");
-  });
+  var value = btn.getAttribute('data-clipboard-value') || "";
+  {# what the copy says comes from status_message.js and Bootstrap, which a click right
+     after the page is painted can come before; the copy itself needs neither. Comments
+     in Jinja, since this is in every page #}
+  function report(copied) {
+    whenReady(function () {
+      if (!copied) {
+        mcritStatus("Could not copy to the clipboard. It is selected here instead: press Ctrl+C to copy it.", {select: value});
+        return;
+      }
+      mcritStatus("Copied to the clipboard.");
+      var tooltip = bootstrap.Tooltip.getInstance(btn);
+      if (tooltip) {
+        var title = btn.getAttribute('data-bs-original-title');
+        btn.setAttribute('data-bs-original-title', "Copied!");
+        tooltip.show();
+        btn.setAttribute('data-bs-original-title', title);
+      }
+    });
+  }
+  {# navigator.clipboard is only there in a secure context, and MCRITweb is served over
+     plain HTTP often enough; a copy of a selection works without one #}
+  function copyBySelection() {
+    var area = document.createElement("textarea");
+    area.value = value;
+    area.readOnly = true;
+    area.className = "visually-hidden";
+    document.body.appendChild(area);
+    area.focus({preventScroll: true});
+    area.select();
+    var copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch (error) {
+      copied = false;
+    }
+    area.remove();
+    btn.focus({preventScroll: true});
+    return copied;
+  }
+  if (window.isSecureContext && navigator.clipboard) {
+    navigator.clipboard.writeText(value).then(
+      function () { report(true); },
+      function () { report(copyBySelection()); }
+    );
+  } else {
+    report(copyBySelection());
+  }
 }
 </script>
 {%- endmacro -%}

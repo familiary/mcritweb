@@ -148,6 +148,13 @@ rather than reconstructing it from the commit log at release time.
   pointer on the first drag, and a file dropped a little off the zone, on the overlay or the page,
   was opened by the browser in place of the page (a `.smda` report as JSON) or downloaded. Only the
   zone takes a dragged file now; elsewhere the pointer shows that it cannot be dropped.
+- A copy says whether it worked in a message at the foot of the window, which screen readers
+  announce. The YARA rule and the registration URL answered with an alert dialog, which took the
+  focus until it was dismissed, and the other copy buttons only with a "Copied!" tooltip, which a
+  screen reader was not told about. On a page served over plain HTTP, where browsers withhold the
+  clipboard API, the copy buttons and the registration URL now copy all the same; they threw
+  there, silently. Where a copy cannot be made at all, the text is left selected for Ctrl+C. The
+  registration URL is copied by a button the keyboard reaches, not by a bare icon.
 
 ### Security
 
