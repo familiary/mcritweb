@@ -84,10 +84,10 @@ Every call MCRITweb makes to the MCRIT backend is bounded by `MCRIT_CLIENT_TIMEO
 MCRITweb keeps its users, their settings and the backend address in `instance/mcritweb.sqlite`. The file runs in SQLite's WAL mode, which MCRITweb switches on at startup and SQLite then keeps in the file, so the two gunicorn workers docker-mcrit starts can read while the other writes. In WAL mode two more files live next to it, `mcritweb.sqlite-wal` and `mcritweb.sqlite-shm`, and recent changes can sit in the `-wal` file until SQLite folds them in. So back the database up through SQLite's backup API, which is safe while MCRITweb runs - the docker-mcrit image has Python but no `sqlite3` shell:
 
 ```
-python3 -c "import sqlite3; sqlite3.connect('instance/mcritweb.sqlite').backup(sqlite3.connect('mcritweb-backup.sqlite'))"
+python3 -c "import sqlite3; sqlite3.connect('file:instance/mcritweb.sqlite?mode=ro', uri=True).backup(sqlite3.connect('instance/mcritweb-backup.sqlite'))"
 ```
 
-or stop MCRITweb and copy all three files together. WAL needs `instance/` on a local filesystem, as docker-mcrit's bind mount is; it does not work on a network share.
+Run it from the directory that holds `instance/`: opened read-only, a database that is not there is an error rather than a new, empty one to back up, and the backup goes into `instance/`, so under `docker exec` it lands on the bind mount rather than in the container. Or stop MCRITweb and copy all three files together. WAL needs `instance/` on a local filesystem, as docker-mcrit's bind mount is; it does not work on a network share.
 
 ## Version History
  * unreleased: The generated `instance/secret_key` is written atomically. When two gunicorn workers started without the file, each could keep a key of its own, and a login or CSRF token from one worker was then refused by the other until a restart. A fresh docker-mcrit install was not affected, because `flask init-db` creates the key before gunicorn starts; upgrading from before 1.4.4, or starting after the key file was deleted, was. An explicit `SECRET_KEY` in `instance/config.py` is unaffected.
