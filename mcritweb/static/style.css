@@ -555,3 +555,13 @@ main #xcfg_text_right {
     height: 70svh;
   }
 }
+
+/* The "Loading" note of a graph pane, and the combined graph's error, sat 400px down the
+   pane, and a pane is the window's height less 106px: in a landscape phone's 284px its
+   overflow hid them. They sit about halfway down now, and never further than before. */
+.graph-note {
+  margin-top: min(400px, calc(50svh - 73px));
+  margin-left: 20px;
+  font-size: x-large;
+  color: var(--text-progress);
+}

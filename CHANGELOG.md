@@ -160,6 +160,9 @@ rather than reconstructing it from the commit log at release time.
   and each takes the width of the page; side by side at every width, they were two slivers of
   about 150px. The panes are as tall as the window with the browser's bars shown, so the bottom
   of a pane no longer hides behind them.
+- A graph's "Loading" note and the combined graph's error show in a short window. They sat 400px
+  down a pane that is the window's height less 106px, so on a landscape phone the pane cut them
+  off; they now sit about halfway down it.
 
 ### Security
 

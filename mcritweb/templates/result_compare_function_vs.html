@@ -193,7 +193,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
             <div id="tooltip_a" class="hidden">
             <p><span id="value_a"></span></p>
             </div>
-            <div id="loading_a" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--text-progress); ">
+            <div id="loading_a" class="hidden graph-note">
             Loading. Please Wait!
             </div>
             <svg id="graphContainer_a" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
@@ -204,7 +204,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
           <div id="tooltip_b" class="hidden">
             <p><span id="value_b"></span></p>
             </div>
-            <div id="loading_b" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--text-progress); ">
+            <div id="loading_b" class="hidden graph-note">
             Loading. Please Wait!
             </div>
             <svg id="graphContainer_b" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
@@ -216,10 +216,10 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
         <div id="tooltip_c" class="hidden">
           <p><span id="value_c"></span></p>
         </div>
-        <div id="loading_c" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--text-progress); ">
+        <div id="loading_c" class="hidden graph-note">
         Loading. Please Wait!
         </div>
-        <div id="combined_error" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--status-no);">
+        <div id="combined_error" class="hidden graph-note" style="color: var(--status-no);">
         The combined graph could not be loaded.
         </div>
         <svg id="graphContainer_c" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">

@@ -31,3 +31,15 @@ def test_the_panes_are_as_tall_as_the_window_with_its_bars_shown():
     assert re.search(r"\n" + PANES + r"\s*height:\s*calc\(100svh - 106px\);", css)
     assert re.search(r"#xcfg_combined\s*\{[^}]*height:\s*calc\(100svh - 106px\);", css)
     assert "100vh" not in css
+
+
+def test_a_graph_note_sits_inside_its_pane():
+    """The "Loading" note and the combined graph's error sat 400px down a pane that is the
+    window's height less 106px, which on a landscape phone is 284px."""
+    templates = (ROOT / "templates" / "single_function.html").read_text() + (ROOT / "templates" / "result_compare_function_vs.html").read_text()
+    assert "margin-top:400px" not in templates.replace(" ", "")
+    for note in ["loading", "loading_a", "loading_b", "loading_c", "combined_error"]:
+        assert re.search(rf'<div id="{note}" class="hidden graph-note"', templates), note
+
+    rule = re.search(r"\.graph-note\s*\{([^}]*)\}", STYLESHEET.read_text())
+    assert rule and re.search(r"margin-top:\s*min\(400px, calc\(50svh - 73px\)\)", rule.group(1))

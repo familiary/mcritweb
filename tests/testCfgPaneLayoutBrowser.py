@@ -1,10 +1,11 @@
 #!/usr/bin/python
-"""The panes of the control flow graph viewer on a phone, in a browser.
+"""The panes of the control flow graph viewer on a phone and in a short window, in a browser.
 
 trace_CFG/cfg_style.css floats the graph and the code (or the two graphs) side by side at
 50% each, at every width, and makes them as tall as the window less the 106px above them,
 in `vh`. On a phone that was two 147px slivers: the graph a speck, the code cut after twenty
-characters. On the offline harness of testFunctionVsBrowser.py; like it, this skips where
+characters. And the "Loading" and error notes sat 400px down a pane that can be shorter
+than that. On the offline harness of testFunctionVsBrowser.py; like it, this skips where
 playwright is not installed, CI among them, and tests/testCfgPaneLayout.py checks the
 stylesheet in CI.
 """
@@ -57,3 +58,28 @@ def test_on_a_wide_screen_the_panes_stay_side_by_side(browser_page, live_server,
     assert abs(width_a - width_b) <= 1
     assert height_a == height_b == 800 - 106
 
+
+def note_inside_its_pane(page, note, pane):
+    return page.evaluate(
+        "([note, pane]) => { const n = document.querySelector(note), p = document.querySelector(pane);"
+        " n.classList.remove('hidden'); p.style.display = p.style.display === 'none' ? 'block' : p.style.display;"
+        " const a = n.getBoundingClientRect(), b = p.getBoundingClientRect();"
+        " return [a.top >= b.top && a.bottom <= b.bottom && a.height > 0, a.top - b.top, a.bottom, b.bottom]; }",
+        [note, pane],
+    )
+
+
+@pytest.mark.parametrize("name, note, pane", [
+    ("function", "#loading", "#xcfg_left"),
+    ("comparison", "#loading_c", "#xcfg_combined"),
+    ("comparison", "#combined_error", "#xcfg_combined"),
+])
+def test_on_a_short_window_the_graph_notes_show_inside_their_pane(browser_page, live_server, name, note, pane):
+    """A landscape phone's pane is 284px tall, and the note was 400px down it, hidden by
+    the pane's overflow: neither "Loading. Please Wait!" nor the combined graph's error
+    ever showed there."""
+    browser_page.set_viewport_size({"width": 844, "height": 390})
+    browser_page.goto(live_server + PAGES[name][0])
+
+    inside, offset, note_bottom, pane_bottom = note_inside_its_pane(browser_page, note, pane)
+    assert inside, f"{note} is {offset}px down its pane, its bottom at {note_bottom} below the pane's {pane_bottom}"
