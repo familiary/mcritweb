@@ -238,6 +238,12 @@
   filter: invert(1);
 }
 
+/* a pill that is not the current one: Bootstrap's #0d6efd, which the light theme keeps since
+   #253, is 3.9:1 on the dark page */
+:root .nav-pills .nav-link {
+  color: var(--link-plain);
+}
+
 /* pills and the pager: the active one is lifted and underlined in the accent, which tells
    it apart on a dark ground better than the light theme's grey alone would */
 :root .nav-pills .nav-link.active,
@@ -641,6 +647,19 @@
 :root .accordion-button {
   color: var(--text-strong);
   background-color: var(--surface-chrome);
+}
+
+/* Bootstrap paints an open header #0c63e4 on #e7f1ff and rings a focused one in a pale blue;
+   the light theme keeps both since #253, here they are the palette's */
+:root .accordion-button:not(.collapsed) {
+  color: var(--text-strong);
+  background-color: var(--surface-chrome);
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+:root .accordion-button:focus {
+  border-color: var(--border);
+  box-shadow: 0 0 0 .25rem var(--accordion-focus-ring);
 }
 
 /* the chevron is an SVG in #212529 (open: #0c63e4); inverted it reads on the chrome */
