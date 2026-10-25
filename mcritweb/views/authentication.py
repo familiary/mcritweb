@@ -339,26 +339,26 @@ def login():
     return render_template('login.html')
 
 
-#: The session key holding `password_mark()` of the password the session logged in with.
+#: The session key holding `password_mark()` of the account as the session logged in.
 PASSWORD_MARK = 'password_mark'
 
 
 def password_mark(user_info):
-    """A digest of the account's stored password hash, keyed with SECRET_KEY.
+    """A digest of the account's stored password hash and session generation, keyed
+    with SECRET_KEY.
 
-    The session is a signed cookie, not a server-side record, so logging out elsewhere
-    cannot reach a copy of it. What can be checked is whether the password it was issued
-    for is still the account's password: the session carries this mark, and a password
-    change makes every mark issued before it stop matching. Keyed, because the cookie is
-    signed but readable, and an unkeyed digest of the hash would be something to test
-    password guesses against. It names the account it was issued for, so a session whose
-    user_id was set without logging in - the test suite does that - is not taken for one
-    whose password changed.
+    The session is a signed cookie, not a server-side record, so ending a session cannot
+    reach a copy of it. What can be checked is whether the account is still as it was
+    when the session logged in: the session carries this mark, and a password change, or
+    a logout moving the session generation on, makes every mark issued before it stop
+    matching. Keyed, because the cookie is signed but readable, and an unkeyed digest of
+    the hash would be something to test password guesses against.
     """
     key = current_app.secret_key
     if isinstance(key, str):
         key = key.encode()
-    return f"{user_info.user_id}:" + hmac.new(key, user_info.password.encode(), hashlib.sha256).hexdigest()
+    marked = f"{user_info.session_generation}:{user_info.password}"
+    return hmac.new(key, marked.encode(), hashlib.sha256).hexdigest()
 
 
 @bp.before_app_request
@@ -369,11 +369,10 @@ def load_logged_in_user():
     else:
         user_info = UserInfo.fromDb(user_id=user_id)
         mark = session.get(PASSWORD_MARK)
-        # a session from before marks existed has none, and gets one at the end of this
-        # request; it cannot have had one removed, since the cookie is signed
-        if user_info is not None and isinstance(mark, str) and mark.startswith(f"{user_id}:") \
-                and not hmac.compare_digest(mark, password_mark(user_info)):
-            # the password was changed after this session logged in
+        # a session from before marks existed has none. It cannot be told apart from a
+        # copy that outlived a password change or a logout, so it ends the same way, and
+        # its user logs in once more
+        if user_info is not None and not (isinstance(mark, str) and hmac.compare_digest(mark, password_mark(user_info))):
             session.clear()
             user_info = None
         g.user = user_info
@@ -381,12 +380,11 @@ def load_logged_in_user():
 
 @bp.after_app_request
 def mark_the_session_with_the_current_password(response):
-    """Give a session that got this far the mark of the account's current password.
+    """Give a session that got this far the mark of the account as it is now.
 
-    That covers two cases. A session from before marks existed is marked on its first
-    request, so a later password change ends it too. And a request that changed the
-    account's own password - /admin/change_password - keeps its own session, while every
-    other session of the account still carries the old mark and ends on its next request.
+    A request that changed the account's own password - /admin/change_password - keeps
+    its own session this way, while every other session of the account still carries the
+    old mark and ends on its next request.
     """
     user_info = g.get('user')
     if user_info is not None and session.get(PASSWORD_MARK) != password_mark(user_info):
@@ -477,9 +475,26 @@ def token_required(view):
     return wrapped_view
 
 
-@bp.route('/logout')
+@bp.route('/logout', methods=['GET', 'POST'])
 @login_required
 def logout():
+    if request.method != 'POST':
+        # ending every session of the account is a write, so a link - one on another
+        # site, followed with the Lax cookie, among them - only gets to ask
+        return render_template('logout.html', can_use_api=g.user.role in API_ROLES)
+    # clearing the cookie only ends this browser's copy of the session, and a copy taken
+    # elsewhere would stay valid for PERMANENT_SESSION_LIFETIME. Moving the generation on
+    # ends every session of the account, this one included
+    g.user.endSessions()
+    # the API token is left as it is, since replacing it would break every client using
+    # it on each logout; whoever may have copied it is pointed at /settings instead
+    can_use_api = g.user.role in API_ROLES
+    # and nobody is logged in for the rest of this request, so the cleared session is
+    # not given a mark on its way out
+    g.user = None
     session.clear()
-    flash('You\'re logged out now', category='success')
+    if can_use_api:
+        flash('You\'re logged out now, in every browser. Your API token still works: if it may have been copied, issue a new one on Settings.', category='success')
+    else:
+        flash('You\'re logged out now', category='success')
     return redirect(url_for('index'))

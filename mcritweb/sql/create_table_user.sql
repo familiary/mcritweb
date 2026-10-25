@@ -7,5 +7,8 @@ CREATE TABLE user (
   role VARCHAR NOT NULL,
   registered VARCHAR NOT NULL,
   last_login VARCHAR,
-  apitoken VARCHAR
+  apitoken VARCHAR,
+  -- moved on by every logout, which ends every session issued before it; see
+  -- authentication.password_mark
+  session_generation INTEGER NOT NULL DEFAULT 0
 );

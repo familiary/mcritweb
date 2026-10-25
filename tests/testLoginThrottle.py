@@ -91,7 +91,7 @@ def test_a_successful_login_forgets_the_failures(client, registered_user):
         attempt(client, registered_user, "not the password")
     attempt(client, registered_user, PASSWORD)
 
-    client.get("/logout", follow_redirects=True)
+    client.post("/logout", follow_redirects=True)
     for _ in range(db.LOGIN_ATTEMPT_LIMIT - 1):
         attempt(client, registered_user, "not the password")
     page = attempt(client, registered_user, "not the password")
@@ -114,7 +114,7 @@ def test_logging_in_to_another_account_does_not_forget_the_failures(app, client,
         attempt(client, registered_user, "not the password")
     attempt(client, "mallory", PASSWORD)
 
-    client.get("/logout", follow_redirects=True)
+    client.post("/logout", follow_redirects=True)
     attempt(client, registered_user, "not the password")
     page = attempt(client, registered_user, "not the password")
 
@@ -137,7 +137,7 @@ def test_the_block_is_on_the_address_not_the_account(client, registered_user):
     # log out first: that successful login put a session on this client, and /login
     # short-circuits to the index for anyone already logged in - which would make the
     # assertion below pass without the throttle being consulted at all
-    client.get("/logout", follow_redirects=True)
+    client.post("/logout", follow_redirects=True)
     assert "Too many failed attempts" in attempt(client, registered_user, "not the password", HERE),         "the address that spent its budget should still be refused"
 
 
@@ -202,7 +202,7 @@ def test_logging_in_does_not_forget_wrong_registration_tokens(app, client, regis
             "registrationToken": "a guess",
         }, environ_base=HERE, follow_redirects=True)
     attempt(client, registered_user, PASSWORD)
-    client.get("/logout", follow_redirects=True)
+    client.post("/logout", follow_redirects=True)
 
     attempt(client, registered_user, "not the password")
     page = attempt(client, registered_user, "not the password")

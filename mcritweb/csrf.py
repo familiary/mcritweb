@@ -82,25 +82,29 @@ def unmask(submitted, length):
     return submitted.encode()
 
 
-def _submitted_token():
-    """Pull the token out of the headers, then the form body.
+def _submitted_token(read_form=True):
+    """Pull the token out of the headers, then - unless `read_form` is false - the form
+    body.
 
     Headers first, because reading `request.form` reads and parses the whole body, and
-    this runs before any view. The upload dropzone sends its token as a header, so
-    `analyze.query` can still refuse an upload over the role's cap from its declared
-    length before the body is taken in.
+    this runs before any view. The upload dropzone sends its token as a header, and the
+    query route never has its form read here (see CsrfProtect.header_only), so
+    `analyze.query` can refuse an upload over the role's cap from its declared length
+    before the body is taken in, wherever the token was put.
     """
     for header in HEADER_NAMES:
         token = request.headers.get(header)
         if token:
             return token
+    if not read_form:
+        return None
     return request.form.get(FIELD_NAME) or None
 
 
-def validate_csrf():
+def validate_csrf(read_form=True):
     """True when the request carries this session's token, masked or bare."""
     expected = session.get(FIELD_NAME)
-    submitted = _submitted_token()
+    submitted = _submitted_token(read_form)
     if not expected or not submitted:
         return False
     expected = expected.encode()
@@ -114,6 +118,7 @@ class CsrfProtect:
     def __init__(self, app=None):
         self._exempt_views = set()
         self._exempt_blueprints = set()
+        self._header_only_views = set()
         if app is not None:
             self.init_app(app)
 
@@ -139,6 +144,20 @@ class CsrfProtect:
             self._exempt_views.add(f"{view.__module__}.{view.__name__}")
         return view
 
+    def header_only(self, view):
+        """Take a view's token from a header only, and never look for it in the body.
+
+        For an upload route with a per-role cap. Looking in the form parses the whole
+        body, up to MAX_CONTENT_LENGTH, and this check runs before the view, which is
+        where an upload over the caller's cap is refused from its declared length. The
+        caller's role is not known yet at this point, so the cap cannot be applied here
+        instead. The dropzone, the only thing posting to such a route, sends a header.
+
+        flask-wtf has no counterpart; see ADR-0002.
+        """
+        self._header_only_views.add(f"{view.__module__}.{view.__name__}")
+        return view
+
     def _protect(self):
         if not current_app.config[ENABLED_KEY]:
             return
@@ -150,7 +169,8 @@ class CsrfProtect:
         if request.blueprint in self._exempt_blueprints:
             return
         view = current_app.view_functions.get(request.endpoint)
-        if view is not None and f"{view.__module__}.{view.__name__}" in self._exempt_views:
+        name = f"{view.__module__}.{view.__name__}" if view is not None else None
+        if name in self._exempt_views:
             return
-        if not validate_csrf():
+        if not validate_csrf(read_form=name not in self._header_only_views):
             abort(400, description="The CSRF token is missing or invalid.")

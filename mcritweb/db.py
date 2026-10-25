@@ -68,7 +68,8 @@ def generate_apitoken():
 
 class UserInfo:
 
-    #: The columns of `user` a UserInfo carries besides its id, as attribute names.
+    #: The columns of `user` a UserInfo carries besides its id, as attribute names. The
+    #: session generation is not among them: only endSessions writes it.
     COLUMNS = ("username", "password", "role", "registered", "last_login", "apitoken")
 
     def __init__(self) -> None:
@@ -80,6 +81,8 @@ class UserInfo:
         self.registered = None
         self.last_login = None
         self.apitoken = None
+        # what the column starts at, see endSessions
+        self.session_generation = 0
         # the values the row had when it was read, see saveToDb
         self._stored = {}
 
@@ -103,6 +106,7 @@ class UserInfo:
             if record["last_login"] != "no login":
                 user_info.last_login = parse_timestamp(record["last_login"])
             user_info.apitoken = record["apitoken"]
+            user_info.session_generation = record["session_generation"]
             user_info._stored = {column: getattr(user_info, column) for column in cls.COLUMNS}
         else:
             user_info = None
@@ -121,33 +125,49 @@ class UserInfo:
         saveLogin.
         """
         database = get_db()
-        if self.user_id is None or self.username != self._stored.get("username"):
-            # the UNIQUE column compares exactly, so "Alice" could sit next to "alice" in
-            # the approval list and on labels. A new name is refused the same way when it
-            # differs from someone else's only in case; names already stored are left alone
-            clash = database.execute(
-                "SELECT 1 FROM user WHERE username = ? COLLATE NOCASE AND id IS NOT ? LIMIT 1;",
-                (self.username, self.user_id),
-            ).fetchone()
-            if clash:
-                raise sqlite3.IntegrityError("UNIQUE constraint failed: user.username (ignoring case)")
-        if self.user_id is None:
-            database.execute(
-                "INSERT INTO user (username, password, role, registered, last_login, apitoken) VALUES (?,?,?,?,?,?)",
-                # formatted here rather than handed over as a datetime: sqlite3's
-                # implicit adapter is deprecated as of 3.12, and it wrote a value
-                # fromDb could not always read back. See issue #98.
-                (self.username, self.password, self.role, format_timestamp(utc_now()), 'no login', self.apitoken),
-            )
-        else:
-            for column in self.COLUMNS:
-                value = getattr(self, column)
-                if column in self._stored and value == self._stored[column]:
-                    continue
-                if isinstance(value, datetime.datetime):
-                    value = format_timestamp(value)
-                database.execute(f"UPDATE user SET {column} = ? WHERE id = ?;", (value, self.user_id))
-        database.commit()
+        began = False
+        try:
+            if self.user_id is None or self.username != self._stored.get("username"):
+                # the UNIQUE column compares exactly, so "Alice" could sit next to "alice" in
+                # the approval list and on labels. A new name is refused the same way when it
+                # differs from someone else's only in case; names already stored are left alone.
+                # Nothing but this lookup enforces that, and a lookup is not a lock: two
+                # registrations of "Eve" and "eve" could both find the name free before either
+                # was written. So the write lock is taken first and held until the commit
+                # below, unless the caller holds it already - first-user registration does.
+                began = not database.in_transaction
+                if began:
+                    database.execute("BEGIN IMMEDIATE;")
+                clash = database.execute(
+                    "SELECT 1 FROM user WHERE username = ? COLLATE NOCASE AND id IS NOT ? LIMIT 1;",
+                    (self.username, self.user_id),
+                ).fetchone()
+                if clash:
+                    raise sqlite3.IntegrityError("UNIQUE constraint failed: user.username (ignoring case)")
+            if self.user_id is None:
+                database.execute(
+                    "INSERT INTO user (username, password, role, registered, last_login, apitoken) VALUES (?,?,?,?,?,?)",
+                    # formatted here rather than handed over as a datetime: sqlite3's
+                    # implicit adapter is deprecated as of 3.12, and it wrote a value
+                    # fromDb could not always read back. See issue #98.
+                    (self.username, self.password, self.role, format_timestamp(utc_now()), 'no login', self.apitoken),
+                )
+            else:
+                for column in self.COLUMNS:
+                    value = getattr(self, column)
+                    if column in self._stored and value == self._stored[column]:
+                        continue
+                    if isinstance(value, datetime.datetime):
+                        value = format_timestamp(value)
+                    database.execute(f"UPDATE user SET {column} = ? WHERE id = ?;", (value, self.user_id))
+            database.commit()
+        except BaseException:
+            # a lock taken here is not left held by a write that failed, and what was
+            # written before the failure is not committed by the next write on this
+            # connection
+            if began:
+                database.rollback()
+            raise
 
     def saveLogin(self, verified_password=None):
         """Record a successful login: last_login, and - when login() moved the password
@@ -163,7 +183,19 @@ class UserInfo:
             database.execute("UPDATE user SET password = ? WHERE id = ? AND password = ?;",
                              (self.password, self.user_id, verified_password))
         database.commit()
-    
+
+    def endSessions(self):
+        """End every session of this account, wherever it is.
+
+        A session carries the generation it logged in under (see
+        authentication.password_mark), and this moves the account's on. Counted up in
+        the row rather than written from this copy, so two logouts at once cannot write
+        back the same number, or an older one that brings an ended session back.
+        """
+        database = get_db()
+        database.execute("UPDATE user SET session_generation = session_generation + 1 WHERE id = ?;", (self.user_id,))
+        database.commit()
+
     @property
     def registration_date(self):
         return self.registered.strftime("%Y-%m-%d")
@@ -809,6 +841,17 @@ def migrate(app_context):
                 # the token itself is deliberately not printed: it authenticates its
                 # owner to /api, and this line goes to the container log
                 print(f"EXECUTED MIGRATION: ADD APITOKEN TO USER_ID {user_id} FROM TABLE USER")
+        # since logout ends every session of the account (#284), users have a session
+        # generation; every existing row starts at 0
+        if "session_generation" not in user_table_columns:
+            try:
+                db.execute('ALTER TABLE user ADD session_generation INTEGER NOT NULL DEFAULT 0')
+                print("EXECUTED MIGRATION: ADD SESSION_GENERATION TO TABLE USER")
+            except sqlite3.OperationalError:
+                # gunicorn workers each run this on start, so another one may have added
+                # the column between the read above and this ALTER
+                if "session_generation" not in [x[0] for x in db.execute('SELECT * FROM user').description]:
+                    raise
         # since version v1.2.10, we have an additional server_token field, ensure it exists (empty)
         server_table_columns = list(map(lambda x: x[0], db.execute('SELECT * FROM server').description))
         if "server_token" not in server_table_columns:

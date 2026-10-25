@@ -6,6 +6,7 @@ import unittest
 from html import unescape
 
 import pytest
+from conftest import log_in_as
 from fixtureData import job_id_of
 
 from mcritweb.views.pagination import Pagination, request_args_for_link_building
@@ -163,8 +164,7 @@ def test_external_cannot_be_turned_on_from_the_query_string(client, as_role, pat
     user_id = as_role("admin")
     # the session cookie is scoped to the host it was set on, so the spoofed Host
     # needs a logged-in cookie of its own
-    with client.session_transaction(base_url="http://attacker.example/") as session:
-        session["user_id"] = user_id
+    log_in_as(client, user_id, base_url="http://attacker.example/")
 
     response = client.get(f"{path}?_external=1", headers={"Host": "attacker.example"}, follow_redirects=True)
 
@@ -302,8 +302,7 @@ def test_the_search_redirect_cannot_be_pointed_at_another_host(client, as_role):
     `?_external=1` turned the normalising redirect into a redirect to whatever the
     Host header said."""
     user_id = as_role("visitor")
-    with client.session_transaction(base_url="http://attacker.example/") as session:
-        session["user_id"] = user_id
+    log_in_as(client, user_id, base_url="http://attacker.example/")
 
     response = client.get(f"{MULTI_TYPE_SEARCH}&_external=1", headers={"Host": "attacker.example"})
 

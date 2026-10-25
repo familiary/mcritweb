@@ -244,7 +244,11 @@
         {% endif %}
         <a class="dropdown-item" href="{{ url_for('index') }}">View profile</a>
         <a class="dropdown-item" href="{{ url_for('authentication.settings') }}">Settings</a>
-        <a class="dropdown-item" href="{{ url_for('authentication.logout') }}">Logout</a>
+        {# a form, since logging out ends the account's sessions everywhere (#284) #}
+        <form method="post" action="{{ url_for('authentication.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="dropdown-item">Logout</button>
+        </form>
       </div>
       {% endif %}
     </li>
