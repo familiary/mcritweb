@@ -213,7 +213,7 @@ if __name__ == "__main__":
 # job overview and the query result page printed as the task. `job_task` reads the
 # queue's record itself and says what the job was run on, in the words its page uses.
 
-from mcritweb.jobnames import job_task  # noqa: E402
+from mcritweb.jobnames import folded_sample_ids, job_task  # noqa: E402
 
 
 def fixture_job(report):
@@ -253,6 +253,24 @@ class JobTaskTest(unittest.TestCase):
         # mcrit's server stores the ids as ints, but a record that does not still gets a line
         self.assertEqual("UniqueBlocks | 2 samples", unique_blocks(["1", True]))
 
+    def test_the_ids_a_folded_line_hides_are_handed_back_as_the_job_names_them(self):
+        """For the Task row to list under the line: only where a range or a count stands
+        for ids, and in the job's own order."""
+        def unique_blocks(sample_ids):
+            return Job({"payload": {"method": "getUniqueBlocks", "params": json.dumps({"0": sample_ids})}}, None)
+
+        self.assertEqual([30, 14, 15, 16, 17, 20, 21], folded_sample_ids(unique_blocks([30, 14, 15, 16, 17, 20, 21])))
+        self.assertEqual([1, 2, 3, 5, 7, 9, 11, 13], folded_sample_ids(unique_blocks([1, 2, 3, 5, 7, 9, 11, 13])))
+        self.assertEqual(list(range(1, 500, 2)), folded_sample_ids(unique_blocks(list(range(1, 500, 2)))))
+        self.assertEqual(["1", True], folded_sample_ids(unique_blocks(["1", True])))
+        # the line names each of these already
+        self.assertIsNone(folded_sample_ids(unique_blocks([3, 4, 9])))
+        self.assertIsNone(folded_sample_ids(unique_blocks([2, 1, 2])))
+        self.assertIsNone(folded_sample_ids(unique_blocks([16])))
+        self.assertIsNone(folded_sample_ids(unique_blocks([])))
+        self.assertIsNone(folded_sample_ids(fixture_job("matches_for_sample")))
+        self.assertIsNone(folded_sample_ids(Job({"payload": {"method": "getUniqueBlocks", "params": "not json"}}, None)))
+
     def test_options_read_by_their_names_and_flags_only_when_set(self):
         job = Job({"payload": {"method": "getMatchesForSample", "params": json.dumps({"0": 4, "force_recalculation": True, "minhash_threshold": 70, "sample_group_only": False})}}, None)
         self.assertEqual("Match 1vN | sample 4 | forced recalculation | MinHash threshold: 70", job_task(job))
@@ -275,7 +293,7 @@ def test_the_job_page_prints_the_readable_task(client, as_role):
 def test_a_unique_blocks_job_page_keeps_every_sample_in_the_title(client, as_role):
     as_role("visitor")
     page = client.get(f"/data/jobs/{job_id_of('unique_blocks')}").get_data(as_text=True)
-    assert 'title="getUniqueBlocks([0, 1, 2], 1)">UniqueBlocks | samples 0–2 (3) | family: 1<' in page
+    assert 'title="getUniqueBlocks([0, 1, 2], 1)"><details><summary>UniqueBlocks | samples 0–2 (3) | family: 1<' in page
 
 
 def sample_set_job(job_id, sample_ids):
@@ -350,3 +368,80 @@ def test_the_requested_samples_unfold_under_their_families(client, as_role, corp
     ]
     sample_requests = [(name, args) for name, args, _ in corpus_mcrit.calls if name in ("getSamplesByIds", "getSampleById")]
     assert sample_requests == [("getSamplesByIds", ([0, 1, 2, 3, 4, 999],))]
+
+
+#: The unique blocks job the Task row tests below are served under.
+TASK_JOB_ID = "6a74660af8b8d2c6f8366403"
+
+#: The three pages that print a job's Task row (job_column_table), and what the job's
+#: record needs for each: the overview, and the result page while the job is still
+#: running or once it has failed.
+JOB_PAGES = {
+    "overview": ("/data/jobs/{}", {}),
+    "in progress": ("/data/result/{}", {"finished_at": None, "result": None}),
+    "failed": ("/data/result/{}", {"finished_at": None, "result": None, "attempts_left": 0}),
+}
+
+
+def serve_unique_blocks_job(corpus_mcrit, sample_ids, **changes):
+    document = sample_set_job(TASK_JOB_ID, sample_ids)
+    document.update(changes)
+    corpus_mcrit._jobs[TASK_JOB_ID] = (document, None)
+
+
+def task_row(client, path):
+    """A job page's Task row, whitespace collapsed."""
+    page = client.get(path).get_data(as_text=True)
+    row = page[page.index("Task:"):]
+    return re.sub(r"\s+", " ", row[:row.index("</tr>")])
+
+
+@pytest.mark.parametrize("page", JOB_PAGES)
+def test_a_folded_task_row_opens_into_every_sample(client, as_role, corpus_mcrit, page):
+    """Issue #300 folded the ids into ranges and left the full list in the row's title,
+    which touch and the keyboard cannot reach. The line is the summary of an expander
+    now, which opens into every sample, linked, in the order the job names them."""
+    path, changes = JOB_PAGES[page]
+    serve_unique_blocks_job(corpus_mcrit, [30, 14, 15, 16, 17, 20, 21], **changes)
+    as_role("visitor")
+    row = task_row(client, path.format(TASK_JOB_ID))
+
+    assert '<details><summary>UniqueBlocks | samples 14–17, 20, 21, 30 (7)</summary>' in row, row
+    assert re.findall(r'/explore/samples/(\d+)"', row) == ["30", "14", "15", "16", "17", "20", "21"]
+    assert 'title="getUniqueBlocks([30, 14, 15, 16, 17, 20, 21])"' in row
+
+
+def test_a_task_row_that_names_every_sample_has_nothing_to_open(client, as_role, corpus_mcrit):
+    serve_unique_blocks_job(corpus_mcrit, [3, 4, 9])
+    as_role("visitor")
+    row = task_row(client, f"/data/jobs/{TASK_JOB_ID}")
+
+    assert 'title="getUniqueBlocks([3, 4, 9])">UniqueBlocks | samples 3, 4, 9</td>' in row
+    assert "<details>" not in row
+
+
+def test_a_folded_task_row_escapes_what_it_opens_into(client, as_role, corpus_mcrit):
+    """mcrit's server queues ints, but the line copes with a record that does not, and
+    so does the expander: it prints such an id escaped, like the rest of the row, and
+    links only an int."""
+    serve_unique_blocks_job(corpus_mcrit, ["<b>1</b>", 2])
+    as_role("visitor")
+    row = task_row(client, f"/data/jobs/{TASK_JOB_ID}")
+
+    assert ('<details><summary>UniqueBlocks | 2 samples</summary>'
+            '&lt;b&gt;1&lt;/b&gt;, <a href="/explore/samples/2">2</a></details>') in row, row
+    assert "<b>1</b>" not in row
+
+
+def test_the_jobs_list_row_leads_to_the_task_row_that_opens(client, as_role, corpus_mcrit, monkeypatch):
+    """A click anywhere on a jobs list row opens the job's page (job_row_std_js), so an
+    expander in the row would open and navigate at once. The row keeps its title, and
+    the page it leads to is where the samples unfold."""
+    serve_unique_blocks_job(corpus_mcrit, [0, 1, 2, 3, 4, 7, 9])
+    monkeypatch.setattr(corpus_mcrit, "getQueueData", lambda *args, **kwargs: [corpus_mcrit.getJobData(TASK_JOB_ID)])
+    as_role("visitor")
+    listing = client.get("/data/jobs?active=getUniqueBlocks").get_data(as_text=True)
+
+    assert f'job_id="{TASK_JOB_ID}" class="job-cell job-description"' in listing
+    assert "<details>" not in listing
+    assert re.findall(r'/explore/samples/(\d+)"', task_row(client, f"/data/jobs/{TASK_JOB_ID}")) == ["0", "1", "2", "3", "4", "7", "9"]

@@ -168,6 +168,23 @@ def unique_blocks_samples(sample_ids):
     return listed if len(pieces) == count else f"{listed} ({count})"
 
 
+def folded_sample_ids(job):
+    """Every sample id of a unique blocks job whose task line folds them into ranges or a
+    count, as the job names them, for the Task row to list in full; None when the line
+    names each one already, and for any other job."""
+    if getattr(job, "method", None) != "getUniqueBlocks":
+        return None
+    positional, _ = _split_params(job)
+    sample_ids = positional[0] if positional else None
+    if not isinstance(sample_ids, list) or not sample_ids:
+        return None
+    if all(type(sample_id) is int for sample_id in sample_ids):
+        pieces = _sample_ranges(sample_ids)
+        if len(pieces) == len(set(sample_ids)) <= MAX_LISTED_SAMPLE_RUNS:
+            return None
+    return sample_ids
+
+
 def _short_sha(job):
     sha256 = getattr(job, "sha256", None)
     return sha256[:8] if isinstance(sha256, str) and sha256 else None
