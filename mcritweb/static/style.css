@@ -565,3 +565,10 @@ main #xcfg_text_right {
   font-size: x-large;
   color: var(--text-progress);
 }
+
+/* The manual's paragraphs ran the width of the page, 171 characters a line at 1280px and
+   199 at 1920px; past about 80 a reader loses their place on the way back to the start
+   of the next line. Its pictures, tables and code keep the whole width. */
+.manual :is(p, li, blockquote, dd) {
+  max-inline-size: 80ch;
+}

@@ -117,6 +117,9 @@ rather than reconstructing it from the commit log at release time.
 - A table or cross compare matrix that scrolls sideways fades out at its right edge while there is
   more of it to the right, in Chrome and Edge; a touch scrollbar stays hidden until the table is
   touched, so nothing used to say there was more. Other browsers show no fade, as before.
+- The help page's paragraphs and list items are at most 80 characters wide, instead of running the
+  width of the window, up to about 200 characters a line on a wide screen; its screenshots, tables
+  and code still use the whole width.
 - On a phone, a tablet or a window under 1200px wide, a result page lays out its function matches
   only when they are scrolled near, in browsers that support `content-visibility`. With 250 rows a
   page that halves the layout and style work before the page is first shown (2.7 s to 1.0 s of
