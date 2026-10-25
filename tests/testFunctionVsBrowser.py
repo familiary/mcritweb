@@ -390,6 +390,51 @@ def test_without_a_script_the_drawing_can_do_without_the_graphs_are_still_drawn(
     assert browser_page.is_visible("#viewer_error")
 
 
+#: a block of each panel by its node id, as main_duo.js binds it to the block's group
+NODE_BY_ID = "([panel, id]) => [...document.querySelectorAll('#graphContainer_' + panel + ' g.node')].find(node => node.__data__ === id)"
+
+
+def test_the_graphs_are_drawn_from_the_block_data_fetched_with_the_viewer(browser_page, live_server, thrown):
+    """The colours and matches come with the viewer, from match_functions_diff, once the
+    graphs are wanted. What the graphs show is what that answers, even when it comes in
+    after the viewer's scripts: a colour and a match planted in the answer are the ones
+    drawn."""
+    requests = []
+    browser_page.on("request", lambda request: requests.append(request.url) if request.url.endswith("/diff") else None)
+    planted = {}
+
+    def plant(route):
+        response = route.fetch()
+        browser_page.wait_for_timeout(700)
+        answer = response.json()
+        planted["a"], planted["b"] = sorted(answer["node_colors"]["a"])[0], sorted(answer["node_colors"]["b"])[-1]
+        answer["node_colors"]["a"][planted["a"]] = "rgb(1, 2, 3)"
+        answer["node_matches"]["a"][planted["a"]] = [planted["b"]]
+        route.fulfill(response=response, body=json.dumps(answer))
+    browser_page.route("**/data/matches/function/*/*/diff", plant)
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    browser_page.wait_for_load_state("networkidle")
+    assert requests == []
+
+    scroll_to_the_graphs(browser_page)
+    for panel in ("a", "b"):
+        browser_page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
+    assert requests == [f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}/diff"]
+    assert browser_page.evaluate(f"args => ({NODE_BY_ID})(args).querySelector('rect').style.fill", ["a", planted["a"]]) == "rgb(1, 2, 3)"
+    browser_page.evaluate(f"args => ({NODE_BY_ID})(args).dispatchEvent(new MouseEvent('mouseover', {{bubbles: true}}))", ["a", planted["a"]])
+    assert browser_page.evaluate(f"args => ({NODE_BY_ID})(args).classList.contains('matched')", ["b", planted["b"]])
+    assert thrown == []
+
+
+def test_block_data_that_does_not_load_says_so_and_the_graphs_are_still_drawn(browser_page, live_server):
+    browser_page.route("**/data/matches/function/*/*/diff", lambda route: route.fulfill(status=500, body="down"))
+    browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    scroll_to_the_graphs(browser_page)
+    for panel in ("a", "b"):
+        browser_page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
+    assert browser_page.is_visible("#viewer_error")
+
+
 def test_the_viewer_scripts_run_in_order_however_they_arrive(browser_page, live_server, thrown):
     """Each script builds on the ones before it. Added by a script, they would run as each
     arrives, so d3 arriving last would break every one after it."""
