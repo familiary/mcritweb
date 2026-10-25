@@ -90,8 +90,11 @@ DIAGRAM_FILENAME_RE = re.compile(
 
 #: The width of the strftime prefix cache_result puts in front of the job id.
 CACHE_TIMESTAMP_LENGTH = len("20260806-104636")
-#: How a report that is not pretty-printed begins, which an indent=1 one never does.
-UNINDENTED_REPORT_STARTS = (b'{"', b"{}")
+#: How a pretty-printed report begins: json.dump with indent=1 breaks the line after the
+#: opening bracket of an object or a list, and compact output never does.
+PRETTY_PRINTED_REPORT_STARTS = (b"{\n", b"[\n")
+#: The last byte of a whole compact object or list.
+CLOSING_BYTES = {b"{": b"}", b"[": b"]"}
 
 
 def quote_backend_query_value(value):
@@ -209,13 +212,15 @@ def find_cached_result_filename(app, job_id):
     timestamp prefix sorts chronologically, so the newest capture wins for a job that
     has been fetched more than once.
 
-    Unread also means unchecked, so only a compact report qualifies. cache_result has
-    written compact only for as long as it has written through write_atomically - the
-    two reached master in one merge - so a compact file was renamed into place whole,
-    and its first two bytes say so. A pretty-printed one was written in place by an
-    older version and may have been cut short by a crash; only parsing it can tell,
-    which would double the cost of every download, so it is left to the caller to load
-    like any other cached report.
+    Unread also means unchecked, so a pretty-printed report does not qualify. It was
+    written in place by an older version and may have been cut short by a crash; only
+    parsing it can tell, which would double the cost of every download, so it is left
+    to the caller to load like any other cached report. cache_result has written
+    compact only for as long as it has written through write_atomically - the two
+    reached master in one merge - so a compact file was renamed into place whole. Its
+    last byte is checked all the same, which is one seek: it also catches a file the
+    pre-merge branch of #229 wrote compact but in place. A scalar result (`true`, a
+    count) is a few bytes, written whole or not at all, and qualifies as it is.
     """
     cache_path = os.sep.join([app.instance_path, "cache", "results"])
     suffix = f"-{job_id}.json"
@@ -226,8 +231,15 @@ def find_cached_result_filename(app, job_id):
     for filename in sorted(candidates, reverse=True):
         try:
             with open(os.sep.join([cache_path, filename]), "rb") as fin:
-                if fin.read(2) in UNINDENTED_REPORT_STARTS:
-                    return filename
+                head = fin.read(2)
+                if not head or head in PRETTY_PRINTED_REPORT_STARTS:
+                    continue
+                closing = CLOSING_BYTES.get(head[:1])
+                if closing is not None:
+                    fin.seek(-1, os.SEEK_END)
+                    if fin.read(1) != closing:
+                        continue
+                return filename
         except OSError:
             # evicted since the listing, or unreadable: not one to hand out either way
             continue
@@ -301,6 +313,11 @@ def write_atomically(app, directory, filename, write, mode="wb"):
         text_kwargs = {} if "b" in mode else {"newline": ""}
         with open(temp_path, mode, opener=lambda path, flags: os.open(path, flags | os.O_EXCL, CACHE_FILE_MODE), **text_kwargs) as fout:
             write(fout)
+            # on disk before the rename: renamed first, a power loss can leave the new
+            # name on a file whose data never got there, and the download streams a
+            # compact report without reading it
+            fout.flush()
+            os.fsync(fout.fileno())
         os.replace(temp_path, os.sep.join([directory, filename]))
     finally:
         # os.replace consumed it on the success path; this is the failure path
@@ -751,8 +768,8 @@ def download_result(job_id):
             # error if it happened between that check and the open. Fetch it again.
             pass
     # what is cached but was not served is pretty-printed, from before writes were
-    # atomic: loading it is the check, a file cut short is skipped, and caching it
-    # again below makes it one the next download streams
+    # atomic, or does not end the way it begins: loading it is the check, a file cut
+    # short is skipped, and caching it again below makes it one the next download streams
     result_json = load_cached_result(current_app, job_id) or client.getResultForJob(job_id)
     if not result_json:
         # unfinished, failed, or a job type that produces nothing - the report page
