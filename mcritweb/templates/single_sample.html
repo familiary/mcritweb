@@ -17,7 +17,7 @@ Sample: {{ entry.sample_id }}
 
 {% block content %}
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   whenReady(function(){
     var editSampleModal = document.getElementById('editSampleModal');
     editSampleModal.addEventListener('show.bs.modal', function (event) {
@@ -88,7 +88,7 @@ Sample: {{ entry.sample_id }}
     </div>
   </div>
 </div>
-  <script>
+  <script nonce="{{ csp_nonce() }}">
     function toggle_delete_sample(cb) {
     var deleteSampleButton = document.getElementById('button_delete_sample');
     if (cb.checked) {
@@ -161,7 +161,7 @@ Sample: {{ entry.sample_id }}
 {{ pagination_widget(pagination) }}
 {% endif %}
   </div>
-<script>later({{ url_for('static', filename='live_search.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='live_search.js')|tojson }})</script>
 {% if job_collection.count %}
 <h2 class="h3" id="jobs">Jobs</h2>
 {{ job_table(job_collection.getJobs(), samples_by_id=samples) }}

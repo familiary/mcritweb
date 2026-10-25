@@ -178,6 +178,15 @@ rather than reconstructing it from the commit log at release time.
   its own origin, so no page changes; markup injected past autoescaping can no longer load an
   object, re-point the page's relative links or post a form to another site. A reverse proxy that
   adds a policy of its own should stop doing so: browsers enforce both.
+- Pages run only the scripts MCRITweb wrote. The `Content-Security-Policy` now runs a script element
+  only when it carries the nonce drawn for that response, which every page writes on its own scripts
+  and injected markup cannot know, plus what those scripts load themselves (`'strict-dynamic'`):
+  the queued page scripts, the graph viewer and its worker, Dropzone. A `<script>` that slipped past
+  autoescaping, as family names once could before #85, no longer runs, and neither does `eval`.
+  Handler attributes such as `onclick` still run for now (`script-src-attr 'unsafe-inline'`), until
+  they become listeners. Every page was walked in Chromium as each role and signed out under the
+  new policy, with uploads, live search, the graphs, the comparison view, tabs, dialogs, sorting,
+  the copy buttons and a running job's polling exercised, without a violation.
 
 ## [1.6.0] - 2026-10-16
 

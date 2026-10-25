@@ -3,7 +3,7 @@
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro family_row_std_js() %}
-<script>
+<script nonce="{{ csp_nonce() }}">
   whenReady(function(){
     // delegated, so the listener holds whichever modal the page has, including one a
     // live search (live_search.js) brings in; Bootstrap's modal events bubble

@@ -55,7 +55,7 @@
      in post_action.js, because the CFG viewers ask for it from window.onload, which can
      come first. This is the first script on the page, so that all of them can call it.
      tests/testParseTimeScripts.py fails on a `$` that runs before the queue has. #}
-  <script>
+  <script nonce="{{ csp_nonce() }}">
     var mcritScripts = {queued: [], waiting: [], pressed: []};
     {# a file queued twice, by a partial that a page includes twice, is fetched and run once #}
     function later(src) {
@@ -139,7 +139,7 @@
       setTimeout(startTheQueue, 3000);
     });
   </script>
-  <script>later({{ url_for('static', filename='jquery.js')|tojson }})</script>
+  <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='jquery.js')|tojson }})</script>
   {# DataTables and jQuery UI used to be here: 623 KB of render-blocking JavaScript and
      41 KB of CSS, on every page, for two calls.
 
@@ -160,9 +160,9 @@
      order of the tags, and take the names. See ADR-0015. #}
   {# nothing below is called before the queue has run: post_action.js and page_loading.js
      only listen for events, and every `new Autocomplete` waits in whenReady. #}
-  <script>later({{ url_for('static', filename='post_action.js')|tojson }})</script>
-  <script>later({{ url_for('static', filename='page_loading.js')|tojson }})</script>
-  <script>later({{ url_for('static', filename='autocomplete.js')|tojson }})</script>
+  <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='post_action.js')|tojson }})</script>
+  <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='page_loading.js')|tojson }})</script>
+  <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='autocomplete.js')|tojson }})</script>
 
   {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
     {{ submit_or_query_dropzone_js(select_form_type=True, lazy=True) }}
@@ -172,7 +172,7 @@
   {# below the block, so that it runs after a page's own jQuery plugins - see above. Its
      declarative behaviour and its jQuery plugins are in place before any whenReady
      handler runs. #}
-  <script>later({{ url_for('static', filename='bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js')|tojson }})</script>
+  <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js')|tojson }})</script>
   {# the dark palette and what it takes to bring the vendored widgets onto it. Linked last,
      so it wins over every stylesheet above at equal specificity, and only when the theme
      can be dark: under "system" its media query follows the browser's preference live #}

@@ -7,7 +7,7 @@ Settings
 {% block style %}
 {# queued with later(): in <head> it held back the first paint, and the lists below are
    only made sortable from whenReady, once it has run (issue #63) #}
-<script>later({{ url_for('static', filename='sortablejs/Sortable.min.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='sortablejs/Sortable.min.js')|tojson }})</script>
 <style>
     .list-group.col {
         min-height: 50px;
@@ -307,7 +307,7 @@ Settings
 </div>
 
 
-    <script type="text/javascript">
+    <script nonce="{{ csp_nonce() }}" type="text/javascript">
       whenReady(function () {
         // Family Table
         var familyTableActive = document.getElementById('family_table_active');

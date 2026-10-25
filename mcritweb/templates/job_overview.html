@@ -12,7 +12,7 @@ Overview for Job: {{ job_info.job_id }}
    page asks data.job_status instead and reloads only once there is something new to
    show. Without it, this is the whole mechanism. See issue #183. #}
 <noscript><meta http-equiv="refresh" content="{{ auto_refresh }}"></noscript>
-<script>
+<script nonce="{{ csp_nonce() }}">
   (function () {
     const statusUrl = {{ url_for('data.job_status', job_id=job_info.job_id)|tojson }};
     const shown = {{ job_state|tojson }};

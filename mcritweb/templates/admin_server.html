@@ -93,7 +93,7 @@ Server settings
     <button type="submit" class="btn btn-danger">Reset Server</button>
 </form>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
     function copyRegistrationUrl() {
       var js_token = "{{ server_info.registration_token }}";
       const var_register_url = "{{ url_for('authentication.register', _external=True) }}";

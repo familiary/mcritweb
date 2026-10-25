@@ -1,6 +1,7 @@
 import datetime
 import mimetypes
 import os
+import secrets
 
 from flask import Flask, g, redirect, render_template, request, send_from_directory, url_for
 
@@ -31,6 +32,15 @@ RESOURCE_POLICY = "; ".join([
     "media-src 'none'",
     "manifest-src 'self'",
 ])
+
+#: Which scripts a page runs: only a script element carrying the response's nonce, which
+#: every template writes on its own and which injected markup cannot know, and whatever
+#: such a script adds to the page itself ('strict-dynamic'): base.html's later() queue,
+#: the CFG viewer's libraries, Dropzone fetched on the first drag. 'self' would be
+#: ignored next to 'strict-dynamic', so the scripts under static/ load only that way.
+#: The onclick= and other handler attributes still run, until they are listeners, but
+#: an injected <script> does not.
+SCRIPT_POLICY = "script-src 'nonce-{nonce}' 'strict-dynamic' 'report-sample'; script-src-attr 'unsafe-inline'"
 
 
 def _trusted_proxy_count(configured, logger):
@@ -331,14 +341,23 @@ def create_app(test_config=None, instance_path=None):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         return response
 
+    @app.template_global()
+    def csp_nonce():
+        # drawn for each response, never reused: a nonce one page showed would let markup
+        # injected into the next run as if it were ours. See SCRIPT_POLICY
+        if "csp_nonce" not in g:
+            g.csp_nonce = secrets.token_urlsafe(16)
+        return g.csp_nonce
+
     @app.after_request
     def no_framing_by_other_sites(response):
         # a page of ours inside another site's frame can be dressed up to make a logged-in
         # user click something they cannot see. SameSite=Lax already keeps the session
         # cookie out of a cross-site frame in current browsers; these say it outright, the
         # CSP for browsers that read it and X-Frame-Options for those that do not. The CSP
-        # carries the rest of RESOURCE_POLICY with it
-        response.headers.setdefault("Content-Security-Policy", RESOURCE_POLICY)
+        # carries SCRIPT_POLICY and the rest of RESOURCE_POLICY with it
+        response.headers.setdefault(
+            "Content-Security-Policy", SCRIPT_POLICY.format(nonce=csp_nonce()) + "; " + RESOURCE_POLICY)
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         return response
 

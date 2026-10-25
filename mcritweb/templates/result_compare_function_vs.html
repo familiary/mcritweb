@@ -40,7 +40,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
       ("Function B with its CFG", "/functions/%d?with_xcfg=true" % function_id_b),
     ], "match_info = client.getMatchFunctionVs(%d, %d)\nprint(match_info[\"match_entry\"])" % (function_id_a, function_id_b)) }}
 
-    <script type="text/javascript">
+    <script nonce="{{ csp_nonce() }}" type="text/javascript">
     window.onload = function() {
         var js_function_id_a = {{ function_id_a }};
         var js_function_id_b = {{ function_id_b }};

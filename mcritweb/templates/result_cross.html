@@ -71,9 +71,9 @@ Results for Job: {{ job_info.job_id }}
    jquery-ui-sortable.js is jQuery UI cut down to the sortable widget and what it is built
    on (scripts/subset_jquery_ui.py), 76 KB of the full build's 529. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='jquery-ui.css') }}">
-<script>later({{ url_for('static', filename='jquery-ui-sortable.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='jquery-ui-sortable.js')|tojson }})</script>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   whenReady(function(){
     // delegated, so that it also reaches the rows of a pane filled after load
     $(document).on("click", "td.clickable", function(){
@@ -92,7 +92,7 @@ Results for Job: {{ job_info.job_id }}
     window.location.href = "{{ url_for('data.result', job_id=job_info.job_id) }}" + "?custom=" + array2;
   }
 </script>
-<script>
+<script nonce="{{ csp_nonce() }}">
   // A matrix cell's tooltip names both of its samples. That part is the same along a whole
   // row and down a whole column, so it is no longer written into every cell of every matrix
   // (issue #198): a cell carries its score line, a row the line naming its sample, and the
@@ -118,7 +118,7 @@ Results for Job: {{ job_info.job_id }}
 {% block content %}
 
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   var button_clicked = false;
   whenReady(function(){
     var editSampleModal = document.getElementById('editSampleModal');
@@ -192,7 +192,7 @@ Results for Job: {{ job_info.job_id }}
     </div>
   </div>
 </div>
-  <script>
+  <script nonce="{{ csp_nonce() }}">
     function toggle_delete_sample(cb) {
     var deleteSampleButton = document.getElementById('button_delete_sample');
     if (cb.checked) {
@@ -272,7 +272,7 @@ Results for Job: {{ job_info.job_id }}
   </div>
 
 <script type="application/json" id="cross-lazy-panes">{{ lazy_panes|tojson }}</script>
-<script>
+<script nonce="{{ csp_nonce() }}">
   // Only the pane shown on load is rendered (issue #182). Any other is built the first time
   // its tab is shown, by cloning the rows and cells of the rendered one - they already carry
   // everything a pair of samples has in common across the methods: links, edit buttons and
