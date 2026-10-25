@@ -88,6 +88,8 @@ STRICT_TRANSPORT_SECURITY = "max-age=86400"
 
 A browser that has seen the header refuses plain HTTP for the host until its `max-age` has run out, so shorten it well before moving a host off HTTPS.
 
+The session cookie is named `__Host-session`, which a browser accepts only from the host itself, over HTTPS, for the whole site. It falls back to `session` when the cookie cannot meet those terms: with `SESSION_COOKIE_SECURE = False` for plain HTTP, with a `SESSION_COOKIE_DOMAIN`, or with a `SESSION_COOKIE_PATH` or `APPLICATION_ROOT` other than `/`. `SESSION_COOKIE_NAME` in `instance/config.py` overrides either.
+
 ### Backend timeout
 
 Every call MCRITweb makes to the MCRIT backend is bounded by `MCRIT_CLIENT_TIMEOUT`, a `(connect, read)` pair in seconds that defaults to `(10, 280)`. Without it a backend that is down or hung held a gunicorn request thread indefinitely, since gunicorn's own timeout does not reclaim a thread under the `gthread` worker. The read bound sits under the 300 s that docker-mcrit's NGINX waits, so a slow backend ends in MCRITweb's error page rather than a proxy 504. Raise both together if long synchronous calls - a whole-corpus import or export through the API passthrough - need more, or set the read to `None` in `instance/config.py` to wait indefinitely. It takes effect with an MCRIT release whose `McritClient` supports a timeout; an older one ignores it.

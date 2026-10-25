@@ -197,6 +197,15 @@ rather than reconstructing it from the commit log at release time.
   docker-mcrit's TLS site already adds the same HSTS value; a browser acts on the first such header,
   MCRITweb's, so change it with `STRICT_TRANSPORT_SECURITY` in `instance/config.py` rather than in
   the proxy, or set that to `None` to leave the header to the proxy. See "HTTPS" in `README.md`.
+- **The session cookie is now `__Host-session`, and everyone has to log in once more after
+  upgrading**, as the session generation change above asks of them anyway. A browser takes a cookie
+  of that name only from the instance's own host, over HTTPS, so a sibling subdomain, or someone in
+  the middle of a plain-HTTP request before the user signs in, can no longer slip them a validly
+  signed session of the attacker's own account, or log them out. **Upgrading:** an instance whose
+  cookie cannot carry the prefix keeps the name `session`: one served over plain HTTP with
+  `SESSION_COOKIE_SECURE = False`, one sharing the cookie across subdomains through
+  `SESSION_COOKIE_DOMAIN`, one under a `SESSION_COOKIE_PATH` or `APPLICATION_ROOT` other than `/`,
+  and one that sets `SESSION_COOKIE_NAME` itself.
 
 ## [1.6.0] - 2026-10-16
 

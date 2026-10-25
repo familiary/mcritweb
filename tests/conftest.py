@@ -331,6 +331,10 @@ def app(tmp_path, fake_mcrit):
             ),
             # mcrit_server_required otherwise makes a real HTTP call to the backend
             "MCRIT_SERVER_PROBE": lambda: True,
+            # the browser tests hand Chromium the session cookie without a Secure flag,
+            # which it refuses under the __Host- name create_app gives it otherwise;
+            # testAppConfig.py and testSessionCookieBrowser.py cover that name
+            "SESSION_COOKIE_NAME": "session",
         },
         instance_path=str(instance_path),
     )

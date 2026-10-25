@@ -170,6 +170,8 @@ def create_app(test_config=None, instance_path=None):
         # is never sent back and login fails with nothing to point at. Set it explicitly
         # in instance/config.py to override either way.
         SESSION_COOKIE_SECURE=not app.debug,
+        # named once the config has loaded, from what the cookie can carry - see below
+        SESSION_COOKIE_NAME=None,
         # Werkzeug rejects a larger body with 413 before buffering it. This is a ceiling
         # on absurdity rather than a tuned limit: it applies to every route uniformly,
         # and /data/import takes whole-corpus exports, so it has to clear those. The
@@ -316,6 +318,19 @@ def create_app(test_config=None, instance_path=None):
     # after the config has loaded, so an explicit key in instance/config.py wins
     if app.config['SECRET_KEY'] == INSECURE_DEFAULT:
         app.config['SECRET_KEY'] = load_or_create_secret_key(app.instance_path)
+
+    # The session cookie is __Host-session where it can be, which a browser takes only from
+    # this host, over HTTPS, for the whole site. Under a plain name, a sibling subdomain -
+    # or anyone in the middle of a plain-HTTP request to this host before the user signs
+    # in - can set a session cookie of their own, validly signed for their own account,
+    # that the browser then sends in place of ours, or one that logs the user out. The
+    # prefix demands Secure, Path=/ and no Domain, so a cookie without all three - plain
+    # HTTP with SESSION_COOKIE_SECURE = False, shared across subdomains, under a path -
+    # keeps "session", as does a name set in instance/config.py.
+    if app.config['SESSION_COOKIE_NAME'] is None:
+        cookie_path = app.config['SESSION_COOKIE_PATH'] or app.config['APPLICATION_ROOT']
+        host_only = app.config['SESSION_COOKIE_SECURE'] and not app.config['SESSION_COOKIE_DOMAIN'] and cookie_path == '/'
+        app.config['SESSION_COOKIE_NAME'] = '__Host-session' if host_only else 'session'
 
     csrf = CsrfProtect(app)
     # authenticates by `apitoken` header, never by the session cookie, so a
