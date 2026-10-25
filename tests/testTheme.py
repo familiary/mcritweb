@@ -12,9 +12,9 @@ and the palette that makes it a theme. No browser; testThemeBrowser.py drives th
    <picture> is held by testMatchDiagramThemes.py (which of the four result pages carry it,
    and in which theme its <source> is there) and not repeated here.
 4. ScoreColorProvider's tints.
-5. The palette: static/style.css names every colour (light, the values master had) and
-   static/theme-dark.css gives the same names their dark values; every var() names something
-   defined; the contrast of the dark palette is measured.
+5. The palette: static/style.css names every colour (light, the values master had but for
+   LIGHT_CHANGES) and static/theme-dark.css gives the same names their dark values; every var()
+   names something defined; the contrast of the dark palette is measured.
 6. The ratchet: no colour is written anywhere but in the two palettes. A new colour gets a
    name in both files, or one of the few exceptions below, with its reason.
 
@@ -1547,8 +1547,8 @@ def test_light_status_icons_hold_3_to_1_on_the_worst_tint_and_on_the_picker_rows
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
 def test_the_diagram_caption_is_readable_on_its_placeholder(theme):
-    """"rendering diagram..." shows on the grey box a match diagram fills once it has loaded, so for as
-    long as the diagram is slow; in slategray it was 3.6:1 there."""
+    """The "rendering diagram" caption shows on the grey box a match diagram fills once it has
+    loaded, so for as long as the diagram is slow; in slategray it was 3.6:1 there."""
     def rule(selector):
         return {d.name: d.value for r in light_rules() if selector in themeCss.selectors_of(r) for d in r.declarations}
     caption, box = rule(".mcrit-diagram::before")["color"], rule(".mcrit-diagram")["background-color"]
