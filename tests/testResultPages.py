@@ -1437,8 +1437,9 @@ def test_cached_result_lookup_matches_whole_job_ids_only(app):
     assert find_cached_result_filename(app, "f8b8d2c6f836649a") is None
     assert find_cached_result_filename(app, "") is None
 
-    # a local queue's uuid4 ids have dashes of their own, so the tail of one is also a
-    # "-<id>.json" suffix of the file - only the length tells them apart
+    # the uuid4 ids a local queue issued before mcrit 1.14 have dashes of their own, so
+    # the tail of one is also a "-<id>.json" suffix of the file - only the length tells
+    # them apart
     uuid_job_id = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
     (cache_path / f"20260808-104636-{uuid_job_id}.json").write_text("{}")
     assert find_cached_result_filename(app, uuid_job_id) == f"20260808-104636-{uuid_job_id}.json"
