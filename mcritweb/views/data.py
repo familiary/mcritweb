@@ -706,7 +706,10 @@ def match_functions_diff(function_id_a, function_id_b):
 # download puts it: a cache filename match, a path handed to send_from_directory,
 # and a filename in the Content-Disposition header. Matched with fullmatch rather
 # than `$`, which would also accept a trailing newline - and a newline is exactly
-# what splits a response header in two.
+# what splits a response header in two. Every route that hands a job id from the
+# request to getJobData, getResultForJob or deleteJob checks it too: the backend
+# client puts it into its request path unquoted, where ".." resolves to the
+# backend's root and its answer was read as a job.
 JOB_ID_PATTERN = re.compile(r"[0-9a-fA-F]+")
 
 
@@ -766,6 +769,8 @@ def download_result(job_id):
 @mcrit_server_required
 # TODO:  refactor, simplify
 def result(job_id):
+    if not JOB_ID_PATTERN.fullmatch(job_id):
+        return render_template("result_invalid.html", job_id=job_id)
     client = get_client()
     # check if we have the respective report already locally cached
     result_json = load_cached_result(current_app, job_id)
@@ -1468,6 +1473,8 @@ LINKHUNTABLE_METHODS = (
 @mcrit_server_required
 # TODO:  refactor, simplify
 def linkhunt(job_id):
+    if not JOB_ID_PATTERN.fullmatch(job_id):
+        return render_template("result_invalid.html", job_id=job_id)
     client = get_client()
     # check if we have the respective report already locally cached
     result_json = load_cached_result(current_app, job_id)
@@ -1825,7 +1832,7 @@ def job_by_id(job_id):
     auto_refresh = parse_integer_query_param(request, "refresh") or 0
     auto_forward = parse_integer_query_param(request, "forward") or 0
 
-    job_info = client.getJobData(job_id)
+    job_info = client.getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if auto_refresh and job_info and job_info.is_failed:
         auto_refresh = 0
         suppress_processing_message = True
@@ -1916,7 +1923,7 @@ def job_overview_state(job_info):
 @mcrit_server_required
 def job_status(job_id):
     """The job overview's polling endpoint: one getJobData, as JSON."""
-    job_info = get_client().getJobData(job_id)
+    job_info = get_client().getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if job_info is None:
         return {"error": "unknown job"}, 404
     return job_overview_state(job_info)
@@ -1973,7 +1980,7 @@ def delete_job_by_id(job_id):
         if jobs:
             for job in jobs:
                 client.deleteJob(job.job_id)
-    else:
+    elif JOB_ID_PATTERN.fullmatch(job_id):
         client.deleteJob(job_id)
     return redirect(url_for("data.jobs"))
     
@@ -2050,6 +2057,13 @@ def submit_or_query():
     return "", 400 # Bad Request
 
 
+#: The shape of the `sha256` an .smda report declares. smda copies that field as it
+#: finds it, and McritClient.getSampleBySha256 puts it into the request path unquoted,
+#: so "../../rebuild_index" asked the backend for an admin-only route instead.
+#: `\Z` rather than `$`, which would also match before a trailing newline.
+SMDA_SHA256 = re.compile(r"^[0-9a-fA-F]{64}\Z")
+
+
 @bp.route('/submit',methods=('GET', 'POST'))
 @contributor_required
 @mcrit_server_required
@@ -2076,6 +2090,11 @@ def submit():
             content_as_dict = json.loads(binary_content)
             smda_report = SmdaReport.fromDict(content_as_dict)
             upload_sha256 = smda_report.sha256
+            if not isinstance(upload_sha256, str) or not SMDA_SHA256.match(upload_sha256):
+                flash("The SMDA report does not carry a valid sha256.", category='error')
+                return "", 400 # Bad Request
+            # the corpus holds lowercase hashes and both lookups match exactly, as promote_query does
+            upload_sha256 = smda_report.sha256 = upload_sha256.lower()
         else:
             # check here if it is already part of corpus
             upload_sha256 = hashlib.sha256(binary_content).hexdigest()
@@ -2212,7 +2231,7 @@ def query_report_sample_info(client, job_info):
 def promote_query(job_id):
     """Add the file a query was run for to the corpus, without a second upload."""
     client = get_client()
-    job_info = client.getJobData(job_id)
+    job_info = client.getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if job_info is None:
         flash("The given Job ID doesn't exist", category='error')
         return redirect(url_for('data.jobs'))
@@ -2229,7 +2248,11 @@ def promote_query(job_id):
     # corpus is asked about below; what was actually resubmitted is checked against the
     # job descriptor further down instead.
     upload_sha256 = sample_info.get("sha256")
-    upload_sha256 = upload_sha256.lower() if isinstance(upload_sha256, str) else None
+    # an .smda query's report declares this value itself - see SMDA_SHA256
+    if isinstance(upload_sha256, str) and SMDA_SHA256.match(upload_sha256):
+        upload_sha256 = upload_sha256.lower()
+    else:
+        upload_sha256 = None
     if upload_sha256 is None:
         flash('The report of this query does not record which file it was run for, so it cannot be promoted.', category='error')
         return redirect(result_page)
