@@ -61,8 +61,8 @@ Results for Job: {{ job_info.job_id }}
 <p>selection: {{ funp.max_value }}, showing: {{ 1 + funp.start_index }} - {{ funp.end_index }} (filtered: {{ matching_result.num_original_function_matches - funp.max_value}})</p>
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#function-matches" method='GET'>
   <div class="form-group row">
-    <input type="hidden" id="samid" name="samid" value="{{ samid }}">
-    <input type="hidden" id="funp" name="funp" value="{{ funp.page }}">
+    <input type="hidden" name="samid" value="{{ samid }}">
+    <input type="hidden" name="funp" value="{{ funp.page }}">
     {{ filter_field("filter_function_min_score", "Min. score", matching_result.getFilterValue("filter_function_min_score"), placeholder="0-100", kind="score") }}
     {{ filter_field("filter_function_max_score", "Max. score", matching_result.getFilterValue("filter_function_max_score"), placeholder="0-100", kind="score") }}
     <input class="col-1" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" {% if matching_result.getFilterValue("filter_exclude_library") %}checked{% endif %}>

@@ -355,3 +355,40 @@ def test_a_page_that_edits_samples_still_has_its_dialog(client, as_role):
     as_role("contributor")
     ids = Tags(page_of(client, "/explore/samples")).ids()
     assert ids.count("editSampleModal") == 1
+
+
+def result_variants():
+    matches, versus = job_id_of("matches_for_sample"), job_id_of("matches_for_sample_vs")
+    return [f"/data/result/{job_id_of(report)}" for report in
+            ["matches_for_sample", "matches_for_sample_vs", "matches_for_query", "cross_compare", "unique_blocks"]] + [
+        # a family's page prints two filter forms, one over its samples and one over its functions
+        f"/data/result/{matches}?famid=1",
+        f"/data/result/{matches}?famid=1&filter_direct_min_score=10&filter_function_min_score=10&filter_unique_only=on",
+        f"/data/result/{matches}?famid=1&samp=1&funp=2&funl=10",
+        f"/data/result/{versus}?samid=3",
+        f"/data/result/{versus}?samid=3&funp=1",
+        f"/data/result/{matches}?funid=2",
+        f"/data/result/{matches}?funid=2&funp=1",
+    ]
+
+
+@pytest.mark.parametrize("path", result_variants())
+def test_no_id_is_used_twice_on_a_result_page(client, as_role, path):
+    """The family page printed its samples filter and its functions filter with the same
+    hidden `famid`, `samp` and `funp` inputs, ids included, so an id lookup (a label's `for`,
+    a script, a fragment) found the first form's whichever one it meant. The hidden inputs
+    are read by name."""
+    as_role("contributor")
+    counts = collections.Counter(Tags(page_of(client, path)).ids())
+    assert [name for name, count in counts.items() if count > 1] == []
+
+
+def test_the_family_filters_still_carry_the_position_by_name(client, as_role):
+    """Dropping the ids must not drop the values: each filter form submits where the reader is."""
+    as_role("contributor")
+    html = page_of(client, f"/data/result/{job_id_of('matches_for_sample')}?famid=1&samp=1&funp=2")
+    carried = [dict(attrs) for tag, attrs in Tags(html).tags if tag == "input" and dict(attrs).get("type") == "hidden"
+               and "id" not in dict(attrs)]
+    names = collections.Counter(field["name"] for field in carried if field["name"] in ("famid", "samp", "funp"))
+    assert names == {"famid": 2, "samp": 2, "funp": 2}
+    assert {field["name"]: field["value"] for field in carried if field["name"] != "csrf_token"} == {"famid": "1", "samp": "1", "funp": "2"}

@@ -33,9 +33,9 @@ Results for Job: {{ job_info.job_id }}
 <p>total: {{ samp.max_value }}{% if samp.max_value > 0 %}, showing: {{ 1 + samp.start_index }} - {{ samp.end_index }}{% endif %} (filtered: {{ matching_result.num_original_sample_matches - samp.max_value}})</p>
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#family-matches" method='GET'>
   <div class="form-group row">
-    <input type="hidden" id="famid" name="famid" value="{{ famid }}">
-    <input type="hidden" id="samp" name="samp" value="{{ samp.page }}">
-    <input type="hidden" id="funp" name="funp" value="{{ funp.page }}">
+    <input type="hidden" name="famid" value="{{ famid }}">
+    <input type="hidden" name="samp" value="{{ samp.page }}">
+    <input type="hidden" name="funp" value="{{ funp.page }}">
     {{ filter_field("filter_direct_min_score", "Min. direct score", matching_result.getFilterValue("filter_direct_min_score"), placeholder="0-100", kind="score") }}
     {{ filter_field("filter_direct_nonlib_min_score", "Min. nonlib direct score", matching_result.getFilterValue("filter_direct_nonlib_min_score"), placeholder="0-100", kind="score") }}
     {{ filter_field("filter_frequency_min_score", "Min. frequency score", matching_result.getFilterValue("filter_frequency_min_score"), placeholder="0-100", kind="score") }}
@@ -75,9 +75,9 @@ Results for Job: {{ job_info.job_id }}
 <p>selection: {{ funp.max_value }}, showing: {{ 1 + funp.start_index }} - {{ funp.end_index }} (filtered: {{ num_original_aggregated_functions - funp.max_value}})</p>
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#function-matches" method='GET'>
   <div class="form-group row">
-    <input type="hidden" id="famid" name="famid" value="{{ famid }}">
-    <input type="hidden" id="samp" name="samp" value="{{ samp.page }}">
-    <input type="hidden" id="funp" name="funp" value="{{ funp.page }}">
+    <input type="hidden" name="famid" value="{{ famid }}">
+    <input type="hidden" name="samp" value="{{ samp.page }}">
+    <input type="hidden" name="funp" value="{{ funp.page }}">
     {{ filter_field("filter_function_min_score", "Min. score", matching_result.getFilterValue("filter_function_min_score"), placeholder="0-100", kind="score") }}
     {{ filter_field("filter_function_max_score", "Max. score", matching_result.getFilterValue("filter_function_max_score"), placeholder="0-100", kind="score") }}
     {{ filter_field("filter_min_num_samples", "Min. samples", matching_result.getFilterValue("filter_min_num_samples"), kind="count") }}
