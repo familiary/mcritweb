@@ -515,6 +515,7 @@ textarea.form-control{min-height:calc(1.5em + (0.75rem + 2px))}
 .bg-white{background-color:#fff!important}
 .bg-transparent{background-color:transparent!important}
 .bg-gradient{background-image:var(--bs-gradient)!important}
+.rounded{border-radius:0.25rem!important}
 .visible{visibility:visible!important}
 .invisible{visibility:hidden!important}
 @media (min-width:768px){.d-md-block{display:block!important}.d-md-none{display:none!important}.mt-md-auto{margin-top:auto!important}}
