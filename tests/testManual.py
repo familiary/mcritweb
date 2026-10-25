@@ -271,4 +271,4 @@ def test_the_manual_s_lines_are_at_most_80_characters_long():
     measures them."""
     css = (pathlib.Path(__file__).resolve().parents[1] / "mcritweb" / "static" / "style.css").read_text()
 
-    assert re.search(r"\.manual :is\(p, li, blockquote, dd\)\s*\{\s*max-inline-size:\s*80ch;", css)
+    assert re.search(r"\.manual :is\(p, li, blockquote, dd\):not\(:has\(> img\)\)\s*\{\s*max-inline-size:\s*80ch;", css)

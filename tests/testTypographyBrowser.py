@@ -65,12 +65,26 @@ def test_the_manual_s_lines_are_at_most_80_characters_long(open_page, live_serve
     the start of the next line."""
     page = open_page(live_server + "/help", 1920, height=1080)
     longest = page.evaluate(
-        "() => Math.max(...[...document.querySelectorAll('.manual p, .manual li')].map((element) => {"
+        "() => Math.max(...[...document.querySelectorAll('.manual p:not(:has(> img)), .manual li')].map((element) => {"
         " const probe = document.createElement('span'); probe.textContent = '0'.repeat(100); probe.style.whiteSpace = 'nowrap';"
         " element.appendChild(probe); const ch = probe.getBoundingClientRect().width / 100; probe.remove();"
         " return element.getBoundingClientRect().width / ch; }))"
     )
     assert longest <= 80.5, f"a manual line is {longest:.0f} characters wide"
+
+
+def test_the_manual_s_screenshots_keep_the_width_of_the_page(open_page, live_server):
+    """The manual's pictures sit in a paragraph each, and a paragraph held to 80
+    characters held its picture to it: the screenshots were 640px of a 1,116px column,
+    their lettering too small to read. A picture is as wide as it is, or as its column."""
+    page = open_page(live_server + "/help", 1280)
+    narrow = page.evaluate(
+        "() => { const manual = document.querySelector('.manual'); const style = getComputedStyle(manual);"
+        " const column = manual.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);"
+        " return [...document.querySelectorAll('.manual img')].map((image) => [image.alt, Math.round(image.getBoundingClientRect().width), Math.min(Number(image.getAttribute('width')), column)])"
+        ".filter(([, shown, wanted]) => shown < wanted - 2); }"
+    )
+    assert narrow == [], narrow
 
 
 def test_the_pages_are_set_in_the_font_they_always_were(open_page, live_server):
