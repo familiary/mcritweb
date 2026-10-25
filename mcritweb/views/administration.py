@@ -273,15 +273,9 @@ def change_user_role(user_id, role, tab):
 @bp.route('/delete_user/<int:user_id>/<tab>', methods=('POST',))
 @admin_required
 def delete_user(user_id, tab = None):
-    # root user is not deletable
-    if user_id == 1:
-        return redirect(url_for('admin.users', tab=tab))
-    # others can be deleted, along with everything keyed to them
-    database = db.get_db()
-    database.execute("DELETE FROM user_filters WHERE user_id = ?;", (user_id,))
-    database.execute("DELETE FROM user_column_settings WHERE user_id = ?;", (user_id,))
-    database.execute("DELETE FROM user WHERE id = ?;", (user_id,))
-    database.commit()
+    # root user is not deletable, which db.delete_user refuses; others are deleted along
+    # with everything keyed to them
+    db.delete_user(user_id)
     return redirect(url_for('admin.users', tab=tab))
 
 
