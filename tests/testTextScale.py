@@ -72,10 +72,15 @@ def test_no_project_stylesheet_sets_the_root_font_size(name):
 def test_the_tooltips_follow_the_text_size():
     """hint.css is vendored and sets 12px on a 12px line; style.css loads before it, so the
     override needs the extra :root to win, as theme-dark.css's does."""
-    rule = re.search(r":root \[data-hint\]::after\s*\{([^}]*)\}", STYLESHEET.read_text())
-    assert rule
-    assert re.search(r"font-size:\s*0\.75rem", rule.group(1))
-    assert re.search(r"line-height:\s*1;", rule.group(1))
+    # the rule that sizes the text, of the several that may change a tooltip
+    rules = re.findall(r":root \[data-hint\]::after\s*\{([^}]*)\}", STYLESHEET.read_text())
+    sized = [rule for rule in rules if "font-size" in rule]
+    assert len(sized) == 1, sized
+    assert re.search(r"font-size:\s*0\.75rem", sized[0])
+    # unitless, so the line grows with the text, and more than one line's worth, since a
+    # tooltip that wraps sets its lines on top of each other at 1
+    line = re.search(r"line-height:\s*(\d+(?:\.\d+)?);", sized[0])
+    assert line and float(line.group(1)) >= 1.3, sized[0]
 
 
 def test_the_copy_button_grows_with_its_icon():

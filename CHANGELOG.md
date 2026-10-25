@@ -125,6 +125,8 @@ rather than reconstructing it from the commit log at release time.
   pixels and so would not have grown - the score tooltips, the cross compare matrix's labels, the
   login fields - is sized in `rem` instead, and a copy button grows with its icon instead of
   clipping it; it is at least 24px square, up from 16px.
+  The tooltips take a line height of 1.4 instead of 1, so one that wraps onto several lines stays
+  readable.
 - On a phone, a tablet or a window under 1200px wide, a result page lays out its function matches
   only when they are scrolled near, in browsers that support `content-visibility`. With 250 rows a
   page that halves the layout and style work before the page is first shown (2.7 s to 1.0 s of

@@ -605,7 +605,9 @@ main #xcfg_text_right {
 }
 :root [data-hint]::after {
   font-size: 0.75rem;
-  line-height: 1;
+  /* unitless, so it scales with the text; more than hint.css's single line, since tooltips
+     wrap and at 1 their lines sit on top of each other */
+  line-height: 1.4;
 }
 
 /* The yes and no of an icon or a message: green and dark red, and their dark-theme values
