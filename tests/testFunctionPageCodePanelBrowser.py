@@ -39,17 +39,17 @@ def _open(page, live_server, answer):
 def test_the_code_is_shown_before_any_lookup_answers(browser_page, live_server):
     held = []
     errors = _open(browser_page, live_server, lambda route: held.append(route))
-    browser_page.wait_for_function("document.querySelectorAll('#text_code p').length > 0")
+    browser_page.wait_for_function("() => document.querySelectorAll('#text_code p').length > 0")
     first_lines = browser_page.evaluate(PANEL)
     assert held, "the panel sent no block lookups"
     assert first_lines.count(">>> Matches: looking up...") == len(held)
     top = browser_page.evaluate(LAST_BLOCK_TOP)
 
     held[0].continue_()
-    browser_page.wait_for_function("[...document.querySelectorAll('#text_code p')].some((p) => /^>>> Matches: \\d+ families/.test(p.textContent))")
+    browser_page.wait_for_function("() => [...document.querySelectorAll('#text_code p')].some((p) => /^>>> Matches: \\d+ families/.test(p.textContent))")
     for route in held[1:]:
         route.continue_()
-    browser_page.wait_for_function("![...document.querySelectorAll('#text_code p')].some((p) => p.textContent.startsWith('>>> Matches: looking up'))")
+    browser_page.wait_for_function("() => ![...document.querySelectorAll('#text_code p')].some((p) => p.textContent.startsWith('>>> Matches: looking up'))")
     answered = browser_page.evaluate(PANEL)
     assert len(answered) == len(first_lines)
     assert sum(line.startswith(">>> Matches: ") for line in answered) == len(held)
@@ -60,7 +60,7 @@ def test_the_code_is_shown_before_any_lookup_answers(browser_page, live_server):
 
 def test_a_failed_lookup_leaves_its_block_without_a_match_line(browser_page, live_server):
     errors = _open(browser_page, live_server, lambda route: route.fulfill(status=404, body=""))
-    browser_page.wait_for_function("document.querySelectorAll('#text_code p').length > 0")
-    browser_page.wait_for_function("![...document.querySelectorAll('#text_code p')].some((p) => p.textContent.startsWith('>>> Matches'))")
+    browser_page.wait_for_function("() => document.querySelectorAll('#text_code p').length > 0")
+    browser_page.wait_for_function("() => ![...document.querySelectorAll('#text_code p')].some((p) => p.textContent.startsWith('>>> Matches'))")
     assert errors == []
 

@@ -102,7 +102,7 @@ def test_the_layout_worker_takes_dagre_from_the_request_the_page_made(browser_pa
     browser_page.goto(f"{live_server}/explore/functions/84")
     browser_page.evaluate("document.getElementById('xcfg_top').scrollIntoView()")
     browser_page.wait_for_selector("#graphContainer g.node", state="attached")
-    browser_page.wait_for_function("!document.getElementById('showCycles').disabled")
+    browser_page.wait_for_function("() => !document.getElementById('showCycles').disabled")
     assert any("layout_worker.js" in url for url in browser_page.requested), "the graph was not laid out in the worker"
     dagre = [url for url in browser_page.requested if "dagre-d3.min.js" in url]
     assert len(dagre) >= 2 and len(set(dagre)) == 1, dagre
