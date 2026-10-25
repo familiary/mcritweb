@@ -9,6 +9,20 @@
 // A radio changed before this has run changes nothing at once: the ready handler below
 // then sets the fields from the radios, as it does for a page the browser restores.
 
+// The slides below are jQuery's, and jQuery's effects take no notice of
+// prefers-reduced-motion. jQuery.fx.off makes every effect jump to where it would have ended;
+// it is set from the preference, and set again when the preference changes while the page is
+// open. Here because this file is the project's only user of jQuery's effects, and it runs
+// after jQuery has (ADR-0021).
+(function () {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    function followThePreference() {
+        jQuery.fx.off = reduce.matches;
+    }
+    followThePreference();
+    reduce.addEventListener("change", followThePreference);
+})();
+
 function show_extended(x) {
     if (x.checked && window.jQuery) {
         $(document.getElementById("extendedFields")).slideDown();

@@ -152,6 +152,9 @@ rather than reconstructing it from the commit log at release time.
   were painted in full-strength colours with white text, 2.1:1 on the orange; the colour now shows
   at half strength under the page's own text colour, 6.9:1 or more, as the dark theme already did
   with its values.
+- The upload form's extra fields open and close at once, instead of sliding, for a reader who has
+  asked the system for reduced motion; jQuery's slides took no notice of the setting. A change of
+  the setting is followed while the page is open.
 
 ### Security
 
