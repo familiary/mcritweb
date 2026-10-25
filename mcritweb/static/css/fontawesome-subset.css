@@ -696,6 +696,10 @@
   content: "\f104"; }
 
 
+.fa-triangle-exclamation::before {
+  content: "\f071"; }
+
+
 .fa-times-circle::before {
   content: "\f057"; }
 
