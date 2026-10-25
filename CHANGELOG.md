@@ -187,6 +187,8 @@ rather than reconstructing it from the commit log at release time.
   bitness, the registration's operation mode and the function comparison's graph view, and the
   search page's "search in" checkboxes. A screen reader announced "Dumped, radio button" without the
   question it answers.
+- The family type-ahead tells a screen reader what it is and what it found: the field is a combobox
+  controlling the list of suggestions, and how many there are is announced as they arrive.
 
 ### Security
 

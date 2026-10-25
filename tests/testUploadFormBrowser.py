@@ -206,3 +206,29 @@ def test_moving_the_minhash_slider_says_its_new_setting(open_page, path, slider)
     # and it is drawn as focused: Bootstrap takes the outline away and leaves a faint halo
     assert page.evaluate(f"() => getComputedStyle(document.querySelector('{slider}')).outlineStyle") != "none"
     assert page.errors == []
+
+
+def test_the_family_type_ahead_is_a_combobox_that_says_how_many_it_suggests(open_page):
+    """The widget built a dropdown of buttons and said nothing: a screen reader heard no
+    "suggestions available", and the field was not known to control a list at all."""
+    page = open_page("/data/submit")
+    page.focus("#family")
+    with page.expect_response("**/explore/familyNames*"):
+        page.keyboard.type("win")
+    page.wait_for_selector("#family-suggestions .dropdown-item")
+    # the status is written once the answer is in, right after the suggestions are
+    page.wait_for_function("() => document.querySelector('#family ~ [role=status]').textContent !== ''")
+
+    field = page.evaluate("""() => { const field = document.getElementById('family');
+        return [field.getAttribute('role'), field.getAttribute('aria-autocomplete'), field.getAttribute('aria-controls')]; }""")
+    assert field == ["combobox", "list", "family-suggestions"]
+    assert page.get_attribute("#family-suggestions", "role") == "listbox"
+    options = page.evaluate("() => [...document.querySelectorAll('#family-suggestions .dropdown-item')].map((item) => item.getAttribute('role'))")
+    assert options == ["option"] * len(options) and len(options) == 3, options
+    assert page.inner_text("#family ~ [role=status]") == "3 family suggestions"
+    assert page.get_attribute("#family", "aria-expanded") == "true"
+
+    with page.expect_response("**/explore/familyNames*"):
+        page.keyboard.type("zzz")
+    page.wait_for_function("() => document.querySelector('#family ~ [role=status]').textContent === 'No family suggestions'")
+    assert page.errors == []
