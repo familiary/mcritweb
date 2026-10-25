@@ -25,6 +25,13 @@ live_server = harness.live_server
 browser_page = harness.browser_page
 FUNCTION_A = harness.FUNCTION_A
 
+
+def scroll_to_the_graph(page):
+    """The page loads its graph viewer once the graph comes into view, and the graph starts
+    below the first screen."""
+    page.evaluate("document.getElementById('xcfg_top').scrollIntoView()")
+
+
 THRESHOLD_RE = re.compile(r"var CFG_DEFERRED_LAYOUT_BLOCKS = \d+;")
 # where a failing layout is injected: the start of showGraph(), and a line it runs after it has
 # built the code panel - which it skips when the panel came first
@@ -74,6 +81,7 @@ def _open(page, live_server, errors):
     page.on("console", lambda message: errors.append("console: " + message.text)
             if message.type == "error" and not message.text.startswith("Failed to load resource") else None)
     page.goto(f"{live_server}/explore/functions/{FUNCTION_A}")
+    scroll_to_the_graph(page)
     page.wait_for_function("document.querySelectorAll('#text_code p').length > 0")
 
 
