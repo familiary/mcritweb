@@ -333,9 +333,13 @@ def test_the_move_buttons_are_not_in_the_page_but_made_by_the_script(client, as_
     as_role("contributor")
     settings = client.get("/settings").get_data(as_text=True)
     assert "data-reorder=" not in settings
-    assert "<button" not in settings[settings.index('id="pills-column-settings"'):settings.index('<button id="saveButton"')]
-    assert len(settings.encode()) < 48_000
-    assert settings.count("data-reorder-item") > 0
+    columns = settings[settings.index('id="pills-column-settings"'):settings.index('<button id="saveButton"')]
+    assert "<button" not in columns
+    # what the buttons cost, per item and not for the whole page, which other forms on it
+    # also grow: about 990 bytes an item with them, under 200 without
+    items = columns.count("data-reorder-item")
+    assert items > 0
+    assert len(columns.encode()) / items < 300
 
     cross = client.get(f"/data/result/{job_id_of('cross_compare')}").get_data(as_text=True)
     assert "data-reorder=" not in cross
