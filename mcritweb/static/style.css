@@ -621,3 +621,24 @@ main #xcfg_text_right {
 .settings-columns {
   justify-content: space-between;
 }
+
+/* The labels of a table of fields keep their words. A table breaking a long value at any
+   point (above) is sized from the narrowest its cells can be, which for `anywhere` is one
+   letter, so the label column was squeezed until "Registration:" broke after the "n" and
+   "Instructions:" after the "Ins". The label cells, the first of a row, are at least as
+   wide as the longest word a label has, and a value as a number of eight digits, and the
+   rest of a value gives up the width instead.
+   The tables that compare samples or functions side by side hold more than a phone has
+   room for even then, below about 360px: they sit in a box that scrolls them there, and
+   in the box they break a long value as well, rather than scrolling at once. */
+.table-wrap > table :is(td, th) {
+  overflow-wrap: anywhere;
+}
+table.table:not(.table-scroll > table) :is(td, th):first-child,
+.table-wrap > table :is(td, th):first-child {
+  min-width: 14ch;
+}
+table.table:not(.table-scroll > table) :is(td, th):not(:first-child),
+.table-wrap > table :is(td, th):not(:first-child) {
+  min-width: 10ch;
+}

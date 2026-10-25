@@ -14,6 +14,7 @@
   {% for name_and_sample in varargs %}
     {% if name_and_sample[1].sample_id is not none and name_and_sample[1].sample_id >= 0 %}{% set identity.is_stored = true %}{% endif %}
   {% endfor %}
+  <div class="table-scroll table-wrap">
   <table class="table table-hover">
     <thead class="table-light">
       <tr>
@@ -86,10 +87,12 @@
       </tr>
     </tbody>
   </table>
+  </div>
 {% endmacro %}
 
 
 {% macro function_column_table()%}
+  <div class="table-scroll table-wrap">
   <table class="table table-hover">
     <thead class="table-light">
       <tr>
@@ -198,6 +201,7 @@
       </tr>
     </tbody>
   </table>
+  </div>
 {% endmacro %}
 
 

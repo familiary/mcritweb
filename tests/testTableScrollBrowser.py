@@ -242,6 +242,41 @@ def test_a_table_of_fields_breaks_a_long_value_and_the_page_stays_the_width_of_t
         assert shifted == 0, f"{path} shifted at {width}px: {moved}"
 
 
+#: the words of a table of fields that are cut across two lines: a word of at most 13
+#: characters, which is no token to break (a hash, an id) but a label or a number
+BROKEN_WORDS = """() => {
+    const broken = [];
+    const cells = 'table.table:not(.table-scroll > table) td, table.table:not(.table-scroll > table) th, .table-wrap td, .table-wrap th';
+    document.querySelectorAll(cells).forEach((cell) => {
+        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            for (const word of node.data.matchAll(/\\S+/g)) {
+                if (word[0].length > 13) continue;
+                const range = document.createRange();
+                range.setStart(node, word.index);
+                range.setEnd(node, word.index + word[0].length);
+                if (range.getClientRects().length > 1) broken.push(word[0]);
+            }
+        }
+    });
+    return [...new Set(broken)];
+}"""
+
+
+@pytest.mark.parametrize("path", FIELD_PAGES + ["/settings"])
+def test_a_table_of_fields_keeps_its_labels_and_numbers_whole(open_page, live_server, path):
+    """Letting a table break a long value anywhere sizes it from one letter a cell, and the
+    label column was squeezed to 52px: "Username:" broke after the "n" and "Instructions:"
+    after the "Ins", on the settings page and the samples' and functions' pages at 390px.
+    The long values give up the width; the words and numbers of the rest do not."""
+    url = live_server + (path if path.startswith("/") else f"/data/result/{job_id_of(path)}")
+    for width in NARROW_WIDTHS[:3]:
+        page = open_page(url, width)
+        assert page.evaluate(BROKEN_WORDS) == [], f"{path} at {width}px"
+        scroll_width, client_width = page.evaluate(PAGE_WIDTH)
+        assert scroll_width <= client_width, f"{path} is {scroll_width}px wide in a {client_width}px window"
+
+
 def test_the_api_token_breaks_on_the_settings_page(app, open_page, live_server):
     """The settings page was 641px wide at 390px: the 64 characters of the token in one
     line of a two-column table."""
@@ -258,7 +293,7 @@ def test_the_api_token_breaks_on_the_settings_page(app, open_page, live_server):
 
 
 #: the function matches of a sample's 1:N result: 100 rows, 3,900px at 1280px
-LONG_TABLE = "() => document.querySelectorAll('.table-scroll table')[2]"
+LONG_TABLE = "() => document.querySelector('.table-deferred table')"
 
 
 def test_on_a_wide_screen_the_headings_of_a_long_table_stay_in_view(open_page, live_server):

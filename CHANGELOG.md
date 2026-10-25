@@ -157,7 +157,10 @@ rather than reconstructing it from the commit log at release time.
   open over the edge of the box rather than being cut off by it.
 - The tables that list the fields of one thing - a sample, a function, a job, the settings - break a
   long value onto the next line instead of pushing the page wider than a phone: the 64-character API
-  token on the settings page, a long filename, a 37-character statistics field.
+  token on the settings page, a long filename, a 37-character statistics field. The labels of those
+  tables keep their words whole ("Registration:", not "Registratio" and "n:"), and the tables that
+  put samples or functions side by side scroll in a box of their own below 1200px where a 320px
+  window leaves them too little room.
 - A cross compare matrix wider than the window can be scrolled back to its first column. Centred
   in its pane, it overflowed on both sides, and the index, hash and copy button of every row sat to
   the left of where the scrollbar could go: on a phone always, on a desktop from about 40 samples.

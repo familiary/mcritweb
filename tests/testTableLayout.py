@@ -98,7 +98,7 @@ TABLES_THAT_WRAP = {
     "settings.html": 1,
     "single_query_sample.html": 2,
     "statistics.html": 1,
-    "table/column_table.html": 3,
+    "table/column_table.html": 1,
     "table/function_details.html": 3,
     "table/matching_statistics_table.html": 1,
 }
