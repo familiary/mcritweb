@@ -177,3 +177,40 @@ def test_decorative_generated_text_is_not_in_the_accessibility_tree(page, live_s
     drawn = page.evaluate("""() => [".breadcrumb-item + .breadcrumb-item", ".mcrit-diagram"].map(
         (selector) => getComputedStyle(document.querySelector(selector), "::before").content)""")
     assert drawn == ['"/" / ""', '"rendering diagram\u2026" / ""']
+
+
+#: the page's layout shifts from its first paint on, as Lighthouse adds them up
+COUNT_LAYOUT_SHIFTS = """
+window.mcritShifted = 0;
+new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) { window.mcritShifted += entry.value; }
+}).observe({type: "layout-shift", buffered: true});
+"""
+
+
+@pytest.mark.parametrize("path", ["/", "/settings"])
+def test_the_first_tab_shows_the_skip_link_and_enter_moves_past_the_navbar(page, live_server, path):
+    open_page(page, f"{live_server}{path}")
+    page.evaluate(COUNT_LAYOUT_SHIFTS)
+    page.wait_for_timeout(200)
+    page.evaluate("window.mcritShifted = 0")
+    skip = page.locator("a.skip-link")
+    clip = "() => getComputedStyle(document.querySelector('a.skip-link')).clipPath"
+    assert page.evaluate(clip) == "inset(50%)"
+    hidden = skip.bounding_box()
+    main_before = page.locator("main").bounding_box()
+
+    page.keyboard.press("Tab")
+
+    assert page.evaluate("document.activeElement.className") == "skip-link"
+    assert page.evaluate(clip) == "none"
+    shown = skip.bounding_box()
+    assert (shown["x"], shown["y"]) == (hidden["x"], hidden["y"])
+    assert shown["width"] > 100 and shown["height"] > 20 and shown["x"] < 20 and shown["y"] < 20
+    assert page.locator("main").bounding_box() == main_before
+    page.keyboard.press("Enter")
+    assert page.evaluate("document.activeElement.id") == "content"
+    page.keyboard.press("Tab")
+    assert page.evaluate("document.activeElement.closest('main') !== null")
+    assert page.evaluate("window.mcritShifted") == 0
+    assert page.errors == []

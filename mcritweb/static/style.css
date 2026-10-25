@@ -407,3 +407,27 @@ form.form-inline input {
 .breadcrumb-item + .breadcrumb-item::before {
   content: "/" / "";
 }
+
+/* The skip link is out of sight until the keyboard reaches it, and then sits over the top
+   left corner. It is out of the flow, and its box starts in the same place in both states,
+   padding and border included, so neither the page nor the link's text moves when it
+   appears; only its clip and size change. Its colours are its own, so its contrast does
+   not depend on what it lies over. */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 2001;
+  padding: 0.5rem 1rem;
+  color: var(--link);
+  background-color: var(--surface-page);
+  border: 1px solid var(--accent);
+}
+
+.skip-link:where(:not(:focus-within, :active)) {
+  clip-path: inset(50%);
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  white-space: nowrap;
+}

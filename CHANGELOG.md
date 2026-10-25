@@ -65,6 +65,11 @@ rather than reconstructing it from the commit log at release time.
   too. A role with a query upload cap - by default a visitor - reruns only its own queries, since a
   stored query may be larger than that role could have uploaded. With an older one it is offered on
   the 1vsN, 1vs1 and cross compare jobs it can rebuild from their parameters.
+- A "Skip to main content" link is the first stop of the Tab key on every page, shown only while it
+  has focus, so keyboard users no longer cross the logos and menus to reach a page's content. The
+  navbar, the jobs page's category bar and every pager are named navigation landmarks, the search
+  boxes are search landmarks, and the current page of a pager, the current compare picker and the
+  current job category are announced as current rather than shown by colour alone.
 
 ### Changed
 

@@ -150,10 +150,12 @@ Unique Blocks
   {{ pagination_widget(pagination_selected, _js_argument_provider="fetchState") }}
   {% endif %}
   <br>
+  <search>
   <form style="width:100%" id="unique_blocks_search_form">
       <input type="text" class="form-control shadow-none" name="query" value="{{ query }}" id="Search" placeholder="Search" autofocus autocomplete="on">
       <input type='submit' hidden>
   </form>
+  </search>
 
   {% if samples %}
   {{ set_pagination_params(pagination, _anchor="Search", _js_argument_provider="fetchState") }}

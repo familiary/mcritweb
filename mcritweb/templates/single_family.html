@@ -15,10 +15,12 @@ Family: {{ family.family }}
 {% block content %}
 <h1>Family: {{ family.family }}</h1>
 
+  <search>
   <form style="width:100%" method="GET" required action="#" data-live-search="family-samples">
     <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" aria-label="Search this family's samples" aria-controls="family-samples" autofocus autocomplete="on">
     <input type='submit' hidden>
   </form>
+  </search>
   <p id="family-samples-status" class="visually-hidden" role="status"></p>
   <div id="family-samples">
 

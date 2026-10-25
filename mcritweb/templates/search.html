@@ -31,6 +31,7 @@ Search
   {% endfor %}
 
   
+  <search>
   <form style="width:100%" method="GET" required action="#">
     <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" {% if focus_search.value %}autofocus{% endif %} autocomplete="on">
     <div>
@@ -50,6 +51,7 @@ Search
     </div>
      <input type='submit' hidden>
   </form>
+  </search>
 
   {# tracked so a search that matched nothing can say so instead of rendering a
      heading and then silence - see issue #54. Set inside the three blocks rather than

@@ -91,7 +91,7 @@ Jobs
   </p>
 {% endif %}
 
-  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <nav class="navbar navbar-expand-lg navbar-light bg-light" aria-label="Job categories">
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#first_level_navbar" aria-controls="first_level_navbar" aria-expanded="false" aria-label="Toggle job categories">
       <span class="navbar-toggler-icon"></span>
     </button>
@@ -108,13 +108,13 @@ Jobs
               </a>
               <div class="dropdown-menu" aria-labelledby="navbarDropdown-{{entry['group']}}">
                 {% for subentry in entry["submenu"] %}
-                  <a class="dropdown-item {% if not subentry['available'] %}disabled{% endif %}" href="{{ url_for('data.jobs', active=subentry['name']) }}">{{subentry["title"]}}</a>
+                  <a class="dropdown-item {% if not subentry['available'] %}disabled{% endif %}"{% if subentry['active'] %} aria-current="page"{% endif %} href="{{ url_for('data.jobs', active=subentry['name']) }}">{{subentry["title"]}}</a>
                 {% endfor %}
               </div>
             </li>
           {% else %}
           <li class="nav-item  px-2">
-            <a class="nav-link {% if entry['active'] %}active{% endif %}" href="{{ url_for('data.jobs', active=entry['group']) }}" id="navbar-{{entry['group']}}">
+            <a class="nav-link {% if entry['active'] %}active{% endif %}"{% if entry['active'] %} aria-current="page"{% endif %} href="{{ url_for('data.jobs', active=entry['group']) }}" id="navbar-{{entry['group']}}">
               {{ entry["title"] }}
             </a>
           {% endif %}
@@ -128,6 +128,7 @@ Jobs
       </ul>
     </div>
   </nav>
+  <search>
   <form style="width:100%" method="GET">
     {# carried so searching does not silently drop the category/state you were looking at #}
     {% if active %}<input type="hidden" name="active" value="{{ active }}">{% endif %}
@@ -136,6 +137,7 @@ Jobs
     <input type="text" class="form-control shadow-none" name="Search" id="Search" placeholder="Search jobs" value="{{ query or '' }}" autocomplete="on">
     <input type='submit' hidden>
   </form>
+  </search>
   {% if query and match_count is not none %}
   <p>
     {{ match_count }} job{{ '' if match_count == 1 else 's' }} matching "{{ query }}"

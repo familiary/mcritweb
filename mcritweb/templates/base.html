@@ -181,9 +181,12 @@
   {% endif %}
 </head>
 <body style="font-family: sans-serif">
+  {# the first stop of the Tab key, past the logos and the menus to the page's own content;
+     out of sight until it has focus (style.css) #}
+  <a class="skip-link" href="#content">Skip to main content</a>
   <header>
     <noscript>Please enable JavaScript to use all features of this site. </noscript>
-<nav class="navbar navbar-expand-lg navbar-light">
+<nav class="navbar navbar-expand-lg navbar-light" aria-label="Main">
   <a class="navbar-brand d-none d-md-block" href="{{ url_for('index') }}">
     {{ themed_img(url_for('static', filename='d20_mcrit_cabaret.png'), url_for('static', filename='d20_mcrit_cabaret_dark.png'), class="img-fluid", alt="MCRIT home", width="459", height="150", fetchpriority="high") }}
   </a>
@@ -271,7 +274,7 @@
 </nav>
 
   </header>
-  <main class="content">
+  <main class="content" id="content" tabindex="-1">
       {% for category, message in get_flashed_messages(with_categories=true) %}
         {% if category == 'error' %}
           <div class="alert alert-danger mt-3" role="alert">{{ message }}</div>

@@ -14,6 +14,7 @@ Families
 
 {% block content %}
 <h1>Overview of Families</h1>
+  <search>
   <div class="d-flex align-items-center" style="width:100%">
     <form class="flex-grow-1 me-3" method="GET" required action="#" data-live-search="family-list">
       <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" aria-label="Search families" aria-controls="family-list" autofocus autocomplete="on">
@@ -23,6 +24,7 @@ Families
       <a href="{{ url_for('help') }}#search"><i class="fas fa-book"></i> Search Syntax</a>
     </div>
   </div>
+  </search>
   <p id="family-list-status" class="visually-hidden" role="status"></p>
   <div id="family-list">
 

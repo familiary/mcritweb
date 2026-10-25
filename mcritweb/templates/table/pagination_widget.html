@@ -65,6 +65,7 @@
     {% endif %}
   {%- endmacro -%}
 
+  <nav aria-label="Pagination">
   <ul class="pagination justify-content-center">
     <li class="page-item {% if pagination.page_index == 0 %}disabled{% endif %}">
       <a aria-label="First page" title="First page" class="page-link" {{ _get_href_or_onclick(1, **kwargs) }}><i class="fa-solid fa-angles-left"></i></a>
@@ -73,7 +74,7 @@
       <a aria-label="Previous page" title="Previous page" class="page-link" {{ _get_href_or_onclick(pagination.page - 1, **kwargs) }}><i class="fa-solid fa-angle-left"></i></a>
     </li>
     {% for item in pagination.pages %}
-      <li class="page-item {% if loop.index == pagination.page_index + 1 %}active{% endif %}"><a class="page-link" {{ _get_href_or_onclick(item, **kwargs) }}>{{ item }}</a></li>
+      <li class="page-item {% if loop.index == pagination.page_index + 1 %}active{% endif %}"><a class="page-link" {% if loop.index == pagination.page_index + 1 %}aria-current="page" {% endif %}{{ _get_href_or_onclick(item, **kwargs) }}>{{ item }}</a></li>
     {% endfor %}
     <li class="page-item {% if pagination.pages[pagination.page_index] == pagination.max_page %}disabled{% endif %}">
       <a aria-label="Next page" title="Next page" class="page-link" {{ _get_href_or_onclick(pagination.page + 1, **kwargs) }}><i class="fa-solid fa-angle-right "></i></a>
@@ -89,6 +90,7 @@
       </select>
     </li>
   </ul>
+  </nav>
 {% endmacro %}
 
 
@@ -117,6 +119,7 @@
   {% set params = dict() %}
   {{ params.update(pagination|getattr("_extra_pagination_params", {}))|silent }}
   {{ params.update(**kwargs)|silent }}
+  <nav aria-label="Pagination">
   <ul class="pagination justify-content-center">
     <li class="page-item {% if not pagination.hasBackward %}disabled{% endif %}">
       <a aria-label="First page" title="First page" class="page-link" {{ _get_href_or_onclick('first', **params) }}><i class="fa-solid fa-angles-left"></i></a>
@@ -127,7 +130,7 @@
     {% if pagination.hasBackward %}
       <li class="page-item"><a class="page-link" {{ _get_href_or_onclick('backward', **params) }}>{{ pagination.page-1 }}</a></li>
     {% endif %}
-    <li class="page-item active"><a class="page-link" {{ _get_href_or_onclick('current', **params) }}>{{ pagination.page }}</a></li>
+    <li class="page-item active"><a class="page-link" aria-current="page" {{ _get_href_or_onclick('current', **params) }}>{{ pagination.page }}</a></li>
     {% if pagination.hasForward %}
       <li class="page-item"><a class="page-link" {{ _get_href_or_onclick('forward', **params) }}>{{ pagination.page+1 }}</a></li>
     {% endif %}
@@ -147,6 +150,7 @@
       </select>
     </li>
   </ul>
+  </nav>
 {% endmacro %}
 
 {%- macro cursor_pagination_sort_symbol(pagination, sort_by) -%}
