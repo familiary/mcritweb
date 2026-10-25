@@ -1289,7 +1289,7 @@ def test_in_forced_colours_the_close_cross_of_a_dialog_is_drawn(open_in, theme, 
     page.evaluate("new Promise((resolve) => mcritLoadDropzone(resolve))")
     page.evaluate("$('#submitFileModal').modal('show')")
     page.wait_for_selector("#submitFileModal.show")
-    page.wait_for_function("getComputedStyle(document.querySelector('#submitFileModal')).opacity === '1'")
+    page.wait_for_function("() => getComputedStyle(document.querySelector('#submitFileModal')).opacity === '1'")
     calm(page)
     cross = page.locator("#submitFileModal .btn-close")
     ground = tuple(round(channel) for channel in as_rgb(computed(page, "#submitFileModal .modal-content", "background-color")[0]))
@@ -1470,7 +1470,7 @@ def test_the_blocks_show_cycles_colours_keep_their_text_readable(open_in, theme,
     2.1:1 on the orange, and black text would be 1.8:1 on the darkest; the dark theme already shows
     the colours at 35% under its own text colour."""
     page = open_in(theme, path, ready)
-    page.wait_for_function(f"!document.querySelector('{button}').disabled")
+    page.wait_for_function(f"() => !document.querySelector('{button}').disabled")
 
     page.click(button)
     page.wait_for_selector('g.node[fill="white"]', state="attached")
@@ -1486,7 +1486,7 @@ def test_a_file_waiting_to_be_uploaded_is_drawn_on_the_dark_palette(open_in):
     capsule it paints 90% white (dropzone.min.css), which theme-dark.css's Dropzone rules did not
     reach: a bright bar in the dark preview card of every upload that waits for "Submit"."""
     page = open_in("dark", "/data/submit", ".dropzone")
-    page.wait_for_function("window.Dropzone !== undefined && document.getElementById('myDropzone').dropzone !== undefined")
+    page.wait_for_function("() => window.Dropzone !== undefined && document.getElementById('myDropzone').dropzone !== undefined")
 
     page.evaluate("Dropzone.forElement('#myDropzone').addFile(new File(['MZ'], 'waiting.exe'))")
     page.wait_for_selector(".dropzone .dz-preview .dz-progress")

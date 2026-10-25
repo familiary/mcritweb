@@ -62,7 +62,7 @@ def open_page(app, live_server, make_user):
             page.set_default_timeout(TIMEOUT_MS)
             page.goto(live_server + path)
             # whenReady's handlers have run once jQuery's ready queue has
-            page.wait_for_function("window.jQuery !== undefined && jQuery.isReady && window.bootstrap !== undefined")
+            page.wait_for_function("() => window.jQuery !== undefined && jQuery.isReady && window.bootstrap !== undefined")
             return page
 
         try:
@@ -89,9 +89,9 @@ def test_the_upload_form_follows_a_change_of_the_preference_while_the_page_is_op
     page = open_page("/data/submit", "no-preference")
     page.click("#dumped")
     assert page.evaluate(SLIDING, "#extendedFields")[0], "without a preference the fields slide, as they always did"
-    page.wait_for_function("!jQuery('#extendedFields').is(':animated')")
+    page.wait_for_function("() => !jQuery('#extendedFields').is(':animated')")
     page.click("#unmapped")
-    page.wait_for_function("!jQuery('#extendedFields').is(':animated') && getComputedStyle(document.getElementById('extendedFields')).display === 'none'")
+    page.wait_for_function("() => !jQuery('#extendedFields').is(':animated') && getComputedStyle(document.getElementById('extendedFields')).display === 'none'")
 
     page.emulate_media(reduced_motion="reduce")
     page.click("#dumped")
@@ -106,7 +106,7 @@ def test_with_reduced_motion_a_file_waiting_to_be_uploaded_does_not_pulse(open_p
     """Dropzone pulses the progress bar of a file that waits for "Submit", a 6 s scale animation
     that repeats for as long as the file waits."""
     page = open_page("/data/submit", "reduce")
-    page.wait_for_function("window.Dropzone !== undefined && document.getElementById('myDropzone').dropzone !== undefined")
+    page.wait_for_function("() => window.Dropzone !== undefined && document.getElementById('myDropzone').dropzone !== undefined")
 
     page.evaluate("Dropzone.forElement('#myDropzone').addFile(new File(['MZ'], 'waiting.exe'))")
     page.wait_for_selector(".dropzone .dz-preview .dz-progress", state="attached")
