@@ -192,7 +192,9 @@ rather than reconstructing it from the commit log at release time.
   search page's "search in" checkboxes. A screen reader announced "Dumped, radio button" without the
   question it answers.
 - The family type-ahead tells a screen reader what it is and what it found: the field is a combobox
-  controlling the list of suggestions, and how many there are is announced as they arrive.
+  controlling the list of suggestions, and how many there are is announced as they arrive. The
+  suggestion under the pointer or keyboard focus has an outline, and the typed part of each is
+  bold, where colour alone told them apart and forced colours took that away.
 
 ### Security
 

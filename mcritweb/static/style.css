@@ -438,3 +438,16 @@ form.form-inline input {
   outline: 2px solid var(--accent);
   outline-offset: 4px;
 }
+
+/* The family type-ahead's suggestions (static/family_names.js gives its menu the listbox role).
+   Bootstrap marks the suggestion under the pointer by its background alone and the vendored
+   widget the typed part of each by its colour alone: forced colours take both away, and neither
+   tells a reader who cannot see the difference. An outline and a weight survive both. */
+.dropdown-menu[role="listbox"] .dropdown-item:hover,
+.dropdown-menu[role="listbox"] .dropdown-item:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.dropdown-menu[role="listbox"] .dropdown-item .text-primary {
+  font-weight: 700;
+}

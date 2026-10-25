@@ -15,6 +15,8 @@ import pytest
 from conftest import session_cookie_for
 from werkzeug.serving import make_server
 
+from mcritweb.db import UserInfo
+
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
 
 SMDA_REPORT = '{\n "base_addr": 4194304,\n "bitness": 32,\n "metadata": {\n  "family": "dropfamily",\n  "version": "1.0"\n }\n}\n'
@@ -43,16 +45,22 @@ def live_server(app):
 
 @pytest.fixture
 def open_page(app, live_server, make_user):
-    """open_page(path, role) -> a page on `path`, signed in, once its queued scripts have run."""
+    """open_page(path, role, theme, forced_colors) -> a page on `path`, signed in, once its
+    queued scripts have run."""
     with sync_api.sync_playwright() as playwright:
         try:
             browser = playwright.chromium.launch(executable_path=os.environ.get("MCRITWEB_CHROMIUM") or None)
         except sync_api.Error as error:
             pytest.skip(f"no Chromium for playwright to drive: {error}")
         try:
-            def _open(path, role="contributor"):
+            def _open(path, role="contributor", theme=None, forced_colors="none"):
                 user_id = make_user(role=role)
-                context = browser.new_context()
+                if theme:
+                    with app.app_context():
+                        user_info = UserInfo.fromDb(user_id=user_id)
+                        user_info.theme = theme
+                        user_info.saveToDb()
+                context = browser.new_context(forced_colors=forced_colors)
                 context.add_cookies([{"name": app.config["SESSION_COOKIE_NAME"], "value": session_cookie_for(app, user_id),
                                       "domain": "127.0.0.1", "path": "/"}])
                 page = context.new_page()
@@ -244,4 +252,27 @@ def test_the_overlay_button_follows_the_chosen_mode(open_page):
     assert page.evaluate(label) == "Submit"
     page.evaluate(choose, "query_form")
     assert page.evaluate(label) == "Query"
+    assert page.errors == []
+
+
+@pytest.mark.parametrize("theme, forced_colors", [("light", "none"), ("dark", "none"), ("light", "active")])
+def test_the_highlighted_suggestion_is_told_by_more_than_colour(open_page, theme, forced_colors):
+    """Bootstrap marked the suggestion under the pointer by its background alone, and the
+    vendored widget the typed part of each by its colour alone: forced colours take both
+    away, and neither says anything to a reader who cannot tell the colours apart. The one
+    keyboard focus is on had the browser's 1px ring and no more."""
+    page = open_page("/data/submit", theme=theme, forced_colors=forced_colors)
+    page.focus("#family")
+    with page.expect_response("**/explore/familyNames*"):
+        page.keyboard.type("win")
+    page.wait_for_selector("#family-suggestions .dropdown-item")
+
+    weight = page.evaluate("() => getComputedStyle(document.querySelector('#family-suggestions .dropdown-item span')).fontWeight")
+    assert int(weight) >= 600, weight
+    outline = "(element) => { const style = getComputedStyle(element); return [style.outlineStyle, style.outlineWidth]; }"
+    page.locator("#family-suggestions .dropdown-item").nth(1).hover()
+    assert page.locator("#family-suggestions .dropdown-item").nth(1).evaluate(outline) == ["solid", "2px"]
+    page.keyboard.press("ArrowDown")
+    assert page.evaluate("() => document.activeElement.classList.contains('dropdown-item')")
+    assert page.evaluate(f"({outline})(document.activeElement)") == ["solid", "2px"]
     assert page.errors == []
