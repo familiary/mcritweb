@@ -454,6 +454,13 @@ def test_a_column_moves_up_down_and_across_from_the_keyboard(open_as):
     assert moved.get_attribute("aria-label") == f"Move {first} to Active"
     assert page.inner_text("#reorder-status") == f"{first} moved to position {len(available) + 1} of {len(available) + 1} in Available."
 
+    # and the order saved is the order on screen
+    with page.expect_navigation():
+        page.click("#saveButton")
+    page.click("#pills-column-settings-tab")
+    page.wait_for_selector("#samples_table_active [data-reorder]", state="visible")
+    assert column_order(page, "samples_table") == [active[1:], available + [first]]
+
 
 def test_a_cross_compare_sample_moves_by_touch(open_as, live_server):
     """jQuery UI's drag takes no touch, so a phone could not set an order of its own."""
@@ -489,7 +496,7 @@ def test_the_matrix_is_read_and_followed_from_the_keyboard(open_as, live_server)
     tab_to(page, "#pills-unweighted .score-swatch")
     assert page.evaluate(FOCUSED_SCORE) == score(0, 0)
     # the tooltip shows on focus as on hover, with the pair it is for
-    assert page.evaluate("() => getComputedStyle(document.activeElement, '::after').visibility") == "visible"
+    page.wait_for_function("() => getComputedStyle(document.activeElement, '::after').visibility === 'visible'")
     assert "vs." in page.evaluate("() => document.activeElement.getAttribute('data-hint')")
 
     page.keyboard.press("ArrowRight")
