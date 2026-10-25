@@ -68,6 +68,11 @@ rather than reconstructing it from the commit log at release time.
 
 ### Changed
 
+- The project's own stylesheets (`style.css`, `theme-dark.css`, `navbar.css`, `signin.css`) are
+  served without their comments. The comments stay in the files, where AGENTS.md wants the reasons
+  for a rule, but a stylesheet is what a page's first paint waits for, and they were most of its
+  bytes. The ETag, gzip, 304 answers and cache lifetimes are those of any other static file;
+  vendored stylesheets are sent as they are.
 - Packaging metadata moved from `setup.py` to `pyproject.toml` (PEP 621), which is now the only
   place the version is declared: the running version shown on the server page and stored in the
   `server` table is read from it, through `get_mcritweb_version()`. `ruff.toml` and `pytest.ini`
