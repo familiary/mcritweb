@@ -77,6 +77,17 @@ The hop count applies to `X-Forwarded-For` only. `X-Forwarded-Proto` is always r
 One rough edge, noted rather than fixed: Werkzeug parses `X-Forwarded-For` as a list header, so a client sending something unparseable - an unterminated quote, say - produces no usable address and MCRITweb falls back to the proxy's. Those attempts are then metered against the proxy. It costs the sender their own attempts and nobody else's, since a well-formed request still resolves to its own address, so the fix would be re-parsing the header in front of Werkzeug for no gain.
 
 
+### HTTPS
+
+Served over HTTPS - directly, or through a proxy that terminates TLS and that `TRUSTED_PROXY_COUNT` counts, so that MCRITweb believes its `X-Forwarded-Proto` - every response carries `Strict-Transport-Security: max-age=31536000; includeSubDomains` and `Cross-Origin-Opener-Policy: same-origin-allow-popups`. Neither is sent over plain HTTP, where a browser ignores HSTS and Chromium reports the COOP header as an error on every page. The HSTS value is the one docker-mcrit's TLS site already adds in NGINX. A browser acts on the first such header in a response, which is MCRITweb's, so set another value here rather than in the proxy, or `None` to send none:
+
+```python
+# while trying HTTPS out: a day, to be raised once it works
+STRICT_TRANSPORT_SECURITY = "max-age=86400"
+```
+
+A browser that has seen the header refuses plain HTTP for the host until its `max-age` has run out, so shorten it well before moving a host off HTTPS.
+
 ### Backend timeout
 
 Every call MCRITweb makes to the MCRIT backend is bounded by `MCRIT_CLIENT_TIMEOUT`, a `(connect, read)` pair in seconds that defaults to `(10, 280)`. Without it a backend that is down or hung held a gunicorn request thread indefinitely, since gunicorn's own timeout does not reclaim a thread under the `gthread` worker. The read bound sits under the 300 s that docker-mcrit's NGINX waits, so a slow backend ends in MCRITweb's error page rather than a proxy 504. Raise both together if long synchronous calls - a whole-corpus import or export through the API passthrough - need more, or set the read to `None` in `instance/config.py` to wait indefinitely. It takes effect with an MCRIT release whose `McritClient` supports a timeout; an older one ignores it.

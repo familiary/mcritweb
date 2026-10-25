@@ -42,6 +42,11 @@ RESOURCE_POLICY = "; ".join([
 #: an injected <script> does not.
 SCRIPT_POLICY = "script-src 'nonce-{nonce}' 'strict-dynamic' 'report-sample'; script-src-attr 'unsafe-inline'"
 
+#: Browser features no page of MCRITweb uses, refused to every page and to anything a page
+#: embeds, so that script injected into one cannot ask the user for them either. The
+#: clipboard, which the copy buttons write to, is not among them.
+PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+
 
 def _trusted_proxy_count(configured, logger):
     """Validate TRUSTED_PROXY_COUNT, or 0 - trust nothing - if it is not a hop count.
@@ -207,6 +212,13 @@ def create_app(test_config=None, instance_path=None):
         # MCRITweb's own error page rather than a 504 from the proxy. None waits forever.
         # Honoured by mcrit releases whose McritClient has a `timeout`; older ones ignore it.
         MCRIT_CLIENT_TIMEOUT=(10, 280),
+        # The Strict-Transport-Security header, which tells a browser that reached
+        # MCRITweb over HTTPS to use nothing else for it from then on; None sends none. It
+        # goes only on a request that came over HTTPS - through a proxy that terminates
+        # TLS, that takes TRUSTED_PROXY_COUNT. The default is what docker-mcrit's TLS site
+        # already adds in NGINX: a browser acts on the first such header of a response
+        # only, which is this one, so anything else would change what that site says.
+        STRICT_TRANSPORT_SECURITY='max-age=31536000; includeSubDomains',
     )
 
     if test_config is None:
@@ -368,6 +380,24 @@ def create_app(test_config=None, instance_path=None):
         # may be internal, and an older browser sends the whole URL. Requests within
         # MCRITweb keep their Referer
         response.headers.setdefault("Referrer-Policy", "same-origin")
+        return response
+
+    @app.after_request
+    def no_features_nothing_uses(response):
+        response.headers.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
+        return response
+
+    @app.after_request
+    def https_stays_https(response):
+        # both only over HTTPS: a browser ignores HSTS on a plain-HTTP response, and
+        # Chromium logs an error for COOP on every plain-HTTP page off the loopback
+        # address, which a deployment served that way would otherwise carry on all of them
+        if request.is_secure:
+            # a site that opens MCRITweb gets no handle on its window to navigate it or
+            # count its frames with; a window MCRITweb opens keeps its own
+            response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
+            if app.config['STRICT_TRANSPORT_SECURITY']:
+                response.headers.setdefault("Strict-Transport-Security", app.config['STRICT_TRANSPORT_SECURITY'])
         return response
 
     @app.template_filter('silent')

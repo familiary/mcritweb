@@ -187,6 +187,16 @@ rather than reconstructing it from the commit log at release time.
   they become listeners. Every page was walked in Chromium as each role and signed out under the
   new policy, with uploads, live search, the graphs, the comparison view, tabs, dialogs, sorting,
   the copy buttons and a running job's polling exercised, without a violation.
+- Every response refuses the camera, the microphone, the location, payments and USB
+  (`Permissions-Policy`), none of which MCRITweb uses, so script injected into a page cannot ask
+  for them. Served over HTTPS, responses also carry `Strict-Transport-Security: max-age=31536000;
+  includeSubDomains`, so a browser that has reached the instance once is not talked into plain HTTP
+  again, and `Cross-Origin-Opener-Policy: same-origin-allow-popups`, so a site that opens MCRITweb
+  in a window gets no handle on it. Neither is sent over plain HTTP. **Upgrading:** behind a proxy
+  that terminates TLS, MCRITweb knows a request was secure only with `TRUSTED_PROXY_COUNT` set.
+  docker-mcrit's TLS site already adds the same HSTS value; a browser acts on the first such header,
+  MCRITweb's, so change it with `STRICT_TRANSPORT_SECURITY` in `instance/config.py` rather than in
+  the proxy, or set that to `None` to leave the header to the proxy. See "HTTPS" in `README.md`.
 
 ## [1.6.0] - 2026-10-16
 
