@@ -174,6 +174,26 @@ def test_a_list_of_hashes_and_a_rule_are_not_spellchecked(client, as_role, path,
     assert areas[textarea].get("spellcheck") == "false"
 
 
+def test_every_password_field_has_a_show_password_button(client, as_role, make_user):
+    """A real button, not a submit one, that says whether it is showing the password and
+    which field it shows (static/form_fields.js)."""
+    pages = {"first registration": page_of(client, "/register")}
+    make_user("admin")
+    pages["login"] = page_of(client, "/login")
+    pages["registration"] = page_of(client, "/register")
+    as_role("contributor")
+    pages["settings"] = page_of(client, "/settings")
+    for page, html in pages.items():
+        tags = Tags(html).tags
+        passwords = [dict(attrs)["id"] for tag, attrs in tags if tag == "input" and dict(attrs).get("type") == "password"]
+        toggles = {dict(attrs).get("aria-controls"): dict(attrs) for tag, attrs in tags
+                   if tag == "button" and "password-toggle" in (dict(attrs).get("class") or "")}
+        assert passwords, page
+        for field in passwords:
+            assert field in toggles, (page, field)
+            assert (toggles[field].get("type"), toggles[field].get("aria-pressed")) == ("button", "false"), (page, field)
+
+
 def test_a_page_that_edits_samples_still_has_its_dialog(client, as_role):
     """The dialog is printed where an edit control can open it, and once."""
     as_role("contributor")

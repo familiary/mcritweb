@@ -65,6 +65,9 @@ rather than reconstructing it from the commit log at release time.
   too. A role with a query upload cap - by default a visitor - reruns only its own queries, since a
   stored query may be larger than that role could have uploaded. With an older one it is offered on
   the 1vsN, 1vs1 and cross compare jobs it can rebuild from their parameters.
+- The password fields of the sign-in, registration and settings forms have a Show button, which shows
+  what was typed and hides it again, so a password typed on a phone keyboard can be checked without
+  typing it twice. A shown password is hidden again as the form is sent.
 
 ### Changed
 

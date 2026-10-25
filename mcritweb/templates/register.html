@@ -1,4 +1,4 @@
-{% from 'table/field_feedback.html' import USERNAME_RULE, username_hint, error_attrs, error_message %}
+{% from 'table/field_feedback.html' import USERNAME_RULE, username_hint, error_attrs, error_message, password_toggle %}
 {% extends 'base.html' %}
 {% block title%}
 Register
@@ -18,12 +18,18 @@ Register
     </div>
     <div class="mb-2">
       <label for="inputPassword1" class="form-label">Password</label>
-      <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" autocomplete="new-password" required{{ error_attrs(field_error, "inputPassword1") }}{% if field_error and "inputPassword1" in field_error.fields %} autofocus{% endif %}>
+      <div class="password-field">
+        <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" autocomplete="new-password" required{{ error_attrs(field_error, "inputPassword1") }}{% if field_error and "inputPassword1" in field_error.fields %} autofocus{% endif %}>
+        {{ password_toggle("inputPassword1") }}
+      </div>
       {{ error_message(field_error, "inputPassword1") }}
     </div>
     <div class="mb-3">
         <label for="inputPassword2" class="form-label">Confirm password</label>
-        <input type="password" class="form-control" name="inputPassword2" id="inputPassword2" autocomplete="new-password" required{{ error_attrs(field_error, "inputPassword2") }}{% if field_error and "inputPassword2" in field_error.fields %} autofocus{% endif %}>
+        <div class="password-field">
+          <input type="password" class="form-control" name="inputPassword2" id="inputPassword2" autocomplete="new-password" required{{ error_attrs(field_error, "inputPassword2") }}{% if field_error and "inputPassword2" in field_error.fields %} autofocus{% endif %}>
+          {{ password_toggle("inputPassword2") }}
+        </div>
         {{ error_message(field_error, "inputPassword2") }}
     </div>
     {% if is_registration_token_required %}

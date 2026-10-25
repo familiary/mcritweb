@@ -1,4 +1,4 @@
-{% from 'table/field_feedback.html' import error_attrs, error_message %}
+{% from 'table/field_feedback.html' import error_attrs, error_message, password_toggle %}
 {% extends 'base.html' %}
 {% block title%}
 Login
@@ -16,7 +16,10 @@ Login
         </div>
         <div class="mb-3">
             <label for="current-password" class="form-label">Password</label>
-            <input type="password" name='inputPassword' id="current-password" class="form-control" autocomplete="current-password" required{{ error_attrs(field_error, "current-password") }}{% if field_error %} autofocus{% endif %}>
+            <div class="password-field">
+              <input type="password" name='inputPassword' id="current-password" class="form-control" autocomplete="current-password" required{{ error_attrs(field_error, "current-password") }}{% if field_error %} autofocus{% endif %}>
+              {{ password_toggle("current-password") }}
+            </div>
             {{ error_message(field_error, "current-password") }}
         </div>
         <button class="btn btn-lg btn-primary w-100 mb-2" type="submit">Sign in</button>

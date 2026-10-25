@@ -1,11 +1,12 @@
 // What the sign-in, registration, settings and upload forms say about a field, kept in step
-// with what the page shows. Queued with later() by those pages (ADR-0021); everything binds
-// to the document, so it holds for fields a page adds after it has run.
+// with what the page shows, and the Show button of their password fields. Queued with later()
+// by those pages (ADR-0021); everything binds to the document, so it holds for fields a page
+// adds after it has run.
 //
 // aria-invalid follows the browser's own verdict, :user-invalid, which matches only once the
 // user has left a field or tried to submit, so a screen reader hears "invalid" when a sighted
 // user sees the red border and not before. A field the server refused
-// (templates/table/field_error.html) comes marked already; editing it withdraws the mark and
+// (templates/table/field_feedback.html) comes marked already; editing it withdraws the mark and
 // the message beside it, which no longer describe what is there.
 
 (function () {
@@ -67,5 +68,26 @@
         if (isField(event.target)) {
             syncValidity(event.target);
         }
+    }, true);
+
+    // Show password (templates/table/field_feedback.html, password_toggle): a password typed on
+    // a phone keyboard can be checked without typing it twice.
+    function showPassword(toggle, show) {
+        document.getElementById(toggle.getAttribute("aria-controls")).type = show ? "text" : "password";
+        toggle.setAttribute("aria-pressed", show ? "true" : "false");
+    }
+
+    document.addEventListener("click", function (event) {
+        const toggle = event.target.closest && event.target.closest(".password-toggle");
+        if (toggle) {
+            showPassword(toggle, toggle.getAttribute("aria-pressed") !== "true");
+        }
+    });
+    // a password manager offers to save what it finds in a password field, so the fields hide
+    // what they hold again as the form is sent, before any handler of the form's own runs
+    document.addEventListener("submit", function (event) {
+        event.target.querySelectorAll(".password-toggle[aria-pressed='true']").forEach(function (toggle) {
+            showPassword(toggle, false);
+        });
     }, true);
 })();

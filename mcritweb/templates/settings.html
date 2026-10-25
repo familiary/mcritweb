@@ -1,6 +1,6 @@
 {% from 'table/links.html' import clipboard_btn %}
 {% from 'table/filter_fields.html' import filter_field %}
-{% from 'table/field_feedback.html' import USERNAME_RULE, username_hint, error_attrs, error_message %}
+{% from 'table/field_feedback.html' import USERNAME_RULE, username_hint, error_attrs, error_message, password_toggle %}
 {% extends 'base.html' %}
 {% block title%}
 Settings
@@ -105,7 +105,10 @@ Settings
           </div>
           <div class="form-group mb-2">
             <label for="inputPassword1" class="form-label">Password</label>
-            <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" autocomplete="current-password" required{{ error_attrs(form_error, "inputPassword1") }}{% if form_error and "inputPassword1" in form_error.fields %} autofocus{% endif %}>
+            <div class="password-field">
+              <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" autocomplete="current-password" required{{ error_attrs(form_error, "inputPassword1") }}{% if form_error and "inputPassword1" in form_error.fields %} autofocus{% endif %}>
+              {{ password_toggle("inputPassword1") }}
+            </div>
             {{ error_message(form_error, "inputPassword1") }}
           </div>
           <button type="submit" class="btn btn-primary">Confirm Change</button>
@@ -116,17 +119,26 @@ Settings
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group mb-2">
             <label for="inputPassword2" class="form-label">Current password</label>
-            <input type="password" name='inputPassword2' class="form-control" id="inputPassword2" autocomplete="current-password" required{{ error_attrs(form_error, "inputPassword2") }}{% if form_error and "inputPassword2" in form_error.fields %} autofocus{% endif %}>
+            <div class="password-field">
+              <input type="password" name='inputPassword2' class="form-control" id="inputPassword2" autocomplete="current-password" required{{ error_attrs(form_error, "inputPassword2") }}{% if form_error and "inputPassword2" in form_error.fields %} autofocus{% endif %}>
+              {{ password_toggle("inputPassword2") }}
+            </div>
             {{ error_message(form_error, "inputPassword2") }}
           </div>
           <div class="form-group mb-2">
               <label for="inputPassword3" class="form-label">New password</label>
-              <input type="password" class="form-control" name="inputPassword3" id="inputPassword3" autocomplete="new-password" required{{ error_attrs(form_error, "inputPassword3") }}{% if form_error and "inputPassword3" in form_error.fields %} autofocus{% endif %}>
+              <div class="password-field">
+                <input type="password" class="form-control" name="inputPassword3" id="inputPassword3" autocomplete="new-password" required{{ error_attrs(form_error, "inputPassword3") }}{% if form_error and "inputPassword3" in form_error.fields %} autofocus{% endif %}>
+                {{ password_toggle("inputPassword3") }}
+              </div>
               {{ error_message(form_error, "inputPassword3") }}
             </div>
           <div class="form-group mb-2">
               <label for="inputPassword4" class="form-label">Confirm new password</label>
-              <input type="password" class="form-control" name="inputPassword4" id="inputPassword4" autocomplete="new-password" required{{ error_attrs(form_error, "inputPassword4") }}{% if form_error and "inputPassword4" in form_error.fields %} autofocus{% endif %}>
+              <div class="password-field">
+                <input type="password" class="form-control" name="inputPassword4" id="inputPassword4" autocomplete="new-password" required{{ error_attrs(form_error, "inputPassword4") }}{% if form_error and "inputPassword4" in form_error.fields %} autofocus{% endif %}>
+                {{ password_toggle("inputPassword4") }}
+              </div>
               {{ error_message(form_error, "inputPassword4") }}
             </div>
           <button type="submit" class="btn btn-primary">Confirm Change</button>

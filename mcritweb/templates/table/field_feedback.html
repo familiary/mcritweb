@@ -33,3 +33,12 @@
   <div class="field-error" id="{{ field }}-error"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> {{ error.message }}</div>
   {%- endif -%}
 {%- endmacro %}
+
+{#
+  The Show button beside a password field, which static/form_fields.js wires: it shows what
+  was typed, to check it, and hides it again, and aria-pressed says which it does now. Its
+  name keeps the word it shows, "Show", as a voice user will say it.
+#}
+{% macro password_toggle(field) -%}
+  <button type="button" class="btn btn-outline-secondary password-toggle" aria-pressed="false" aria-controls="{{ field }}">Show<span class="visually-hidden"> password</span></button>
+{%- endmacro %}

@@ -414,3 +414,12 @@ form.form-inline input {
 :root .form-control:user-invalid {
   border-color: var(--text-danger);
 }
+
+/* A password field and its Show button (templates/table/field_feedback.html) on one line */
+.password-field {
+  display: flex;
+  gap: 0.25rem;
+}
+.password-field .form-control {
+  flex: 1 1 auto;
+}

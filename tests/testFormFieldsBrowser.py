@@ -94,3 +94,38 @@ def test_editing_a_refused_field_withdraws_the_verdict(page):
     assert page.get_attribute("#username", "aria-describedby") is None
     assert page.errors == []
 
+
+
+@pytest.mark.parametrize("path, field", [("/login", "#current-password"), ("/register", "#inputPassword2")])
+def test_the_show_password_button_shows_and_hides_the_password(page, path, field):
+    """Without it, the only way to check a password typed on a phone keyboard was to type
+    it again."""
+    open_ready(page, path)
+    page.fill(field, "a secret")
+    toggle = f".password-toggle[aria-controls='{field[1:]}']"
+    assert page.get_attribute(toggle, "aria-pressed") == "false"
+
+    page.click(toggle)
+    assert page.get_attribute(field, "type") == "text"
+    assert page.get_attribute(toggle, "aria-pressed") == "true"
+    assert page.input_value(field) == "a secret"
+
+    page.click(toggle)
+    assert page.get_attribute(field, "type") == "password"
+    assert page.get_attribute(toggle, "aria-pressed") == "false"
+    assert page.errors == []
+
+
+def test_a_shown_password_is_hidden_again_when_the_form_is_sent(page):
+    """A password manager offers to save what it finds in a password field."""
+    open_ready(page, "/login")
+    page.fill("#username", "walker")
+    page.fill("#current-password", "not the password")
+    page.click(".password-toggle")
+    sent = page.evaluate("""() => new Promise((resolve) => {
+        const form = document.querySelector("form.form-signin");
+        form.addEventListener("submit", (event) => { event.preventDefault();
+            resolve(document.getElementById("current-password").type); });
+        form.requestSubmit();
+    })""")
+    assert sent == "password"
