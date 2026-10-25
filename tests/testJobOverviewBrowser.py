@@ -202,3 +202,50 @@ def test_a_job_that_is_gone_reloads_once_and_stops(browser_page, live_server, ba
     assert traffic.polls == 1
     assert traffic.loads == 2
     assert f"/data/jobs/{PARENT_JOB_ID}/status" not in browser_page.content()
+
+
+#: A tab the test can hide and show: headless Chromium reports every page as visible, so
+#: `document.hidden` is the test's to set, and setting it sends the visibilitychange a
+#: browser would.
+HIDDEN_TAB = """
+window.mcritHidden = false;
+Object.defineProperty(document, "hidden", {configurable: true, get: () => window.mcritHidden});
+Object.defineProperty(document, "visibilityState", {configurable: true, get: () => window.mcritHidden ? "hidden" : "visible"});
+window.mcritSetHidden = (hidden) => {
+    window.mcritHidden = hidden;
+    document.dispatchEvent(new Event("visibilitychange"));
+};
+"""
+
+#: an interval long enough that a poll made at once on showing the tab cannot be the timer's
+SLOW_REFRESH = 5
+
+
+def test_a_hidden_tab_is_not_polled_and_is_polled_at_once_when_shown(browser_page, live_server, backend):
+    """A job watched from a background tab cost the backend a status read every interval,
+    for as long as the tab stayed open: about 1,200 an hour at refresh=3."""
+    browser_page.add_init_script(HIDDEN_TAB)
+    traffic = Traffic(browser_page)
+    browser_page.goto(f"{live_server}/data/jobs/{PARENT_JOB_ID}?refresh={SLOW_REFRESH}")
+    browser_page.evaluate("mcritSetHidden(true)")
+    browser_page.wait_for_timeout(SLOW_REFRESH * 1000 + 1500)
+    assert traffic.polls == 0, "a hidden tab was polled"
+
+    browser_page.evaluate("mcritSetHidden(false)")
+    browser_page.wait_for_timeout(1500)
+    assert traffic.polls == 1, "showing the tab did not poll at once"
+    browser_page.wait_for_timeout(SLOW_REFRESH * 1000)
+    assert traffic.polls == 2, "the polling did not go on at its interval"
+    assert traffic.loads == 1
+
+
+def test_a_tab_opened_in_the_background_waits_to_be_shown(browser_page, live_server, backend):
+    browser_page.add_init_script(HIDDEN_TAB.replace("window.mcritHidden = false;", "window.mcritHidden = true;"))
+    traffic = open_overview(browser_page, live_server)
+    browser_page.wait_for_timeout(THREE_TICKS_MS)
+    assert traffic.polls == 0
+
+    browser_page.evaluate("mcritSetHidden(false)")
+    browser_page.wait_for_timeout(THREE_TICKS_MS)
+    assert traffic.polls >= 2
+    assert traffic.loads == 1

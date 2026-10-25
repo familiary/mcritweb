@@ -54,7 +54,7 @@ def _with_threshold(page, blocks=None, fail_at=None):
             failure = 'throw new Error("injected layout failure");'
             body = body.replace(fail_at, f"{fail_at} {failure}" if fail_at.endswith("{") else f"{failure} {fail_at}")
         route.fulfill(response=response, body=body)
-    page.route("**/static/trace_CFG/main.js", rewrite)
+    page.route("**/static/trace_CFG/main.js*", rewrite)
 
 
 def _count_lookups(page):

@@ -391,3 +391,10 @@ form.form-inline input {
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }
+
+/* The one rule of jquery-ui.css that applies on the cross compare: jQuery UI marks each item of
+   the sortable sample list as its handle. The page linked all 36 KB of the theme for it, which
+   held up its first paint (result_cross.html). */
+.ui-sortable-handle {
+  touch-action: none;
+}

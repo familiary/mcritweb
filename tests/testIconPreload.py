@@ -30,9 +30,19 @@ A markup assertion cannot tell a rendered box from a hidden one, so this file no
 pretends to. What it can check is the structural fact the measurement rests on: a
 signed-in page draws solid icons in its *content*, outside the collapsible navbar, so
 the font is needed at every width. The layout claim itself is measured out of band.
+
+That holds for most signed-in pages, not all. The manual and the upload and export forms
+draw no solid icon outside the navbar, so at 390x844 they too requested the font and
+`document.fonts` reported nothing loaded. Without the preload their first paint came
+52 ms sooner and their largest paint 60 ms sooner (medians over the five pages, 11 runs
+each, at 1.6 Mbit/s and 150 ms round trips). They set `icons_only_in_the_navbar`, which
+gives the preload `media="(min-width: 992px)"`: from there up the navbar is expanded and
+draws its help icon, so a desktop still has the font in time, and a phone fetches it
+when the menu is opened. tests/testNarrowViewportBrowser.py checks both in Chromium.
 """
 
 import logging
+import pathlib
 import re
 import unittest
 
@@ -116,6 +126,48 @@ def test_a_signed_in_page_draws_icons_outside_the_collapsing_navbar(client, as_r
     after_the_navbar = body[body.index(b"</nav>"):]
     assert re.search(rb'class="(fas|fa-solid)[ "]', after_the_navbar), \
         "no solid icon outside the navbar - the preload may no longer be paying for itself"
+
+
+#: the pages that draw solid icons in the navbar only, and preload the font only where the
+#: navbar is expanded
+NAVBAR_ICONS_ONLY = ["/help", "/analyze/query", "/data/submit", "/data/import", "/data/export"]
+
+
+@pytest.mark.parametrize("path", NAVBAR_ICONS_ONLY)
+def test_a_page_with_icons_only_in_the_navbar_preloads_the_font_where_the_navbar_shows(client, as_role, path):
+    as_role("contributor")
+    response = client.get(path)
+    assert response.status_code == 200
+    links = [link for link in preload_links(response.data) if SOLID_FONT in link]
+    assert len(links) == 1 and b'media="(min-width: 992px)"' in links[0], links
+
+
+@pytest.mark.parametrize("path", NAVBAR_ICONS_ONLY)
+def test_those_pages_draw_no_solid_icon_outside_the_navbar(client, as_role, path):
+    """What the media query rests on: an icon in the content would be drawn at every width,
+    and at a phone's it would wait a round trip for the font."""
+    as_role("contributor")
+    body = client.get(path).data
+    after_the_navbar = body[body.index(b"</nav>"):]
+    assert not re.search(rb'class="[^"]*\b(fas|fa-solid)\b', after_the_navbar), path
+
+
+@pytest.mark.parametrize("path", ["/", "/explore/samples", "/explore/statistics", "/settings"])
+def test_a_page_with_icons_in_its_content_preloads_the_font_at_every_width(client, as_role, path):
+    as_role("contributor")
+    response = client.get(path)
+    assert response.status_code == 200
+    links = [link for link in preload_links(response.data) if SOLID_FONT in link]
+    assert len(links) == 1 and b"media=" not in links[0], links
+
+
+def test_only_the_pages_without_content_icons_say_so():
+    """The family page lists its samples and the statistics page its maintenance warnings
+    with solid icons, though the captured corpus leaves both lists empty, so measuring them
+    without the icons said nothing about them."""
+    templates = pathlib.Path(__file__).resolve().parents[1] / "mcritweb" / "templates"
+    flagged = {path.name for path in templates.rglob("*.html") if "{% set icons_only_in_the_navbar=true %}" in path.read_text()}
+    assert flagged == {"help.html", "query.html", "submit.html", "import.html", "export.html"}
 
 
 def test_only_the_face_every_page_draws_with_is_preloaded(signed_in):

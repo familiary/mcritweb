@@ -843,7 +843,7 @@ class Document(HTMLParser):
 
     def logos(self):
         """The navbar's pictures, found by the light file their <img> shows."""
-        return [picture for picture in self.pictures if any(tag == "img" and attrs.get("src") in LOGOS for tag, attrs in picture)]
+        return [picture for picture in self.pictures if any(tag == "img" and attrs.get("src", "").split("?")[0] in LOGOS for tag, attrs in picture)]
 
 
 @pytest.fixture
@@ -887,13 +887,13 @@ def check_theme_on_the_page(page, theme):
     for picture in logos:
         sources = [attrs for tag, attrs in picture if tag == "source"]
         images = [attrs for tag, attrs in picture if tag == "img"]
-        assert len(images) == 1 and images[0]["src"] in LOGOS
+        assert len(images) == 1 and images[0]["src"].split("?")[0] in LOGOS
         if expected["media"] is None:
             assert sources == [], "a light page offers the dark logo, so it fetches it"
         else:
             assert [tag for tag, _attrs in picture] == ["source", "img"], "the <source> has to come before the <img>"
             assert sources[0]["media"] == expected["media"], "the logo and the stylesheet switch on different queries"
-            assert sources[0]["srcset"] == LOGOS[images[0]["src"]]
+            assert sources[0]["srcset"].split("?")[0] == LOGOS[images[0]["src"].split("?")[0]]
     return document
 
 

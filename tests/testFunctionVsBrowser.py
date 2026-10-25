@@ -274,8 +274,8 @@ VIEWER = ["trace_CFG/lib/d3.min.js", "trace_CFG/lib/graphlib.min.js", "trace_CFG
 
 def viewer_requests(page):
     requests = []
-    page.on("request", lambda request: requests.append(request.url.split("/static/", 1)[1])
-            if "/static/" in request.url and request.url.split("/static/", 1)[1] in VIEWER else None)
+    page.on("request", lambda request: requests.append(request.url.split("?")[0].split("/static/", 1)[1])
+            if "/static/" in request.url and request.url.split("?")[0].split("/static/", 1)[1] in VIEWER else None)
     return requests
 
 
@@ -302,7 +302,7 @@ def hold_the_viewer(page):
     """Holds main_duo.js until released, so that what is pressed meanwhile is pressed
     before the viewer is in. Returns a function that lets it through."""
     held = []
-    page.route("**/static/trace_CFG/main_duo.js", lambda route: held.append(route))
+    page.route("**/static/trace_CFG/main_duo.js*", lambda route: held.append(route))
 
     def release():
         for _ in range(100):
@@ -375,7 +375,7 @@ def test_combined_pressed_before_the_viewer_is_in_is_shown_once_the_graphs_are(b
 @pytest.mark.parametrize("script", ["trace_CFG/lib/d3.min.js", "trace_CFG/main_duo.js", "function_compare.js"])
 def test_a_viewer_script_that_does_not_load_says_so(browser_page, live_server, script):
     """Without it the graphs cannot be drawn, and the page used to stay blank and silent."""
-    browser_page.route("**/static/" + script, lambda route: route.fulfill(status=404, body="gone"))
+    browser_page.route("**/static/" + script + "*", lambda route: route.fulfill(status=404, body="gone"))
     browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
     assert browser_page.is_hidden("#viewer_error")
     scroll_to_the_graphs(browser_page)
@@ -387,7 +387,7 @@ def test_a_viewer_script_that_does_not_load_says_so(browser_page, live_server, s
 def test_without_a_script_the_drawing_can_do_without_the_graphs_are_still_drawn(browser_page, live_server):
     """loopCollapser.js is not needed to draw. A page that loaded the viewer from plain
     script tags drew both graphs without it, and this one does too, under the message."""
-    browser_page.route("**/static/trace_CFG/loopCollapser.js", lambda route: route.fulfill(status=404, body="gone"))
+    browser_page.route("**/static/trace_CFG/loopCollapser.js*", lambda route: route.fulfill(status=404, body="gone"))
     browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
     scroll_to_the_graphs(browser_page)
     for panel in ("a", "b"):
@@ -446,7 +446,7 @@ def test_the_viewer_scripts_run_in_order_however_they_arrive(browser_page, live_
     def late(route):
         browser_page.wait_for_timeout(700)
         route.continue_()
-    browser_page.route("**/static/trace_CFG/lib/d3.min.js", late)
+    browser_page.route("**/static/trace_CFG/lib/d3.min.js*", late)
     browser_page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
     scroll_to_the_graphs(browser_page)
     for panel in ("a", "b"):
@@ -636,7 +636,7 @@ def open_and_draw(page, live_server, panels=("a", "b")):
 def test_each_graph_is_laid_out_in_a_worker(browser_page, live_server, thrown):
     workers = layout_workers(browser_page)
     open_and_draw(browser_page, live_server)
-    assert [url.rsplit("/", 1)[1] for url in workers] == ["layout_worker.js"] * 2
+    assert [url.split("?")[0].rsplit("/", 1)[1] for url in workers] == ["layout_worker.js"] * 2
 
     browser_page.wait_for_function("() => !document.getElementById('viewCombined').disabled")
     browser_page.click("#viewCombined")
@@ -655,7 +655,7 @@ def test_the_drawing_is_the_worker_s_layout(browser_page, live_server, thrown):
             "laidOut.eachNode(function (id, value) { value.x += 1000; }); var answer = dagreD3.json.encode(laidOut);")
         assert "value.x += 1000" in body
         route.fulfill(response=response, body=body)
-    browser_page.route("**/static/trace_CFG/layout_worker.js", shifted)
+    browser_page.route("**/static/trace_CFG/layout_worker.js*", shifted)
     drawing = open_and_draw(browser_page, live_server, GRAPHS)
     for panel in GRAPHS:
         xs = browser_page.evaluate(f"[...document.querySelectorAll('#graphContainer_{panel} g.node')]"
@@ -679,7 +679,7 @@ def test_the_worker_s_drawing_is_the_one_the_page_made_itself(browser_page, live
     def missing(route):
         refused.append(route.request.url)
         route.fulfill(status=404, body="")
-    on_page.route("**/static/trace_CFG/layout_worker.js", missing)
+    on_page.route("**/static/trace_CFG/layout_worker.js*", missing)
     assert open_and_draw(on_page, live_server, GRAPHS) == in_worker
     assert len(refused) == 3
 
@@ -725,7 +725,7 @@ def test_a_combined_graph_that_comes_back_while_side_by_side_is_shown_is_drawn_w
         # the two graphs side by side are drawn; only the combined one's answer is held
         closed = []
         browser_page.on("worker", lambda worker: worker.on("close", lambda _: closed.append(worker.url)))
-        browser_page.route("**/static/trace_CFG/layout_worker.js", waiting)
+        browser_page.route("**/static/trace_CFG/layout_worker.js*", waiting)
         browser_page.route("**/static/layout-answer-released", lambda route: held.append(route))
         browser_page.click("#viewCombined")
         until_held()
@@ -813,7 +813,7 @@ def test_the_combined_graph_is_drawn_where_its_pane_showed_it_loading(browser_pa
         body = response.text().replace("self.postMessage({ graph: answer });",
                                        "setTimeout(function () { self.postMessage({ graph: answer }); }, 1000);")
         route.fulfill(response=response, body=body)
-    browser_page.route("**/static/trace_CFG/layout_worker.js", late)
+    browser_page.route("**/static/trace_CFG/layout_worker.js*", late)
     top = "document.getElementById('graphContainer_c').getBoundingClientRect().top"
     browser_page.click("#viewCombined")
     browser_page.wait_for_selector("#loading_c", state="visible")
@@ -827,9 +827,9 @@ def test_the_combined_graph_is_drawn_where_its_pane_showed_it_loading(browser_pa
 @pytest.mark.parametrize("worker", ["missing", "failing"])
 def test_without_a_working_worker_the_page_lays_the_graphs_out_itself(browser_page, live_server, thrown, worker):
     if worker == "missing":
-        browser_page.route("**/static/trace_CFG/layout_worker.js", lambda route: route.fulfill(status=404, body=""))
+        browser_page.route("**/static/trace_CFG/layout_worker.js*", lambda route: route.fulfill(status=404, body=""))
     else:
-        browser_page.route("**/static/trace_CFG/layout_worker.js", lambda route: route.fulfill(
+        browser_page.route("**/static/trace_CFG/layout_worker.js*", lambda route: route.fulfill(
             content_type="application/javascript",
             body="self.onmessage = function () { self.postMessage({ error: 'injected layout failure' }); };"))
     drawing = open_and_draw(browser_page, live_server)

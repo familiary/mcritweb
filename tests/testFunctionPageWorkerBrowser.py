@@ -63,7 +63,7 @@ def test_the_graph_is_laid_out_in_the_worker_as_on_the_page(browser_page, live_s
     started = _workers(browser_page)
     _open(browser_page, live_server, function_id, errors)
     in_worker = json.loads(browser_page.evaluate(DRAWING))
-    assert [url.rsplit("/", 1)[-1] for url in started] == ["layout_worker.js"]
+    assert [url.split("?")[0].rsplit("/", 1)[-1] for url in started] == ["layout_worker.js"]
 
     # the same page in a browser without workers lays the graph out itself, as before
     browser_page.add_init_script("delete window.Worker;")
@@ -89,7 +89,7 @@ def test_the_drawing_is_the_worker_s_layout(browser_page, live_server):
             " self.postMessage({ graph: answer });")
         assert "node.value.x += 100" in body
         route.fulfill(response=response, body=body)
-    browser_page.route("**/static/trace_CFG/layout_worker.js", shifted)
+    browser_page.route("**/static/trace_CFG/layout_worker.js*", shifted)
     _open(browser_page, live_server, harness.FUNCTION_A, errors)
     drawn = [node[1] for node in json.loads(browser_page.evaluate(DRAWING))[0]]
 
@@ -102,7 +102,7 @@ def test_the_drawing_is_the_worker_s_layout(browser_page, live_server):
 
 def test_a_layout_the_worker_cannot_make_gives_the_button_back(browser_page, live_server):
     errors = []
-    browser_page.route("**/static/trace_CFG/layout_worker.js", lambda route: route.fulfill(
+    browser_page.route("**/static/trace_CFG/layout_worker.js*", lambda route: route.fulfill(
         content_type="application/javascript",
         body="self.onmessage = function () { self.postMessage({ error: 'injected layout failure' }); };"))
     browser_page.on("pageerror", lambda error: errors.append(str(error)))
@@ -121,7 +121,7 @@ def test_a_layout_the_worker_cannot_make_gives_the_button_back(browser_page, liv
 
 def test_a_worker_that_does_not_load_leaves_the_layout_to_the_page(browser_page, live_server):
     errors = []
-    browser_page.route("**/static/trace_CFG/layout_worker.js", lambda route: route.fulfill(status=404, body=""))
+    browser_page.route("**/static/trace_CFG/layout_worker.js*", lambda route: route.fulfill(status=404, body=""))
     _open(browser_page, live_server, harness.FUNCTION_A, errors)
 
     assert browser_page.locator("#graphContainer g.node").count() > 0
@@ -139,7 +139,7 @@ def test_a_large_graph_shows_its_code_first_and_follows_without_a_click(browser_
         body = response.text().replace("var CFG_CODE_FIRST_BLOCKS = 250;", "var CFG_CODE_FIRST_BLOCKS = 3;")
         assert "CFG_CODE_FIRST_BLOCKS = 3;" in body
         route.fulfill(response=response, body=body)
-    browser_page.route("**/static/trace_CFG/main.js", rewrite)
+    browser_page.route("**/static/trace_CFG/main.js*", rewrite)
     browser_page.route("**/explore/findLoops/", lambda route: held.append(route))
     browser_page.on("request", lambda request: lookups.append(request.url) if "getPicBlockMatches" in request.url else None)
     browser_page.on("pageerror", lambda error: errors.append(str(error)))

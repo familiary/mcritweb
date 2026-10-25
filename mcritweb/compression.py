@@ -87,7 +87,13 @@ def is_compressible(response):
 
 def compress(response):
     """The response, gzipped in place when that is worth doing."""
-    if not wants_gzip() or not is_compressible(response):
+    if not is_compressible(response):
+        return response
+    # the body depends on Accept-Encoding whether or not this client takes gzip, and a cache
+    # that keeps a static file for a year (mcritweb/static_cache.py) must not hand the plain
+    # copy one client was sent to every other
+    response.vary.add("Accept-Encoding")
+    if not wants_gzip():
         return response
     # a static file is streamed through untouched by default; reading it here is what
     # makes it compressible, and MAX_SIZE bounds what that reads
@@ -98,7 +104,6 @@ def compress(response):
     response.set_data(gzip.compress(body, compresslevel=LEVEL, mtime=0))
     response.headers["Content-Encoding"] = "gzip"
     response.headers["Content-Length"] = str(response.content_length)
-    response.headers.add("Vary", "Accept-Encoding")
     etag, weak = response.get_etag()
     if etag:
         response.set_etag(f"{etag}-gzip", weak)

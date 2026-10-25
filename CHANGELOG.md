@@ -75,6 +75,11 @@ rather than reconstructing it from the commit log at release time.
 
 ### Changed
 
+- The project's own stylesheets (`style.css`, `theme-dark.css`, `navbar.css`, `signin.css`) are
+  served without their comments. The comments stay in the files, where AGENTS.md wants the reasons
+  for a rule, but a stylesheet is what a page's first paint waits for, and they were most of its
+  bytes. The ETag, gzip, 304 answers and cache lifetimes are those of any other static file;
+  vendored stylesheets are sent as they are.
 - Packaging metadata moved from `setup.py` to `pyproject.toml` (PEP 621), which is now the only
   place the version is declared: the running version shown on the server page and stored in the
   `server` table is read from it, through `get_mcritweb_version()`. `ruff.toml` and `pytest.ini`
@@ -118,6 +123,27 @@ rather than reconstructing it from the commit log at release time.
 - Control flow graphs are laid out about three times faster on large functions, with the same
   result: 5.6 s instead of 21.7 s for a 971-block function. A patch to the vendored dagre builds the
   graph of each rank in one pass instead of walking the whole graph once per rank.
+- The browser keeps the static files from one page to the next instead of asking for each of them
+  again. Their URLs carry a digest of the file (`?v=`), which changes when the file does, and a URL
+  with the current digest may be kept for a year; on a phone at 150 ms round trips the next page
+  paints about 100 ms sooner. The files a stylesheet or the CFG layout worker names themselves (the
+  icon fonts, the CFG viewer's images and its dagre bundle) are kept for an hour. Match diagrams
+  and the manual's screenshots are still revalidated on every view. A compressible file sent
+  without gzip now says `Vary: Accept-Encoding` as well, so that a shared cache keeping it does not
+  hand that copy to clients that take gzip.
+- The help page asks for its first screenshot, its largest paint, at high priority.
+- Phones and tablets no longer download the Fraunhofer logo, which the navbar shows only from 992px
+  up.
+- The help page and the query, submit, import and export forms preload the icon font only from
+  992px up. Below that they draw no icon until the menu is opened, and their first paint on a phone
+  comes about 50 ms sooner.
+- A running job's overview stops polling its status, and its elapsed time stops counting, while
+  its tab is hidden; it polls at once when the tab is shown again. A long job watched from a
+  background tab cost the backend a status read every interval for as long as the tab was open.
+- A function page shows its code without waiting for the match lookup of every block: each block's
+  "Matches" line says "looking up..." until its answer arrives.
+- A cross compare result no longer waits for jQuery UI's 36 KB theme stylesheet before its first
+  paint; the one rule of it the sample list uses is in `style.css`.
 
 ### Fixed
 

@@ -53,14 +53,14 @@ BASE = TEMPLATE_ROOT / "base.html"
 #: assets base.html must not load, and where they belong instead
 PAGE_SPECIFIC = {
     "jquery-ui-sortable.js": "result_cross.html",
-    "jquery-ui.css": "result_cross.html",
 }
 
 #: assets no template should load at all any more. dropzone.min.js is stock 5.9.2,
 #: without the patch in dropzone.js that sends the head of a dropped file for the
 #: pre-fill (AGENTS.md); all.css, bootstrap.css and jquery-ui.js are the full builds the
-#: subsets and the minified file replaced (issue #63)
-RETIRED = ["jquery.dataTables.min.js", "dataTables.bootstrap5.min.js", "dataTables.bootstrap5.min.css", "dropzone.min.js", "css/all.css", "css/bootstrap.css", "jquery-ui.js"]
+#: subsets and the minified file replaced (issue #63); jquery-ui.css is the whole theme,
+#: of which the cross compare uses one rule, now in style.css
+RETIRED = ["jquery.dataTables.min.js", "dataTables.bootstrap5.min.js", "dataTables.bootstrap5.min.css", "dropzone.min.js", "css/all.css", "css/bootstrap.css", "jquery-ui.js", "jquery-ui.css"]
 
 
 @pytest.mark.parametrize("asset", sorted(PAGE_SPECIFIC))
@@ -139,8 +139,8 @@ def test_only_base_html_loads_a_jquery():
 
 
 #: a script base.html's queue loads after the first paint: `later({{ url_for(...)|tojson }})`
-#: in a template, `later("/static/...")` in a page
-QUEUED = re.compile(r"""later\((?:\{\{\s*url_for\('static',\s*filename='([^']+)'\)\|tojson\s*\}\}|"/static/([^"]+)")\)""")
+#: in a template, `later("/static/...?v=...")` in a page, the version left out
+QUEUED = re.compile(r"""later\((?:\{\{\s*url_for\('static',\s*filename='([^']+)'\)\|tojson\s*\}\}|"/static/([^"?]+)(?:\?v=\w+)?")\)""")
 
 
 def queued(code):
@@ -294,8 +294,16 @@ class TestTheCrossComparePage:
     def test_it_ships_the_library_it_calls(self, client, as_role):
         page = self.rendered(client, as_role)
         assert "jquery-ui-sortable.js" in page
-        assert "jquery-ui.css" in page
         assert ".sortable()" in page
+
+    def test_it_takes_the_one_jquery_ui_rule_it_needs_from_style_css(self, client, as_role):
+        """jquery-ui.css is 375 rules and 36 KB (8 KB gzipped) of render-blocking CSS, and
+        on this page exactly one of them matches anything: the touch-action of the sortable
+        list's handles. That rule is in style.css, which every page loads anyway."""
+        page = self.rendered(client, as_role)
+        assert "jquery-ui.css" not in page
+        style = (STATIC_ROOT / "style.css").read_text()
+        assert re.search(r"\.ui-sortable-handle\s*\{\s*touch-action:\s*none;\s*\}", style)
 
     def test_jquery_reaches_the_page_before_jquery_ui(self, client, as_role):
         page = self.rendered(client, as_role)
@@ -330,3 +338,17 @@ def test_the_graph_libraries_stay_out_of_the_head(name):
     first_graph_script = code.index("trace_CFG/main")
     for lib in ("d3.min.js", "graphlib.min.js", "graphlib-dot.min.js", "dagre-d3.min.js", "convexhull.js"):
         assert -1 < code.find("trace_CFG/lib/" + lib) < first_graph_script, lib
+
+
+
+def test_the_logo_a_phone_never_shows_is_not_downloaded_there(client, as_role):
+    """The Fraunhofer logo is `d-none d-lg-block`, so below 992px it has no box, and phones
+    and tablets downloaded it anyway, 1.7 KB (2.8 KB dark) among the page's first requests.
+    Lazy, it is fetched only where it is shown. The MCRIT logo is the largest paint of many
+    pages and stays eager."""
+    as_role("visitor")
+    page = client.get("/explore/samples").get_data(as_text=True)
+    fkie = re.findall(r'<img src="/static/fkie_190x52\.gif[^"]*"[^>]*>', page)
+    assert len(fkie) == 1 and 'loading="lazy"' in fkie[0], fkie
+    mcrit = re.findall(r'<img src="/static/d20_mcrit_cabaret\.png[^"]*"[^>]*>', page)
+    assert len(mcrit) == 2 and all("loading=" not in logo for logo in mcrit), mcrit
