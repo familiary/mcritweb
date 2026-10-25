@@ -130,6 +130,12 @@ rather than reconstructing it from the commit log at release time.
   its longest instruction and stays inside its pane and the window; it was sized from the drawn
   block, so most instructions ran out of the box, and the combined view's "B's code" tooltip was not
   held inside the pane at all.
+- Windows' contrast themes (forced colours) no longer hide what Bootstrap draws with fills and
+  shadows. A ticked checkbox or chosen radio button looked empty, the MinHash slider vanished, the
+  keyboard's focus did not show on buttons, fields, the pager or accordion headers, the current tab
+  and page looked like the others, and the cross compare matrix and the CFG comparison's legend
+  were blank. Each now has something the forced palette keeps: the browser's own boxes, outlines
+  in the user's highlight colour, and the data colours left as they are.
 
 ### Security
 

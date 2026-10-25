@@ -391,3 +391,78 @@ form.form-inline input {
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }
+
+/* --- colour, forced colours and motion --------------------------------------------------- */
+
+/* Windows' contrast themes (forced-colors) repaint every colour with the user's own few and
+   drop background images and box shadows. Bootstrap 5.0.2 draws a ticked box, the slider, the
+   keyboard's focus and the current tab or page with exactly those, so each of them gets
+   something here that the forced palette keeps. Highlight, CanvasText and the rest are that
+   palette's colours, not the project's. */
+@media (forced-colors: active) {
+  /* the browser's own box, which draws its tick in the palette; Bootstrap's is a white image
+     on a fill that turns into the canvas, so a ticked box looked empty */
+  .form-check-input {
+    appearance: auto;
+  }
+
+  /* the slider's track and thumb are fills too. One rule each, because a pseudo-element the
+     browser does not know drops the whole rule; they start at :root and name the element to
+     outrank theme-dark.css, which paints the same parts from :root and is linked later */
+  :root input.form-range::-webkit-slider-thumb {
+    background-color: Highlight;
+  }
+  :root input.form-range::-moz-range-thumb {
+    background-color: Highlight;
+  }
+  :root input.form-range::-webkit-slider-runnable-track {
+    background-color: ButtonText;
+  }
+  :root input.form-range::-moz-range-track {
+    background-color: ButtonText;
+  }
+
+  /* colours that are the data: the cross compare's squares, and the legend of the CFG
+     comparison, whose graph keeps its colours */
+  .score-swatch,
+  .cfg-legend span.swatch,
+  .cfg-legend span.edge-swatch {
+    forced-color-adjust: none;
+  }
+  .score-swatch {
+    border: 1px solid CanvasText;
+  }
+
+  /* the current tab and page were a fill (and in the dark theme an underline drawn as a box
+     shadow); a page link that leads nowhere looked like one that does (that rule outranks
+     theme-dark.css's the same way as the slider's) */
+  .nav-pills .nav-link.active,
+  .nav-pills .show > .nav-link,
+  .page-item.active .page-link {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+    font-weight: 700;
+  }
+  :root li.page-item.disabled .page-link {
+    color: GrayText;
+    border-color: GrayText;
+  }
+
+  /* Bootstrap draws focus as a box shadow, with `outline: 0`; the current tab and page carry
+     an outline of their own, which this replaces while they have the focus */
+  .btn:focus-visible,
+  .btn-close:focus-visible,
+  .navbar-toggler:focus-visible,
+  .accordion-button:focus-visible,
+  .form-control:focus-visible,
+  .form-select:focus-visible,
+  .form-check-input:focus-visible,
+  .form-range:focus-visible,
+  .page-link:focus-visible,
+  .page-item.active .page-link:focus-visible,
+  .nav-pills .nav-link:focus-visible,
+  .nav-pills .nav-link.active:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

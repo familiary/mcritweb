@@ -17,7 +17,9 @@ Then the states that only exist while something is open or in use (the drop zone
 menu, a Bootstrap tooltip, a hint tooltip, each tab of the settings page, a picker row that is
 chosen, a control that is hovered or has the keyboard's focus), the pages of an account that is
 not signed in (always light), the "system" theme under an emulated colour scheme (and a live
-change of it), and the light theme, which must never fetch a dark file.
+change of it), and the light theme, which must never fetch a dark file. Last, a forced colour
+palette (Windows' contrast themes) over either theme: what Bootstrap shows only with fills, images
+and box shadows has to survive it.
 
 The probe is tried on pages that are known to be wrong (the light theme's, a dark page with a
 light square planted in it) so that "nothing found" can be believed.
@@ -32,6 +34,7 @@ to launch, as in testPickerRowsBrowser.py; a launch that fails with it set is an
 a skip: a browser test that silently skips tests nothing.
 """
 
+import io
 import logging
 import os
 import threading
@@ -40,6 +43,7 @@ import pytest
 import themeCss
 from conftest import session_cookie_for
 from fixtureData import job_id_of
+from PIL import Image, ImageChops
 from testResultPages import CorpusWithEveryMatchedFunction
 from werkzeug.security import generate_password_hash
 from werkzeug.serving import make_server
@@ -1089,3 +1093,195 @@ def test_the_current_page_of_the_pager_shows_its_focus(visit):
     found = current.evaluate(FOCUS_INDICATOR_OF)
 
     assert found["ring"] is not None and found["ring"] >= 3, f"the current page in focus: {found}"
+
+
+# --- forced colours (Windows' contrast themes) ------------------------------------------------
+#
+# A forced colour palette replaces every colour an author sets with the user's own few, and drops
+# background images and box shadows. Bootstrap 5.0.2 draws a ticked box as a white SVG on its blue
+# fill, its focus rings as box shadows, the current page and tab as a fill: all of it goes. The
+# palette Chromium emulates follows the colour scheme, and the light one is where a white tick lands
+# on a white box, so these run on it, for an account of each theme.
+
+FORCED = {"forced_colors": "active", "color_scheme": "light"}
+
+
+@pytest.fixture
+def open_in(browser, served):
+    """open_in(theme, path, ready=None, **media) -> a page of a fresh context of that theme's account,
+    with the media features asked for emulated (forced_colors, reduced_motion, contrast, color_scheme)."""
+    base, cookies = served
+    opened = []
+
+    def _open(theme, path, ready=None, **media):
+        context = browser.new_context(viewport=VIEWPORT, **media)
+        opened.append(context)
+        context.add_cookies([cookies[theme]])
+        page = context.new_page()
+        page.set_default_timeout(SCRIPT_TIMEOUT_MS)
+        page.goto(base + path, wait_until="load")
+        settle(page, ready)
+        return page
+
+    yield _open
+    for context in opened:
+        context.close()
+
+
+def picture_of(page, locator, pad=0, inset=0):
+    """The pixels of an element as drawn, `pad` px around it, or only its middle with `inset` (a
+    fraction of each side) cut off."""
+    box = locator.bounding_box()
+    x, y, width, height = box["x"] - pad, box["y"] - pad, box["width"] + 2 * pad, box["height"] + 2 * pad
+    clip = {"x": x + width * inset, "y": y + height * inset, "width": width * (1 - 2 * inset), "height": height * (1 - 2 * inset)}
+    return Image.open(io.BytesIO(page.screenshot(clip=clip))).convert("RGB")
+
+
+def pixels_apart(first, second):
+    """How many pixels of two pictures of one size differ, past antialiasing."""
+    red, green, blue = ImageChops.difference(first, second).split()
+    return ImageChops.lighter(ImageChops.lighter(red, green), blue).point(lambda value: 255 if value > 48 else 0).histogram()[255]
+
+
+def pixels_off(picture, ground):
+    """How many pixels of a picture are not the (r, g, b) ground."""
+    return pixels_apart(picture, Image.new("RGB", picture.size, ground))
+
+
+def canvas_of(page):
+    return tuple(round(channel) for channel in as_rgb(page.evaluate("getComputedStyle(document.documentElement).backgroundColor")))
+
+
+def keyboard_focus(page, locator):
+    """Focus an element the way the keyboard does, so that :focus-visible is what it matches."""
+    page.keyboard.press("Shift")
+    locator.evaluate("(element) => element.focus()")
+    calm(page)
+    assert locator.evaluate("(element) => element.matches(':focus-visible')"), "the focus did not count as the keyboard's"
+
+
+#: (what it is, the page it is on, a box that is ticked, one that is not)
+CHOICES = [
+    ("a ticked search type", "/explore/search?query=citadel&type=sample&type=family", "#families_checkbox", "#functions_checkbox"),
+    ("the chosen kind of upload", "/data/submit", "#unmapped", "#dumped"),
+]
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("what, path, ticked, empty", CHOICES, ids=[choice[0] for choice in CHOICES])
+def test_in_forced_colours_a_ticked_box_does_not_look_like_an_empty_one(open_in, theme, what, path, ticked, empty):
+    """Bootstrap turns the native box off (appearance: none) and draws the tick as a white image on a
+    blue fill. Forced colours paint the fill in the canvas colour and keep the image: white on white,
+    so the search types, the kind of upload and the theme a user had chosen all looked unchosen."""
+    page = open_in(theme, path, **FORCED)
+    ticked, empty = page.locator(ticked), page.locator(empty)
+    assert ticked.is_checked() and not empty.is_checked(), "the page does not start the way the test needs"
+
+    assert ticked.evaluate("(box) => getComputedStyle(box).appearance") != "none"
+    assert pixels_apart(picture_of(page, ticked, inset=0.25), picture_of(page, empty, inset=0.25)) >= 4, f"{what}: the middle of a ticked box is drawn like an empty one's"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_in_forced_colours_the_minhash_slider_is_drawn(open_in, theme):
+    """The slider's track and thumb are background colours, which forced colours turn into the canvas:
+    the whole control vanished, and with it the setting it shows."""
+    page = open_in(theme, "/analyze/compare", "tr.parent_table_sample", **FORCED)
+    slider = page.locator("#minhashBandRange")
+
+    assert pixels_off(picture_of(page, slider), canvas_of(page)) >= 50
+
+
+#: (what it is, the page it is on, the element): one of each kind of control whose focus Bootstrap
+#: draws as a box shadow, which forced colours drop
+FORCED_FOCUS = [
+    ("a row's action button", "/explore/samples", "td a.btn"),
+    ("a menu button", "/explore/samples", "button.btn.dropdown-toggle"),
+    ("the current page", "/explore/samples", ".page-item.active .page-link"),
+    ("another page", "/explore/functions", ".page-item:not(.active):not(.disabled) a.page-link"),
+    ("the rows-per-page menu", "/explore/samples", "select.page-link"),
+    ("a search field", "/explore/samples", "input.form-control"),
+    ("a checkbox", "/explore/search?query=citadel", "#functions_checkbox"),
+    ("a radio button", "/data/submit", "#dumped"),
+    ("an accordion header", f"/explore/functions/{FUNCTION_A}", ".accordion-button"),
+]
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("what, path, selector", FORCED_FOCUS, ids=[control[0] for control in FORCED_FOCUS])
+def test_in_forced_colours_the_keyboard_focus_is_drawn(open_in, theme, what, path, selector):
+    """Bootstrap sets `outline: 0` and draws focus as a box shadow; forced colours drop the shadow, so
+    on these controls a keyboard user could not see where they were. An outline is drawn instead."""
+    page = open_in(theme, path, **FORCED)
+    element = page.locator(f"{selector}:visible").first
+    assert element.count() == 1, f"{path} has no {what} ({selector})"
+    element.scroll_into_view_if_needed()
+    page.evaluate("document.activeElement && document.activeElement.blur()")
+    calm(page)
+    before = picture_of(page, element, pad=8)
+
+    keyboard_focus(page, element)
+    outline = element.evaluate("(element) => [getComputedStyle(element).outlineStyle, parseFloat(getComputedStyle(element).outlineWidth)]")
+    after = picture_of(page, element, pad=8)
+
+    assert outline[0] not in ("none", "hidden") and outline[1] >= 2, f"{what} in focus: outline {outline}"
+    assert pixels_apart(before, after) >= 20, f"{what}: focusing it changes nothing on the screen"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize(
+    "what, path, ready, selector",
+    [
+        ("a square of the cross compare matrix", f"/data/result/{RESULT['cross_compare']}", ".score-swatch", ".score-swatch"),
+        ("a swatch of the CFG legend", f"/data/matches/function/{FUNCTION_A}/{FUNCTION_B}", "#graphContainer_a g.node", ".cfg-legend span.swatch"),
+    ],
+    ids=["matrix", "legend"],
+)
+def test_in_forced_colours_a_colour_that_is_data_keeps_its_colour(open_in, theme, what, path, ready, selector):
+    """The matrix squares are nothing but their colour, and the legend says which colour of the graph
+    means what (the graph keeps its colours, SVG fills are not forced). Forced colours painted both in
+    the canvas colour: a blank matrix, and a legend of identical empty boxes."""
+    page = open_in(theme, path, ready, **FORCED)
+    swatches = page.locator(f"{selector}:visible")
+    assert swatches.count() >= 3, f"{what}: hardly any on the page"
+
+    found = swatches.evaluate_all("(swatches) => swatches.map((swatch) => [getComputedStyle(swatch).forcedColorAdjust, getComputedStyle(swatch).backgroundColor])")
+    assert all(adjust == "none" for adjust, _colour in found), found
+    assert len({colour for _adjust, colour in found}) >= 2, f"{what}: every one is {found[0][1]}"
+    assert all(tuple(round(channel) for channel in as_rgb(colour)) != canvas_of(page) for _adjust, colour in found), found
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize(
+    "what, path, current, other",
+    [
+        ("the current tab", "/settings", ".nav-pills .nav-link.active", ".nav-pills .nav-link:not(.active)"),
+        ("the current page", "/explore/functions", ".page-item.active .page-link", ".page-item:not(.active):not(.disabled) .page-link"),
+    ],
+    ids=["tab", "page"],
+)
+def test_in_forced_colours_the_current_tab_and_page_are_marked(open_in, theme, what, path, current, other):
+    """Both were told apart by their fill alone (and in the dark theme an underline drawn as a box
+    shadow), which forced colours replace: six identical tab labels, a row of identical page numbers.
+    The mark is an outline, and the keyboard's focus is one too, so focusing the current one has to
+    show as well."""
+    page = open_in(theme, path, **FORCED)
+    current, other = page.locator(f"{current}:visible").first, page.locator(f"{other}:visible").first
+
+    assert current.evaluate("(element) => getComputedStyle(element).outlineStyle") not in ("none", "hidden"), f"{what} is not marked"
+    assert other.evaluate("(element) => getComputedStyle(element).outlineStyle") in ("none", "hidden"), f"the others are marked like {what}"
+    current.scroll_into_view_if_needed()
+    page.evaluate("document.activeElement && document.activeElement.blur()")
+    calm(page)
+    before = picture_of(page, current, pad=8)
+    keyboard_focus(page, current)
+    assert pixels_apart(before, picture_of(page, current, pad=8)) >= 20, f"focusing {what} changes nothing on the screen"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_in_forced_colours_a_page_link_that_leads_nowhere_looks_it(open_in, theme):
+    """On the first page, "First page" and "Previous page" go nowhere; forced colours drew them in the
+    link colour like the others."""
+    page = open_in(theme, "/explore/functions", **FORCED)
+    colour = "(element) => getComputedStyle(element).color"
+
+    assert page.locator(".page-item.disabled .page-link").first.evaluate(colour) != page.locator(".page-item:not(.active):not(.disabled) a.page-link").first.evaluate(colour)
