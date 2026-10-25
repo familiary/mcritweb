@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{# the page of mcritweb/http_errors.py, for a 400, 403, 404 or 405: it must not need the backend #}
+{% block title %}{{ error.code }} {{ error.name }}{% endblock %}
+{% block content %}
+<h1>{{ error.name }}</h1>
+<p role="alert">{{ error.description }}</p>
+{% if error.code == 400 %}
+<p>If you were sending a form, the page may have been open from before you last signed in or out.
+   Go back, reload the page and send the form again.</p>
+{% elif error.code == 403 %}
+<p>Your account's role does not give access to this page. An administrator can change the role.</p>
+{% elif error.code == 405 %}
+<p>This address is the target of a form or a button, and cannot be opened as a page.</p>
+{% endif %}
+<p><a href="{{ url_for('index') }}">Go to the start page</a></p>
+{% endblock %}

@@ -1,7 +1,8 @@
 /* The palette (#70). Every colour this stylesheet and the templates paint is named here
    once, by the job it does, and the rules below use the names. These are the light values,
-   which are the colours the pages always had; static/theme-dark.css gives the same names
-   their dark values, and base.html links it only when the user's theme can be dark.
+   which are the colours the pages always had but for the few that were measured short of
+   WCAG (tests/testTheme.py lists them in LIGHT_CHANGES); static/theme-dark.css gives the same
+   names their dark values, and base.html links it only when the user's theme can be dark.
    A new colour gets a name here and in theme-dark.css - tests/testTheme.py fails on a
    colour written anywhere else, and on a name that only one of the two files defines. */
 :root {
@@ -22,7 +23,8 @@
   /* full-contrast text on the chrome and on a score tint */
   --text-strong: black;
   --text-muted: #6c757d;
-  --text-subtle: slategray;
+  /* a slate a step darker than slategray, which was 3.6:1 on the chrome it is written on */
+  --text-subtle: #5a6878;
   --text-danger: #cc2f2e;
   /* the project accent: headings and rules */
   --accent: #377ba8;
@@ -42,17 +44,24 @@
   --border-strong: #333;
   --border-swatch: #444;
   --dropzone-border: black;
+  /* the edge of a field, a check box and a radio button: 3:1 or more on every surface a control
+     sits on (WCAG 1.4.11), where Bootstrap's #ced4da was 1.5:1 on the page */
+  --border-control: #80868b;
 
   /* states and indicators */
   --sort-idle: rgba(0, 0, 0, 0.3);
   --sort-active: rgba(0, 0, 0, 1);
+  /* the ring of the keyboard's focus: Bootstrap's blue at 85%, 3:1 or more on the page and the
+     chrome, where its own at 25% was 1.4:1 */
+  --focus-ring: rgba(13, 110, 253, 0.85);
   /* the ring an accordion header draws instead of Bootstrap's */
   --accordion-focus-ring: #FFF;
   /* a sample picker row: in the comparison, or already computed / just clicked */
   --row-selected: yellowgreen;
   --row-pending: var(--surface-chrome);
-  /* the tick and the cross of a yes/no column */
-  --status-yes: green;
+  /* the tick and the cross of a yes/no column. The tick is a deeper green than `green`, which
+     was 2.5:1 on the darkest of the score tints */
+  --status-yes: #0a5c0a;
   --status-no: darkred;
 
   /* score tints (ScoreColorProvider): the view picks the hue of a score, these decide
@@ -85,6 +94,10 @@
   --cfg-tooltip-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
   /* the label of "Show Loop Boundaries": the colour the first (outermost) loop is drawn in */
   --cfg-loop-label: #fdd0a2;
+  /* how much of its colour a block shows while "Show Cycles" or "Show Loops" colours it. At
+     full strength the viewer's sixteen colours put the block's text under 4.5:1, white text
+     on the orange (2.1:1) as much as black text on the darkest (1.8:1) */
+  --cfg-cycle-opacity: 0.5;
 }
 
 html {
@@ -397,4 +410,195 @@ form.form-inline input {
    held up its first paint (result_cross.html). */
 .ui-sortable-handle {
   touch-action: none;
+}
+
+/* --- colour, forced colours and motion --------------------------------------------------- */
+
+/* Windows' contrast themes (forced-colors) repaint every colour with the user's own few and
+   drop background images and box shadows. Bootstrap 5.0.2 draws a ticked box, the slider, the
+   keyboard's focus and the current tab or page with exactly those, so each of them gets
+   something here that the forced palette keeps. Highlight, CanvasText and the rest are that
+   palette's colours, not the project's. */
+@media (forced-colors: active) {
+  /* the browser's own box, which draws its tick in the palette; Bootstrap's is a white image
+     on a fill that turns into the canvas, so a ticked box looked empty */
+  .form-check-input {
+    appearance: auto;
+  }
+
+  /* the slider's track and thumb are fills too. One rule each, because a -moz- pseudo-element
+     drops the whole rule it is grouped in elsewhere (tests/testSelectorLists.py); they start at
+     :root and name the element to outrank theme-dark.css, which paints the same parts from :root
+     and is linked later */
+  :root input.form-range::-webkit-slider-thumb {
+    background-color: Highlight;
+  }
+  :root input.form-range::-moz-range-thumb {
+    background-color: Highlight;
+  }
+  :root input.form-range::-webkit-slider-runnable-track {
+    background-color: ButtonText;
+  }
+  :root input.form-range::-moz-range-track {
+    background-color: ButtonText;
+  }
+
+  /* colours that are the data: the cross compare's squares, and the legend of the CFG
+     comparison, whose graph keeps its colours */
+  .score-swatch,
+  .cfg-legend span.swatch,
+  .cfg-legend span.edge-swatch {
+    forced-color-adjust: none;
+  }
+  .score-swatch {
+    border: 1px solid CanvasText;
+  }
+
+  /* a dialog's close cross is a black image, which the palette keeps as it is (and the dark
+     theme inverts): black on the canvas of a dark palette, white on a light one's. Here the
+     same cross is a mask over the palette's button text, at full strength */
+  :root button.btn-close {
+    background-image: none;
+    filter: none;
+    opacity: 1;
+  }
+  :root button.btn-close::before {
+    content: "";
+    display: block;
+    width: 1em;
+    height: 1em;
+    background-color: ButtonText;
+    mask: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23000'%3e%3cpath d='M.293.293a1 1 0 011.414 0L8 6.586 14.293.293a1 1 0 111.414 1.414L9.414 8l6.293 6.293a1 1 0 01-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 01-1.414-1.414L6.586 8 .293 1.707a1 1 0 010-1.414z'/%3e%3c/svg%3e") center / 1em auto no-repeat;
+  }
+
+  /* the current tab and page were a fill (and in the dark theme an underline drawn as a box
+     shadow); a page link that leads nowhere looked like one that does (that rule outranks
+     theme-dark.css's the same way as the slider's) */
+  .nav-pills .nav-link.active,
+  .nav-pills .show > .nav-link,
+  .page-item.active .page-link {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+    font-weight: 700;
+  }
+  :root li.page-item.disabled .page-link {
+    color: GrayText;
+    border-color: GrayText;
+  }
+
+  /* Bootstrap draws focus as a box shadow, with `outline: 0`; the current tab and page carry
+     an outline of their own, which this replaces while they have the focus */
+  .btn:focus-visible,
+  .btn-close:focus-visible,
+  .navbar-toggler:focus-visible,
+  .accordion-button:focus-visible,
+  .form-control:focus-visible,
+  .form-select:focus-visible,
+  .form-check-input:focus-visible,
+  .form-range:focus-visible,
+  .page-link:focus-visible,
+  .page-item.active .page-link:focus-visible,
+  .nav-pills .nav-link:focus-visible,
+  .nav-pills .nav-link.active:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+/* The edge of a field, a check box and a radio button, and the ring of the keyboard's focus
+   (WCAG 1.4.11): Bootstrap's were 1.5:1, 1.8:1 and 1.4:1 on the light page. theme-dark.css
+   paints the same parts from the same names. The focus rules start at :root to outrank
+   Bootstrap's own rings, which its button variants set as specifically as `.btn:focus`
+   (`.btn-primary:active:focus`). */
+.form-control,
+.form-select,
+.form-check-input {
+  border-color: var(--border-control);
+}
+
+:root .form-control:focus,
+:root .form-select:focus,
+:root .form-check-input:focus {
+  border-color: var(--accent);
+}
+
+:root .btn:focus,
+:root .btn-close:focus,
+:root .accordion-button:focus,
+:root .form-control:focus,
+:root .form-select:focus,
+:root .form-check-input:focus,
+:root .page-link:focus {
+  box-shadow: 0 0 0 0.25rem var(--focus-ring);
+}
+
+/* one rule each, as for the forced colours above */
+:root .form-range:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 1px var(--surface-page), 0 0 0 0.25rem var(--focus-ring);
+}
+
+:root .form-range:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 1px var(--surface-page), 0 0 0 0.25rem var(--focus-ring);
+}
+
+/* the search boxes and check boxes that turn the ring off (.shadow-none) showed a 1px border
+   going a paler blue; five pages open with the focus in one */
+:root .shadow-none:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+/* The current page of a pager was told from the others by a grey fill alone, #f0f0f0 on the
+   white page: 1.14:1. It is underlined in the accent, as theme-dark.css underlines it, and
+   keeps the focus ring above while it has the focus: both are box shadows, so the one rule
+   would replace the other */
+:root .page-item.active .page-link {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+:root .page-item.active .page-link:focus {
+  box-shadow: inset 0 -2px 0 var(--accent), 0 0 0 0.25rem var(--focus-ring);
+}
+
+/* a link in a table head: Bootstrap paints a .table-light cell #f8f9fa over the chrome the
+   head is given, and the accent is 4.4:1 on it (the jobs list's "#") */
+.table-light a {
+  color: var(--link-on-tint);
+}
+
+/* "Show Cycles" and "Show Loops" paint a block's rect in one of sixteen saturated colours and
+   turn its text white, with fill="white" on the block (trace_CFG/main.js, main_duo.js). The
+   colour shows at --cfg-cycle-opacity over the canvas and the text keeps the page's: 6.9:1 or
+   more on every one of them. theme-dark.css does the same with its own values */
+.node[fill="white"] {
+  fill: var(--text-strong);
+}
+
+.node[fill="white"] rect {
+  fill-opacity: var(--cfg-cycle-opacity);
+}
+
+/* Motion a reader has asked to be spared. Bootstrap's own fades, collapses and dialogs stop
+   under prefers-reduced-motion already; two did not: the pulse Dropzone gives a file that waits
+   for "Submit", a 6 s scale repeated for as long as it waits, and the slide of every hint.css
+   tooltip, which now appears at once where it would have ended up. Both start at :root to
+   outrank the vendored rules, which are as specific and can be linked after this file */
+@media (prefers-reduced-motion: reduce) {
+  :root .dropzone .dz-preview:not(.dz-processing) .dz-progress {
+    animation: none;
+  }
+
+  :root [data-hint]::before,
+  :root [data-hint]::after {
+    transition: none;
+  }
+}
+
+/* The arrow of a column that sorts but is not sorted is faint by design, 2.1:1 on the light
+   table head, and it is the only sign that the column sorts. A reader who has asked for more
+   contrast gets it at full strength; it still differs from the sorted column's arrow in shape,
+   both ways against one */
+@media (prefers-contrast: more) {
+  .fa-sort {
+    color: var(--sort-active);
+  }
 }

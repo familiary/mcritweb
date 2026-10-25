@@ -73,7 +73,10 @@ every later colour change has to follow it.
   painted a deselected row an inline white (`compare.html`, `compare_versus.html`,
   `cross_compare.html`, `unique_blocks.html`), which also gave its link the darker
   colour meant for tinted rows. A row's state is a class now, and a deselected row
-  looks like one that was never selected.
+  looks like one that was never selected. Later, a few light values were changed where they
+  were measured short of WCAG (control edges and the focus ring, the yes/no tick, the diagram
+  caption, the cycle colours of the CFG viewer); `tests/testTheme.py` lists each, with its
+  reason, in `LIGHT_CHANGES`, and still holds every pair to master's.
 - `color-mix()` needs Chrome 111, Firefox 113 or Safari 16.2 (Baseline 2023). An older browser
   shows the score cells untinted, in either theme.
 - The diagram cache holds a second file per diagram once someone with the dark theme views it,
