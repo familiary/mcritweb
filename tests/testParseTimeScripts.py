@@ -589,7 +589,7 @@ def test_the_plain_scripts_are_the_expected_ones():
 def test_dropzone_is_not_a_plain_script_anywhere():
     """It names jQuery, to attach a `$.fn.dropzone` plugin when jQuery is there. Every page
     queues it after jQuery now, or fetches it after DOMContentLoaded (the drop overlay)."""
-    assert "dropzone.js" not in plain_scripts()
+    assert {"dropzone.js", "dropzone-patched.min.js"}.isdisjoint(plain_scripts())
 
 
 def test_a_viewer_list_counts_as_plain_scripts():
