@@ -355,7 +355,6 @@ table.table td.id, table.table td.family {
 }
 #tooltip_c {
   position: absolute;
-  max-width: 45%;
   padding: 3px;
   background-color: white;
   border-radius: 10px;
