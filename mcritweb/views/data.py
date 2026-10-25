@@ -90,6 +90,11 @@ DIAGRAM_FILENAME_RE = re.compile(
 
 #: The width of the strftime prefix cache_result puts in front of the job id.
 CACHE_TIMESTAMP_LENGTH = len("20260806-104636")
+#: How a pretty-printed report begins: json.dump with indent=1 breaks the line after the
+#: opening bracket of an object or a list, and compact output never does.
+PRETTY_PRINTED_REPORT_STARTS = (b"{\n", b"[\n")
+#: The last byte of a whole compact object or list.
+CLOSING_BYTES = {b"{": b"}", b"[": b"]"}
 
 
 def quote_backend_query_value(value):
@@ -199,13 +204,23 @@ def load_cached_result(app, job_id):
 
 
 def find_cached_result_filename(app, job_id):
-    """Name of the newest cached report for a job, or None if none is cached.
+    """Name of the newest cached report for a job that can be served unread, or None.
 
     Matches the whole `<timestamp>-<job_id>.json` name that cache_result writes, as
     load_cached_result does: this file is handed to the caller as-is, so a short or
     crafted job_id must not be able to select a report that merely contains it. The
     timestamp prefix sorts chronologically, so the newest capture wins for a job that
     has been fetched more than once.
+
+    Unread also means unchecked, so a pretty-printed report does not qualify. It was
+    written in place by an older version and may have been cut short by a crash; only
+    parsing it can tell, which would double the cost of every download, so it is left
+    to the caller to load like any other cached report. cache_result has written
+    compact only for as long as it has written through write_atomically - the two
+    reached master in one merge - so a compact file was renamed into place whole. Its
+    last byte is checked all the same, which is one seek: it also catches a file the
+    pre-merge branch of #229 wrote compact but in place. A scalar result (`true`, a
+    count) is a few bytes, written whole or not at all, and qualifies as it is.
     """
     cache_path = os.sep.join([app.instance_path, "cache", "results"])
     suffix = f"-{job_id}.json"
@@ -213,7 +228,22 @@ def find_cached_result_filename(app, job_id):
     # a uuid4 job id - which has dashes of its own - select another job's report
     expected_length = CACHE_TIMESTAMP_LENGTH + len(suffix)
     candidates = [filename for filename in os.listdir(cache_path) if len(filename) == expected_length and filename.endswith(suffix)]
-    return max(candidates) if candidates else None
+    for filename in sorted(candidates, reverse=True):
+        try:
+            with open(os.sep.join([cache_path, filename]), "rb") as fin:
+                head = fin.read(2)
+                if not head or head in PRETTY_PRINTED_REPORT_STARTS:
+                    continue
+                closing = CLOSING_BYTES.get(head[:1])
+                if closing is not None:
+                    fin.seek(-1, os.SEEK_END)
+                    if fin.read(1) != closing:
+                        continue
+                return filename
+        except OSError:
+            # evicted since the listing, or unreadable: not one to hand out either way
+            continue
+    return None
 
 
 def cache_result(app, job_info, matching_result):
@@ -223,7 +253,9 @@ def cache_result(app, job_info, matching_result):
         # the filename is only second-resolution, so two requests for the same job can
         # pick the same one - write elsewhere and rename, or a reader gets half a file
         # compact: the file is only ever parsed, or streamed as the download, and
-        # indentation made it about 1.5 times the size on disk and on the wire
+        # indentation made it about 1.5 times the size on disk and on the wire. The
+        # download streams a compact file unchecked (find_cached_result_filename), so
+        # never write one other than through write_atomically
         write_atomically(app, cache_path, timestamped_filename, lambda fout: json.dump(matching_result, fout, separators=(",", ":")), "w")
         try:
             trim_result_cache(app)
@@ -281,6 +313,11 @@ def write_atomically(app, directory, filename, write, mode="wb"):
         text_kwargs = {} if "b" in mode else {"newline": ""}
         with open(temp_path, mode, opener=lambda path, flags: os.open(path, flags | os.O_EXCL, CACHE_FILE_MODE), **text_kwargs) as fout:
             write(fout)
+            # on disk before the rename: renamed first, a power loss can leave the new
+            # name on a file whose data never got there, and the download streams a
+            # compact report without reading it
+            fout.flush()
+            os.fsync(fout.fileno())
         os.replace(temp_path, os.sep.join([directory, filename]))
     finally:
         # os.replace consumed it on the success path; this is the failure path
@@ -538,11 +575,15 @@ def import_complete():
 EXPORT_ENVELOPE = (b'{"status": "successful", "data": ', b"}")
 #: The size of the pieces a passed-through export is sent in.
 EXPORT_CHUNK_SIZE = 1 << 20
+#: How many samples an export holds, read off its first bytes: MinHashIndex.getExportData
+#: puts its counts first, as a flat object, and the backend keeps that order on the wire.
+EXPORT_SAMPLE_COUNT_RE = re.compile(rb'\{"content": \{[^{}]*"num_samples": ([0-9]+)')
 
 
-def fetch_export(sample_ids=None):
+def fetch_export(sample_ids=None, require_samples=False):
     """The export of `sample_ids` (every sample for None) as its JSON bytes in pieces, with
-    their total length, or None when the backend did not export.
+    their total length, or None when the backend did not export - or, with
+    `require_samples`, exported no sample at all.
 
     Parsing a whole-corpus export into a dict and serialising it again held both at once
     (#202). Asked in raw mode, the client hands over the backend's response, and the
@@ -553,6 +594,8 @@ def fetch_export(sample_ids=None):
     """
     exported = get_client(raw_responses=True).getExportData(sample_ids)
     if isinstance(exported, dict):
+        if require_samples and not exported.get("content", {}).get("num_samples"):
+            return None
         serialised = json.dumps(exported).encode("utf-8")
         return [serialised], len(serialised)
     if exported is None or exported.status_code != 200:
@@ -562,6 +605,12 @@ def fetch_export(sample_ids=None):
     # a failed export answers its own envelope, `"status": "failed"`
     if not (body.startswith(head) and body.endswith(tail)):
         return None
+    if require_samples:
+        sample_count = EXPORT_SAMPLE_COUNT_RE.match(body, len(head))
+        # an export that does not open with its counts is passed on rather than refused:
+        # it was asked for by id, so it is not every sample whatever it holds
+        if sample_count is not None and not int(sample_count.group(1)):
+            return None
     export = memoryview(body)[len(head):len(body) - len(tail)]
     pieces = (bytes(export[offset:offset + EXPORT_CHUNK_SIZE]) for offset in range(0, len(export), EXPORT_CHUNK_SIZE))
     return pieces, len(export)
@@ -624,16 +673,11 @@ def specific_export(type, item_id):
     if type == 'samples':
         # the backend leaves out a sample_id it does not know, so the export itself says
         # whether there was one
-        export_data = client.getExportData([int(item_id)])
-        if not export_data or not export_data["content"]["num_samples"]:
+        export_file = fetch_export([int(item_id)], require_samples=True)
+        if export_file is None:
             flash(f'MCRIT did not export sample "{item_id}" - it may not exist, or MCRIT could not export it.', category='error')
             return redirect(url_for('data.export_view'))
-        export_file = json.dumps(export_data)
-        return Response(
-            export_file,
-            mimetype='application/json',
-            headers={"Content-disposition":
-                    "attachment; filename=export_samples.json"})
+        return export_download(export_file, "export_samples.json")
     # <type> is unconstrained, so anything but the two known values used to fall off
     # the end of this function and return None, which Flask answers with a 500
     flash(f'"{type}" cannot be exported - use "family" or "samples".', category='error')
@@ -746,7 +790,10 @@ def download_result(job_id):
             # happened before send_from_directory checked for the file, and the bare
             # error if it happened between that check and the open. Fetch it again.
             pass
-    result_json = client.getResultForJob(job_id)
+    # what is cached but was not served is pretty-printed, from before writes were
+    # atomic, or does not end the way it begins: loading it is the check, a file cut
+    # short is skipped, and caching it again below makes it one the next download streams
+    result_json = load_cached_result(current_app, job_id) or client.getResultForJob(job_id)
     if not result_json:
         # unfinished, failed, or a job type that produces nothing - the report page
         # already knows how to tell those apart, so let it do the talking

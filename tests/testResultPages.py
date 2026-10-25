@@ -1446,6 +1446,24 @@ def test_cached_result_lookup_matches_whole_job_ids_only(app):
     assert find_cached_result_filename(app, "9a0c-0305e82c3301") is None
 
 
+def test_cached_result_lookup_hands_out_only_a_report_that_cannot_be_cut_short(app):
+    """The download streams what this finds without reading it. A pretty-printed report
+    was written in place, before writes were atomic, and an empty one is what a crash
+    left of such a write; neither is found, and the compact one behind them is."""
+    from mcritweb.views.data import find_cached_result_filename
+
+    cache_path = pathlib.Path(app.instance_path) / "cache" / "results"
+    job_id = "6a7464faf8b8d2c6f836649a"
+    (cache_path / f"20260806-104636-{job_id}.json").write_text('{"report":"compact"}')
+    (cache_path / f"20260807-104636-{job_id}.json").write_text('{\n "report": "pretty"\n}')
+    (cache_path / f"20260808-104636-{job_id}.json").write_text('{\n "report": "cut sh')
+    (cache_path / f"20260809-104636-{job_id}.json").write_text("")
+
+    assert find_cached_result_filename(app, job_id) == f"20260806-104636-{job_id}.json"
+    (cache_path / f"20260806-104636-{job_id}.json").unlink()
+    assert find_cached_result_filename(app, job_id) is None
+
+
 #: Not job ids. The backend client puts the id into its request path unquoted, so
 #: ".." asks for the backend's root, and its answer was read as a job (a 500 on the
 #: live testbed for each route below); "?" and "#" cut the path short the same way.
