@@ -12,6 +12,26 @@ from flask import Flask, g, redirect, render_template, request, send_from_direct
 #: with nothing in the log to point at it.
 MAX_TRUSTED_PROXY_COUNT = 16
 
+#: What a page may load and send, scripts apart. Everything MCRITweb serves comes from its
+#: own origin - no CDN, font service or analytics - so an injection that gets past
+#: autoescaping finds nowhere else to fetch from, post a form to or send data to, no plugin
+#: to load and no <base> to re-point every relative link with. img-src takes data: for
+#: Bootstrap's SVG icons and Dropzone's file previews, and blob:, which can only name what
+#: a script on the page made itself. The links to FKIE and Malpedia are navigations, which
+#: none of this governs.
+RESOURCE_POLICY = "; ".join([
+    "frame-ancestors 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "connect-src 'self'",
+    "font-src 'self'",
+    "img-src 'self' data: blob:",
+    "worker-src 'self'",
+    "media-src 'none'",
+    "manifest-src 'self'",
+])
+
 
 def _trusted_proxy_count(configured, logger):
     """Validate TRUSTED_PROXY_COUNT, or 0 - trust nothing - if it is not a hop count.
@@ -316,8 +336,9 @@ def create_app(test_config=None, instance_path=None):
         # a page of ours inside another site's frame can be dressed up to make a logged-in
         # user click something they cannot see. SameSite=Lax already keeps the session
         # cookie out of a cross-site frame in current browsers; these say it outright, the
-        # CSP for browsers that read it and X-Frame-Options for those that do not
-        response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'self'")
+        # CSP for browsers that read it and X-Frame-Options for those that do not. The CSP
+        # carries the rest of RESOURCE_POLICY with it
+        response.headers.setdefault("Content-Security-Policy", RESOURCE_POLICY)
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         return response
 

@@ -171,6 +171,13 @@ rather than reconstructing it from the commit log at release time.
   stays `True` for one release - after which a 32-character token is answered with a 403 that says
   so, rather than the bare 403 an unknown token gets. See "API tokens issued before 1.5.0" in
   `README.md` for the operator's view.
+- Every response's `Content-Security-Policy` now says what a page may load and send, not only who
+  may frame it: no plugin (`object-src 'none'`), no `<base>` (`base-uri 'none'`), forms posted only
+  back to MCRITweb (`form-action 'self'`), fetches, fonts, images, workers and manifests from
+  MCRITweb's own origin only, and no audio or video. Everything MCRITweb loads already comes from
+  its own origin, so no page changes; markup injected past autoescaping can no longer load an
+  object, re-point the page's relative links or post a form to another site. A reverse proxy that
+  adds a policy of its own should stop doing so: browsers enforce both.
 
 ## [1.6.0] - 2026-10-16
 
