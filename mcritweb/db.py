@@ -895,8 +895,14 @@ def migrate(app_context):
         # since #70, users pick a colour theme, ensure the column exists. It stays NULL
         # for existing accounts, which UserInfo reads as DEFAULT_THEME.
         if "theme" not in user_table_columns:
-            db.execute('ALTER TABLE user ADD theme VARCHAR')
-            print("EXECUTED MIGRATION: ADD THEME TO TABLE USER")
+            try:
+                db.execute('ALTER TABLE user ADD theme VARCHAR')
+                print("EXECUTED MIGRATION: ADD THEME TO TABLE USER")
+            except sqlite3.OperationalError:
+                # gunicorn workers each run this on start, so another one may have added
+                # the column between the read above and this ALTER
+                if "theme" not in [x[0] for x in db.execute('SELECT * FROM user').description]:
+                    raise
         # since version v1.4.0, we have user_column_settings, ensure table exists
         try:
             db.execute('SELECT * FROM user_column_settings').fetchone()
