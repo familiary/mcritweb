@@ -50,6 +50,18 @@
   <a href="{{ url_for('explore.function_by_id', function_id=function_id) }}">{{ function_id }}</a>
 {%- endmacro -%}
 
+{#- A yes/no value drawn as a tick or a cross. The glyph is a private-use character, which
+  assistive technology reads as nothing or as "unknown character", so it is hidden from it
+  and a word stands in. `title=true` also shows the word as the icon's tooltip; the sample
+  pickers draw the icon in the text colour, `coloured=false`. -#}
+{%- macro status_icon(value, yes="Yes", no="No", coloured=true, title=false) -%}
+  {%- if value -%}
+    <i {% if coloured %}style="color: var(--status-yes);" {% endif %}class="fa-solid fa-square-check"{% if title %} title="{{ yes }}"{% endif %} aria-hidden="true"></i><span class="visually-hidden">{{ yes }}</span>
+  {%- else -%}
+    <i {% if coloured %}style="color: var(--status-no);" {% endif %}class="fa-solid fa-times-circle"{% if title %} title="{{ no }}"{% endif %} aria-hidden="true"></i><span class="visually-hidden">{{ no }}</span>
+  {%- endif -%}
+{%- endmacro -%}
+
 {%- macro clipboard_btn(clipboard_value) -%}
   {# the value travels in a data attribute rather than as a quoted JS literal: the HTML
      parser decodes &#39; back to ' before the handler is compiled as script, so a value

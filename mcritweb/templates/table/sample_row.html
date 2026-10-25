@@ -1,5 +1,6 @@
 {% from 'table/pagination_widget.html' import sortable_header_col %}
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id, mark %}
+{% from 'table/links.html' import status_icon %}
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro sample_row_std_js() %}
@@ -131,7 +132,7 @@
       {% elif column_type == "num_functions" %}
         <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
       {% elif column_type == "is_library" %}
-        <td align="center" valign="middle"><i {% if sample.is_library %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+        <td align="center" valign="middle">{{ status_icon(sample.is_library) }}</td>
       {% endif %}
     {% endfor %}
     {% if show_hint %}

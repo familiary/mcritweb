@@ -1,5 +1,6 @@
 {% from 'table/pagination_widget.html' import sortable_header_col %}
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id, mark %}
+{% from 'table/links.html' import status_icon %}
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro function_row_std_js() %}
@@ -80,7 +81,7 @@
       {% elif column_type == "pic_hash" %}
         <td align="right" valign="middle" class="font-monospace">{{ format_pichash(function.pichash) }}</td>
       {% elif column_type == "has_minhash" %}
-        <td align="center" valign="middle"><i {% if function.minhash|length > 0 %}style="color: var(--status-yes);" class="fa-solid fa-square-check" title="MinHash present"{% else %}style="color: var(--status-no);" class="fa-solid fa-times-circle" title="No MinHash"{% endif %}></i></td>
+        <td align="center" valign="middle">{{ status_icon(function.minhash|length > 0, yes="MinHash present", no="No MinHash", title=true) }}</td>
       {% elif column_type == "offset" %}
         <td align="right" valign="middle" class="font-monospace">{{ format_offset(function.offset) }}</td>
       {% elif column_type == "function_name" %}

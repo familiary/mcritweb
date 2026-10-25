@@ -28,6 +28,7 @@ here. `url_for`, `request` and `join_hint_strings` are Jinja globals and do reac
 macro, which is why they are not parameters.
 #}
 {% from 'table/links.html' import format_family_name %}
+{% from 'table/links.html' import status_icon %}
 {% from 'table/pagination_widget.html' import sortable_header_col %}
 
 {# Defaults for when a caller has no stored column settings. Mirrors
@@ -178,9 +179,9 @@ macro, which is why they are not parameters.
           {% elif column_type == "num_pichash" %}
             <td style="text-align: right;" valign="middle">{{ aggregate["pichash_matches"] }}</td>
           {% elif column_type == "is_library_match" %}
-            <td style="text-align: right;" valign="middle"><i {% if aggregate["library_matches"] %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+            <td style="text-align: right;" valign="middle">{{ status_icon(aggregate["library_matches"]) }}</td>
           {% elif column_type == "is_unique_match" %}
-            <td style="text-align: right;" valign="middle"><i {% if aggregate["is_family_unique"] %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+            <td style="text-align: right;" valign="middle">{{ status_icon(aggregate["is_family_unique"]) }}</td>
           {% endif %}
         {% endfor %}{% endmacro %}
 
@@ -233,12 +234,12 @@ macro, which is why they are not parameters.
       {% elif column_type == "best_score" %}
       <td style="text-align: right;" valign="middle">{{ "%3.0f"|format(matched_function.matched_score) }}</td>
       {% elif column_type == "is_minhash_match" %}
-      <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_minhash %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td style="text-align: center;" valign="middle">{{ status_icon(matched_function.match_is_minhash) }}</td>
       {% elif column_type == "is_pichash_match" %}
-      <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_pichash %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td style="text-align: center;" valign="middle">{{ status_icon(matched_function.match_is_pichash) }}</td>
       {% elif column_type == "is_library_match" %}
-      <td style="text-align: center;" valign="middle"><i {% if matching_result.hasLibraryMatch(matched_function.function_id) %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td style="text-align: center;" valign="middle">{{ status_icon(matching_result.hasLibraryMatch(matched_function.function_id)) }}</td>
       {% elif column_type == "is_unique_match" and unique_match_known %}
-      <td style="text-align: center;" valign="middle"><i {% if matching_result.getFamilyIdsMatchedByFunctionId(matched_function.function_id)|length == 1 %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td style="text-align: center;" valign="middle">{{ status_icon(matching_result.getFamilyIdsMatchedByFunctionId(matched_function.function_id)|length == 1) }}</td>
       {% endif %}
     {% endfor %}{% endmacro %}

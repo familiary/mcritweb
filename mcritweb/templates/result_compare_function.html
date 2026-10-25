@@ -3,6 +3,7 @@
 {% from 'table/column_table.html' import sample_column_table, matching_result_job_column_table %}
 {% from 'table/matching_statistics_table.html' import matching_statistics_table %}
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
+{% from 'table/links.html' import status_icon %}
 {% from 'table/compare_breadcrumb.html' import compare_breadcrumb %}
 
 {% extends 'base.html' %}
@@ -101,13 +102,13 @@ Results for Job: {{ job_info.job_id }}
       {% elif column_type == "best_score" %}
       <td style="text-align: right;" valign="middle">{{ "%3.0f"|format(matched_function.matched_score) }}</td>
       {% elif column_type == "is_minhash_match" %}
-      <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_minhash %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td style="text-align: center;" valign="middle">{{ status_icon(matched_function.match_is_minhash) }}</td>
       {% elif column_type == "is_pichash_match" %}
-      <td style="text-align: center;" valign="middle"><i {% if matched_function.match_is_pichash %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td style="text-align: center;" valign="middle">{{ status_icon(matched_function.match_is_pichash) }}</td>
       {% elif column_type == "is_library_match" %}
-      <td style="text-align: center;" valign="middle"><i {% if matching_result.hasLibraryMatch(matched_function.function_id) %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td style="text-align: center;" valign="middle">{{ status_icon(matching_result.hasLibraryMatch(matched_function.function_id)) }}</td>
       {% elif column_type == "is_unique_match" %}
-      <td style="text-align: center;" valign="middle"><i {% if matching_result.getFamilyIdsMatchedByFunctionId(matched_function.function_id)|length == 1 %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td style="text-align: center;" valign="middle">{{ status_icon(matching_result.getFamilyIdsMatchedByFunctionId(matched_function.function_id)|length == 1) }}</td>
       {% endif %}
       {% endfor %}
    </tr>

@@ -1,4 +1,5 @@
 {% from 'table/links.html' import format_pichash, format_function_id, format_family_name, format_family_id, format_sample_id, format_sha_short_clipboard, sha256_provenance, clipboard_btn %}
+{% from 'table/links.html' import status_icon %}
 
 {% macro sample_column_table()%}
   {# `show_sha256_provenance=true` adds where each sample's sha256 comes from to its SHA256 cell
@@ -41,7 +42,7 @@
           <td valign="middle">
             {{ name_and_sample[1].version or "-" }} | 
             {{ name_and_sample[1].component or "-" }} | 
-            <i {% if name_and_sample[1].is_library %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+            {{ status_icon(name_and_sample[1].is_library) }}</td>
           {% else %}
           {# a query has none of these; an empty cell keeps the row aligned without
              claiming the queried binary is not a library, which we do not know #}
@@ -186,11 +187,11 @@
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">
             {% if name_fe_se_ph[1].minhash|length > 0 %}
-              <i style="color: var(--status-yes);" class="fa-solid fa-square-check" title="MinHash available"></i>
+              <i style="color: var(--status-yes);" class="fa-solid fa-square-check" title="MinHash available" aria-hidden="true"></i>
               <span class="font-monospace">{{ name_fe_se_ph[1].minhash.hex()[:16] }}&hellip;</span> {{ clipboard_btn(name_fe_se_ph[1].minhash.hex()) }}
               ({{ name_fe_se_ph[1].minhash|length // 4 }} x 32 bit)
             {% else %}
-              <i style="color: var(--status-no);" class="fa-solid fa-times-circle" title="No MinHash"></i> not calculated
+              <i style="color: var(--status-no);" class="fa-solid fa-times-circle" title="No MinHash" aria-hidden="true"></i> not calculated
               <span style="font-size: 0.8em; color: var(--text-muted);">(too small to be minhashed, or the MinHash job has not run yet)</span>
             {% endif %}
           </td>

@@ -134,6 +134,9 @@ rather than reconstructing it from the commit log at release time.
   and dropped the error the page reported, because the script looked for the messages in an element
   the layout does not have; the error is now shown above the table and the screen-reader status says
   the search failed.
+- Screen readers hear "Yes" or "No" for the tick and cross icons that are a table cell's whole value
+  (library, MinHash, PicHash, unique), where they heard nothing or "unknown character"; the link
+  hunt's family-unique matches say "(unique)" beside the bold that marks them.
 
 ### Security
 
