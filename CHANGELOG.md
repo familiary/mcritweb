@@ -152,6 +152,10 @@ rather than reconstructing it from the commit log at release time.
 - A cross compare matrix wider than the window can be scrolled back to its first column. Centred
   in its pane, it overflowed on both sides, and the index, hash and copy button of every row sat to
   the left of where the scrollbar could go: on a phone always, on a desktop from about 40 samples.
+- Searching for a SHA-256 no longer makes the page wider than the window, at any width: the heading
+  that quotes the term, the notice the search flashes and an empty table's message break the hash
+  across lines, as do the other headings, a family's name among them. The rule meant to do this for
+  headings was written for a `<section>` no page has.
 
 ### Security
 

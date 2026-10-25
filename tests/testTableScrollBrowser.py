@@ -433,3 +433,16 @@ def test_on_a_wide_screen_every_table_is_laid_out_at_once(open_page, live_server
     page = open_page(live_server + f"/data/result/{job_id_of('matches_for_sample')}", 1280)
     assert page.evaluate(f"() => getComputedStyle(({FUNCTION_MATCHES})()).contentVisibility") == "visible"
 
+
+SHA256 = "0123456789abcdef" * 4
+
+
+@pytest.mark.parametrize("path", [f"/explore/search?query={SHA256}&type=sample", f"/explore/samples?query={SHA256}"])
+def test_a_searched_hash_breaks_in_the_heading_and_the_empty_message(open_page, live_server, path):
+    """The search page's heading quotes the term, and an empty table says what matched
+    nothing; neither could break a SHA-256, and searching for one made the page 1,434px
+    wide at 1280px."""
+    for width in [390, 1280]:
+        page = open_page(live_server + path, width)
+        scroll_width, client_width = page.evaluate(PAGE_WIDTH)
+        assert scroll_width <= client_width, f"{path} is {scroll_width}px wide in a {client_width}px window"

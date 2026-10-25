@@ -228,9 +228,13 @@ tr.row-pending { background-color: var(--row-pending); }
   /* Same string, two more places it can widen the page. The job overview and progress
      headings print the raw `job.parameters`, and a heading that overflows does not
      enlarge its own bounding box - it just pushes documentElement.scrollWidth out, so
-     it is invisible to an element-overflow check and very visible to a reader. Scoped
-     to the content region so the navbar and the manual are untouched. */
-  section.content h1 {
+     it is invisible to an element-overflow check and very visible to a reader. Other
+     headings print what someone typed or named - the term searched for, a SHA-256 more
+     often than not, or a family's name - and so do the message of an empty table and the
+     notice a search flashes. None of them is the worse for breaking a word that does not
+     fit its line. (This was `section.content h1`, and the content region is a <main>: it
+     matched nothing.) */
+  h1, h2, h3, h4, h5, h6, .empty-state, .alert {
     overflow-wrap: anywhere;
   }
 
