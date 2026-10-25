@@ -10,7 +10,10 @@
 {% if not lazy %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
 {% endif %}
-{{ dropzone.style('border: 2px dashed var(--dropzone-border); margin: 20px auto; max-width: 600px; min-height: 200px; border-radius: 25px; background: var(--surface-chrome);') }}
+{# style.css's `.content form` rule, which this branch drops, made the zone half the column,
+   608px on a desktop. Centred in a flex column it was as wide as Dropzone's message instead,
+   and 44px before Dropzone had filled it; `width` makes it the column's, up to 600px #}
+{{ dropzone.style('border: 2px dashed var(--dropzone-border); margin: 20px auto; width: 100%; max-width: 600px; min-height: 200px; border-radius: 25px; background: var(--surface-chrome);') }}
 {% if not lazy %}
 {# the library, after the first paint, and what attaches the form, right behind it #}
 <script>later({{ url_for('static', filename='dropzone.js')|tojson }})</script>
