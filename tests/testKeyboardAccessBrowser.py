@@ -205,3 +205,56 @@ def test_rows_per_page_changed_with_the_keyboard_loads_when_focus_leaves(open_as
         page.keyboard.press("Tab")
 
     assert f"limit={chosen}" in page.url
+
+
+def close_with_escape(page, dialog):
+    """Escape reaches a dialog once its opening has finished, which is when Bootstrap moves
+    focus into it."""
+    page.wait_for_function(f"() => document.querySelector('{dialog}').contains(document.activeElement)")
+    page.keyboard.press("Escape")
+    page.wait_for_function(f"() => !document.querySelector('{dialog}').classList.contains('show') && !document.body.classList.contains('modal-open')")
+
+
+def test_focus_comes_back_to_the_delete_button_when_its_dialog_closes(open_as):
+    """The jobs page opens its delete dialog from a script, and Bootstrap hands focus
+    back only to an opener of its own, so Escape left focus on <body>."""
+    page = open_as("contributor", "/data/jobs?active=getMatchesForSample")
+    opener = page.locator(".confirm-delete").first
+    opener_id = opener.get_attribute("id")
+
+    opener.focus()
+    page.keyboard.press("Enter")
+    page.wait_for_selector("#jobDeleteModal.show")
+    close_with_escape(page, "#jobDeleteModal")
+
+    assert focused(page) == opener_id
+
+
+def test_a_dialog_opened_from_a_menu_starts_in_its_field_and_ends_on_the_menu(open_as):
+    """Bootstrap focuses the dialog's box, so the compare dialog's `autofocus` field never
+    had the cursor; and the menu entry that opened it is hidden by the time it closes, so
+    focus fell to <body>. The menu's toggle is where it comes back to."""
+    page = open_as("visitor", "/explore/functions/0")
+
+    page.focus("#button_function_analyze")
+    page.keyboard.press("Enter")
+    page.wait_for_selector("#button_function_analyze + .dropdown-menu.show")
+    page.locator("[data-bs-target='#compareFunctionModal']").focus()
+    page.keyboard.press("Enter")
+    page.wait_for_selector("#compareFunctionModal.show")
+    page.wait_for_function("() => document.activeElement.id === 'other_function_id'")
+    close_with_escape(page, "#compareFunctionModal")
+
+    assert focused(page) == "button_function_analyze"
+
+
+def test_the_rename_dialog_starts_in_its_field(open_as):
+    page = open_as("contributor", "/explore/functions/0")
+
+    page.focus("#button_function_rename")
+    page.keyboard.press("Enter")
+    page.wait_for_selector("#renameFunctionModal.show")
+
+    page.wait_for_function("() => document.activeElement.id === 'function_name'")
+    close_with_escape(page, "#renameFunctionModal")
+    assert focused(page) == "button_function_rename"

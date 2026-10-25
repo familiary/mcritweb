@@ -138,6 +138,11 @@ rather than reconstructing it from the commit log at release time.
   and put the cursor back at the top. A change made with a key now waits for Enter, or for focus to
   leave the select; one made with the mouse or a touch screen still loads at once. On the search
   page the select did nothing at all, for want of the script it calls.
+- Dialogs put the cursor where it belongs and give it back. The compare and rename dialogs of a
+  function's page open with the cursor in their field, which their `autofocus` asked for and
+  Bootstrap never gave. Closing the jobs page's delete dialog, or one opened from a menu, puts
+  focus back on the button or menu that opened it; it fell to the top of the page, where a
+  keyboard user started over.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files

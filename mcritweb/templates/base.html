@@ -162,6 +162,8 @@
      only listen for events, and every `new Autocomplete` waits in whenReady. #}
   <script>later({{ url_for('static', filename='post_action.js')|tojson }})</script>
   <script>later({{ url_for('static', filename='page_loading.js')|tojson }})</script>
+  {# focus for the dialogs, which Bootstrap 5.0.2 leaves to the page; it only listens too #}
+  <script>later({{ url_for('static', filename='keyboard.js')|tojson }})</script>
   <script>later({{ url_for('static', filename='autocomplete.js')|tojson }})</script>
 
   {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
