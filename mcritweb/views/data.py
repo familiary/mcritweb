@@ -4,6 +4,7 @@ import os
 import re
 import types
 import uuid
+from datetime import datetime
 from urllib.parse import quote, urlencode
 
 from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
@@ -858,7 +859,7 @@ def result(job_id):
         # it ran to completion and the report it produced is empty. That is a result
         return render_template("result_empty.html", job_id=job_id)
     # if we are not done processing, list job data
-    return render_template("job_in_progress.html", job_info=job_info)
+    return render_job_in_progress(client, job_info)
 
 #: `UniqueBlocksResult.generateYaraRule`'s own defaults, restated so the page can offer
 #: them as a form. These are not job parameters - the backend stores blocks and
@@ -1495,7 +1496,7 @@ def linkhunt(job_id):
             return render_template("result_empty.html", job_id=job_id)
         return render_template("result_incompatible.html", job_id=job_id)
     # genuinely still working
-    return render_template("job_in_progress.html", job_info=job_info)
+    return render_job_in_progress(client, job_info)
 
 def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
     name_query_sample(job_info, matching_result)
@@ -1593,6 +1594,125 @@ def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
 ################################################################
 # Listing Job information
 ################################################################
+
+# Job.duration is finished_at - started_at of a single job. A job that waits on
+# dependencies - a cross compare waits on one child per sample - does not start until
+# the last child is done, so its own duration covers only the assembly of the result
+# and reads as ~0 however long the matching took (issue #46). created_at ->
+# finished_at brackets the children too, and both are already on the job document, so
+# it costs no additional backend call. Until the job finishes, the far end of that
+# span is the latest time the backend wrote on the job or its dependencies, see
+# `latest_job_timestamp`.
+JOB_TIMESTAMP_FMT = "%Y-%m-%d-%H:%M:%S"
+#: The timestamps the queue writes on a job, all from the backend's own clock.
+JOB_TIMESTAMP_FIELDS = ("created_at", "started_at", "finished_at", "locked_at")
+
+
+def latest_job_timestamp(jobs):
+    """The latest time the backend wrote on any of `jobs`, or None if none is readable.
+
+    mcrit's queue stamps its jobs with `datetime.now()`, the backend's local time
+    (`libs/mongoqueue.py`: created_at on enqueue, started_at and locked_at when a worker
+    takes the job, locked_at again on each progress update, finished_at), and the REST
+    API sends them with a "Z" all the same. Measured against this server's clock, a
+    running job's total was off by the backend's UTC offset - negative east of UTC, so
+    the row was hidden. Measured against the backend's own latest stamp instead, the
+    total is a lower bound, short by the time since that stamp, but never off by a
+    time zone.
+    """
+    latest = None
+    for job in jobs:
+        for field in JOB_TIMESTAMP_FIELDS:
+            try:
+                stamp = job_timestamp_as_datetime(getattr(job, field))
+            except KeyError:
+                # a job document written before the field existed
+                continue
+            if stamp is not None and (latest is None or stamp > latest):
+                latest = stamp
+    return latest
+
+
+def dependency_progress(child_jobs):
+    """How far a job waiting on dependencies actually is, or None if that is unknowable.
+
+    `Job.progress` is the parent's own counter, and a parent does not start until its
+    last child is done - so for the whole time the children run it reads 0, which is the
+    other half of what issue #46 calls meaningless. The children each carry a real
+    progress, and the page that shows this has already fetched them, so averaging costs
+    no additional backend call.
+
+    A finished child counts as done whatever its counter says: a worker that finishes
+    without ticking progress to 1.0 would otherwise hold the parent below 100% forever.
+    A child that has been deleted is skipped rather than counted as 0 - it is not
+    "no progress", it is "no longer knowable", and counting it as zero would make the
+    bar go backwards when a dependency is cleaned up.
+    """
+    known = [job for job in (child_jobs or []) if job is not None]
+    if not known:
+        return None
+    total = 0.0
+    for job in known:
+        total += 1.0 if job.finished_at else min(max(job.progress or 0, 0.0), 1.0)
+    return total / len(known)
+
+
+def job_timestamp_as_datetime(value):
+    """One of Job's timestamps as a datetime, or None if it is unreadable.
+
+    Job.created_at / .finished_at normalize the {"$date": ...} the REST API sends into
+    an ISO string, but hand back whatever the queue stored otherwise - a datetime, for
+    an in-process LocalQueue. Both shapes come back at whole-second resolution: the
+    string one has to be, since parsing it drops the sub-second part, and a total of
+    `0:01:29.510000` beside a `0:00:00` duration reads as a different kind of number.
+    """
+    if isinstance(value, datetime):
+        return value.replace(microsecond=0)
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value[:10] + "-" + value[11:19], JOB_TIMESTAMP_FMT)
+        except ValueError:
+            return None
+    return None
+
+
+@bp.app_template_filter('total_duration')
+def total_duration(job_info, child_jobs=None):
+    """How long a job that waited on dependencies has taken end to end, or None when
+    that is not a number this job can produce.
+
+    A job still waiting on its dependencies is measured up to the latest time the
+    backend wrote on it or on `child_jobs`, the dependencies the page has fetched. That
+    is the state issue #46 is really about - while the children run, the parent has no
+    duration and a progress of 0, so the page a reader watches refresh says nothing
+    at all about how long the work has been going. A page that has not fetched the
+    dependencies gets None for a running job: the parent's own stamps would only give
+    the time between its creation and its children's.
+    """
+    try:
+        if not job_info.all_dependencies:
+            return None
+        created_at = job_timestamp_as_datetime(job_info.created_at)
+        if job_info.finished_at is None:
+            # a failed or terminated job never gets a finished_at, so there is no end
+            # to measure to
+            if job_info.is_failed or job_info.is_terminated or child_jobs is None:
+                return None
+            finished_at = latest_job_timestamp([job_info, *child_jobs])
+        else:
+            finished_at = job_timestamp_as_datetime(job_info.finished_at)
+    except KeyError:
+        # a job document written before one of these fields existed does not carry it
+        return None
+    if created_at is None or finished_at is None:
+        return None
+    if (created_at.tzinfo is None) != (finished_at.tzinfo is None):
+        # one aware, one naive - subtracting them raises, and there is nothing
+        # meaningful to show either way
+        return None
+    duration = finished_at - created_at
+    return duration if duration.total_seconds() >= 0 else None
+
 
 #: Shown on job_corrupted.html. The job document is the backend's, so there is nothing
 #: to do about it here beyond naming it and offering to delete it.
@@ -1871,19 +1991,26 @@ def job_by_id(job_id):
         samples_by_id.update(get_sample_entries(sample_id for job in described_children for sample_id in job.sample_ids or []))
         families_by_id.update(get_family_entries(job.family_id for job in described_children if job.family_id is not None))
     # only a page that will poll needs it, so a finished job's page never reads it
-    job_state = job_overview_state(job_info) if auto_refresh > 0 and not job_info.finished_at else None
-    return render_template('job_overview.html', families=families_by_id, samples=samples_by_id, job_info=job_info, job_state=job_state, auto_refresh=auto_refresh, child_jobs=child_jobs, missing_children=missing_children)
+    job_state = job_overview_state(job_info, child_jobs if dependencies else None) if auto_refresh > 0 and not job_info.finished_at else None
+    return render_template('job_overview.html', families=families_by_id, samples=samples_by_id, job_info=job_info, job_state=job_state, auto_refresh=auto_refresh, child_jobs=child_jobs, child_progress=dependency_progress(child_jobs), missing_children=missing_children)
 
 
-def job_overview_state(job_info):
+def job_overview_state(job_info, child_jobs=None):
     """What the overview of a running job shows that can still change, read off the job
-    alone - without its sub-jobs or the samples and families they name.
+    and, for a job waiting on sub-jobs, off those sub-jobs - never the samples and
+    families they name.
 
     The overview polls `job_status` for this and reloads once the answer differs from
     what it rendered. A reload fetches every sub-job and every sample they name, so it
     should happen when there is something new to show, not on every tick. See #183.
+
+    A job waiting on sub-jobs does not start until the last of them is done, so its own
+    progress reads 0 while they run, and the overview shows their average instead (#46).
+    `child_jobs` are the sub-jobs the backend still has; with them the state also
+    carries that average and how many it covers, for the page to update in place.
+    Neither is a reload trigger: a sub-job's progress moves on every tick.
     """
-    return {
+    state = {
         "started": job_info.started_at is not None,
         "finished": job_info.finished_at is not None,
         "failed": job_info.is_failed,
@@ -1896,17 +2023,29 @@ def job_overview_state(job_info):
         # not the page.
         "unfinished_sub_jobs": len(getattr(job_info, "_data", {}).get("unfinished_dependencies") or []),
     }
+    if child_jobs is not None:
+        known = [job for job in child_jobs if job is not None]
+        state["dependency_progress"] = dependency_progress(known)
+        state["dependencies"] = len(known)
+    return state
 
 
 @bp.route('/jobs/<job_id>/status')
 @visitor_required
 @mcrit_server_required
 def job_status(job_id):
-    """The job overview's polling endpoint: one getJobData, as JSON."""
-    job_info = get_client().getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
+    """The job overview's polling endpoint, as JSON: one getJobData, and for an
+    unfinished job waiting on sub-jobs one queue read per JOB_IDS_PER_REQUEST of them -
+    still no samples or families, which are most of what a reload reads."""
+    client = get_client()
+    job_info = client.getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if job_info is None:
         return {"error": "unknown job"}, 404
-    return job_overview_state(job_info)
+    child_jobs = None
+    dependencies = list(dict.fromkeys(getattr(job_info, "all_dependencies", None) or []))
+    if dependencies and not job_info.finished_at:
+        child_jobs = dependency_jobs(client, dependencies)
+    return job_overview_state(job_info, child_jobs)
 
 
 #: job ids per `getQueueData(job_ids=...)` request. The ids travel in the query string,
@@ -1914,6 +2053,15 @@ def job_status(job_id):
 #: a request line of about 6,250 bytes, over gunicorn's default limit_request_line of
 #: 4,094 (mcrit's USE_GUNICORN). 100 keep it at about 2,530.
 JOB_IDS_PER_REQUEST = 100
+
+
+def render_job_in_progress(client, job_info):
+    """The progress page of a job that has not finished. A job with dependencies gets
+    them fetched, since its total is measured up to the latest time the backend wrote
+    on one of them - see `total_duration`."""
+    dependencies = list(dict.fromkeys(job_info.all_dependencies or []))
+    child_jobs = dependency_jobs(client, dependencies) if dependencies else None
+    return render_template("job_in_progress.html", job_info=job_info, child_jobs=child_jobs)
 
 
 def dependency_jobs(client, job_ids):

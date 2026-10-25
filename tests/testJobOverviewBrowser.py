@@ -124,11 +124,50 @@ def test_an_idle_tick_does_not_reload(browser_page, live_server, backend):
     assert traffic.loads == 1, "an unchanged job reloaded the page"
 
 
-def test_progress_alone_is_updated_in_place(browser_page, live_server, backend):
-    browser_page.route(f"**/data/jobs/{PARENT_JOB_ID}/status", lambda route: route.fulfill(status=200, content_type="application/json", body=status(progress=0.5)))
+@pytest.fixture
+def solo_backend(app):
+    """A running job without sub-jobs, under the id the traffic counter watches."""
+    jobs = CountingJobs(running(job_data(PARENT_JOB_ID, 10, params='{"0": 7}')), [])
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: jobs
+    return jobs
+
+
+def progress_text(page):
+    return page.evaluate("document.getElementById('job-progress').textContent.replace(/\\s+/g, ' ').trim()")
+
+
+def test_progress_alone_is_updated_in_place(browser_page, live_server, solo_backend):
+    answer = status(progress=0.5, unfinished_sub_jobs=0)
+    browser_page.route(f"**/data/jobs/{PARENT_JOB_ID}/status", lambda route: route.fulfill(status=200, content_type="application/json", body=answer))
     traffic = open_overview(browser_page, live_server)
     browser_page.wait_for_function("document.getElementById('job-progress').textContent.trim() === '50.00%'")
 
+    assert traffic.loads == 1
+
+
+def test_the_dependencies_average_is_updated_in_place(browser_page, live_server, backend):
+    """The cell of a job waiting on sub-jobs shows their average (#46): a tick takes it
+    from dependency_progress, not from the job's own counter, which stays at 0."""
+    answer = status(progress=0.0, dependency_progress=0.75, dependencies=2)
+    browser_page.route(f"**/data/jobs/{PARENT_JOB_ID}/status", lambda route: route.fulfill(status=200, content_type="application/json", body=answer))
+    traffic = open_overview(browser_page, live_server)
+    assert progress_text(browser_page) == "62.50% (across 2 dependencies)"
+    browser_page.wait_for_function("document.getElementById('job-progress').textContent.includes('75.00%')")
+
+    assert progress_text(browser_page) == "75.00% (across 2 dependencies)"
+    assert traffic.loads == 1
+
+
+def test_the_dependencies_average_stays_when_no_sub_job_could_be_read(browser_page, live_server, backend):
+    """A tick that read none of the sub-jobs has no average to give; the cell keeps the
+    one it has rather than falling back to the job's own 0."""
+    answer = status(progress=0.0, dependency_progress=None, dependencies=0)
+    browser_page.route(f"**/data/jobs/{PARENT_JOB_ID}/status", lambda route: route.fulfill(status=200, content_type="application/json", body=answer))
+    traffic = open_overview(browser_page, live_server)
+    browser_page.wait_for_timeout(THREE_TICKS_MS)
+
+    assert traffic.polls >= 2
+    assert progress_text(browser_page) == "62.50% (across 2 dependencies)"
     assert traffic.loads == 1
 
 

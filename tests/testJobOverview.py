@@ -31,6 +31,7 @@ LOG = logging.getLogger(__name__)
 PARENT_JOB_ID = "abababababababababababab"
 DONE_JOB_ID = "cdcdcdcdcdcdcdcdcdcdcdcd"
 UNKNOWN_JOB_ID = "efefefefefefefefefefefef"
+SOLO_JOB_ID = "bcbcbcbcbcbcbcbcbcbcbcbc"
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
 logging.disable(logging.CRITICAL)
 
@@ -169,6 +170,10 @@ class CountingJobs(JobsWithHoles):
         self.calls.append(("getFamily", family_id))
         return None
 
+    def getQueueData(self, *args, job_ids=None, **kwargs):
+        self.calls.append(("getQueueData", tuple(job_ids or ())))
+        return super().getQueueData(*args, job_ids=job_ids, **kwargs)
+
 
 @pytest.fixture
 def cross_compare_backend(app):
@@ -184,7 +189,11 @@ def cross_compare_backend(app):
     return backend
 
 
-def test_the_status_of_a_running_job_is_read_off_the_job_alone(client, as_role, cross_compare_backend):
+def test_the_status_of_a_running_job_reads_its_sub_jobs_but_nothing_they_name(client, as_role, cross_compare_backend):
+    """A job waiting on sub-jobs has not started, so its own progress stays 0 while they
+    run; the overview shows their average instead (#46), and the tick brings it along.
+    The sub-jobs are one queue read; the samples they name, most of what a reload
+    reads, are not read at all."""
     as_role("visitor")
     response = client.get(f"/data/jobs/{PARENT_JOB_ID}/status")
 
@@ -195,8 +204,43 @@ def test_the_status_of_a_running_job_is_read_off_the_job_alone(client, as_role, 
         "failed": False,
         "progress": 0.25,
         "unfinished_sub_jobs": 2,
+        # child-7 finished (1.0), child-8 and child-9 at 0.25
+        "dependency_progress": 0.5,
+        "dependencies": 3,
     }
-    assert cross_compare_backend.calls == [("getJobData", PARENT_JOB_ID)], "a tick fetched more than the job it polls"
+    assert cross_compare_backend.calls == [
+        ("getJobData", PARENT_JOB_ID),
+        ("getQueueData", ("child-7", "child-8", "child-9")),
+    ], "a tick fetched more than the job it polls and its sub-jobs"
+
+
+def test_the_status_of_a_job_without_sub_jobs_is_read_off_the_job_alone(client, as_role, app):
+    backend = CountingJobs(running(job_data(SOLO_JOB_ID, 3, "getMatchesForSample", [], params='{"0": 7}')), [])
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend
+    as_role("visitor")
+
+    assert client.get(f"/data/jobs/{SOLO_JOB_ID}/status").get_json() == {
+        "started": True,
+        "finished": False,
+        "failed": False,
+        "progress": 0.25,
+        "unfinished_sub_jobs": 0,
+    }
+    assert backend.calls == [("getJobData", SOLO_JOB_ID)]
+
+
+def test_the_status_of_a_finished_job_does_not_read_its_sub_jobs(client, as_role, app):
+    """Nothing polls a finished job, but a stray request must not cost the queue reads."""
+    children = [job_data("child-7", 7, params='{"0": 7}')]
+    backend = CountingJobs(job_data(DONE_JOB_ID, 10, "combineMatchesToCross", ["child-7"]), children)
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend
+    as_role("visitor")
+
+    state = client.get(f"/data/jobs/{DONE_JOB_ID}/status").get_json()
+
+    assert state["finished"] is True, state
+    assert "dependency_progress" not in state
+    assert backend.calls == [("getJobData", DONE_JOB_ID)]
 
 
 def test_the_status_of_an_unknown_job_is_a_404(client, as_role, cross_compare_backend):
