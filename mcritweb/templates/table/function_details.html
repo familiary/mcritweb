@@ -47,7 +47,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="{{ modal_id }}Label">{{ title }}</h5>
+        <h2 class="modal-title h5" id="{{ modal_id }}Label">{{ title }}</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -99,7 +99,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
     <div class="font-monospace" style="word-break: break-all; font-size: 0.85em;">{{ function_entry.minhash.hex() }} {{ clipboard_btn(function_entry.minhash.hex(), "Copy the MinHash of function " ~ function_entry.function_id) }}</div>
     {% set composition = function_entry.minhash_shingle_composition or {} %}
     {% if composition %}
-      <h6 class="mt-3">Shingle composition</h6>
+      <h3 class="h6 mt-3">Shingle composition</h3>
       <table class="table table-sm mb-0" style="width: auto;">
         <caption class="visually-hidden">Shingle composition</caption>
         <thead class="table-light">

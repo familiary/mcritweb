@@ -157,6 +157,10 @@ rather than reconstructing it from the commit log at release time.
   stayed in the page after the diagram covered it, nor a "slash" between the items of the result
   pages' breadcrumb. Browsers that predate alternative text for generated content show and read them
   as before.
+- Every page has one top-level heading, visually hidden where the page shows none (settings, users,
+  submit, import, export, register, and search before anything is searched), and its sections and
+  dialogs follow it without skipping a level. The 1vsN, 1vs1 and cross compare pages, all titled
+  "Compare", and a link hunt, titled as its result page, have titles of their own.
 
 ### Security
 

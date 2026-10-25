@@ -14,6 +14,7 @@ Import
 {% endblock %}
 {% set suppress_dropzone_overlay=true %}
 {% block content %}
+<h1 class="visually-hidden">Import</h1>
 <div class="d-flex flex-column align-items-center">
     {{ dropzone.create(action= url_for('data.import_view')) }}
     {# the live region is this wrapper, which is rendered from the start: a screen reader

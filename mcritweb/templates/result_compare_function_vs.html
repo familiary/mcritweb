@@ -15,7 +15,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
 {% block content %}
 
 <div class="container">
-<span><h1>Function Comparison: {{ format_function_id(function_id_a) }} vs. {{ format_function_id(function_id_b) }}</h1></span>
+<h1>Function Comparison: {{ format_function_id(function_id_a) }} vs. {{ format_function_id(function_id_b) }}</h1>
     <div id="match_score">
         <h2 class="h3">Match Score: <span id="match_score_value"></span>{% if match_result.matched_score is not none %}{{ "%.0f"|format(match_result.matched_score) }}{% else %}n/a{% endif %}
           {% if match_result.match_is_pichash %}<span class="badge bg-primary" title="Both functions have the same PicHash">PicHash</span>{% endif %}
@@ -164,7 +164,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
 
 
     <div id="xcfg_top" style="min-height: 90px;">
-        <span><h2 class="h3" id="function_xcfg">Function CFGs</h2></span>
+        <h2 class="h3" id="function_xcfg">Function CFGs</h2>
         <span style="float:right"><a href="#top">go to top</a></span>
         <div class="d-flex flex-wrap align-items-center" style="gap: 4px 12px;">
           <span>

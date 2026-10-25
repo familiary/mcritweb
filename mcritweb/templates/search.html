@@ -18,6 +18,8 @@ Search
 
   {% if query %}
     <h1>Results for "{{ query }}"</h1>
+  {% else %}
+    <h1 class="visually-hidden">Search</h1>
   {% endif %}
 
   {# find out if search should be focused #}
