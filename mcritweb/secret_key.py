@@ -16,6 +16,9 @@ the file at once. Each must come away with the one key that ends up on disk - a 
 holding a key of its own would reject every session and CSRF token the others issue,
 until the next restart. So a new key is written in full to a private file first and
 published with `os.link`, which fails rather than overwrite when another process won.
+A filesystem without hard links - vfat, exFAT, some SMB and FUSE mounts - refuses the
+link itself, and there the key goes into a file created with O_EXCL instead, which
+fails the same way, under a lock that keeps the others out until the key is in.
 
 An explicit key in `instance/config.py` still wins. That remains the right answer for
 a multi-host deployment, where all hosts must share one key and a per-host file
@@ -49,6 +52,11 @@ def load_or_create_secret_key(instance_path):
                 return key
             except FileExistsError:
                 pass
+            except OSError:
+                # no hard links here: EPERM on vfat and exFAT, ENOTSUP on some SMB and
+                # FUSE mounts. Any other reason, the create meets as well and raises
+                if _create_key_file(path, key):
+                    return key
             existing = _read_key(path)
             if existing:
                 return existing
@@ -89,6 +97,40 @@ def _stage_new_key(instance_path):
         os.unlink(staged)
         raise
     return staged, key
+
+
+def _create_key_file(path, key):
+    """Publish `key` without a hard link: create `path` with O_EXCL and write it in.
+
+    O_EXCL fails rather than overwrite when another process won, as os.link does, but
+    the file exists - empty - before the key is in it. The lock covers that: it is
+    taken before the write and held until the key is synced, and a process that finds
+    the file empty queues on the same lock in _replace_if_still_empty, so it finds the
+    key there rather than a file to replace. The key goes in with one write, so a read
+    that does not queue finds the file empty, which sends it to the lock, or the key
+    whole. One that got the lock in the moment between the create and this lock has
+    replaced the file already; then `path` no longer names the one written here, and
+    False sends the caller to read the key that took its place.
+
+    fcntl is imported here for the same reason as in _replace_if_still_empty."""
+    import fcntl
+
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return False
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        # buffered, so the 64 characters reach the file in a single write() on close
+        with open(descriptor, "w", closefd=False) as key_file:
+            key_file.write(key)
+        os.fsync(descriptor)
+        try:
+            return os.path.samestat(os.stat(path), os.fstat(descriptor))
+        except FileNotFoundError:
+            return False
+    finally:
+        os.close(descriptor)
 
 
 def _replace_if_still_empty(path, staged):

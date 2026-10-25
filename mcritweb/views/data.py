@@ -51,12 +51,13 @@ bp = Blueprint('data', __name__, url_prefix='/data')
 # Helper functions
 ################################################################
 
-#: A job id as the backend hands it out: a mongo ObjectId (24 hex) or, on a local
-#: queue, a uuid4. A cached report is named after its job id, and the id arrives
-#: straight from the URL - so keep it to characters that cannot leave the cache
-#: directory (no os.sep, no ".."), and to a length a filename can hold. `\Z`, not `$`,
-#: which also matches before a trailing newline - the convention master's own
-#: JOB_ID_PATTERN states for the download route.
+#: A job id as the backend hands it out: a mongo ObjectId (24 hex), which a local
+#: queue mints too since mcrit 1.14 - before that it was a uuid4, and setup.py still
+#: allows those releases. A cached report is named after its job id, and the id
+#: arrives straight from the URL - so keep it to characters that cannot leave the
+#: cache directory (no os.sep, no ".."), and to a length a filename can hold. `\Z`,
+#: not `$`, which also matches before a trailing newline - the convention master's
+#: own JOB_ID_PATTERN states for the download route.
 JOB_ID_RE = re.compile(r"^[0-9A-Za-z_-]{1,64}\Z")
 
 
@@ -72,9 +73,10 @@ def is_cacheable_job_id(job_id):
 #: The diagram filenames create_match_diagram writes and the four result templates
 #: ask for: "<job_id>.png", or "<job_id>-famid_7.png" / "-samid_7" / "-funid_7".
 #: The job id is lazy so that the optional filter suffix is preferred over letting
-#: the id swallow it - a uuid4 job id contains dashes, so a greedy id would read
-#: "<uuid>-famid_7.png" as one long unfiltered id. Query reports number their
-#: functions negatively, hence the optional sign.
+#: the id swallow it - a uuid4 job id, which a local queue issued before mcrit 1.14,
+#: contains dashes, so a greedy id would read "<uuid>-famid_7.png" as one long
+#: unfiltered id. Query reports number their functions negatively, hence the
+#: optional sign.
 #: The filter id is exactly how str(int) spells it, because the whole point of
 #: recognising the name is to render the file that was asked for: "0001" and "-0"
 #: would be rendered as "-famid_1" and "-funid_0", leaving the requested name still
@@ -187,7 +189,8 @@ def load_cached_result(app, job_id):
     cache_path = os.sep.join([app.instance_path, "cache", "results"])
     suffix = f"-{job_id}.json"
     # the length test is what keeps a *partial* id from matching on a dash boundary,
-    # which "endswith" alone would allow for the uuid4 ids a local queue hands out
+    # which "endswith" alone would allow for the uuid4 ids a local queue handed out
+    # before mcrit 1.14
     expected_length = CACHE_TIMESTAMP_LENGTH + len(suffix)
     cached = [name for name in os.listdir(cache_path) if len(name) == expected_length and name.endswith(suffix)]
     # the timestamp prefix is fixed-width, so lexical order is chronological order
@@ -434,6 +437,11 @@ def render_missing_match_diagram(app, filename_match):
 def diagram_file(filename):
     cache_path = os.sep.join([current_app.instance_path, "cache", "diagrams"])
     filename_match = DIAGRAM_FILENAME_RE.match(filename)
+    if filename_match is not None:
+        # the job id the way the backend mints it, as for the result pages (see
+        # JOB_ID_PATTERN) - or every casing of one id is a render and a file of its own
+        filename = filename.lower()
+        filename_match = DIAGRAM_FILENAME_RE.match(filename)
     # only a name this route itself could have produced is worth rendering; anything
     # else - including a diagram cached under a name we no longer generate - is left
     # to send_from_directory, which serves it if it is there and 404s if it is not
@@ -753,7 +761,10 @@ def match_functions_diff(function_id_a, function_id_b):
 # what splits a response header in two. Every route that hands a job id from the
 # request to getJobData, getResultForJob or deleteJob checks it too: the backend
 # client puts it into its request path unquoted, where ".." resolves to the
-# backend's root and its answer was read as a job.
+# backend's root and its answer was read as a job. Upper case passes, and is then
+# lower-cased: the backend mints str(ObjectId), which is lower-case hex, and takes
+# either, but a cached report is named with the id it answers with - so an
+# upper-case URL missed the cache on every visit and wrote another copy.
 JOB_ID_PATTERN = re.compile(r"[0-9a-fA-F]+")
 
 
@@ -766,6 +777,7 @@ def download_result(job_id):
     client = get_client()
     job_info = None
     if JOB_ID_PATTERN.fullmatch(job_id):
+        job_id = job_id.lower()
         job_info = client.getJobData(job_id)
     if job_info is None:
         return render_template("result_invalid.html", job_id=job_id)
@@ -818,6 +830,7 @@ def download_result(job_id):
 def result(job_id):
     if not JOB_ID_PATTERN.fullmatch(job_id):
         return render_template("result_invalid.html", job_id=job_id)
+    job_id = job_id.lower()
     client = get_client()
     # check if we have the respective report already locally cached
     result_json = load_cached_result(current_app, job_id)
@@ -1527,6 +1540,7 @@ LINKHUNTABLE_METHODS = (
 def linkhunt(job_id):
     if not JOB_ID_PATTERN.fullmatch(job_id):
         return render_template("result_invalid.html", job_id=job_id)
+    job_id = job_id.lower()
     client = get_client()
     # check if we have the respective report already locally cached
     result_json = load_cached_result(current_app, job_id)
@@ -1884,7 +1898,10 @@ def job_by_id(job_id):
     auto_refresh = parse_integer_query_param(request, "refresh") or 0
     auto_forward = parse_integer_query_param(request, "forward") or 0
 
-    job_info = client.getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
+    job_info = None
+    if JOB_ID_PATTERN.fullmatch(job_id):
+        job_id = job_id.lower()
+        job_info = client.getJobData(job_id)
     if auto_refresh and job_info and job_info.is_failed:
         auto_refresh = 0
         suppress_processing_message = True
@@ -1975,7 +1992,7 @@ def job_overview_state(job_info):
 @mcrit_server_required
 def job_status(job_id):
     """The job overview's polling endpoint: one getJobData, as JSON."""
-    job_info = get_client().getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
+    job_info = get_client().getJobData(job_id.lower()) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if job_info is None:
         return {"error": "unknown job"}, 404
     return job_overview_state(job_info)
@@ -2033,7 +2050,7 @@ def delete_job_by_id(job_id):
             for job in jobs:
                 client.deleteJob(job.job_id)
     elif JOB_ID_PATTERN.fullmatch(job_id):
-        client.deleteJob(job_id)
+        client.deleteJob(job_id.lower())
     return redirect(url_for("data.jobs"))
     
 
@@ -2283,7 +2300,7 @@ def query_report_sample_info(client, job_info):
 def promote_query(job_id):
     """Add the file a query was run for to the corpus, without a second upload."""
     client = get_client()
-    job_info = client.getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
+    job_info = client.getJobData(job_id.lower()) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if job_info is None:
         flash("The given Job ID doesn't exist", category='error')
         return redirect(url_for('data.jobs'))

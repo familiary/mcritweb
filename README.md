@@ -86,10 +86,10 @@ Every call MCRITweb makes to the MCRIT backend is bounded by `MCRIT_CLIENT_TIMEO
 MCRITweb keeps its users, their settings and the backend address in `instance/mcritweb.sqlite`. The file runs in SQLite's WAL mode, which MCRITweb switches on at startup and SQLite then keeps in the file, so the two gunicorn workers docker-mcrit starts can read while the other writes. In WAL mode two more files live next to it, `mcritweb.sqlite-wal` and `mcritweb.sqlite-shm`, and recent changes can sit in the `-wal` file until SQLite folds them in. So back the database up through SQLite's backup API, which is safe while MCRITweb runs - the docker-mcrit image has Python but no `sqlite3` shell:
 
 ```
-python3 -c "import sqlite3; sqlite3.connect('instance/mcritweb.sqlite').backup(sqlite3.connect('mcritweb-backup.sqlite'))"
+python3 -c "import sqlite3; sqlite3.connect('file:instance/mcritweb.sqlite?mode=ro', uri=True).backup(sqlite3.connect('instance/mcritweb-backup.sqlite'))"
 ```
 
-or stop MCRITweb and copy all three files together. WAL needs `instance/` on a local filesystem, as docker-mcrit's bind mount is; it does not work on a network share.
+Run it from the directory that holds `instance/`: opened read-only, a database that is not there is an error rather than a new, empty one to back up, and the backup goes into `instance/`, so under `docker exec` it lands on the bind mount rather than in the container. Or stop MCRITweb and copy all three files together. WAL needs `instance/` on a local filesystem, as docker-mcrit's bind mount is; it does not work on a network share.
 
 ## Version History
  * unreleased: The sample page shows where a sample's sha256 comes from, in its SHA256 row (familiary/mcrit#270). A sample MCRIT disassembled from an uploaded binary is marked "verified against the uploaded binary"; one indexed from a submitted report or an import carries a note that its sha256 was taken from there and not checked against a binary. A sample stored before mcrit recorded this shows nothing. Neither does any sample while the `mcrit` package installed with MCRITweb predates the field, since MCRITweb reads samples through its `SampleEntry`: nothing breaks, the marker appears once the package is upgraded.

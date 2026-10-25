@@ -480,7 +480,7 @@ def modifySample():
         sample_id = request.form.get("sample_id", None)
         redirection_job_id = request.form.get("redirection_job_id", None)
         if redirection_job_id is not None and (
-                not JOB_ID_PATTERN.fullmatch(redirection_job_id) or client.getJobData(redirection_job_id) is None):
+                not JOB_ID_PATTERN.fullmatch(redirection_job_id) or client.getJobData(redirection_job_id.lower()) is None):
             flash("Trying to redirect from invalid job_Id.", category="error")
             return redirect(url_for('explore.samples'))
         sample_entry = None

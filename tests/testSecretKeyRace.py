@@ -10,11 +10,14 @@ also open the file between another's create and write, read it as empty, and rep
 the key that worker was already using.
 """
 
+import errno
 import fcntl
 import logging
 import multiprocessing
 import os
 import stat
+
+import pytest
 
 from mcritweb import secret_key
 from mcritweb.secret_key import FILENAME, load_or_create_secret_key
@@ -27,20 +30,28 @@ WORKERS = 8
 ROUNDS = 40
 
 
-def _race(instance_paths, barrier, results):
+def _no_hard_links(source, destination):
+    """os.link on vfat, exFAT and some SMB and FUSE mounts."""
+    raise PermissionError(errno.EPERM, os.strerror(errno.EPERM), source, None, destination)
+
+
+def _race(instance_paths, barrier, results, hard_links=True):
     """One worker: in every round, wait for the others, then all ask for the key at once."""
+    if not hard_links:
+        # a spawned process of its own, so this changes nothing outside it
+        os.link = _no_hard_links
     for instance_path in instance_paths:
         barrier.wait(timeout=60)
         results.put((instance_path, load_or_create_secret_key(instance_path)))
 
 
-def _race_workers(instance_paths):
+def _race_workers(instance_paths, hard_links=True):
     """{instance_path: [the key each worker got]} from WORKERS real processes."""
     # spawn rather than fork: the test process may have threads of its own by now
     context = multiprocessing.get_context("spawn")
     barrier = context.Barrier(WORKERS)
     results = context.Queue()
-    workers = [context.Process(target=_race, args=(instance_paths, barrier, results)) for _ in range(WORKERS)]
+    workers = [context.Process(target=_race, args=(instance_paths, barrier, results, hard_links)) for _ in range(WORKERS)]
     for worker in workers:
         worker.start()
     keys = {instance_path: [] for instance_path in instance_paths}
@@ -139,3 +150,72 @@ def test_an_empty_file_replaced_meanwhile_is_not_replaced_again(tmp_path, monkey
     assert load_or_create_secret_key(str(tmp_path)) == winner
     assert (tmp_path / FILENAME).read_text() == winner
     assert os.listdir(tmp_path) == [FILENAME]
+
+
+@pytest.mark.parametrize("error", [errno.EPERM, errno.ENOTSUP], ids=["EPERM", "ENOTSUP"])
+def test_a_filesystem_without_hard_links_still_gets_a_key(tmp_path, monkeypatch, error):
+    """vfat and exFAT refuse a hard link with EPERM, some SMB and FUSE mounts with
+    ENOTSUP. The key used to be written in place, which works there, so publishing
+    with os.link alone turned a first start on one into a start that fails."""
+    def refuse(source, destination):
+        raise OSError(error, os.strerror(error), source, None, destination)
+
+    monkeypatch.setattr(secret_key.os, "link", refuse)
+    key = load_or_create_secret_key(str(tmp_path))
+    assert len(key) == 64
+    assert (tmp_path / FILENAME).read_text() == key
+    assert stat.S_IMODE(os.stat(tmp_path / FILENAME).st_mode) == 0o600
+    assert os.listdir(tmp_path) == [FILENAME], "the staged key was left behind"
+    assert load_or_create_secret_key(str(tmp_path)) == key
+
+
+def test_workers_starting_together_share_one_key_without_hard_links(tmp_path):
+    """There the key file exists, empty, before the key is in it, and a worker finding
+    it like that must not take it for a leftover to replace."""
+    _assert_one_key_per_instance(_race_workers(_fresh_instances(tmp_path, ROUNDS), hard_links=False))
+
+
+def test_a_key_file_replaced_before_it_was_locked_is_not_claimed(tmp_path, monkeypatch):
+    """Without hard links: another worker finds the file this one has just created,
+    still empty, and replaces it in the moment before this one locks it to write."""
+    winner = "c" * 64
+    real_flock = fcntl.flock
+
+    def other_worker_replaces_it_first(descriptor, operation):
+        (tmp_path / "other").write_text(winner)
+        os.replace(tmp_path / "other", tmp_path / FILENAME)
+        return real_flock(descriptor, operation)
+
+    monkeypatch.setattr(secret_key.os, "link", _no_hard_links)
+    monkeypatch.setattr(fcntl, "flock", other_worker_replaces_it_first)
+    assert load_or_create_secret_key(str(tmp_path)) == winner
+    assert (tmp_path / FILENAME).read_text() == winner
+    assert os.listdir(tmp_path) == [FILENAME]
+
+
+def test_a_key_file_is_locked_before_its_key_is_written(tmp_path, monkeypatch):
+    """Without hard links the file exists, empty, before the key is in it. A worker
+    finding it like that queues on its lock before deciding to replace it, so the lock
+    has to be held by then - or that worker replaces a file whose key the one writing
+    it goes on to use. Checked at the write itself, which the race above reaches only
+    now and then."""
+    path = tmp_path / FILENAME
+    real_open = open
+    lock_was_free = []
+
+    def try_the_lock_first(file, *args, **kwargs):
+        if isinstance(file, int):
+            # the descriptor of the file just created, about to have the key written in
+            with real_open(path) as other_worker:
+                try:
+                    fcntl.flock(other_worker.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    lock_was_free.append(True)
+                except BlockingIOError:
+                    lock_was_free.append(False)
+        return real_open(file, *args, **kwargs)
+
+    monkeypatch.setattr(secret_key.os, "link", _no_hard_links)
+    monkeypatch.setattr(secret_key, "open", try_the_lock_first, raising=False)
+    key = load_or_create_secret_key(str(tmp_path))
+    assert lock_was_free == [False], "another worker could lock the empty file and replace it"
+    assert path.read_text() == key
