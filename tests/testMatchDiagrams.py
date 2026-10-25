@@ -110,6 +110,23 @@ def test_diagram_route_serves_the_cached_file_without_re_rendering(client, as_ro
     assert corpus_mcrit.calls == [], "a cached diagram still went to the backend"
 
 
+def test_an_upper_case_job_id_is_served_the_diagram_cached_for_it(client, as_role, app, corpus_mcrit):
+    """Job ids are minted in lower case, and the result pages ask for the diagram by
+    that id. The same id typed in upper case is the same job, so it is the same file -
+    not a render and a file of its own for every casing of the id."""
+    as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+    first = client.get(f"/data/diagrams/{job_id}-famid_1.png")
+    corpus_mcrit.calls.clear()
+
+    second = client.get(f"/data/diagrams/{job_id.upper()}-famid_1.png")
+
+    assert second.status_code == 200
+    assert second.data == first.data
+    assert corpus_mcrit.calls == [], "the cached diagram was rendered again"
+    assert cached_diagrams(app) == [f"{job_id}-famid_1.png"]
+
+
 def test_diagram_route_does_not_need_the_result_cache(client, as_role, app):
     """Nothing guarantees the page was visited first, so the route has to be able to
     fetch the report itself."""
