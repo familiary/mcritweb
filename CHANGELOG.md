@@ -120,6 +120,8 @@ rather than reconstructing it from the commit log at release time.
   without gzip now says `Vary: Accept-Encoding` as well, so that a shared cache keeping it does not
   hand that copy to clients that take gzip.
 - The help page asks for its first screenshot, its largest paint, at high priority.
+- Phones and tablets no longer download the Fraunhofer logo, which the navbar shows only from 992px
+  up.
 
 ### Fixed
 

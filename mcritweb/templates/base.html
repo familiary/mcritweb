@@ -193,8 +193,10 @@
   <button class="navbar-toggler navbar-toggler-end float-end" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
     <span class="navbar-toggler-icon"></span>
   </button>
+  {# lazy, so that below 992px, where it has no box, a phone or tablet does not download it;
+     where it is shown it is in view and loads at once #}
   <a class="right-logo d-none d-lg-block ms-lg-auto mb-lg-auto" href="https://www.fkie.fraunhofer.de/">
-    {{ themed_img(url_for('static', filename='fkie_190x52.gif'), url_for('static', filename='fkie_190x52_dark.png'), alt="Fraunhofer FKIE", width="187", height="52") }}
+    {{ themed_img(url_for('static', filename='fkie_190x52.gif'), url_for('static', filename='fkie_190x52_dark.png'), alt="Fraunhofer FKIE", width="187", height="52", loading="lazy") }}
   </a>
 
 

@@ -330,3 +330,17 @@ def test_the_graph_libraries_stay_out_of_the_head(name):
     first_graph_script = code.index("trace_CFG/main")
     for lib in ("d3.min.js", "graphlib.min.js", "graphlib-dot.min.js", "dagre-d3.min.js", "convexhull.js"):
         assert -1 < code.find("trace_CFG/lib/" + lib) < first_graph_script, lib
+
+
+
+def test_the_logo_a_phone_never_shows_is_not_downloaded_there(client, as_role):
+    """The Fraunhofer logo is `d-none d-lg-block`, so below 992px it has no box, and phones
+    and tablets downloaded it anyway, 1.7 KB (2.8 KB dark) among the page's first requests.
+    Lazy, it is fetched only where it is shown. The MCRIT logo is the largest paint of many
+    pages and stays eager."""
+    as_role("visitor")
+    page = client.get("/explore/samples").get_data(as_text=True)
+    fkie = re.findall(r'<img src="/static/fkie_190x52\.gif[^"]*"[^>]*>', page)
+    assert len(fkie) == 1 and 'loading="lazy"' in fkie[0], fkie
+    mcrit = re.findall(r'<img src="/static/d20_mcrit_cabaret\.png[^"]*"[^>]*>', page)
+    assert len(mcrit) == 2 and all("loading=" not in logo for logo in mcrit), mcrit
