@@ -3,7 +3,7 @@
 {% block title%}
 Register
 {% endblock %}
-{% block style %}<script>later({{ url_for('static', filename='form_fields.js')|tojson }})</script>{% endblock %}
+{% block style %}<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='form_fields.js')|tojson }})</script>{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-center my-4">
   <div style="max-width: 500px; width: 100%;">
