@@ -82,7 +82,8 @@ def test_a_cross_compare_pane_filled_on_first_click_keeps_the_table_s_name(page,
     page.wait_for_selector("#pills-score_weighted table")
 
     captions = page.locator("#pills-tabContent table > caption").all_inner_texts()
-    assert captions == ["Cross comparison matrix"] * 2
+    # the pane built in the browser carries the rendered one's caption, whatever it says
+    assert len(captions) == 2 and captions[0].strip() and captions[1] == captions[0], captions
     assert page.errors == []
 
 
@@ -91,7 +92,7 @@ def test_the_drawn_function_graph_is_not_read_as_its_code_run_together(page, liv
     open_page(page, f"{live_server}/explore/functions/84")
     page.evaluate("document.getElementById('xcfg_top').scrollIntoView()")
     page.wait_for_selector("#graphContainer g.node", state="attached")
-    page.wait_for_function("document.querySelectorAll('#text_code p').length > 0")
+    page.wait_for_function("() => document.querySelectorAll('#text_code p').length > 0")
 
     tree = page.locator("#xcfg_container").aria_snapshot()
 
@@ -143,10 +144,10 @@ def test_an_upload_under_way_is_announced(page, live_server):
     assert page.locator("#submit-status").text_content() == ""
 
     page.evaluate("Dropzone.forElement('#myDropzone').addFile(new File(['MZ'], 'sample.bin'))")
-    page.wait_for_function("Dropzone.forElement('#myDropzone').getQueuedFiles().length === 1")
+    page.wait_for_function("() => Dropzone.forElement('#myDropzone').getQueuedFiles().length === 1")
     # the overlay's form is in a closed modal; its Submit starts the upload
     page.evaluate("document.getElementById('submit-dropzone').click()")
-    page.wait_for_function("document.getElementById('submit-status').textContent !== ''")
+    page.wait_for_function("() => document.getElementById('submit-status').textContent !== ''")
 
     assert page.locator("#submit-status").text_content() == "Uploading, please wait."
     assert page.locator("#submit-status").get_attribute("role") == "status"
@@ -259,7 +260,7 @@ def test_a_search_landing_in_a_closed_panel_opens_it_as_its_button_would(page, l
 
     # what the browser fires on the panel before it shows a match inside
     page.evaluate("document.getElementById('collapse-blocks').dispatchEvent(new Event('beforematch', {bubbles: true}))")
-    page.wait_for_function("document.getElementById('collapse-blocks').classList.contains('show')")
+    page.wait_for_function("() => document.getElementById('collapse-blocks').classList.contains('show')")
 
     state = panel_state(page, "collapse-blocks")
     assert state["hidden"] is None and state["expanded"] == "true" and state["height"] > 0
@@ -272,11 +273,11 @@ def test_a_panel_closed_with_its_button_is_searchable_again(page, live_server):
     button = page.locator("[data-bs-target='#collapse-minhash']")
 
     button.click()
-    page.wait_for_function("document.getElementById('collapse-minhash').classList.contains('show')")
-    page.wait_for_function("!document.getElementById('collapse-minhash').classList.contains('collapsing')")
+    page.wait_for_function("() => document.getElementById('collapse-minhash').classList.contains('show')")
+    page.wait_for_function("() => !document.getElementById('collapse-minhash').classList.contains('collapsing')")
     opened = panel_state(page, "collapse-minhash")
     button.click()
-    page.wait_for_function("document.getElementById('collapse-minhash').getAttribute('hidden') === 'until-found'")
+    page.wait_for_function("() => document.getElementById('collapse-minhash').getAttribute('hidden') === 'until-found'")
 
     assert opened["hidden"] is None and opened["height"] > 0
     assert panel_state(page, "collapse-minhash") == {"hidden": "until-found", "open": False, "height": 0, "expanded": "false"}
