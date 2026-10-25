@@ -603,3 +603,14 @@ main #xcfg_text_right {
   font-size: 0.75rem;
   line-height: 1;
 }
+
+/* The yes and no of an icon or a message: green and dark red, and their dark-theme values
+   (theme-dark.css redefines the two properties). They were a style attribute on 36 elements,
+   each a place to change a colour, and one the dark sheet could only outweigh with
+   !important. After .graph-note above, whose colour the error note replaces. */
+.status-yes {
+  color: var(--status-yes);
+}
+.status-no {
+  color: var(--status-no);
+}

@@ -21,6 +21,7 @@ STATIC = ROOT / "static"
 #: is not one of them
 LITERAL_STYLES = [
     re.compile(r'style="[^"]*text-align:\s*(?:right|center)\s*;'),
+    re.compile(r'style="[^"]*color:\s*var\(--status-(?:yes|no)\)'),
 ]
 
 
@@ -44,3 +45,11 @@ def test_the_alignment_classes_are_in_the_bootstrap_subset(name):
     has to be in the cut, or the cells go back to the left."""
     subset = (STATIC / "css" / "bootstrap-subset.css").read_text()
     assert re.search(rf"\.{name}\s*\{{[^}}]*text-align", subset)
+
+
+@pytest.mark.parametrize("name", ["yes", "no"])
+def test_the_status_classes_take_their_colour_from_the_theme_token(name):
+    """The token is what theme-dark.css redefines; a class that named a colour would not
+    follow it."""
+    css = (STATIC / "style.css").read_text()
+    assert re.search(rf"\.status-{name}\s*\{{\s*color:\s*var\(--status-{name}\);\s*\}}", css)

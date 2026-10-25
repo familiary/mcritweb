@@ -178,9 +178,9 @@ macro, which is why they are not parameters.
           {% elif column_type == "num_pichash" %}
             <td class="text-end" valign="middle">{{ aggregate["pichash_matches"] }}</td>
           {% elif column_type == "is_library_match" %}
-            <td class="text-end" valign="middle"><i {% if aggregate["library_matches"] %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+            <td class="text-end" valign="middle"><i {% if aggregate["library_matches"] %} class="status-yes fa-solid fa-square-check" {% else %} class="status-no fa-solid fa-times-circle" {% endif %}></i></td>
           {% elif column_type == "is_unique_match" %}
-            <td class="text-end" valign="middle"><i {% if aggregate["is_family_unique"] %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+            <td class="text-end" valign="middle"><i {% if aggregate["is_family_unique"] %} class="status-yes fa-solid fa-square-check" {% else %} class="status-no fa-solid fa-times-circle" {% endif %}></i></td>
           {% endif %}
         {% endfor %}{% endmacro %}
 
@@ -233,12 +233,12 @@ macro, which is why they are not parameters.
       {% elif column_type == "best_score" %}
       <td class="text-end" valign="middle">{{ "%3.0f"|format(matched_function.matched_score) }}</td>
       {% elif column_type == "is_minhash_match" %}
-      <td class="text-center" valign="middle"><i {% if matched_function.match_is_minhash %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td class="text-center" valign="middle"><i {% if matched_function.match_is_minhash %} class="status-yes fa-solid fa-square-check" {% else %} class="status-no fa-solid fa-times-circle" {% endif %}></i></td>
       {% elif column_type == "is_pichash_match" %}
-      <td class="text-center" valign="middle"><i {% if matched_function.match_is_pichash %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td class="text-center" valign="middle"><i {% if matched_function.match_is_pichash %} class="status-yes fa-solid fa-square-check" {% else %} class="status-no fa-solid fa-times-circle" {% endif %}></i></td>
       {% elif column_type == "is_library_match" %}
-      <td class="text-center" valign="middle"><i {% if matching_result.hasLibraryMatch(matched_function.function_id) %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td class="text-center" valign="middle"><i {% if matching_result.hasLibraryMatch(matched_function.function_id) %} class="status-yes fa-solid fa-square-check" {% else %} class="status-no fa-solid fa-times-circle" {% endif %}></i></td>
       {% elif column_type == "is_unique_match" and unique_match_known %}
-      <td class="text-center" valign="middle"><i {% if matching_result.getFamilyIdsMatchedByFunctionId(matched_function.function_id)|length == 1 %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+      <td class="text-center" valign="middle"><i {% if matching_result.getFamilyIdsMatchedByFunctionId(matched_function.function_id)|length == 1 %} class="status-yes fa-solid fa-square-check" {% else %} class="status-no fa-solid fa-times-circle" {% endif %}></i></td>
       {% endif %}
     {% endfor %}{% endmacro %}

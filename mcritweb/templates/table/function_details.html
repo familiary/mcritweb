@@ -92,7 +92,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
   {% if function_entry.minhash|length > 0 %}
     {% set num_slots = function_entry.minhash|length // 4 %}
     <p class="mb-1">
-      <i style="color:var(--status-yes);" class="fa-solid fa-square-check"></i>
+      <i class="status-yes fa-solid fa-square-check"></i>
       MinHash available, {{ num_slots }} x 32 bit:
     </p>
     <div class="font-monospace" style="word-break: break-all; font-size: 0.85em;">{{ function_entry.minhash.hex() }} {{ clipboard_btn(function_entry.minhash.hex()) }}</div>
@@ -123,7 +123,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
     {% endif %}
   {% else %}
     <p class="mb-0">
-      <i style="color:var(--status-no);" class="fa-solid fa-times-circle"></i>
+      <i class="status-no fa-solid fa-times-circle"></i>
       No MinHash - the function is below the size threshold for minhashing, or the MinHash job has not run yet. Only PicHash matching applies.
     </p>
   {% endif %}

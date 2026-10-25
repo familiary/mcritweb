@@ -133,7 +133,7 @@
       {% elif column_type == "num_functions" %}
         <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
       {% elif column_type == "is_library" %}
-        <td align="center" valign="middle"><i {% if sample.is_library %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+        <td align="center" valign="middle"><i {% if sample.is_library %} class="status-yes fa-solid fa-square-check" {% else %} class="status-no fa-solid fa-times-circle" {% endif %}></i></td>
       {% endif %}
     {% endfor %}
     {% if show_hint %}
@@ -148,7 +148,7 @@
              its name (WCAG 2.5.3) #}
           <button type="button" title="Analyze" class="btn btn-outline-dark btn-sm dropdown-toggle" id="sample_{{ sample.sample_id }}_analyze" data-bs-toggle="dropdown" aria-expanded="false">
             {% if job_collection and matching_jobs %}
-            <i style="color: var(--status-yes);" class="fa-solid fa-flask" aria-hidden="true"></i><span class="visually-hidden">Analyze sample {{ sample.sample_id }}, matching jobs:</span>&nbsp;{{ matching_jobs | length}}
+            <i class="status-yes fa-solid fa-flask" aria-hidden="true"></i><span class="visually-hidden">Analyze sample {{ sample.sample_id }}, matching jobs:</span>&nbsp;{{ matching_jobs | length}}
             {% else %}
             <i class="fa-solid fa-flask" aria-hidden="true"></i><span class="visually-hidden">Analyze sample {{ sample.sample_id }}</span>
             {% endif %}
