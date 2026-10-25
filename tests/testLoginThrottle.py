@@ -223,5 +223,44 @@ def test_no_account_can_be_named_like_a_registration_token_counter(app, client, 
         assert UserInfo.fromDb(username="register:alice") is None
 
 
+def _throttle_lines(caplog):
+    return [record.getMessage() for record in caplog.records if record.getMessage().startswith("throttled")]
+
+
+def test_a_refused_attempt_logs_a_bounded_name(client, registered_user, caplog):
+    """The name comes from the form as typed, up to the form field limit, and a refused
+    attempt is cheap to send; logged whole, each one added that much to the log."""
+    burn_the_budget(client)
+    long_name = "x" * 100_000
+    logging.disable(logging.NOTSET)
+    try:
+        with caplog.at_level(logging.WARNING):
+            attempt(client, long_name, "not the password")
+            client.post("/register", data={
+                "username": long_name, "inputPassword1": "pw-12345678", "inputPassword2": "pw-12345678",
+                "registrationToken": "a guess",
+            }, environ_base=HERE)
+    finally:
+        logging.disable(logging.CRITICAL)
+    lines = _throttle_lines(caplog)
+    assert len(lines) == 2
+    for line in lines:
+        assert len(line) < 200
+        # /register counts under "register:<name>", nine characters more
+        assert line.endswith(("... (100000 characters)", "... (100009 characters)"))
+
+
+def test_a_refused_attempt_still_names_a_real_account_whole(client, registered_user, caplog):
+    burn_the_budget(client)
+    name = "twenty.characters_ok"  # as long as a username can be
+    logging.disable(logging.NOTSET)
+    try:
+        with caplog.at_level(logging.WARNING):
+            attempt(client, name, "not the password")
+    finally:
+        logging.disable(logging.CRITICAL)
+    assert _throttle_lines(caplog) == [f"throttled 203.0.113.7 after {db.LOGIN_ATTEMPT_LIMIT} recent failures, 0 of them against {name!r}"]
+
+
 if __name__ == "__main__":
     unittest.main()
