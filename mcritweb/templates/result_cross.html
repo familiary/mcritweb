@@ -74,6 +74,7 @@ Results for Job: {{ job_info.job_id }}
    on (scripts/subset_jquery_ui.py), 76 KB of the full build's 529. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='jquery-ui.css') }}">
 <script>later({{ url_for('static', filename='jquery-ui-sortable.js')|tojson }})</script>
+<script>later({{ url_for('static', filename='reorder_list.js')|tojson }})</script>
 
 <script>
   whenReady( function() {
@@ -83,7 +84,7 @@ Results for Job: {{ job_info.job_id }}
     var array1 = document.getElementById('sortable').children;
     var array2 = []
     for (let i = 0; i < array1.length; i++) {
-        array2.push(array1[i].innerHTML.split(' ')[0]);} 
+        array2.push(array1[i].getAttribute("data-sample-id"));} 
     window.location.href = "{{ url_for('data.result', job_id=job_info.job_id) }}" + "?custom=" + array2;
   }
 </script>
@@ -211,15 +212,21 @@ Results for Job: {{ job_info.job_id }}
 <h1>Results for Job: {{ job_info.method|job_name }}</h1>
 {{ job_column_table(job_info, show_created=False, show_started=False, show_finished=False) }}
 
-<p>Cross Comparison of {{ samples[rendered_method]|length }} samples in the data set. You can order the samples in this list per drag and drop to change the order in the matrices, or use the ordering buttons to switch between the clustered order, ascending sample ID and family name. The sample ID and family orders, and an order dragged here, apply to all matrices, not just the one on screen; the clustered order is computed for each matching method separately, and this list shows the one of the first tab.</p>
+<p>Cross Comparison of {{ samples[rendered_method]|length }} samples in the data set. You can order the samples in this list per drag and drop, or with the arrow buttons beside each, to change the order in the matrices, or use the ordering buttons to switch between the clustered order, ascending sample ID and family name. The sample ID and family orders, and an order dragged here, apply to all matrices, not just the one on screen; the clustered order is computed for each matching method separately, and this list shows the one of the first tab.</p>
 <div class="container">
     <div class="row">
       <div class="col-sm-auto">
+        {# dragged by a pointer; the buttons move a sample by key or by touch
+           (static/reorder_list.js), which jQuery UI's drag takes neither of #}
         <ul style="list-style: none" id="sortable">
             {% for sample in samples[rendered_method] %}
-            <li>{{ sample.sample_id ~' '~ sample.family ~ ' ' ~ sample.version}}</li>
+            <li class="reorder-item" data-reorder-item data-reorder-label="Sample {{ sample.sample_id }}" data-sample-id="{{ sample.sample_id }}"><span>{{ sample.sample_id ~' '~ sample.family ~ ' ' ~ sample.version}}</span>
+              <button type="button" class="btn btn-outline-dark btn-sm" data-reorder="up" aria-label="Move sample {{ sample.sample_id }} up" title="Move up"><i class="fa-solid fa-angle-right fa-rotate-270" aria-hidden="true"></i></button>
+              <button type="button" class="btn btn-outline-dark btn-sm" data-reorder="down" aria-label="Move sample {{ sample.sample_id }} down" title="Move down"><i class="fa-solid fa-angle-right fa-rotate-90" aria-hidden="true"></i></button>
+            </li>
             {% endfor %}
           </ul>
+          <div id="reorder-status" class="visually-hidden" role="status"></div>
       </div>
       <div class="col-sm-auto align-self-center mb-3">
         <button onclick="changeorder()"type="button" class="btn btn-primary ">Change order</button> 

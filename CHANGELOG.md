@@ -158,6 +158,12 @@ rather than reconstructing it from the commit log at release time.
   result opens its page from the keyboard: its id is a link now. A click on the row was the only
   way in, which no key can make, and a queued or running job's page had no other way in at all. A
   click elsewhere on the row still opens it.
+- The table columns under Settings, and the sample order of a cross compare result, can be ordered
+  with the keyboard and on a touch screen. Dragging was the only way: no key reached the items, and
+  the cross compare's drag took no touch, so a keyboard user could not choose a table's columns and
+  a phone could not set a custom sample order. Each item has buttons to move it up and down, and a
+  column one to move it between Active and Available; a screen reader is told where it went.
+  Dragging works as before.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files

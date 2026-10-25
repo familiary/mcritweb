@@ -48,16 +48,16 @@ def live_server(app):
 
 @pytest.fixture
 def open_as(app, live_server, make_user):
-    """open_as(role, path) -> a Chromium page signed in as `role`, at `path`, once its
-    queued scripts have run."""
+    """open_as(role, path, **context options) -> a Chromium page signed in as `role`, at
+    `path`, once its queued scripts have run."""
     with sync_api.sync_playwright() as playwright:
         try:
             browser = playwright.chromium.launch(executable_path=os.environ.get("MCRITWEB_CHROMIUM") or None)
         except sync_api.Error as error:
             pytest.skip(f"no Chromium for playwright to drive: {error}")
         try:
-            def _open(role, path):
-                context = browser.new_context(viewport={"width": 1280, "height": 900})
+            def _open(role, path, **context_options):
+                context = browser.new_context(**{"viewport": {"width": 1280, "height": 900}, **context_options})
                 context.add_cookies([{
                     "name": app.config["SESSION_COOKIE_NAME"],
                     "value": session_cookie_for(app, make_user(role=role)),
@@ -419,3 +419,52 @@ def test_a_click_elsewhere_on_a_row_still_opens_it(open_as, live_server):
     with page.expect_navigation():
         row.locator("td").nth(2).click()
     assert page.url == f"{live_server}/explore/samples/{sample_id}"
+
+
+def column_order(page, table):
+    return page.evaluate("table => [getElementsFromContainer(table + '_active'), getElementsFromContainer(table + '_available')]", table)
+
+
+def test_a_column_moves_up_down_and_across_from_the_keyboard(open_as):
+    """The column lists were ordered by dragging and nothing else; no key reached an item."""
+    page = open_as("contributor", "/settings")
+    page.click("#pills-column-settings-tab")
+    page.wait_for_selector("#samples_table_active [data-reorder]", state="visible")
+    active, available = column_order(page, "samples_table")
+    first, second = active[:2]
+
+    page.focus(f"#samples_table_active [data-column='{first}'] [data-reorder='down']")
+    page.keyboard.press("Enter")
+    assert column_order(page, "samples_table") == [[second, first] + active[2:], available]
+    assert page.evaluate("document.activeElement.getAttribute('aria-label')") == f"Move {first} down"
+    assert page.inner_text("#reorder-status") == f"{first} moved to position 2 of {len(active)} in Active."
+
+    page.keyboard.press("Shift+Tab")
+    page.keyboard.press("Space")
+    assert column_order(page, "samples_table")[0] == active
+    page.keyboard.press("Space")
+    assert page.inner_text("#reorder-status") == f"{first} is already first."
+
+    across = f"#samples_table_active [data-column='{first}'] [data-reorder='across']"
+    page.focus(across)
+    page.keyboard.press("Enter")
+    assert column_order(page, "samples_table") == [active[1:], available + [first]]
+    moved = page.locator(f"#samples_table_available [data-column='{first}'] [data-reorder='across']")
+    assert moved.evaluate("button => button === document.activeElement")
+    assert moved.get_attribute("aria-label") == f"Move {first} to Active"
+    assert page.inner_text("#reorder-status") == f"{first} moved to position {len(available) + 1} of {len(available) + 1} in Available."
+
+
+def test_a_cross_compare_sample_moves_by_touch(open_as, live_server):
+    """jQuery UI's drag takes no touch, so a phone could not set an order of its own."""
+    page = open_as("visitor", f"/data/result/{job_id_of('cross_compare')}", has_touch=True, is_mobile=True,
+                   viewport={"width": 390, "height": 844})
+    order = page.eval_on_selector_all("#sortable li", "items => items.map(item => item.dataset.sampleId)")
+
+    page.tap(f"#sortable li[data-sample-id='{order[0]}'] [data-reorder='down']")
+    assert page.eval_on_selector_all("#sortable li", "items => items.map(item => item.dataset.sampleId)") == [order[1], order[0]] + order[2:]
+    assert page.inner_text("#reorder-status") == f"Sample {order[0]} moved to position 2 of {len(order)}."
+
+    with page.expect_navigation():
+        page.tap("text=Change order")
+    assert page.url.endswith("?custom=" + ",".join([order[1], order[0]] + order[2:]))

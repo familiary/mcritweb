@@ -1688,7 +1688,7 @@ def sortable_order(html):
     otherwise a drag starts from an order the user is not looking at."""
     block = re.search(r'id="sortable">(.*?)</ul>', html, re.S)
     assert block is not None, "the cross compare page has no drag-and-drop list"
-    return [item.split()[0] for item in re.findall(r"<li>(.*?)</li>", block.group(1), re.S)]
+    return re.findall(r'<li [^>]*data-sample-id="(-?\d+)"', block.group(1))
 
 
 def matrix_orders(html):
