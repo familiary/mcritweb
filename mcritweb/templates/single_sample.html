@@ -149,7 +149,8 @@ Sample: {{ entry.sample_id }}
 </div>
 <h2 class="h3">Search</h2>
   <form style="width:100%" method="GET" action="#" data-live-search="sample-functions">
-    <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search by function name or offset (0x...)" aria-label="Search this sample's functions by name or offset" aria-controls="sample-functions" autofocus autocomplete="on">
+    <label for="query" class="visually-hidden">Search this sample's functions by name or offset</label>
+    <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search by function name or offset (0x...)" aria-controls="sample-functions" autofocus autocomplete="on">
     <input type='submit' hidden>
   </form>
   <p id="sample-functions-status" class="visually-hidden" role="status"></p>

@@ -3,6 +3,7 @@
 {% from 'table/matching_statistics_table.html' import matching_statistics_table %}
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
 {% from 'table/match_row.html' import famlib_header, famlib_row, matched_function_header, matched_function_row %}
+{% from 'table/filter_fields.html' import filter_field %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -42,9 +43,8 @@ Results for Job: {{ job_info.job_id }}
 <p>selection: {{ funp.max_value }}, showing: {{ 1 + funp.start_index }} - {{ funp.end_index }} (filtered: {{ matching_result.num_original_function_matches - funp.max_value}})</p>
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#function-matches" method='GET'>
   <div class="form-group row">
-    <label class="col-4">Filter results to</label>
-    <input class="col-4" type="text" name='filter_function_min_score' id="filter_function_min_score" placeholder="min score (0-100)" {% if matching_result.getFilterValue("filter_function_min_score") is not none %}value="{{matching_result.getFilterValue("filter_function_min_score")}}"{% endif %}>
-    <input class="col-4" type="text" name='filter_function_max_score' id="filter_function_max_score" placeholder="max score (0-100)" {% if matching_result.getFilterValue("filter_function_max_score") is not none %}value="{{matching_result.getFilterValue("filter_function_max_score")}}"{% endif %}>
+    {{ filter_field("filter_function_min_score", "Min. score", matching_result.getFilterValue("filter_function_min_score"), placeholder="0-100") }}
+    {{ filter_field("filter_function_max_score", "Max. score", matching_result.getFilterValue("filter_function_max_score"), placeholder="0-100") }}
     <input class="col-1" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" {% if matching_result.getFilterValue("filter_exclude_library") %}checked{% endif %}>
     <label class="col-3" for="filter_exclude_library">exclude functions with library hits</label>
     <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>

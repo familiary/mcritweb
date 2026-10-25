@@ -134,6 +134,7 @@ function handleSliderChange(val) {
 <div class="row">
   <div class="col-12 col-lg-6 mb-3">
     <form style="width:100%" id="compare_search_form_a">
+      <label for="Search_a" class="visually-hidden">Search for sample A</label>
       <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query_a" id="Search_a" value="{{ query_a }}" placeholder="Search" autofocus autocomplete="on">
     </form>
     {{ set_pagination_params(pagination_a, _js_argument_provider="fetchState", _anchor="Search_a") }}
@@ -146,6 +147,7 @@ function handleSliderChange(val) {
   </div>
   <div class="col-12 col-lg-6 mb-3">
     <form style="width:100%" id="compare_search_form_b">
+      <label for="Search_b" class="visually-hidden">Search for sample B</label>
       <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query_b" id="Search_b" value="{{ query_b }}" placeholder="Search" autofocus autocomplete="on">
     </form>
     {{ set_pagination_params(pagination_b, _js_argument_provider="fetchState", _anchor="Search_b") }}

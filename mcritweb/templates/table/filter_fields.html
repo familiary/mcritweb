@@ -1,0 +1,23 @@
+{#
+  A field of the filter forms - the result pages', the link hunt's, the unique blocks
+  page's and the default result filter on the settings page - with a visible label of its
+  own above it.
+
+  These forms used to caption a row of fields with one <label> that had no `for`, so it
+  named none of them, and told the fields of a row apart by their placeholders alone. A
+  placeholder goes as soon as its field holds a value, and the defaults fill most of
+  them, so "regular" and "nonlib" could not be told apart on screen, and a screen reader
+  named each field by its placeholder. Each field also carried an aria-describedby naming
+  itself, which read its value out a second time as its description.
+
+  `value` is printed as it is given, so an offset comes formatted; none leaves the field
+  empty. `cols` are the grid classes of the field's cell in the form's row.
+#}
+{% macro filter_field(name, label, value=none, cols="col-6 col-sm-3", placeholder="") -%}
+  <div class="{{ cols }} filter-field">
+    <label class="form-label" for="{{ name }}">{{ label }}</label>
+    <input class="form-control" type="text" name="{{ name }}" id="{{ name }}"
+      {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
+      {%- if value is not none %} value="{{ value }}"{% endif %}>
+  </div>
+{%- endmacro %}

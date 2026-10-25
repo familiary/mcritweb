@@ -9,17 +9,21 @@ Register
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <h3 class="mb-3">Define User Details:</h3>
     <div class="mb-2">
-      <input name='username' class="form-control" id="username" aria-label="Enter username" placeholder="Enter username" title="Allowed: ^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$ -- i.e. 3-20 chars, alphanumeric with single dots and underscores in the middle" pattern="^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$" autocomplete="username" spellcheck="false" autocapitalize="off" autocorrect="off" required autofocus>
+      <label for="username" class="form-label">Username</label>
+      <input name='username' class="form-control" id="username" title="Allowed: ^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$ -- i.e. 3-20 chars, alphanumeric with single dots and underscores in the middle" pattern="^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$" autocomplete="username" spellcheck="false" autocapitalize="off" autocorrect="off" required autofocus>
     </div>
     <div class="mb-2">
-      <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" aria-label="Enter password" placeholder="Enter password" autocomplete="new-password" required>
+      <label for="inputPassword1" class="form-label">Password</label>
+      <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" autocomplete="new-password" required>
     </div>
     <div class="mb-3">
-        <input type="password" class="form-control" name="inputPassword2" id="inputPassword2" aria-label="Confirm password" placeholder="Confirm password" autocomplete="new-password" required>
+        <label for="inputPassword2" class="form-label">Confirm password</label>
+        <input type="password" class="form-control" name="inputPassword2" id="inputPassword2" autocomplete="new-password" required>
     </div>
     {% if is_registration_token_required %}
       <div class="mb-3">
-        <input class="form-control" name="registrationToken" id="registrationToken" aria-label="Registration token" placeholder="Enter registration token" value="{{ query_token }}" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" required>
+        <label for="registrationToken" class="form-label">Registration token</label>
+        <input class="form-control" name="registrationToken" id="registrationToken" value="{{ query_token }}" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" required>
       </div>
     {% endif %}
       {% if g.first_user %}

@@ -16,7 +16,8 @@ Families
 <h1>Overview of Families</h1>
   <div class="d-flex align-items-center" style="width:100%">
     <form class="flex-grow-1 me-3" method="GET" action="#" data-live-search="family-list">
-      <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" aria-label="Search families" aria-controls="family-list" autofocus autocomplete="on">
+      <label for="query" class="visually-hidden">Search families</label>
+      <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" aria-controls="family-list" autofocus autocomplete="on">
       <input type='submit' hidden>
     </form>
     <div class="d-flex align-items-center">

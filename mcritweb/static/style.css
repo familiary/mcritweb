@@ -391,3 +391,12 @@ form.form-inline input {
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }
+
+/* The filter forms' fields (templates/table/filter_fields.html): a label above its field.
+   Where a label wraps to a second line, as the longer ones do on a phone, its field stays
+   level with the fields beside it instead of dropping below them. */
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}

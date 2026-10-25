@@ -148,6 +148,14 @@ rather than reconstructing it from the commit log at release time.
 - Phone keyboards no longer capitalise or "correct" what is typed into a search box, a username, a
   token or the family, version and base address of an upload, and the hash list and YARA rule are
   not spellchecked. The search boxes are search fields, with a Search key on a phone keyboard.
+- Every form field has a label of its own. The result, link hunt, unique blocks and default filter
+  forms named a row of fields with one caption that was tied to none of them, and told "regular"
+  from "nonlib" by placeholders, which are gone once a field holds a value; each field now has a
+  visible label above it, and no longer describes itself with its own value to a screen reader.
+  The sign-in, registration, settings and upload fields show their labels instead of relying on
+  placeholders, the search boxes have a label for screen readers, and the export field answers to
+  the label it shows. The filter fields are full-size form fields, so a phone no longer zooms in on
+  them.
 
 ### Security
 
