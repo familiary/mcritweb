@@ -201,6 +201,13 @@ Results for Job: {{ job_info.job_id }}
       deleteSampleButton.hidden = true;
     }
   }
+    // every opening starts disarmed: Delete ticked and the dialog closed would otherwise
+    // come back ticked for the next sample, and its plain Submit would delete that one
+    document.getElementById('editSampleModal').addEventListener('show.bs.modal', function () {
+      var deleteBox = document.getElementById('sample_delete');
+      deleteBox.checked = false;
+      toggle_delete_sample(deleteBox);
+    });
   </script>
 
 

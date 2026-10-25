@@ -129,6 +129,13 @@
       keepSamplesForFamilyDiv.hidden = true;
     }
   }
+    // every opening starts disarmed, as the sample dialog's does
+    document.getElementById('editFamilyModal').addEventListener('show.bs.modal', function () {
+      var deleteBox = document.getElementById('family_delete');
+      deleteBox.checked = false;
+      document.getElementById('family_keeping_samples').checked = true;
+      toggle_delete_family(deleteBox);
+    });
   </script>
   {{ _table_base(families, family_header, family_row, table_id=table_id, **kwargs) }}
   {% else %}
@@ -195,6 +202,13 @@
       deleteSampleButton.hidden = true;
     }
   }
+    // every opening starts disarmed: Delete ticked and the dialog closed would otherwise
+    // come back ticked for the next sample, and its plain Submit would delete that one
+    document.getElementById('editSampleModal').addEventListener('show.bs.modal', function () {
+      var deleteBox = document.getElementById('sample_delete');
+      deleteBox.checked = false;
+      toggle_delete_sample(deleteBox);
+    });
   </script>
   {{ _table_base(samples, sample_header, sample_row, table_id=table_id, **kwargs) }}
   {% else %}
