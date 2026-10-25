@@ -110,16 +110,17 @@
   --cfg-matched: #c8a05a;
   --cfg-tooltip-bg: var(--surface-raised);
   --cfg-tooltip-shadow: 4px 4px 10px rgba(0, 0, 0, 0.6);
+  /* how much of a cycle's colour shows over the canvas (see .node[fill="white"] below) */
+  --cfg-cycle-opacity: 0.35;
   /* names only the CFG viewer section below needs: what outlines a hovered block or edge
      (the light theme's #008080 is 3.8:1 on the canvas and 1.7:1 on the palest loop fill;
      the accent is 8.1:1 and 4.7:1); the rose of a loop's back edge, from #dd1c77 (3.9:1
-     and 1.7:1) to 5.5:1 and 3.2:1; how much of a loop's colour shows over the canvas, and
-     how much of a cycle's; the lift of the hovered line of code */
+     and 1.7:1) to 5.5:1 and 3.2:1; how much of a loop's colour shows over the canvas; the
+     lift of the hovered line of code */
   --cfg-highlight: var(--accent);
   --cfg-backedge: #c0789a;
   --cfg-code-active: color-mix(in srgb, var(--accent) 14%, transparent);
   --cfg-hull-opacity: 0.22;
-  --cfg-cycle-opacity: 0.35;
   /* the label of "Show Loop Boundaries" is the first loop colour as it is drawn, i.e. at
      the hull opacity over the canvas */
   --cfg-loop-label: color-mix(in srgb, #fdd0a2 calc(var(--cfg-hull-opacity) * 100%), var(--cfg-canvas));

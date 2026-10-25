@@ -148,6 +148,10 @@ rather than reconstructing it from the commit log at release time.
   (2.5:1 on the darker score tints, now 3.9:1), the "rendering diagram" caption shown while a match
   diagram loads (3.6:1, now 5.0:1), and a link in a table head, such as the jobs list's "#" (4.4:1,
   now 9.4:1).
+- In the light theme, the blocks "Show Cycles" and "Show Loops" colour keep readable text. They
+  were painted in full-strength colours with white text, 2.1:1 on the orange; the colour now shows
+  at half strength under the page's own text colour, 6.9:1 or more, as the dark theme already did
+  with its values.
 
 ### Security
 

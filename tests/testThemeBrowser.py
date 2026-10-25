@@ -1417,3 +1417,45 @@ def test_in_the_light_theme_every_visible_text_node_and_icon_has_its_contrast(wa
     assert report["text"] == [], f"{name}: text below 4.5:1:\n" + listed(report["text"])
     assert report["fields"] == [], f"{name}: field values or placeholders below 4.5:1:\n" + listed(report["fields"])
     assert report["icons"] == [], f"{name}: icons below 3:1:\n" + listed(report["icons"])
+
+
+#: The blocks "Show Cycles" colours, each block's text against its fill as it is drawn: the fill at
+#: its own fill-opacity over what is behind the graph.
+CYCLE_TEXT_CONTRAST = (
+    "() => {" + HELPERS + """
+  return [...document.querySelectorAll('g.node[fill="white"]')].map((node) => {
+    const rect = node.querySelector('rect'), text = node.querySelector('text');
+    const behind = background(node.closest('svg')).rgb;
+    const fill = parse(getComputedStyle(rect).fill);
+    const shown = over([fill[0], fill[1], fill[2], fill[3] * parseFloat(getComputedStyle(rect).fillOpacity)], behind);
+    const ink = over(parse(getComputedStyle(text).fill), shown);
+    return { ratio: Math.round(ratio(ink, shown) * 100) / 100, fill: fill.slice(0, 3).map(Math.round) };
+  });
+}"""
+)
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize(
+    "path, ready, button",
+    [
+        (f"/explore/functions/{FUNCTION_A}", "#graphContainer g.node", "#showCycles"),
+        (f"/data/matches/function/{FUNCTION_A}/{FUNCTION_B}", "#graphContainer_a g.node", "#showCycles"),
+    ],
+    ids=["function", "function vs function"],
+)
+def test_the_blocks_show_cycles_colours_keep_their_text_readable(open_in, theme, path, ready, button):
+    """The viewer paints the blocks of each cycle in one of sixteen saturated colours and turns their
+    text white (fill="white" on the block, main.js and main_duo.js). In the light theme that was
+    2.1:1 on the orange, and black text would be 1.8:1 on the darkest; the dark theme already shows
+    the colours at 35% under its own text colour."""
+    page = open_in(theme, path, ready)
+    page.wait_for_function(f"!document.querySelector('{button}').disabled")
+
+    page.click(button)
+    page.wait_for_selector('g.node[fill="white"]', state="attached")
+    found = page.evaluate(CYCLE_TEXT_CONTRAST)
+
+    assert len(found) >= 3, f"hardly any block was coloured: {found}"
+    worst = min(found, key=lambda block: block["ratio"])
+    assert worst["ratio"] >= 4.5, f"block text at {worst['ratio']}:1 on rgb{tuple(worst['fill'])}"

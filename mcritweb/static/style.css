@@ -94,6 +94,10 @@
   --cfg-tooltip-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
   /* the label of "Show Loop Boundaries": the colour the first (outermost) loop is drawn in */
   --cfg-loop-label: #fdd0a2;
+  /* how much of its colour a block shows while "Show Cycles" or "Show Loops" colours it. At
+     full strength the viewer's sixteen colours put the block's text under 4.5:1, white text
+     on the orange (2.1:1) as much as black text on the darkest (1.8:1) */
+  --cfg-cycle-opacity: 0.5;
 }
 
 html {
@@ -534,4 +538,16 @@ form.form-inline input {
    head is given, and the accent is 4.4:1 on it (the jobs list's "#") */
 .table-light a {
   color: var(--link-on-tint);
+}
+
+/* "Show Cycles" and "Show Loops" paint a block's rect in one of sixteen saturated colours and
+   turn its text white, with fill="white" on the block (trace_CFG/main.js, main_duo.js). The
+   colour shows at --cfg-cycle-opacity over the canvas and the text keeps the page's: 6.9:1 or
+   more on every one of them. theme-dark.css does the same with its own values */
+.node[fill="white"] {
+  fill: var(--text-strong);
+}
+
+.node[fill="white"] rect {
+  fill-opacity: var(--cfg-cycle-opacity);
 }

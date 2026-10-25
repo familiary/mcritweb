@@ -1165,6 +1165,8 @@ MASTER_LIGHT = {
     "--border-control": "#ced4da",
     # Bootstrap 5.0.2's focus ring of fields, check boxes, buttons and the pager
     "--focus-ring": "rgba(13, 110, 253, 0.25)",
+    # trace_CFG/main.js and main_duo.js colour a block of a cycle or loop at full strength
+    "--cfg-cycle-opacity": "1",
 }
 MASTER_PALETTE = {**MASTER_LIGHT, **LIGHT_CFG_COLORS}
 
@@ -1177,6 +1179,7 @@ LIGHT_CHANGES = {
     "--focus-ring": ("rgba(13, 110, 253, 0.85)", "Bootstrap's ring was 1.4:1 on the page; its blue at 85% is 3.6:1 there and 3.2:1 on the chrome"),
     "--status-yes": ("#0a5c0a", "the tick of a yes/no column was 2.5:1 on the darkest score tint, under the 3:1 an icon needs; this is 3.9:1"),
     "--text-subtle": ("#5a6878", "the diagram's \"rendering\" caption was 3.6:1 on the chrome it is written on; this is 5.0:1"),
+    "--cfg-cycle-opacity": ("0.5", "a block coloured by Show Cycles had white text at 2.1:1 on the orange; at half strength under black text the worst is 6.9:1"),
 }
 PINNED_LIGHT = {**MASTER_PALETTE, **{name: value for name, (value, _why) in LIGHT_CHANGES.items()}}
 
