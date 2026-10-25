@@ -42,7 +42,7 @@
         <td class="sha256" style="font-size: 13px; min-width: 100px;">{{ format_sha_short_clipboard(sample.sha256) }}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.family}}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.version}}</td>
-        <td><button type="button" aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square"></i></button></td>
+        <td><button type="button" aria-label="Edit sample {{ sample.sample_id }}" title="Edit sample {{ sample.sample_id }}" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></button></td>
         {# the row's sample, and a link to its own report: the cell itself was the link, which
            only a mouse could follow #}
         {% set row_job_id = sample_to_job_id.get(sample.sample_id|string) %}
@@ -195,7 +195,7 @@ Results for Job: {{ job_info.job_id }}
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="editSampleModalLabel">Modify Sample</h5>
+        <h2 class="modal-title h5" id="editSampleModalLabel">Modify Sample</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -349,7 +349,10 @@ Results for Job: {{ job_info.job_id }}
         sourceIndex[row.querySelector("th.id").textContent.trim()] = index;
       });
       var table = rendered.cloneNode(false);
-      table.appendChild(rendered.caption.cloneNode(true));
+      // the caption names the table; the tab around it says which method it shows
+      if (rendered.caption) {
+        table.appendChild(rendered.caption.cloneNode(true));
+      }
       var body = table.appendChild(rendered.tBodies[0].cloneNode(false));
       body.appendChild(rendered.rows[0].cloneNode(true));
       var indices = body.appendChild(rendered.rows[1].cloneNode(true));

@@ -58,11 +58,25 @@
   <a href="{{ url_for('explore.function_by_id', function_id=function_id) }}">{{ function_id }}</a>
 {%- endmacro -%}
 
+{#- A yes/no value drawn as a tick or a cross. The glyph is a private-use character, which
+  assistive technology reads as nothing or as "unknown character", so it is hidden from it
+  and a word stands in. `title=true` also shows the word as the icon's tooltip; the sample
+  pickers draw the icon in the text colour, `coloured=false`. -#}
+{%- macro status_icon(value, yes="Yes", no="No", coloured=true, title=false) -%}
+  {%- if value -%}
+    <i {% if coloured %}style="color: var(--status-yes);" {% endif %}class="fa-solid fa-square-check"{% if title %} title="{{ yes }}"{% endif %} aria-hidden="true"></i><span class="visually-hidden">{{ yes }}</span>
+  {%- else -%}
+    <i {% if coloured %}style="color: var(--status-no);" {% endif %}class="fa-solid fa-times-circle"{% if title %} title="{{ no }}"{% endif %} aria-hidden="true"></i><span class="visually-hidden">{{ no }}</span>
+  {%- endif -%}
+{%- endmacro -%}
+
 {%- macro clipboard_btn(clipboard_value, label="Copy to Clipboard") -%}
   {# the value travels in a data attribute rather than as a quoted JS literal: the HTML
      parser decodes &#39; back to ' before the handler is compiled as script, so a value
-     containing a quote used to break out of it - see issues #40 and #85 #}
-  <button type="button" class="btn btn-light btn-sm btn-clipboard" title="{{ label }}" data-bs-toggle="tooltip" data-toggle="tooltip" data-clipboard-value="{{ clipboard_value }}" onclick="copy_to_clipboard(this)"><i class="fa-regular fa-copy"></i></button>
+     containing a quote used to break out of it - see issues #40 and #85. `label` names the
+     button after what it copies: a page holds several, and "Copy to Clipboard" each time
+     does not say which is which. #}
+  <button type="button" class="btn btn-light btn-sm btn-clipboard" title="{{ label }}" aria-label="{{ label }}" data-bs-toggle="tooltip" data-toggle="tooltip" data-clipboard-value="{{ clipboard_value }}" onclick="copy_to_clipboard(this)"><i class="fa-regular fa-copy" aria-hidden="true"></i></button>
 {%- endmacro -%}
 
 {%- macro clipboard_js() -%}
@@ -124,7 +138,7 @@ function copy_to_clipboard(btn){
 {%- endmacro -%}
 
 {%- macro format_sha_short_clipboard(sha256) -%}
-  {{ format_monospace(sha256[:8]) }} {{ clipboard_btn(sha256) }}
+  {{ format_monospace(sha256[:8]) }} {{ clipboard_btn(sha256, "Copy SHA256 " ~ sha256[:8]) }}
 {%- endmacro -%}
 
 {#- Where a sample's sha256 comes from (familiary/mcrit#270). `true`: MCRIT disassembled the

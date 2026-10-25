@@ -892,3 +892,66 @@ li[data-reorder-item] {
   padding: 0;
   line-height: 22px;
 }
+
+/* The key to the colours of a cross compare's matrix: a square of each colour, of the
+   matrix's .score-swatch so that whatever the theme does to those squares it does here,
+   beside the range of scores it stands for. */
+.score-key {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 1px solid var(--border-swatch);
+  vertical-align: middle;
+}
+.score-key-entry {
+  white-space: nowrap;
+}
+
+/* What the page's structure says to assistive technology. A rule here changes how a
+   screen reader reads the page, not how it looks. */
+
+/* Generated text that is decoration is not read out: the diagram's placeholder stays in
+   the accessibility tree once the diagram covers it, and a breadcrumb read "slash"
+   between its items. The alternative text, written after a slash, is newer than the rest
+   of `content`, so a browser without it drops these declarations and keeps the rule above
+   and Bootstrap's, as before. */
+.mcrit-diagram::before {
+  content: "rendering diagram\2026" / "";
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+  content: "/" / "";
+}
+
+/* The skip link is out of sight until the keyboard reaches it, and then sits over the top
+   left corner. It is out of the flow, and its box starts in the same place in both states,
+   padding and border included, so neither the page nor the link's text moves when it
+   appears; only its clip and size change. Its colours are its own, so its contrast does
+   not depend on what it lies over. */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 2001;
+  padding: 0.5rem 1rem;
+  color: var(--link);
+  background-color: var(--surface-page);
+  border: 1px solid var(--accent);
+}
+
+.skip-link:where(:not(:focus-within, :active)) {
+  clip-path: inset(50%);
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  white-space: nowrap;
+}
+
+/* A closed accordion panel that find in page can search (static/collapsed_find.js marks
+   it, where the browser can): Bootstrap gives a closed panel and any [hidden] element
+   display: none, which would keep its text from the search. The browser hides an
+   until-found element's content itself, and the panel has no padding or border of its
+   own, so it still takes no room. */
+.accordion-collapse[hidden="until-found"] {
+  display: block !important;
+}

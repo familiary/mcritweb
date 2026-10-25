@@ -25,6 +25,7 @@ Results for Job: {{ job_info.job_id }}
 
 <h2 class="h3">Similarity Scores</h2>
 <table class="table table-hover">
+  <caption class="visually-hidden">Similarity scores</caption>
   <thead class="table-light">
     <tr>
       {{ famlib_header(ucs_famlib) }}
@@ -54,6 +55,7 @@ Results for Job: {{ job_info.job_id }}
 </form>
 {{ set_pagination_params(funp, _anchor="function-matches") }}
 <table class="table table-hover">
+  <caption class="visually-hidden">Function matches</caption>
   <thead class="table-light">
     <tr>
       {{ matched_function_header(ucs_functions, unique_match_known=False, sort_pagination=funp) }}
@@ -67,7 +69,7 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
   </table>
-  {{ pagination_widget(funp, _anchor="function-matches")}}
+  {{ pagination_widget(funp, _label="function matches", _anchor="function-matches")}}
 
 
 <h2 class="h3">Matching Method Statistics </h2>

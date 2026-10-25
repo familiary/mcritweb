@@ -37,6 +37,7 @@ Updated functions: {{ result['minhash_functions_indexed'] }}
 </p>
 {% if result['corrections'] %}
 <table class="table table-sm">
+  <caption class="visually-hidden">Corrected families</caption>
   <thead><tr><th>Family</th><th>Samples before &rarr; after</th><th>Functions before &rarr; after</th><th>Library samples before &rarr; after</th></tr></thead>
   <tbody>
   {% for family_id, correction in result['corrections'].items() %}

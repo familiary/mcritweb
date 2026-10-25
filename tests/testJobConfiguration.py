@@ -63,7 +63,7 @@ def fake_mcrit(corpus_mcrit):
 
 def configuration_link(page):
     """The 'Modify configuration' href on a job page, or None."""
-    match = re.search(r'href="(/analyze/[^"]*)"[^>]*>\s*<i class="fa-solid fa-sliders">', page)
+    match = re.search(r'href="(/analyze/[^"]*)"[^>]*>\s*<i class="fa-solid fa-sliders"[^>]*>', page)
     return match.group(1).replace("&amp;", "&") if match else None
 
 

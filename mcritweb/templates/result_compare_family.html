@@ -50,6 +50,7 @@ Results for Job: {{ job_info.job_id }}
 </form>
 {{ set_pagination_params(samp, _anchor="sample-matches") }}
 <table class="table table-hover">
+  <caption class="visually-hidden">All matches in family {{ matching_result.getFamilyNameByFamilyId(famid) }}</caption>
   <thead class="table-light">
     <tr>
       {{ famlib_header(ucs_famlib, sort_pagination=samp) }}
@@ -64,7 +65,7 @@ Results for Job: {{ job_info.job_id }}
   </tbody>
   </table>
 
-  {{ pagination_widget(samp, _anchor="sample-matches")}}
+  {{ pagination_widget(samp, _label="sample matches", _anchor="sample-matches")}}
   <p><a href="{{ url_for(request.endpoint, **request.view_args) }}#family-matches">back to all family overview</a></p>
 
 <h2 class="h3">MCRIT Diagram</h2>
@@ -96,6 +97,7 @@ Results for Job: {{ job_info.job_id }}
 </form>
 {{ set_pagination_params(funp, _anchor="function-matches") }}
 <table class="table table-hover">
+  <caption class="visually-hidden">Function matches in family {{ matching_result.getFamilyNameByFamilyId(famid) }}</caption>
   <thead class="table-light">
     <tr>
       {{ aggregated_function_header(ucs_functions, sort_pagination=funp) }}
@@ -110,7 +112,7 @@ Results for Job: {{ job_info.job_id }}
   </tbody>
   </table>
 
-  {{ pagination_widget(funp, _anchor="function-matches")}}
+  {{ pagination_widget(funp, _label="function matches", _anchor="function-matches")}}
 
 <h2 class="h3">Matching Method Statistics </h2>
 {{ matching_statistics_table(matching_statistics(matching_result)) }}

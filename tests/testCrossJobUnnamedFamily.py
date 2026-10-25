@@ -23,7 +23,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
 logging.disable(logging.CRITICAL)
 
 #: A family's line in the description, once runs of whitespace are collapsed to one space.
-FAMILY_LINE = re.compile(r'<a href="/explore/families/(\d+)">([^<]*)</a> \| <i class="fa-solid fa-virus " title="Sample ID"></i> ([^<]*)<br />')
+#: The icon is read by its title: it may carry more attributes, and a word for screen readers.
+FAMILY_LINE = re.compile(r'<a href="/explore/families/(\d+)">([^<]*)</a> \| <i class="fa-solid fa-virus " title="Sample ID"[^>]*></i>'
+                         r'(?:<span class="visually-hidden">[^<]*</span>)? ([^<]*)<br />')
 
 
 def cross_job(sample_ids):

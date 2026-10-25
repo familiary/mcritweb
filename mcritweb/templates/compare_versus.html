@@ -7,7 +7,7 @@
 {% set minhash_slider_mapping = ["Off", "Fast", "Standard", "Complete"] %} 
 
 {% block title%}
-Compare
+Compare 1vs1
 {% endblock %}
 {% block style %}
 <script nonce="{{ csp_nonce() }}">
@@ -154,35 +154,39 @@ function handleSliderChange(val) {
 <h1>Compare Samples 1vs1</h1>
 <div class="row">
   <div class="col-12 col-lg-6 mb-3">
+    <search aria-label="First sample">
     <form style="width:100%" id="compare_search_form_a">
       <label for="Search_a" class="visually-hidden">Search for sample A</label>
       <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query_a" id="Search_a" value="{{ query_a }}" placeholder="Search" autofocus autocomplete="on">
     </form>
+    </search>
     {{ set_pagination_params(pagination_a, _js_argument_provider="fetchState", _anchor="Search_a") }}
     {# the rows' radio buttons are one choice; the group names it #}
     <div role="group" aria-label="Sample A">
-    {{ sample_table(samples_a, table_id="table_sample_a", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_a, pick="radio",
+    {{ sample_table(samples_a, table_id="table_sample_a", caption="Samples to pick the first from", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_a, pick="radio",
                 empty_message="No sample matches \"" ~ query_a ~ "\"." if query_a else "No samples available. Click here to upload your first sample",
                 empty_link=none if query_a else url_for("data.submit")) }}
     </div>
     {% if samples_a %}
-      {{ pagination_widget(pagination_a)}}
+      {{ pagination_widget(pagination_a, _label="first sample candidates")}}
     {% endif %}
   </div>
   <div class="col-12 col-lg-6 mb-3">
+    <search aria-label="Second sample">
     <form style="width:100%" id="compare_search_form_b">
       <label for="Search_b" class="visually-hidden">Search for sample B</label>
       <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query_b" id="Search_b" value="{{ query_b }}" placeholder="Search" autofocus autocomplete="on">
     </form>
+    </search>
     {{ set_pagination_params(pagination_b, _js_argument_provider="fetchState", _anchor="Search_b") }}
     {# the rows' radio buttons are one choice; the group names it #}
     <div role="group" aria-label="Sample B">
-    {{ sample_table(samples_b, table_id="table_sample_b", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_b, pick="radio",
+    {{ sample_table(samples_b, table_id="table_sample_b", caption="Samples to pick the second from", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_b, pick="radio",
                 empty_message="No sample matches \"" ~ query_b ~ "\"." if query_b else "No samples available. Click here to upload your first sample",
                 empty_link=none if query_b else url_for("data.submit")) }}
     </div>
     {% if samples_b %}
-      {{ pagination_widget(pagination_b)}}
+      {{ pagination_widget(pagination_b, _label="second sample candidates")}}
     {% endif %}
   </div>
 </div>

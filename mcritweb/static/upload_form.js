@@ -172,6 +172,7 @@ function mcritInitDropzone() {
     myDropzone.on('sending', function (file, xhr, formData) {
         // Append all form inputs to the formData Dropzone will POST
         $("#submit-spinner").show();
+        $("#submit-status").text("Uploading, please wait.");
         var data = $('#dropzone-additional-fields-form').serializeArray();
         $.each(data, function (key, el) {
             formData.append(el.name, el.value);

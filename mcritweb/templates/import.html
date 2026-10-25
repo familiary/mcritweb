@@ -18,11 +18,17 @@ Import
 {% endblock %}
 {% set suppress_dropzone_overlay=true %}
 {% block content %}
+<h1 class="visually-hidden">Import</h1>
 <div class="d-flex flex-column align-items-center">
     {{ dropzone.create(action= url_for('data.import_view')) }}
-    <div id="import-status" class="alert alert-info" role="status" aria-live="polite" style="display:none; width:60%;">
+    {# the live region is this wrapper, which is rendered from the start: a screen reader
+       reads out a change to a region it already knew of, and the box inside is hidden
+       until the first message #}
+    <div role="status" aria-live="polite" style="width:60%;">
+    <div id="import-status" class="alert alert-info" style="display:none;">
       <span id="import-status-spinner" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
       <span id="import-status-text"></span>
+    </div>
     </div>
 </div>
 {% set import_status_js %}

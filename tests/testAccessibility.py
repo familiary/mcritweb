@@ -234,7 +234,7 @@ def problems_of(html):
         # a value with its filter icon is two 24px targets: stacked, they sit a 21.6px line
         # apart, which WCAG 2.5.8 refuses. style.css keeps .id and .family cells on one line
         links = [child for child in cell.children if child.tag == "a"]
-        filters = [link for link in links if (link.attrs.get("aria-label") or "").startswith("Filter by this")]
+        filters = [link for link in links if (link.attrs.get("aria-label") or "").startswith("Filter by ")]
         classes = (cell.attrs.get("class") or "").split()
         if len(links) > 1 and filters and not {"id", "family"} & set(classes):
             problems.append(f"<td {cell.attrs}> holds a link and its filter link but may wrap them")

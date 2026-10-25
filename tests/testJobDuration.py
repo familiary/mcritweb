@@ -54,19 +54,29 @@ def server_clock(monkeypatch):
 def job_table_row(page, label):
     """The value the job table shows for a label, or None if it has no such row.
 
-    The rows are label/value cell pairs:
-    <td valign="middle">Duration: </td><td valign="middle"> 0:00:00 </td>
+    The rows are a row header and its value:
+    <th scope="row" valign="middle">Duration: </th><td valign="middle"> 0:00:00 </td>
 
     The label cell may carry markup of its own - a row whose meaning needs explaining
     wraps it in a `hint--right` span - so the label is matched inside the cell rather
     than as the whole of it.
     """
     match = re.search(
-        r"<td valign=\"middle\"[^>]*>(?:<[^>]+>)?" + re.escape(label) + r": (?:</[^>]+>)?\s*</td>\s*<td valign=\"middle\"[^>]*>\s*(.*?)\s*</td>",
+        r"<th scope=\"row\" valign=\"middle\"[^>]*>(?:<[^>]+>)?" + re.escape(label) + r": (?:</[^>]+>)?\s*</th>\s*<td valign=\"middle\"[^>]*>\s*(.*?)\s*</td>",
         page,
         re.S,
     )
     return match.group(1).strip() if match else None
+
+
+def progress_row(page):
+    """The progress row's number, with the progress bar that shows it as well checked and
+    taken out."""
+    cell = job_table_row(page, "Progress")
+    bar = re.search(r'\s*<progress max="100" value="([\d.]+)" aria-label="Job progress"></progress>', cell)
+    assert bar is not None, cell
+    assert cell.startswith(f"{float(bar.group(1)):5.2f}%"), cell
+    return cell.replace(bar.group(0), "")
 
 
 def test_cross_job_page_reports_the_time_its_dependencies_took(client, as_role):
@@ -161,8 +171,7 @@ class TestWhileTheDependenciesAreStillRunning:
         # children run, which is the other half of what #46 calls meaningless. The row
         # reports the dependencies instead: this fixture's five children are all done,
         # so the parent is waiting on nothing and says so.
-        assert job_table_row(page, "Progress") == (
-            '100.00% <span class="text-muted">(across 5 dependencies)</span>')
+        assert progress_row(page) == '100.00% <span class="text-muted">(across 5 dependencies)</span>'
         # queued at 10:46:10, the last child finished at 10:46:18, both by the backend's
         # clock - whatever this server's reads
         assert job_table_row(page, "Total (since queued)") == RUNNING_TOTAL
@@ -198,8 +207,7 @@ class TestWhileTheDependenciesAreStillRunningOneGone:
         as_role("visitor")
         page = client.get(f"/data/jobs/{job_id_of('cross_compare')}").data.decode()
 
-        assert job_table_row(page, "Progress") == (
-            '100.00% <span class="text-muted">(across 4 dependencies)</span>')
+        assert progress_row(page) == '100.00% <span class="text-muted">(across 4 dependencies)</span>'
         assert re.search(r"1 of this job's 5 sub-jobs\s+is no longer in the system", page)
 
 

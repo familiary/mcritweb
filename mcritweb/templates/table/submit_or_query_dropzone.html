@@ -128,7 +128,10 @@ function handleSliderChange_dropzone(val) {
     </div>
     {# named by what the form will do: the overlay opens on "Match against database", a query,
        and static/upload_form.js renames it when the mode changes #}
-    <button type="submit" class="btn btn-primary" id="submit-dropzone" disabled><span id="submit-dropzone-label">{% if show_submit_fields %}Submit{% else %}Query{% endif %}</span> <span id="submit-spinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display:none"></span></button>
+    <button type="submit" class="btn btn-primary" id="submit-dropzone" disabled><span id="submit-dropzone-label">{% if show_submit_fields %}Submit{% else %}Query{% endif %}</span> <span id="submit-spinner" class="spinner-border spinner-border-sm" aria-hidden="true" style="display:none"></span></button>
+    {# what the spinner shows, for a screen reader: there before it is written to, and
+       outside the button, whose content is its name #}
+    <span id="submit-status" class="visually-hidden" role="status"></span>
     {# the form's word on the upload: a file still to be chosen, or why the server refused it #}
     <div id="upload-feedback" class="upload-feedback" aria-live="polite"></div>
 </form>

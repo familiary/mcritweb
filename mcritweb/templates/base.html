@@ -189,9 +189,12 @@
   {% endif %}
 </head>
 <body style="font-family: sans-serif">
+  {# the first stop of the Tab key, past the logos and the menus to the page's own content;
+     out of sight until it has focus (style.css) #}
+  <a class="skip-link" href="#content">Skip to main content</a>
   <header>
     <noscript>Please enable JavaScript to use all features of this site. </noscript>
-<nav class="navbar navbar-expand-lg navbar-light">
+<nav class="navbar navbar-expand-lg navbar-light" aria-label="Main">
   <a class="navbar-brand d-none d-md-block" href="{{ url_for('index') }}">
     {{ themed_img(url_for('static', filename='d20_mcrit_cabaret.png'), url_for('static', filename='d20_mcrit_cabaret_dark.png'), class="img-fluid", alt="MCRIT home", width="459", height="150", fetchpriority="high") }}
   </a>
@@ -215,12 +218,12 @@
     <li class="nav-item dropdown">
       <button type="button" class="nav-link" id="navbarDropdownExplore" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" {% if g.user.role == 'pending' %} disabled{% endif %}>Explore</button>
       <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownExplore">
-        <a class="dropdown-item" href="{{ url_for('explore.search') }}"><i class="fa-solid fa-search "></i>&nbsp;Search</a>
+        <a class="dropdown-item" href="{{ url_for('explore.search') }}"><i class="fa-solid fa-search " aria-hidden="true"></i>&nbsp;Search</a>
         <div class="dropdown-divider"></div>
-        <a class="dropdown-item" href="{{ url_for('explore.families') }}"><i class="fa-solid fa-bug "></i>&nbsp;Families</a>
-        <a class="dropdown-item" href="{{ url_for('explore.samples') }}"><i class="fa-solid fa-virus "></i>&nbsp;Samples</a>
-        <a class="dropdown-item" href="{{ url_for('explore.functions') }}"><i class="fa-solid fa-project-diagram "></i>&nbsp;Functions</a>
-        <a class="dropdown-item" href="{{ url_for('explore.statistics') }}"><i class="fa-solid fa-chart-line "></i>&nbsp;Statistics</a>
+        <a class="dropdown-item" href="{{ url_for('explore.families') }}"><i class="fa-solid fa-bug " aria-hidden="true"></i>&nbsp;Families</a>
+        <a class="dropdown-item" href="{{ url_for('explore.samples') }}"><i class="fa-solid fa-virus " aria-hidden="true"></i>&nbsp;Samples</a>
+        <a class="dropdown-item" href="{{ url_for('explore.functions') }}"><i class="fa-solid fa-project-diagram " aria-hidden="true"></i>&nbsp;Functions</a>
+        <a class="dropdown-item" href="{{ url_for('explore.statistics') }}"><i class="fa-solid fa-chart-line " aria-hidden="true"></i>&nbsp;Statistics</a>
       </div>
     </li>
     <li class="nav-item dropdown">
@@ -275,9 +278,10 @@
       {% endif %}
     </li>
     <li class="nav-item">
-      <a class="nav-link" href="{{ url_for('help') }}" aria-label="Documentation" title="Documentation"><i class="fas fa-question-circle"></i></a>
+      <a class="nav-link" href="{{ url_for('help') }}" aria-label="Documentation" title="Documentation"><i class="fas fa-question-circle" aria-hidden="true"></i></a>
     </li>
   </ul>
+  </div>
 </nav>
 
   </header>
@@ -286,7 +290,7 @@
      restyle the whole page for any element added to <body> or <main> after it loaded, which
      on a 100 by 100 cross compare matrix took 300 ms. #}
   <div class="status-message"></div>
-  <main class="content">
+  <main class="content" id="content" tabindex="-1">
       {% for category, message in get_flashed_messages(with_categories=true) %}
         {% if category == 'error' %}
           <div class="alert alert-danger mt-3" role="alert">{{ message }}</div>
@@ -308,7 +312,7 @@
           <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content">
               <div class="modal-header">
-                <h5 class="modal-title" id="submitFileModalLabel">Submit File</h5>
+                <h2 class="modal-title h5" id="submitFileModalLabel">Submit File</h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="close-submit-modal"></button>
               </div>
               <div class="modal-body">

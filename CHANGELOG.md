@@ -75,6 +75,14 @@ rather than reconstructing it from the commit log at release time.
 - The password fields of the sign-in, registration and settings forms have a Show button, which shows
   what was typed and hides it again, so a password typed on a phone keyboard can be checked without
   typing it twice. A shown password is hidden again as the form is sent.
+- A "Skip to main content" link is the first stop of the Tab key on every page, shown only while it
+  has focus, so keyboard users no longer cross the logos and menus to reach a page's content. The
+  navbar, the jobs page's category bar and every pager are named navigation landmarks, the search
+  boxes are search landmarks, and the current page of a pager, the current compare picker and the
+  current job category are announced as current rather than shown by colour alone.
+- Find in page (Ctrl+F) finds text in the closed panels of a function's page, such as a PicBlockHash
+  or the MinHash, and opens the panel it lands in, in browsers that support `hidden="until-found"`
+  (Chromium and Firefox). Elsewhere the panels behave as before.
 
 ### Changed
 
@@ -357,6 +365,46 @@ rather than reconstructing it from the commit log at release time.
   clipboard API, the copy buttons and the registration URL now copy all the same; they threw
   there, silently. Where a copy cannot be made at all, the text is left selected for Ctrl+C. The
   registration URL is copied by a button the keyboard reaches, not by a bare icon.
+- A live search that the backend fails to answer says so. The table's search box showed "No results"
+  and dropped the error the page reported, because the script looked for the messages in an element
+  the layout does not have; the error is now shown above the table and the screen-reader status says
+  the search failed.
+- Screen readers hear "Yes" or "No" for the tick and cross icons that are a table cell's whole value
+  (library, MinHash, PicHash, unique), where they heard nothing or "unknown character"; the link
+  hunt's family-unique matches say "(unique)" beside the bold that marks them.
+- Icon buttons and links say which row they act on, for screen readers and voice control: "Filter by
+  function 84", "Compare function 84 with function 943", "Delete job 12", "Show result of job 12",
+  "Remove sample 3", "Copy SHA256 634df40e" and so on. A result page read out a hundred identical
+  "Filter by this function" links that each went somewhere else. Likewise each table's pager is named
+  after its table, "Library matches pages" with "Next page of library matches" and "Page 2 of
+  library matches", where every pager on a result page was "Pagination" with the same links.
+- Every data table has a name screen readers announce and list (a visually hidden caption), and the
+  label column of the job, sample, function, statistics, settings and server tables is the header of
+  its row, so each value is read with its label. The label cells take the bold of a header cell.
+- Screen readers no longer read a control flow graph as the code of all its blocks run together. On
+  a function's page the graph is hidden from them, since the code panel beside it is its text, and
+  the panel can be scrolled from the keyboard in every browser; on the comparison page each graph is
+  one image named after its function.
+- Screen readers are told when a page is loading, a file is uploading or an import moves on: each of
+  these says so in a status region that is on the page before it is written to, where the loading
+  overlay and the import box used to be created or shown together with their text, which a screen
+  reader often does not read. A running job's progress is also shown as a progress bar, which
+  assistive technology reports as one.
+- Screen readers no longer read out the match diagram's "rendering diagram..." placeholder, which
+  stayed in the page after the diagram covered it, nor a "slash" between the items of the result
+  pages' breadcrumb. Browsers that predate alternative text for generated content show and read them
+  as before.
+- Every page has one top-level heading, visually hidden where the page shows none (settings, users,
+  submit, import, export, register, and search before anything is searched), and its sections and
+  dialogs follow it without skipping a level. The 1vsN, 1vs1 and cross compare pages, all titled
+  "Compare", and a link hunt, titled as its result page, have titles of their own.
+- The navbar, the jobs page's menu and the family table's header row close the elements they open,
+  and the jobs page no longer closes a paragraph it never opened; browsers had repaired each, by
+  rules nobody reading the templates could see.
+- Screen readers no longer read the icons as "unknown character": every Font Awesome icon is hidden
+  from them, the icon-only buttons that were named only by a tooltip (analyze and rename a function,
+  regenerate the API token) have names of their own, and the icons that say what a value is, the
+  family and sample of a job's description and the kinds of match of a PicHash, are spelled out.
 
 ### Security
 
