@@ -314,6 +314,43 @@ def test_the_migrated_column_is_the_column_a_fresh_database_has(tmp_path, app):
     assert migrated["theme"] == fresh["theme"]
 
 
+def test_a_theme_column_another_worker_added_first_is_kept(tmp_path, monkeypatch):
+    """Each gunicorn worker migrates on start, and docker-mcrit starts two. When both start
+    on a database from before #70, the other may add the column between this one's look at
+    the columns and its ALTER, which then fails with a duplicate column; that must not stop
+    this worker from starting."""
+    from mcritweb import db as mcritweb_db
+
+    db_path = _legacy_database(tmp_path, SCHEMA_V1_4_8)
+    _insert_legacy_user(db_path, "olduser", with_apitoken=True)
+    connect = sqlite3.connect
+
+    class OtherWorkerGoesFirst:
+        def __init__(self, connection):
+            self._connection = connection
+
+        def execute(self, statement, *args):
+            if statement.startswith("ALTER TABLE user ADD theme"):
+                other = connect(str(db_path))
+                other.execute(statement)
+                other.commit()
+                other.close()
+            return self._connection.execute(statement, *args)
+
+        def __getattr__(self, name):
+            return getattr(self._connection, name)
+
+    def connect_through_the_race(database, *args, **kwargs):
+        connection = connect(database, *args, **kwargs)
+        return OtherWorkerGoesFirst(connection) if database == str(db_path) else connection
+
+    monkeypatch.setattr(mcritweb_db.sqlite3, "connect", connect_through_the_race)
+    _run_migration(tmp_path, db_path)
+    monkeypatch.undo()
+
+    assert _query(db_path, "SELECT username, theme FROM user") == [("olduser", None)]
+
+
 def test_the_migration_keeps_what_the_account_already_had(tmp_path):
     db_path = _legacy_database(tmp_path, SCHEMA_V1_4_8)
     _insert_legacy_user(db_path, "olduser", with_apitoken=True)
