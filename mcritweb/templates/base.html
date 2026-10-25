@@ -33,26 +33,46 @@
   <link rel="icon" type="image/png" href=" {{ url_for('static',filename='d20_mcrit_cabaret_small.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='navbar.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='hint.css') }}">
-  <script src="{{ url_for('static', filename='jquery.js') }}"></script>
+  {# jQuery is deferred, so that no script in <head> holds back the first paint (issue
+     #63). A deferred script runs only once the whole document is parsed, so while an
+     inline script runs `$` does not exist yet, and whenReady(fn) takes the place of
+     $(document).ready(fn) and $(fn) there. It waits for DOMContentLoaded, by which time
+     every deferred script - jQuery, a page's own libraries, Bootstrap - has run, and
+     then hands fn to jQuery's ready queue, so fn runs the way a ready handler always
+     did: after the DOMContentLoaded listeners (Dropzone's auto-discovery among them), in
+     the order the calls were made. Only what a script does at once has to go through
+     it. A function declaration that uses `$` in its body stays where it is, at the top
+     level of its script, because the onclick= attributes call it by its global name.
+     It is defined above every other script so that all of them can call it, and it is
+     for them only: called after DOMContentLoaded it would wait for an event that has
+     already fired. See ADR-0018; tests/testParseTimeScripts.py fails on a `$` that
+     runs while the page parses. #}
+  <script>
+    function whenReady(fn) {
+      document.addEventListener("DOMContentLoaded", function () { jQuery(fn); });
+    }
+  </script>
+  <script defer src="{{ url_for('static', filename='jquery.js') }}"></script>
   {# DataTables and jQuery UI used to be here: 623 KB of render-blocking JavaScript and
      41 KB of CSS, on every page, for two calls.
 
      DataTables is gone entirely - its one initialiser lived on the jobs page, against a
      selector that page never renders, so it did nothing anywhere. jQuery UI loads from
-     result_cross.html, the only page that calls `.sortable()`; {% block style %} runs
-     after this block, so jQuery is in place before it. See issue #63.
+     result_cross.html, the only page that calls `.sortable()`. It is deferred as well,
+     deferred scripts run in the order of the document, and {% block style %} comes after
+     this tag, so jQuery is in place before it. See issue #63.
 
-     That ordering is load-bearing and not only for jQuery UI: Bootstrap 5.0.2 defines
-     its jQuery plugins on DOMContentLoaded, so it wins `$.fn.tooltip` over jQuery UI as
-     long as jQuery UI is a plain `<script>`. Load a library from here *lazily* and that
-     flips. See ADR-0015. #}
-  {# `defer`: nothing below is called while the page parses. Bootstrap's declarative
-     behaviour and its jQuery plugins register when it executes, which with defer is
-     after every plain script (so still after jQuery UI on the cross compare page) and
-     before DOMContentLoaded (so before every $(document).ready block); post_action.js
-     and page_loading.js only listen for events, and every `new Autocomplete` waits for
-     DOMContentLoaded. jQuery stays plain: inline blocks call `$` while parsing. See issue #63. #}
-  <script defer src="{{ url_for('static', filename='bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js') }}"></script>
+     The same ordering is why Bootstrap is loaded below {% block style %} rather than
+     here. Bootstrap 5.0.2 defines its jQuery plugins as it runs, once the document has
+     been parsed - which it has, by the time a deferred script runs - and jQuery UI has a
+     `.tooltip()` and a `.button()` of its own, so whichever of the two runs last owns
+     those names. It has to be Bootstrap: copy_to_clipboard asks
+     `bootstrap.Tooltip.getInstance()` for the tooltip that `.tooltip()` built. A library
+     loaded *lazily*, after the page is up, would run after Bootstrap whatever the order
+     of the tags, and take the names. See ADR-0015. #}
+  {# `defer`: nothing below is called while the page parses. post_action.js and
+     page_loading.js only listen for events, and every `new Autocomplete` waits for
+     DOMContentLoaded. See issue #63. #}
   <script defer src="{{ url_for('static', filename='post_action.js') }}"></script>
   <script defer src="{{ url_for('static', filename='page_loading.js') }}"></script>
   <script defer src="{{ url_for('static', filename='autocomplete.js') }}"></script>
@@ -60,7 +80,7 @@
   {% if not suppress_dropzone_overlay %}
     {{ submit_or_query_dropzone_js(select_form_type=True, lazy=True) }}
     <script>
-    $(document).ready(function(){
+    whenReady(function(){
       function showDropModal() {
         $("#submitFileModal").modal("show");
       }
@@ -87,6 +107,10 @@
   {% endif %}
   {{ clipboard_js() }}
   {% block style %}{% endblock %}
+  {# below the block, so that it runs after a page's own deferred jQuery plugins - see
+     above. Its declarative behaviour and its jQuery plugins are in place before
+     DOMContentLoaded, and so before any whenReady handler. #}
+  <script defer src="{{ url_for('static', filename='bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js') }}"></script>
 </head>
 <body style="font-family: sans-serif">
   <header>
@@ -122,7 +146,7 @@
       </div>
     </li>
     <li class="nav-item dropdown">
-      <a class="nav-link" href="{% if not g.user %}{{ url_for('authentication.login') }}{% endif %}" id="navbarDropdownAnalyze" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" {% if g.user.role == 'pending' %} disabled{% endif %}>
+      <a class="nav-link" href="{% if not g.user %}{{ url_for('authentication.login') }}{% else %}#{% endif %}" id="navbarDropdownAnalyze" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" {% if g.user.role == 'pending' %} disabled{% endif %}>
         Analyze
       </a>
       <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownAnalyze">
@@ -135,7 +159,7 @@
       </div>
     </li>
     <li class="nav-item dropdown">
-      <a class="nav-link" href="{% if not g.user %}{{ url_for('authentication.login') }}{% endif %}" id="navbarDropdownData" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" {% if g.user.role == 'pending' %} disabled{% endif %}>
+      <a class="nav-link" href="{% if not g.user %}{{ url_for('authentication.login') }}{% else %}#{% endif %}" id="navbarDropdownData" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" {% if g.user.role == 'pending' %} disabled{% endif %}>
         Data
       </a>
       <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownData">

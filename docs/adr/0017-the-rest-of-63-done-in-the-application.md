@@ -1,7 +1,8 @@
 # The rest of #63, done in the application after all
 
 ---
-status: accepted — measured 2026-09-06, supersedes 0015
+status: accepted — measured 2026-09-06, supersedes 0015; jQuery, which this left a plain
+script, is deferred as well since 0018
 ---
 
 ADR-0015 measured the five bullets of #63 and left four of them alone: text compression
