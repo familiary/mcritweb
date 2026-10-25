@@ -1,6 +1,7 @@
 {% macro cross_table(method, samples, matching_percent, matching_matches, fifth_indices, job_info) %}
 
   <table>
+    <caption class="visually-hidden">Cross comparison matrix</caption>
     {# header cells, so every cell below has one (axe's td-has-header); normal weight,
        because they looked like the rest of the table when they were <td> #}
     <tr>
@@ -297,6 +298,10 @@ Results for Job: {{ job_info.job_id }}
         sourceIndex[row.querySelector("td.id").textContent.trim()] = index;
       });
       var table = rendered.cloneNode(false);
+      // the caption names the table; the tab around it says which method it shows
+      if (rendered.caption) {
+        table.appendChild(rendered.caption.cloneNode(true));
+      }
       var body = table.appendChild(rendered.tBodies[0].cloneNode(false));
       body.appendChild(rendered.rows[0].cloneNode(true));
       var indices = body.appendChild(rendered.rows[1].cloneNode(true));

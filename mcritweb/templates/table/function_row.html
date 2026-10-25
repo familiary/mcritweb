@@ -75,9 +75,9 @@
       {% if column_type == "function_id" %}
         <th align="left" valign="middle" scope="row" class="function-id">{{ "%d"|format(function.function_id) }}</th>
       {% elif column_type == "family_id" and not for_sample_view %}
-        <td align="right" valign="middle" scope="row" class="family-id">{{ format_family_id(function.family_id) }}</td>
+        <td align="right" valign="middle" class="family-id">{{ format_family_id(function.family_id) }}</td>
       {% elif column_type == "sample_id" and not for_sample_view %}
-        <td align="right" valign="middle" scope="row" class="sample-id">{{ format_sample_id(function.sample_id) }}</td>
+        <td align="right" valign="middle" class="sample-id">{{ format_sample_id(function.sample_id) }}</td>
       {% elif column_type == "pic_hash" %}
         <td align="right" valign="middle" class="font-monospace">{{ format_pichash(function.pichash) }}</td>
       {% elif column_type == "has_minhash" %}

@@ -80,19 +80,20 @@ Unique Blocks for {{ sample_ids|length }} Samples
 
 <h1>Unique Block Isolation Report</h1>
 <table class="table table-hover">
+  <caption class="visually-hidden">Report</caption>
   <tbody>
     <tr>
-      <td valign="middle">Job ID</td>
+      <th scope="row" valign="middle">Job ID</th>
       <td valign="middle">{{ job_info.job_id }}</td>
     </tr>
     {% if family_entry is not none %}
     <tr>
-      <td valign="middle">Family</td>
+      <th scope="row" valign="middle">Family</th>
       <td valign="middle">{{ format_family_name(family_entry.family_name, family_entry.family_id) }}</td>
     </tr>
     {% else %}
     <tr>
-      <td valign="middle">Requested Samples</td>
+      <th scope="row" valign="middle">Requested Samples</th>
       {# the line the job's Task row gives, folded the way linkhunt.html folds a long
          cluster: open, it links every sample under its family, in the order the job names
          them, and an id the backend has no sample for under "-" (issue #300) #}
@@ -109,21 +110,21 @@ Unique Blocks for {{ sample_ids|length }} Samples
     </tr>
     {% endif %}
     <tr>
-      <td valign="middle">Samples</td>
+      <th scope="row" valign="middle">Samples</th>
       <td valign="middle">{{ statistics["num_samples"] }}</td>
     </tr>
     <tr>
-      <td valign="middle">Unique Blocks</td>
+      <th scope="row" valign="middle">Unique Blocks</th>
       <td valign="middle">{{ statistics["unique_blocks_overall"] }}</td>
     </tr>
     {# the cover is recomputed here from the current rule parameters, so these describe
        the rule shown below rather than the one the backend built with its defaults #}
     <tr>
-      <td valign="middle">Has a YARA rule?</td>
+      <th scope="row" valign="middle">Has a YARA rule?</th>
       <td valign="middle">{{ yara_cover["has_rule"] }}, covers: {{ yara_cover["num_samples_covered"] }} samples</td>
     </tr>
     <tr>
-      <td valign="middle">YARA rule covers all?</td>
+      <th scope="row" valign="middle">YARA rule covers all?</th>
       <td valign="middle">{{ yara_cover["is_complete_cover"] }}</td>
     </tr>
 </tbody>
@@ -152,6 +153,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
       Characteristic blocks are basic blocks only found in this collection of samples (versus rest of the whole data set), unique blocks are only found in the specific sample.
     </p>
     <table class="table table-hover sortable-table">
+      <caption class="visually-hidden">Block statistics across samples</caption>
         <thead class="table-light">
           <tr>
             {{ sortable_column("Sample ID", "number", align="right") }}
@@ -164,7 +166,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
         <tbody>
           {% for sid, stats_entry in statistics["by_sample_id"].items() %}
           <tr>
-            <td style="text-align: right;" valign="middle" scope="row" class="id" data-sort-value="{{ stats_entry["sample_id"] }}">{{ format_sample_id(stats_entry["sample_id"]) }}</td>
+            <td style="text-align: right;" valign="middle" class="id" data-sort-value="{{ stats_entry["sample_id"] }}">{{ format_sample_id(stats_entry["sample_id"]) }}</td>
             <td valign="middle">{{ sample_versions.get(stats_entry["sample_id"]) or "" }}</td>
             <td style="text-align: right;" valign="middle" data-sort-value="{{ stats_entry["total_blocks"] }}">{{ stats_entry["total_blocks"] }}</td>
             <td style="text-align: right;" valign="middle" data-sort-value="{{ stats_entry["characteristic_blocks"] }}">{{ stats_entry["characteristic_blocks"] }} ({% if stats_entry["total_blocks"] > 0 %}{{ "%5.2f"|format(stats_entry["characteristic_blocks"] / stats_entry["total_blocks"] * 100) }}%{%else%}0%{%endif%})</td>
@@ -191,6 +193,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
     
     <p>total: {{ blkp.max_value }}, showing: {{ 1 + blkp.start_index }} - {{ blkp.end_index }}</p>
     <table class="table table-hover">
+      <caption class="visually-hidden">Unique blocks</caption>
         <thead class="table-light">
           <tr>
             <th style="text-align: right;" scope="col">Score</th>
@@ -208,7 +211,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
           {% for block in results %}
           <tr>
             <td style="text-align: right;" valign="middle">{{ "%5.2f"|format(block["score"]) }}</td>
-            <td valign="middle" scope="row" class="id">{{ block["key"] }}</td>
+            <td valign="middle" class="id">{{ block["key"] }}</td>
             <td style="text-align: right;" valign="middle">{{ block["samples"]|length }} / {{ statistics["num_samples"] }}</td>
             <td style="text-align: right;" valign="middle">{{ block["length"] }}</td>
             <td style="text-align: right;" valign="middle">{{ format_function_id(block["function_id"]) }}</td>

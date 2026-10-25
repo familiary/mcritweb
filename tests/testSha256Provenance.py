@@ -40,7 +40,7 @@ def sample_page(client, fake_mcrit, sha256_verified):
 
 
 def sha256_cell(page):
-    cell = re.search(r"SHA256 \| Filename: </td>\s*<td[^>]*>(.*?)</td>", page, re.S)
+    cell = re.search(r"SHA256 \| Filename: </th>\s*<td[^>]*>(.*?)</td>", page, re.S)
     assert cell is not None, "the sample page has no SHA256 row"
     return cell.group(1)
 

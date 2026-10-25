@@ -173,7 +173,7 @@ def shows_setting(response, label):
     """The macro renders the label into the cell next to its row heading - asserting
     on the bare word would pass on any page that happens to contain it."""
     rendered = " ".join(response.data.decode().split())
-    return f'MinHash Matching: </td> <td valign="middle">{label}</td>' in rendered
+    return f'MinHash Matching: </th> <td valign="middle">{label}</td>' in rendered
 
 
 @pytest.mark.parametrize("report", ["matches_for_sample", "matches_for_sample_vs", "matches_for_query"])

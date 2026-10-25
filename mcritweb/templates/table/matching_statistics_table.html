@@ -11,6 +11,7 @@
   ] %}
   
   <table class="table table-hover">
+    <caption class="visually-hidden">Matching method statistics</caption>
     <thead class="table-light">
       <tr>
         <th scope="col">Field</th>
@@ -22,9 +23,9 @@
       {% for field in fields %}
         <tr>
           {%- if field == 'num_self_matches' and statistics['is_filtered'] %}
-            <td valign="middle"><span class="hint--right" data-hint="Matches of the sample against itself are not part of the report's function matches, so this row cannot be narrowed and still counts the whole job.">{{ field }} (whole job)</span>: </td>
+            <th scope="row" valign="middle"><span class="hint--right" data-hint="Matches of the sample against itself are not part of the report's function matches, so this row cannot be narrowed and still counts the whole job.">{{ field }} (whole job)</span>: </th>
           {%- else %}
-          <td valign="middle">{{ field }}: </td>
+          <th scope="row" valign="middle">{{ field }}: </th>
           {%- endif %}
           <td style="text-align: right;" valign="middle">{{ statistics["minhash"][field] }}</td>
           <td style="text-align: right;" valign="middle">{{ statistics["pichash"][field] }}</td>

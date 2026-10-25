@@ -51,6 +51,7 @@ Results for Job: {{ job_info.job_id }}
 </form>
 {{ set_pagination_params(funp, _anchor="function-matches") }}
 <table class="table table-hover">
+  <caption class="visually-hidden">Matches for function {{ funid }}</caption>
   <thead class="table-light">
     <tr>
     {% if ucs_functions is none %}
@@ -88,7 +89,7 @@ Results for Job: {{ job_info.job_id }}
     <tr style="background-color: {{ scp.getMatchTintFromResult(matched_function, 'matched_score', scale=50) }}">
       {% for column_type in ucs_functions %}
       {% if column_type == "function_id_a" %}
-      <td valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.function_id * -1 if matching_result.is_query else matched_function.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ matched_function.function_id }}</a>&nbsp;<a aria-label="Filter by function {{ matched_function.function_id }}" title="Filter by function {{ matched_function.function_id }}" href="{{ url_for(request.endpoint, funid=matched_function.function_id, samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
+      <td valign="middle" class="id"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.function_id * -1 if matching_result.is_query else matched_function.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ matched_function.function_id }}</a>&nbsp;<a aria-label="Filter by function {{ matched_function.function_id }}" title="Filter by function {{ matched_function.function_id }}" href="{{ url_for(request.endpoint, funid=matched_function.function_id, samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
       {% elif column_type == "offset_a" %}
       <td style="text-align: right;" valign="middle">0x{{ "%x"|format(matched_function.offset) }}</td>
       {% elif column_type == "offset_b" %}

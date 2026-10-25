@@ -45,20 +45,21 @@ Settings
 <div class="tab-content" id="pills-tabContent">
   <div class="tab-pane fade show active" id="pills-info" role="tabpanel" aria-labelledby="pills-info-tab">
     <table class="table table-striped w-auto">
+      <caption class="visually-hidden">User information</caption>
       <tr>
         <th>Entity</th>
         <th>Value</th>
       </tr>
       <tr>
-        <td>Username:</td>
+        <th scope="row">Username:</th>
         <td>{{user_info.username}}</td>
       </tr>
       <tr>
-        <td>Role:</td>
+        <th scope="row">Role:</th>
         <td>{{user_info.role}}</td>
       </tr>
       <tr>
-        <td>Registration:</td>
+        <th scope="row">Registration:</th>
         <td>{{user_info.registration_date}}</td>
       </tr>
       {# whoever's token the API accepts has to be able to see and replace it. This
@@ -67,7 +68,7 @@ Settings
          account - which is the thing this PR exists to stop being the only option. #}
       {% if can_use_api %}
       <tr>
-        <td>apitoken:</td>
+        <th scope="row">apitoken:</th>
         <td>
           {{user_info.apitoken}} {{ clipboard_btn(user_info.apitoken, "Copy your API token") }}
           {# a write, so it is a button that POSTs rather than a link - see post_action.js #}

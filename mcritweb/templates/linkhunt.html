@@ -51,6 +51,7 @@ Results for Job: {{ job_info.job_id }}
 {# a cluster can hold any number of links, so only the first few are shown open #}
 {% set shown_links = 8 %}
 <table class="table table-hover">
+  <caption class="visually-hidden">Link clusters</caption>
   <thead class="table-light">
     <tr>
       <th style="text-align: right;" scope="col">Rank</th>
@@ -102,6 +103,7 @@ Results for Job: {{ job_info.job_id }}
 <h3 class="h4" id="linkhunt-links">Individual Links</h3>
 <p>Family-unique matches in bold.</p>
 <table class="table table-hover">
+  <caption class="visually-hidden">Individual links</caption>
     <thead class="table-light">
       <tr>
         <th style="text-align: right;" scope="col">Rank</th>
@@ -120,7 +122,7 @@ Results for Job: {{ job_info.job_id }}
       <tr style="background-color: {{ scp.getMatchTintByScore100(link_entry.matched_link_score) }}">
         <td style="text-align: right;" valign="middle">{{ funp.start_index + loop.index }}</td>
         <td style="text-align: right;" valign="middle">{{ "%5.2f"|format(link_entry.matched_link_score) }}</td>
-        <td style="text-align: right;" valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=link_entry.function_id * -1 if matching_result.is_query else link_entry.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ link_entry.function_id }}</a></td>
+        <td style="text-align: right;" valign="middle" class="id"><a href="{{ url_for('explore.function_by_id', function_id=link_entry.function_id * -1 if matching_result.is_query else link_entry.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ link_entry.function_id }}</a></td>
         <td style="text-align: right;" valign="middle">0x{{ "%x"|format(link_entry.offset) }}</td>
         <td style="text-align: right;" valign="middle">{{ "%d"|format(link_entry.num_bytes) }}</td>
         <td style="text-align: right;" valign="middle"><i class="fa-solid fa-bug " title="Family ID"></i>({{ link_entry.matched_family_id }}) {{ format_family_name(link_entry.matched_family, link_entry.matched_family_id) }}</td>

@@ -18,6 +18,7 @@
     Paths are those of the MCRIT backend, forwarded by the passthrough as-is.
   </p>
   <table class="table table-sm mb-2">
+    <caption class="visually-hidden">API calls</caption>
     <tbody>
     {% for description, api_path in calls %}
       <tr>
@@ -100,6 +101,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
     {% if composition %}
       <h6 class="mt-3">Shingle composition</h6>
       <table class="table table-sm mb-0" style="width: auto;">
+        <caption class="visually-hidden">Shingle composition</caption>
         <thead class="table-light">
           <tr><th scope="col">Shingler</th><th scope="col" style="text-align: right;">Signature slots</th><th scope="col" style="text-align: right;">Shingles extracted</th></tr>
         </thead>
@@ -134,6 +136,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
 {% macro picblock_table(function_entry) %}
   {% if function_entry.picblockhashes %}
     <table class="table table-sm table-hover mb-0" style="width: auto;">
+      <caption class="visually-hidden">Basic blocks and their PicBlockHashes</caption>
       <thead class="table-light">
         <tr>
           <th scope="col">Offset</th>

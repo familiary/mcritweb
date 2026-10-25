@@ -141,6 +141,9 @@ rather than reconstructing it from the commit log at release time.
   function 84", "Compare function 84 with function 943", "Delete job 12", "Show result of job 12",
   "Remove sample 3", "Copy SHA256 634df40e" and so on. A result page read out a hundred identical
   "Filter by this function" links that each went somewhere else.
+- Every data table has a name screen readers announce and list (a visually hidden caption), and the
+  label column of the job, sample, function, statistics, settings and server tables is the header of
+  its row, so each value is read with its label. The label cells take the bold of a header cell.
 
 ### Security
 

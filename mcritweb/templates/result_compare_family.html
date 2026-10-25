@@ -51,6 +51,7 @@ Results for Job: {{ job_info.job_id }}
 </form>
 {{ set_pagination_params(samp, _anchor="sample-matches") }}
 <table class="table table-hover">
+  <caption class="visually-hidden">All matches in family {{ matching_result.getFamilyNameByFamilyId(famid) }}</caption>
   <thead class="table-light">
     <tr>
       {{ famlib_header(ucs_famlib, sort_pagination=samp) }}
@@ -99,6 +100,7 @@ Results for Job: {{ job_info.job_id }}
 </form>
 {{ set_pagination_params(funp, _anchor="function-matches") }}
 <table class="table table-hover">
+  <caption class="visually-hidden">Function matches in family {{ matching_result.getFamilyNameByFamilyId(famid) }}</caption>
   <thead class="table-light">
     <tr>
       {{ aggregated_function_header(ucs_functions, sort_pagination=funp) }}

@@ -54,15 +54,15 @@ def server_clock(monkeypatch):
 def job_table_row(page, label):
     """The value the job table shows for a label, or None if it has no such row.
 
-    The rows are label/value cell pairs:
-    <td valign="middle">Duration: </td><td valign="middle"> 0:00:00 </td>
+    The rows are a row header and its value:
+    <th scope="row" valign="middle">Duration: </th><td valign="middle"> 0:00:00 </td>
 
     The label cell may carry markup of its own - a row whose meaning needs explaining
     wraps it in a `hint--right` span - so the label is matched inside the cell rather
     than as the whole of it.
     """
     match = re.search(
-        r"<td valign=\"middle\"[^>]*>(?:<[^>]+>)?" + re.escape(label) + r": (?:</[^>]+>)?\s*</td>\s*<td valign=\"middle\"[^>]*>\s*(.*?)\s*</td>",
+        r"<th scope=\"row\" valign=\"middle\"[^>]*>(?:<[^>]+>)?" + re.escape(label) + r": (?:</[^>]+>)?\s*</th>\s*<td valign=\"middle\"[^>]*>\s*(.*?)\s*</td>",
         page,
         re.S,
     )

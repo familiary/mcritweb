@@ -102,7 +102,7 @@ function handleSliderChange(val) {
 {{ set_pagination_params(pagination, _js_argument_provider="fetchState", _anchor="Search") }}
 {# a search box sits directly above this table, so "upload your first sample" is
    almost never what happened - the collection is full and the term missed #}
-{{ sample_table(samples, table_id="table_sample", show_analyze=False, show_hint=True, sort_pagination=pagination,
+{{ sample_table(samples, table_id="table_sample", caption="Samples to compare", show_analyze=False, show_hint=True, sort_pagination=pagination,
                 empty_message="No sample matches \"" ~ query ~ "\"." if query else "No samples available. Click here to upload your first sample",
                 empty_link=none if query else url_for("data.submit")) }}
 {% if samples %}

@@ -136,6 +136,7 @@ function handleSliderChange(val) {
 <h1>Cross Compare</h1>
 <div>
   <table class="table table-hover">
+    <caption class="visually-hidden">Selected samples</caption>
     <thead class="table-light">
       <tr>
         <th scope="col"><i class="fa-solid fa-virus" title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample ID</span></th>
@@ -182,6 +183,7 @@ function handleSliderChange(val) {
   {% if samples %}
   {{ set_pagination_params(pagination, _anchor="Search", _js_argument_provider="fetchState") }}
   <table class="table table-hover">
+    <caption class="visually-hidden">Samples to select</caption>
       <thead class="table-light">
         {{ sample_header(show_analyze=False, sort_pagination=pagination) }}
       </thead>

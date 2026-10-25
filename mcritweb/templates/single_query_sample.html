@@ -25,6 +25,7 @@ Query Sample: *{{ entry.sample_id|abs }}
     </h2>
     <div id="flush-collapseOne" class="accordion-collapse collapse" aria-labelledby="flush-headingOne" data-bs-parent="#accordionFlushExample">
       <table class="table table-sm table-borderless" style="width:50%;">
+        <caption class="visually-hidden">Metadata</caption>
         {% for key in entry.toDict() %}
           {% if loop.index <= 12 %}
             <tr>
@@ -52,6 +53,7 @@ Query Sample: *{{ entry.sample_id|abs }}
     </h2>
     <div id="flush-collapseTwo" class="accordion-collapse collapse" aria-labelledby="flush-headingTwo" data-bs-parent="#accordionFlushExample">
       <table class="table table-sm table-borderless" style="width:50%;">
+        <caption class="visually-hidden">Statistics</caption>
         {% for key in entry.statistics%}
         <tr>
           <th class="align-middle">{{ key.replace('_', ' ')|capitalize_all  }}</th>

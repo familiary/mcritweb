@@ -155,7 +155,7 @@ Sample: {{ entry.sample_id }}
   <p id="sample-functions-status" class="visually-hidden" role="status"></p>
   <div id="sample-functions">
   <h2 class="h3">Functions</h2>
-{{ function_table(functions, for_sample_view=True, sort_pagination=pagination, column_setup=user_column_setup,
+{{ function_table(functions, for_sample_view=True, caption="Functions of sample " ~ entry.sample_id, sort_pagination=pagination, column_setup=user_column_setup,
                   empty_message=("No functions in this sample match \"" ~ query ~ "\".") if query else "This sample has no functions on record.", highlight_terms=query|search_terms) }}
 {% if functions %}
 {{ pagination_widget(pagination) }}
@@ -164,7 +164,7 @@ Sample: {{ entry.sample_id }}
 <script>later({{ url_for('static', filename='live_search.js')|tojson }})</script>
 {% if job_collection.count %}
 <h2 class="h3" id="jobs">Jobs</h2>
-{{ job_table(job_collection.getJobs(), samples_by_id=samples) }}
+{{ job_table(job_collection.getJobs(), samples_by_id=samples, caption="Jobs for sample " ~ entry.sample_id) }}
 {% endif %}
 {% include 'js/ac_family_names.html' %}
 {% endblock %}

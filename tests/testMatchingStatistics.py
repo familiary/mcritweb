@@ -157,7 +157,7 @@ def statistics_table_of(page):
     table = re.search(r"Matching Method Statistics.*?</table>", page, re.S)
     assert table is not None, "the page has no statistics table"
     rows = re.findall(
-        r"<td valign=\"middle\">(.*?): </td>\s*<td[^>]*>([^<]*)</td>\s*<td[^>]*>([^<]*)</td>",
+        r"<th scope=\"row\" valign=\"middle\">(.*?): </th>\s*<td[^>]*>([^<]*)</td>\s*<td[^>]*>([^<]*)</td>",
         table.group(0),
         re.S,
     )

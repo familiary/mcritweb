@@ -35,6 +35,7 @@ Results for Job: {{ job_info.job_id }}
 <h2 class="h3" id="sample-matches">Sample Match Statistics</h2>
 <p>total: {{ samp.max_value }}, showing: {{ 1 + samp.start_index }} - {{ samp.end_index }}</p>
 <table class="table table-hover">
+  <caption class="visually-hidden">Sample match statistics</caption>
   <thead class="table-light">
     <tr>
       {{ famlib_header(ucs_famlib) }}
@@ -79,6 +80,7 @@ Results for Job: {{ job_info.job_id }}
 </form>
 {{ set_pagination_params(funp, _anchor="function-matches") }}
 <table class="table table-hover">
+  <caption class="visually-hidden">Function matches in sample {{ samid }}</caption>
   <thead class="table-light">
     <tr>
       {{ matched_function_header(ucs_functions, sort_pagination=funp) }}
