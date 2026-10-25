@@ -9,12 +9,13 @@ these tests press the keys in Chromium and read back focus, URLs and state.
 module skips there rather than failing.
 """
 
+import copy
 import os
 import threading
 
 import pytest
 from conftest import session_cookie_for
-from fixtureData import job_id_of
+from fixtureData import job_id_of, load
 from werkzeug.serving import make_server
 
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
@@ -258,3 +259,73 @@ def test_the_rename_dialog_starts_in_its_field(open_as):
     page.wait_for_function("() => document.activeElement.id === 'function_name'")
     close_with_escape(page, "#renameFunctionModal")
     assert focused(page) == "button_function_rename"
+
+
+def tab_list_state(page, tablist="#pills-tab"):
+    """(the focused tab, the selected tab, the tabs Tab stops on) of a tab list."""
+    return page.evaluate("""list => {
+        const tabs = [...document.querySelector(list).querySelectorAll('[role=tab]')];
+        return [document.activeElement.id,
+                tabs.filter(tab => tab.getAttribute('aria-selected') === 'true').map(tab => tab.id),
+                tabs.filter(tab => tab.tabIndex >= 0).map(tab => tab.id)];
+    }""", tablist)
+
+
+def wait_until_shown(page, tab_id):
+    page.wait_for_function("""id => {
+        const tab = document.getElementById(id);
+        const pane = document.querySelector(tab.getAttribute('data-bs-target'));
+        return tab.tabIndex === 0 && pane.classList.contains('active') && pane.classList.contains('show');
+    }""", arg=tab_id)
+
+
+def test_the_arrow_keys_move_between_tabs_and_show_them(open_as):
+    """Bootstrap 5.0.2 gives a tab list no keys: every tab was a tab stop, and the arrow
+    keys did nothing."""
+    page = open_as("contributor", "/settings")
+    assert tab_list_state(page)[1:] == [["pills-info-tab"], ["pills-info-tab"]]
+
+    page.focus("#pills-info-tab")
+    page.keyboard.press("ArrowRight")
+    wait_until_shown(page, "pills-username-tab")
+    assert tab_list_state(page) == ["pills-username-tab", ["pills-username-tab"], ["pills-username-tab"]]
+
+    page.keyboard.press("End")
+    wait_until_shown(page, "pills-theme-tab")
+    page.keyboard.press("ArrowRight")
+    wait_until_shown(page, "pills-info-tab")
+    page.keyboard.press("ArrowLeft")
+    wait_until_shown(page, "pills-theme-tab")
+    page.keyboard.press("Home")
+    wait_until_shown(page, "pills-info-tab")
+    assert tab_list_state(page) == ["pills-info-tab", ["pills-info-tab"], ["pills-info-tab"]]
+
+
+def test_the_arrow_keys_pass_a_disabled_tab(open_as, fake_mcrit, monkeypatch):
+    report = copy.deepcopy(load("unique_blocks.result"))
+    report["statistics"]["has_yara_rule"] = False
+    monkeypatch.setattr(fake_mcrit, "getResultForJob", lambda *args, **kwargs: report)
+    page = open_as("visitor", f"/data/result/{job_id_of('unique_blocks')}?tab=blocks")
+    assert tab_list_state(page)[1:] == [["pills-blocks-tab"], ["pills-blocks-tab"]]
+
+    page.focus("#pills-blocks-tab")
+    page.keyboard.press("ArrowRight")
+
+    wait_until_shown(page, "pills-statistics-tab")
+    assert tab_list_state(page)[0] == "pills-statistics-tab"
+
+
+def test_a_cross_compare_tab_is_shown_by_enter_not_by_reaching_it(open_as):
+    """Each of its tabs builds a matrix the first time it is shown, so the arrow keys
+    only move between them."""
+    page = open_as("visitor", f"/data/result/{job_id_of('cross_compare')}")
+    first, second = page.eval_on_selector_all("#pills-tab [role=tab]", "tabs => tabs.slice(0, 2).map(tab => tab.id)")
+
+    page.focus(f"#{first}")
+    page.keyboard.press("ArrowRight")
+    assert tab_list_state(page) == [second, [first], [first]]
+    assert page.locator("[data-lazy-method]").count() == 5, "a pane was built by moving to its tab"
+
+    page.keyboard.press("Enter")
+    wait_until_shown(page, second)
+    assert tab_list_state(page) == [second, [second], [second]]

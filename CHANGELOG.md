@@ -143,6 +143,11 @@ rather than reconstructing it from the commit log at release time.
   Bootstrap never gave. Closing the jobs page's delete dialog, or one opened from a menu, puts
   focus back on the button or menu that opened it; it fell to the top of the page, where a
   keyboard user started over.
+- Tab lists (Settings, Users, a cross compare's matching methods, Unique Blocks) work with the arrow
+  keys: a list is one tab stop, and Left, Right, Home and End move between its tabs, past a disabled
+  one. A tab is shown as the keys reach it, except a cross compare's, which builds its matrix when
+  first shown and waits for Enter. A Unique Blocks link to its blocks or YARA tab no longer tells a
+  screen reader the statistics tab is the one selected.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files

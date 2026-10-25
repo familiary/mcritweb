@@ -212,3 +212,14 @@ def test_a_header_with_nothing_to_sort_by_is_no_link(client, as_role):
             "{% call sortable_header_col(none, 'family') %}Family{% endcall %}")
 
     assert "onclick" not in html and "<a" not in html and "aria-sort" not in html
+
+
+@pytest.mark.parametrize("tab, selected", [("stats", "pills-statistics-tab"), ("blocks", "pills-blocks-tab"), ("yara", "pills-yara-tab")])
+def test_the_tab_a_unique_blocks_link_opens_on_is_the_one_marked_selected(client, as_role, tab, selected):
+    """`?tab=blocks` showed the blocks and told a screen reader the statistics tab was
+    the selected one: its aria-selected="true" was written whatever the tab."""
+    tags = start_tags(render(client, as_role, f"/data/result/{job_id_of('unique_blocks')}?tab={tab}"))
+
+    tabs = {attrs["id"]: attrs for tag, attrs, _ in tags if attrs.get("role") == "tab"}
+    assert [tab_id for tab_id, attrs in tabs.items() if attrs["aria-selected"] == "true"] == [selected]
+    assert "active" in tabs[selected]["class"].split()
