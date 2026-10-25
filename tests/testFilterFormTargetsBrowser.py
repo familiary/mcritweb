@@ -96,7 +96,7 @@ def test_no_filter_form_control_crowds_another(live_server, browser):
     page = browser.new_page(viewport=VIEWPORT)
     page.goto(f"{live_server}/login")
     page.fill("#username", "walker")
-    page.fill("#inputPassword", "password")
+    page.fill("#current-password", "password")
     page.click("button[type=submit]")
     page.wait_for_load_state()
 

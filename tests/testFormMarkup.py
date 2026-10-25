@@ -10,6 +10,8 @@ from html.parser import HTMLParser
 
 import pytest
 
+from mcritweb.db import ServerInfo
+
 
 @pytest.fixture
 def fake_mcrit(corpus_mcrit):
@@ -55,6 +57,64 @@ def test_no_id_is_used_twice(client, as_role, path):
     as_role("contributor")
     counts = collections.Counter(Tags(page_of(client, path)).ids())
     assert [name for name, count in counts.items() if count > 1] == []
+
+
+def inputs_by_name(html):
+    return {dict(attrs).get("name"): dict(attrs) for tag, attrs in Tags(html).tags if tag == "input"}
+
+
+def credential_fields(client, as_role, make_user):
+    """{page: {field name: attributes}} of every form that holds a username or a password."""
+    pages = {"first registration": inputs_by_name(page_of(client, "/register"))}
+    make_user("admin")
+    pages["login"] = inputs_by_name(page_of(client, "/login"))
+    # the token field is there only while the instance asks for one
+    with client.application.app_context():
+        server_info = ServerInfo.fromDb()
+        server_info.registration_token = "token"
+        server_info.saveToDb()
+    pages["registration"] = inputs_by_name(page_of(client, "/register"))
+    as_role("contributor")
+    pages["settings"] = inputs_by_name(page_of(client, "/settings"))
+    return pages
+
+
+#: page -> field -> the autocomplete token it must carry
+AUTOCOMPLETE = {
+    "login": {"username": "username", "inputPassword": "current-password"},
+    "registration": {"username": "username", "inputPassword1": "new-password", "inputPassword2": "new-password",
+                     "registrationToken": "off"},
+    "first registration": {"username": "username", "inputPassword1": "new-password", "inputPassword2": "new-password",
+                           "mcritServerToken": "off", "setRegistrationToken": "off"},
+    # a rename wants a name the account does not have yet, so its own is not offered
+    "settings": {"username": "off", "inputPassword1": "current-password", "inputPassword2": "current-password",
+                 "inputPassword3": "new-password", "inputPassword4": "new-password"},
+}
+
+
+def test_every_credential_field_says_what_it_holds(client, as_role, make_user):
+    """No field carried an autocomplete token, so a password manager guessed: the
+    change-password form is three password fields in a row, where it could put the saved
+    password into "new" and "confirm" and never offer to generate one."""
+    pages = credential_fields(client, as_role, make_user)
+    tokens = {page: {name: pages[page].get(name, {}).get("autocomplete") for name in fields}
+              for page, fields in AUTOCOMPLETE.items()}
+    assert tokens == AUTOCOMPLETE
+    # and no password field anywhere is left to guess
+    for page, fields in pages.items():
+        for name, attrs in fields.items():
+            if attrs.get("type") == "password":
+                assert attrs.get("autocomplete") in ("current-password", "new-password"), (page, name)
+
+
+def test_the_sign_in_password_is_the_current_password_by_id_too(client, make_user):
+    """The id is the other half of what the sign-in guide asks of a sign-in form, and the
+    label has to follow it."""
+    make_user("admin")
+    html = page_of(client, "/login")
+    assert inputs_by_name(html)["inputPassword"].get("id") == "current-password"
+    labels = [dict(attrs).get("for") for tag, attrs in Tags(html).tags if tag == "label"]
+    assert "current-password" in labels
 
 
 def test_a_page_that_edits_samples_still_has_its_dialog(client, as_role):

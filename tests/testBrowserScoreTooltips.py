@@ -79,7 +79,7 @@ def browser_page(live_server):
             page.on("pageerror", lambda error: console_errors.append(str(error)))
             page.goto(f"{live_server}/login")
             page.fill("#username", "walker")
-            page.fill("#inputPassword", "password")
+            page.fill("#current-password", "password")
             page.click("button[type=submit]")
             page.wait_for_load_state()
             yield page, console_errors

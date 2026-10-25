@@ -140,6 +140,11 @@ rather than reconstructing it from the commit log at release time.
 - Adding a file to the upload form keeps the family and version typed before it. A file that
   declares neither, which is any file but an SMDA report, emptied both fields. What a file filled
   in is still taken back by the next file, unless it was edited.
+- Password managers are told which field is which. The sign-in, registration and settings forms
+  mark the username and the current and new passwords with their `autocomplete` tokens, and the
+  token fields with `off`, so the change-password form no longer gets the saved password put into
+  "new" and "confirm", and a strong password can be offered there and on registration. The sign-in
+  password field's id is now `current-password`; its name is unchanged.
 
 ### Security
 
