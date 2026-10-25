@@ -138,11 +138,15 @@ def test_every_rule_that_breaks_a_long_token_names_something_a_template_renders(
     manual's headings come from markdown, so not every heading level is in a template)."""
     css = re.sub(r"/\*.*?\*/", "", STYLESHEET.read_text(), flags=re.S)
     templates = "\n".join(path.read_text() for path in TEMPLATES.rglob("*.html"))
+    # the project's own scripts build some elements, such as static/status_message.js's
+    # message; the vendored ones live in folders or are minified
+    scripts = "\n".join(path.read_text() for path in STYLESHEET.parent.glob("*.js") if not path.name.endswith(".min.js"))
 
     def rendered(selector):
         tags = re.findall(r"(?:^|[\s>+~(])([a-z][a-z0-9]*)", selector)
         names = re.findall(r"\.([\w-]+)", selector)
-        return all(f"<{tag}" in templates for tag in tags) and all(re.search(rf'class="[^"]*\b{name}\b', templates) for name in names)
+        return all(f"<{tag}" in templates or f'createElement("{tag}")' in scripts for tag in tags) and all(
+            re.search(rf'class="[^"]*\b{name}\b', templates) or re.search(rf'className = "[^"]*\b{name}\b', scripts) for name in names)
 
     rules = re.findall(r"([^{}]*)\{[^{}]*overflow-wrap:\s*anywhere", css)
     assert len(rules) >= 4
