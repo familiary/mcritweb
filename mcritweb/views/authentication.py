@@ -317,7 +317,10 @@ def login():
 
         user_info = UserInfo.fromDb(username=username)
         error = None
-        if user_info is None:
+        # an empty password never signs in, whatever an account holds - one could be set by
+        # a password change before it refused one. It costs the check an unknown name does,
+        # so the time the answer takes says nothing about whether the name exists
+        if user_info is None or not password:
             _spend_a_password_check(password)
             error = LOGIN_FAILED
         elif not check_password_hash(user_info.password, password):
