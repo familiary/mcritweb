@@ -24,6 +24,7 @@ import threading
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from conftest import session_cookie_for
 from fixtureData import job_id_of
 from testAccessibility import ADMIN_PAGES, ANONYMOUS_PAGES, CONTRIBUTOR_PAGES, VISITOR_PAGES
 from werkzeug.serving import make_server
@@ -98,7 +99,7 @@ def open_as(app, browser, make_user):
         user_id = make_user(role="admin" if role == "anonymous" else role)
         context = browser.new_context()
         if role != "anonymous":
-            cookie = app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id})
+            cookie = session_cookie_for(app, user_id)
             context.add_cookies([{"name": app.config["SESSION_COOKIE_NAME"], "value": cookie, "domain": "127.0.0.1", "path": "/"}])
         page = context.new_page()
         page.set_default_timeout(SCRIPT_TIMEOUT_MS)
