@@ -42,7 +42,7 @@ def test_the_tooltip_shows_a_blocks_text_as_text(browser_page, live_server):
         "[...document.querySelectorAll('#graphContainer tspan')]"
         ".find(t => t.textContent.includes('onerror')).closest('g.node')")
     node.as_element().hover(force=True)
-    browser_page.wait_for_function("!document.getElementById('tooltip').classList.contains('hidden')")
+    browser_page.wait_for_function("() => !document.getElementById('tooltip').classList.contains('hidden')")
     tooltip = browser_page.evaluate("""() => ({
         text: document.querySelector('#tooltip #value').textContent,
         elements: [...document.querySelectorAll('#tooltip #value *')].map(e => e.tagName),
