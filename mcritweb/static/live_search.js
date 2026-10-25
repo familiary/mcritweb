@@ -32,10 +32,11 @@
     return url;
   }
 
-  // the page's flashed messages in place of the ones shown; true when one is an error
+  // the page's flashed messages in place of the ones shown; true when one is an error.
+  // base.html flashes them as the first children of its <main class="content">.
   function showMessages(page) {
-    var content = document.querySelector("section.content");
-    var fresh = page.querySelector("section.content");
+    var content = document.querySelector("main.content");
+    var fresh = page.querySelector("main.content");
     if (!content || !fresh) {
       return false;
     }

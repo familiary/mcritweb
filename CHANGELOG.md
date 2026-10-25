@@ -130,6 +130,10 @@ rather than reconstructing it from the commit log at release time.
   its longest instruction and stays inside its pane and the window; it was sized from the drawn
   block, so most instructions ran out of the box, and the combined view's "B's code" tooltip was not
   held inside the pane at all.
+- A live search that the backend fails to answer says so. The table's search box showed "No results"
+  and dropped the error the page reported, because the script looked for the messages in an element
+  the layout does not have; the error is now shown above the table and the screen-reader status says
+  the search failed.
 
 ### Security
 
