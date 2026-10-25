@@ -193,29 +193,52 @@ def test_a_key_file_replaced_before_it_was_locked_is_not_claimed(tmp_path, monke
     assert os.listdir(tmp_path) == [FILENAME]
 
 
-def test_a_key_file_is_locked_before_its_key_is_written(tmp_path, monkeypatch):
-    """Without hard links the file exists, empty, before the key is in it. A worker
-    finding it like that queues on its lock before deciding to replace it, so the lock
-    has to be held by then - or that worker replaces a file whose key the one writing
-    it goes on to use. Checked at the write itself, which the race above reaches only
-    now and then."""
+def test_without_hard_links_the_key_is_whole_and_locked_when_it_appears(tmp_path, monkeypatch):
+    """Without hard links the key is renamed into place. By then it must be complete,
+    or a worker reading the file takes it for empty; and the instance folder must be
+    locked, or a worker that finds no file publishes its own key over this one."""
     path = tmp_path / FILENAME
-    real_open = open
-    lock_was_free = []
+    real_replace = os.replace
+    seen = []
 
-    def try_the_lock_first(file, *args, **kwargs):
-        if isinstance(file, int):
-            # the descriptor of the file just created, about to have the key written in
-            with real_open(path) as other_worker:
-                try:
-                    fcntl.flock(other_worker.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    lock_was_free.append(True)
-                except BlockingIOError:
-                    lock_was_free.append(False)
-        return real_open(file, *args, **kwargs)
+    def check_then_replace(source, destination, *args, **kwargs):
+        seen.append(len(open(source).read()))
+        folder = os.open(tmp_path, os.O_RDONLY)
+        try:
+            fcntl.flock(folder, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            seen.append("lock was free")
+        except BlockingIOError:
+            seen.append("locked")
+        finally:
+            os.close(folder)
+        seen.append(path.exists())
+        return real_replace(source, destination, *args, **kwargs)
 
     monkeypatch.setattr(secret_key.os, "link", _no_hard_links)
-    monkeypatch.setattr(secret_key, "open", try_the_lock_first, raising=False)
+    monkeypatch.setattr(secret_key.os, "replace", check_then_replace)
     key = load_or_create_secret_key(str(tmp_path))
-    assert lock_was_free == [False], "another worker could lock the empty file and replace it"
+    assert seen == [64, "locked", False]
     assert path.read_text() == key
+
+
+def test_without_hard_links_nothing_is_written_into_the_key_file(tmp_path, monkeypatch):
+    """Two workers without hard links went wrong when one created the key file empty
+    and filled it in, and another found it empty meanwhile and replaced it. The first
+    then wrote its key into a file no longer on the path, and a third worker that had
+    opened that file before the replacement read this key from it and used it, while
+    everyone else used the winner's. Whatever the timing, that needs the key file to be
+    opened for writing; it must only ever arrive by rename."""
+    path = str(tmp_path / FILENAME)
+    real_open = os.open
+    writes = []
+
+    def note_writes(file, flags, *args, **kwargs):
+        if os.fspath(file) == path and flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT):
+            writes.append(file)
+        return real_open(file, flags, *args, **kwargs)
+
+    monkeypatch.setattr(secret_key.os, "link", _no_hard_links)
+    monkeypatch.setattr(secret_key.os, "open", note_writes)
+    key = load_or_create_secret_key(str(tmp_path))
+    assert writes == []
+    assert (tmp_path / FILENAME).read_text() == key
