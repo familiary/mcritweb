@@ -1,17 +1,17 @@
 {% macro cross_table(method, samples, matching_percent, matching_matches, fifth_indices, job_info) %}
 
-  <table>
+  <table class="cross-matrix">
     {# header cells, so every cell below has one (axe's td-has-header); normal weight,
        because they looked like the rest of the table when they were <td> #}
     <tr>
-      <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">#</th>
-      <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">family</th>
-      <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">version</th>
+      <th scope="col">#</th>
+      <th scope="col">family</th>
+      <th scope="col">version</th>
       <th scope="col"><span class="visually-hidden">Actions</span></th>
-        <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">ID</th>
-        <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">Bit</th>
-        <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal">FNs</th>
-        <th scope="col" style="font-size: 13px; color: var(--text-strong); font-weight: normal" colspan="{{ samples|length }}">Matrix</th>
+        <th scope="col">ID</th>
+        <th scope="col">Bit</th>
+        <th scope="col">FNs</th>
+        <th scope="col" colspan="{{ samples|length }}">Matrix</th>
     </tr>
     
     <tr>
@@ -27,7 +27,7 @@
         <td></td>
         <td></td>
         <td></td>
-        <td align="middle" style="font-size: 10px; color: var(--text-strong)">{{id}}</td>
+        <td align="middle" class="cross-index">{{id}}</td>
     {% endfor %}
     </tr>
 
@@ -35,13 +35,13 @@
       {% set outer_loop = loop %}
       <tr class="sample-row" style="border: 0; line-height: 0.7em;" data-hint-sample="{{ sample.sample_id }}: {{sample.sha256[:8]}} -- {{ sample.family }} {{ sample.version }} -- ({{sample.statistics['num_functions']}} func)">
         <td class="result clickable" style="display: none;">{{ sample_to_job_id[sample.sample_id|string] }}</td>
-        <td class="sha256" style="font-size: 13px; min-width: 100px;">{{ format_sha_short_clipboard(sample.sha256) }}</td>
-        <td class="" style="padding: 0 5px; font-size: 13px">{{sample.family}}</td>
-        <td class="" style="padding: 0 5px; font-size: 13px">{{sample.version}}</td>
+        <td class="sha256" style="min-width: 100px;">{{ format_sha_short_clipboard(sample.sha256) }}</td>
+        <td class="cross-label" style="padding: 0 5px">{{sample.family}}</td>
+        <td class="cross-label" style="padding: 0 5px">{{sample.version}}</td>
         <td><a aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square"></i></a></td>
-        <td class="id clickable" style="padding: 0 5px; font-size: 13px; color: var(--text-strong)">{{ sample.sample_id }}</td>
-        <td class="" style="padding: 0 5px; font-size: 13px">{{sample.bitness}}</td>
-        <td class="" style="padding: 0 5px; font-size: 13px; color: var(--text-strong)">{{sample.statistics['num_functions']}}</td>
+        <td class="id clickable" style="padding: 0 5px; color: var(--text-strong)">{{ sample.sample_id }}</td>
+        <td class="cross-label" style="padding: 0 5px">{{sample.bitness}}</td>
+        <td class="cross-label" style="padding: 0 5px; color: var(--text-strong)">{{sample.statistics['num_functions']}}</td>
       {# a pane filled in the browser writes its own score line into data-hint, see the script at the end #}
       {% for sample2 in samples %}
         {# a pair without matches links nowhere: the row's report has no entry for the column's

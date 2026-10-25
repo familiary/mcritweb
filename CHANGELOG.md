@@ -120,6 +120,11 @@ rather than reconstructing it from the commit log at release time.
 - The help page's paragraphs and list items are at most 80 characters wide, instead of running the
   width of the window, up to about 200 characters a line on a wide screen; its screenshots, tables
   and code still use the whole width.
+- The pages follow the text size set for the whole system on Android and ChromeOS, in Chrome and
+  Edge: they opt in with `<meta name="text-scale" content="scale">`. The text that was sized in
+  pixels and so would not have grown - the score tooltips, the cross compare matrix's labels, the
+  login fields - is sized in `rem` instead, and a copy button grows with its icon instead of
+  clipping it; it is at least 24px square, up from 16px.
 - On a phone, a tablet or a window under 1200px wide, a result page lays out its function matches
   only when they are scrolled near, in browsers that support `content-visibility`. With 250 rows a
   page that halves the layout and style work before the page is first shown (2.7 s to 1.0 s of

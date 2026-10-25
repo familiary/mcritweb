@@ -179,9 +179,11 @@ hr {
     color: var(--text-strong);
 }
 
+/* at least the 24px a target needs (WCAG 2.5.8), and as big as its icon: a maximum of 24px
+   clipped the icon of a text size doubled by the reader */
 .btn-clipboard {
-    max-height: 24px;
-    max-width: 24px;
+    min-height: 24px;
+    min-width: 24px;
     padding: 0;
     line-height: 1;
 }
@@ -571,4 +573,28 @@ main #xcfg_text_right {
    of the next line. Its pictures, tables and code keep the whole width. */
 .manual :is(p, li, blockquote, dd) {
   max-inline-size: 80ch;
+}
+
+/* Text sizes that follow the reader's. base.html opts the pages in to the system text
+   size, which the browser applies to the root font size, so a size in px stays what it
+   was. The cross compare matrix's labels are a little smaller than the page's text and
+   its column index smaller still: 13px and 10px, now in rem. hint.css, vendored, sets its
+   tooltips' 12px on a 12px line; :root outweighs it, as in theme-dark.css. */
+.cross-matrix th,
+.cross-matrix td.sha256,
+.cross-matrix td.id,
+.cross-matrix .cross-label {
+  font-size: 0.8125rem;
+}
+.cross-matrix th {
+  color: var(--text-strong);
+  font-weight: normal;
+}
+.cross-matrix .cross-index {
+  font-size: 0.625rem;
+  color: var(--text-strong);
+}
+:root [data-hint]::after {
+  font-size: 0.75rem;
+  line-height: 1;
 }
