@@ -848,16 +848,49 @@ def fetchCombinedDotGraph(function_id_a, function_id_b):
 def findLoops():
     out_str = ""
     if request.method=='POST':
+        # Capped before it is read: the bounds in cfg_explorer_detector can only be
+        # checked on a parsed graph, and MAX_CONTENT_LENGTH lets 1 GiB through. A body
+        # that declares no length is read only as far as the cap.
+        max_bytes = current_app.config["FIND_LOOPS_MAX_BYTES"]
+        if request.content_length is not None and request.content_length > max_bytes:
+            current_app.logger.warning("findLoops: body of %d bytes not read", request.content_length)
+            return loops_not_analysed(f"max-bytes={max_bytes}")
+        body = read_at_most(request.stream, max_bytes + 1)
+        if len(body) > max_bytes:
+            current_app.logger.warning("findLoops: body of more than %d bytes not read", max_bytes)
+            return loops_not_analysed(f"max-bytes={max_bytes}")
         # a body that is not UTF-8 is not a dot graph this app produced either; decoded
         # with replacement it parses to whatever blocks it has, or to none
-        data = request.data.decode("utf-8", errors="replace")
+        data = body.decode("utf-8", errors="replace")
         try:
             out_str = cfg_explorer_detector.run(data)
         except cfg_explorer_detector.LoopAnalysisTooLarge as exc:
-            # still JSON: the page draws the graph, without loops, rather than nothing
-            current_app.logger.warning("findLoops: graph of %d bytes not analysed: %s", len(request.data), exc)
-            out_str = "[]"
+            current_app.logger.warning("findLoops: graph of %d bytes not analysed: %s", len(body), exc)
+            return loops_not_analysed(exc.limit)
     return out_str
+
+
+def loops_not_analysed(limit):
+    """findLoops' answer for a graph it did not analyse: still JSON and still a 200, so
+    the page draws the graph without loops rather than nothing, and a header saying
+    why there are none, which the page shows (main.js, main_duo.js)."""
+    response = current_app.response_class("[]")
+    response.headers["X-Loop-Analysis"] = f"skipped; {limit}"
+    return response
+
+
+def read_at_most(stream, limit):
+    """Up to `limit` bytes of `stream`. One read() of a socket may answer with fewer
+    bytes than were asked for, and with none only at the end, so it is read in turns."""
+    chunks = []
+    remaining = limit
+    while remaining > 0:
+        chunk = stream.read(min(remaining, 2**16))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
 
 
 # helper for @bp.route('/functions/<int:function_id>')

@@ -46,7 +46,14 @@ MAX_EQUAL_ENTRIES = 200000
 
 
 class LoopAnalysisTooLarge(Exception):
-    pass
+    '''
+    A graph past one of the bounds above. `limit` names the bound, as findLoops tells
+    the page in its X-Loop-Analysis header: "max-blocks=8000".
+    '''
+
+    def __init__(self, message, limit):
+        super().__init__(message)
+        self.limit = limit
 
 
 class DominatorSets:
@@ -121,9 +128,20 @@ def load_dot_file(file_path):
     return dot_content
 
 
-def parse_dot_to_graph(dot_content):
+#: The lines either regex below can match, as one scan over the text: neither matches
+#: without its "->" or "[shape=". Splitting the text first held every line of it at once,
+#: 570 MiB for 32 MiB of two-character lines, and both regexes ran on each of them.
+CANDIDATE_LINE_RX = re.compile(r"^.*(?:->|\[shape=).*$", re.MULTILINE)
+
+
+def parse_dot_to_graph(dot_content, max_blocks=None, max_edges=None):
     '''
     'Parse' dot file (by collecting edges) into a networkx graph object
+
+    With max_blocks or max_edges, LoopAnalysisTooLarge is raised as soon as the graph
+    has more, rather than after the whole of it is built: findLoops reads a body of up
+    to FIND_LOOPS_MAX_BYTES, and 32 MiB of edges took 1.6 GiB to build into a graph
+    that the block bound then refused.
     '''
     # Regex to capture edges ("node_a -> node_b")
     # edge_rx = re.compile( r"^\s*(?P<src>[\w_][\w_\d]*)\s*\-\>\s*(?P<tgt>[\w_][\w_\d]*)\s*\[.*?label=\"\s*ct\s*:\s*(?P<count>\d+)\s*\".*\]\s*;\s*$" )
@@ -133,8 +151,11 @@ def parse_dot_to_graph(dot_content):
     node_rx = re.compile(
         r"^\s*(?P<node>[\w_][\w_\d]*)(:[\w]*)?\s*\[shape\=\w+(,comment=\".*\")?,label\=")
     graph = nwx.DiGraph()
+    # counted here: DiGraph.number_of_edges() walks every node
+    num_edges = 0
     # For each file
-    for line in dot_content.split("\n"):
+    for candidate in CANDIDATE_LINE_RX.finditer(dot_content):
+        line = candidate.group()
         if line:
             # Try and match node names - doesn't matter if they are added multiple times as long as they have the same identifier
             match = node_rx.match(line)
@@ -147,8 +168,12 @@ def parse_dot_to_graph(dot_content):
                 # Add edge in graph
                 graph.add_node(match.group("src"), _name=match.group("src"))
                 graph.add_node(match.group("tgt"), _name=match.group("tgt"))
+                num_edges += not graph.has_edge(match.group("src"), match.group("tgt"))
                 graph.add_edge(match.group("src"), match.group("tgt"))
-                continue
+            if max_blocks is not None and graph.number_of_nodes() > max_blocks:
+                raise LoopAnalysisTooLarge(f"more than {max_blocks} blocks", f"max-blocks={max_blocks}")
+            if max_edges is not None and num_edges > max_edges:
+                raise LoopAnalysisTooLarge(f"more than {max_edges} edges", f"max-edges={max_edges}")
     return graph
 
 
@@ -257,7 +282,7 @@ def collect_loops(graph, backedges, dominanators):
     the same graph for every backedge.
     '''
     if len(backedges) > MAX_BACK_EDGES:
-        raise LoopAnalysisTooLarge(f"{len(backedges)} back edges")
+        raise LoopAnalysisTooLarge(f"{len(backedges)} back edges", f"max-back-edges={MAX_BACK_EDGES}")
     reverse_graph = graph.reverse()
     result = []
     entries = 0
@@ -266,7 +291,8 @@ def collect_loops(graph, backedges, dominanators):
         result.append(compute_loops_from_backedges(work_unit, reverse_graph=reverse_graph))
         entries += len(result[-1]["nodes"])
         if entries > MAX_LOOP_BODY_ENTRIES:
-            raise LoopAnalysisTooLarge(f"more than {MAX_LOOP_BODY_ENTRIES} loop body entries")
+            raise LoopAnalysisTooLarge(f"more than {MAX_LOOP_BODY_ENTRIES} loop body entries",
+                                       f"max-loop-body-entries={MAX_LOOP_BODY_ENTRIES}")
     return result
 
 def addParentInfo(loopsObj):
@@ -294,12 +320,10 @@ def addParentInfo(loopsObj):
 
 def run(dot_content):
     # print(dot_content)
-    graph = parse_dot_to_graph(dot_content)
+    graph = parse_dot_to_graph(dot_content, max_blocks=MAX_BLOCKS, max_edges=MAX_EDGES)
     # a graph without blocks has no loops, and get_roots() cannot take min() of no nodes
     if graph.number_of_nodes() == 0:
         return "[]"
-    if graph.number_of_nodes() > MAX_BLOCKS or graph.number_of_edges() > MAX_EDGES:
-        raise LoopAnalysisTooLarge(f"{graph.number_of_nodes()} blocks, {graph.number_of_edges()} edges")
     roots = get_roots(graph)
     assert len(roots) == 1, "Must have exactly one root to perform analysis: {}".format(str(roots))
     root = roots[0]

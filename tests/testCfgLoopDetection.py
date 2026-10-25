@@ -10,9 +10,9 @@ collect_loops, reversed the whole control flow graph again for every back edge, 
 depth-first search that only ever needs the one reversed copy. Both were measured
 against the largest functions of a real ripgrep binary (900+ blocks) - see PR.md for
 the numbers. Later the per-node dominator sets gave way to the dominator tree, and
-findLoops got bounds on what one posted graph may cost; `_reference_run` keeps the
-earlier dominator sets and addParentInfo as well, so the same equivalence tests hold
-those changes to the old answers.
+findLoops got bounds on what one posted graph may cost, with the parser stopping at
+them; `_reference_run` keeps the earlier dominator sets, addParentInfo and parser as
+well, so the same equivalence tests hold those changes to the old answers.
 
 Neither endpoint was meant to change what it returns, only how much work it does to
 get there. `_reference_dot_graph` and `_reference_run` are the pre-#204 algorithms,
@@ -25,9 +25,11 @@ calls than blocks/back edges, counted rather than timed, since wall-clock time i
 something a test should assert on.
 """
 
+import io
 import json
 import logging
 import random
+import re
 import unittest
 from functools import reduce
 
@@ -152,11 +154,30 @@ def _reference_add_parent_info(loops):
                     break
 
 
+def _reference_parse_dot_to_graph(dot_content):
+    """parse_dot_to_graph as it read before it stopped at the bounds: every line of the
+    split text tried against both regexes."""
+    edge_rx = re.compile(r"^\s*(?P<src>[\w_][\w_\d]*)(:[\w]*)?\s*\-\>\s*(?P<tgt>[\w_][\w_\d]*)(:[\w]*)?")
+    node_rx = re.compile(r"^\s*(?P<node>[\w_][\w_\d]*)(:[\w]*)?\s*\[shape\=\w+(,comment=\".*\")?,label\=")
+    graph = nwx.DiGraph()
+    for line in dot_content.split("\n"):
+        if line:
+            match = node_rx.match(line)
+            if match is not None:
+                graph.add_node(match.group("node"), _name=match.group("node"))
+            match = edge_rx.match(line)
+            if match is not None:
+                graph.add_node(match.group("src"), _name=match.group("src"))
+                graph.add_node(match.group("tgt"), _name=match.group("tgt"))
+                graph.add_edge(match.group("src"), match.group("tgt"))
+    return graph
+
+
 def _reference_run(dot_content):
     """cfg_explorer_detector.run() as it read before #204 and before the dominator
     tree: per-node dominator sets, the pre-#204 collect_loops/getNodes and the
-    list-scanning addParentInfo."""
-    graph = cfg_explorer_detector.parse_dot_to_graph(dot_content)
+    list-scanning addParentInfo, over the parser of before the bounds."""
+    graph = _reference_parse_dot_to_graph(dot_content)
     if graph.number_of_nodes() == 0:
         return "[]"
     roots = cfg_explorer_detector.get_roots(graph)
@@ -408,13 +429,20 @@ def _dense(blocks):
     return "".join(f"b{i:x} -> b{j:x}\n" for i in range(blocks) for j in range(i + 1, blocks))
 
 
-@pytest.mark.parametrize("dot", [_leaves(41), _dense(200), _fan(700), _self_loops(2001)],
-                         ids=["blocks", "edges", "bodies", "back-edges"])
-def test_a_graph_whose_answer_would_outgrow_the_bounds_gets_no_loops(client, as_role, caplog, monkeypatch, dot):
-    """Still JSON, so the page draws the graph without loops instead of nothing; and
-    a line in the log saying why. The block bound is lowered for this test: a graph
-    over the real one takes the set-based dominators this replaced hours."""
-    monkeypatch.setattr(cfg_explorer_detector, "MAX_BLOCKS", 80)
+@pytest.mark.parametrize("dot,max_blocks,limit", [
+    (_leaves(41), 80, "max-blocks=80"),
+    (_dense(200), None, f"max-edges={cfg_explorer_detector.MAX_EDGES}"),
+    (_fan(700), None, f"max-loop-body-entries={cfg_explorer_detector.MAX_LOOP_BODY_ENTRIES}"),
+    (_self_loops(2001), None, f"max-back-edges={cfg_explorer_detector.MAX_BACK_EDGES}"),
+], ids=["blocks", "edges", "bodies", "back-edges"])
+def test_a_graph_whose_answer_would_outgrow_the_bounds_gets_no_loops(client, as_role, caplog, monkeypatch, dot, max_blocks, limit):
+    """Still JSON and still a 200, so the page draws the graph without loops instead
+    of nothing; a header the page reads to say why, naming the bound; and a line in
+    the log. The block bound is lowered for its own case only: a graph over the real
+    one takes the set-based dominators this replaced hours, and below 80 blocks none of
+    the others would reach its bound."""
+    if max_blocks is not None:
+        monkeypatch.setattr(cfg_explorer_detector, "MAX_BLOCKS", max_blocks)
     as_role("visitor")
     logging.disable(logging.NOTSET)
     try:
@@ -424,6 +452,7 @@ def test_a_graph_whose_answer_would_outgrow_the_bounds_gets_no_loops(client, as_
         logging.disable(logging.CRITICAL)
     assert response.status_code == 200
     assert json.loads(response.data) == []
+    assert response.headers["X-Loop-Analysis"] == f"skipped; {limit}"
     assert any("not analysed" in record.getMessage() for record in caplog.records)
 
 
@@ -449,6 +478,133 @@ def test_a_graph_just_inside_the_bounds_is_still_answered(client, as_role):
     response = client.post("/explore/findLoops/", data=dot, content_type="text/plain")
     assert response.status_code == 200
     assert response.data.decode() == _reference_run(dot)
+    assert "X-Loop-Analysis" not in response.headers
+
+
+@pytest.mark.parametrize("dot,bound,limit", [
+    (_fan(100000), {"max_blocks": 100}, "max-blocks=100"),
+    (_dense(300), {"max_edges": 100}, "max-edges=100"),
+], ids=["blocks", "edges"])
+def test_parsing_stops_at_a_bound(monkeypatch, dot, bound, limit):
+    """The bounds used to be checked on the whole graph, once it was built: 32 MiB of
+    edges took 1.6 GiB to parse before the block bound refused it. Now the parser gives
+    up as soon as the graph is past one."""
+    added = []
+    real_add_edge = nwx.DiGraph.add_edge
+    monkeypatch.setattr(nwx.DiGraph, "add_edge",
+                        lambda self, u, v, **attr: added.append((u, v)) or real_add_edge(self, u, v, **attr))
+    with pytest.raises(cfg_explorer_detector.LoopAnalysisTooLarge) as raised:
+        cfg_explorer_detector.parse_dot_to_graph(dot, **bound)
+    assert raised.value.limit == limit
+    assert len(added) <= 101
+
+
+@pytest.mark.parametrize("dot", [
+    "a -> b\r\nb -> a\r\n",
+    "\n\n  a:s0 -> b:n  \n\tb -> a [label=\"x -> y\"]\n  \n",
+    'a [shape=box,comment="0x1",label="a\nmov eax, ebx\njmp b\n"]\nb [shape=box,label="b"]\na -> b\n',
+    "xy\n" * 50 + "a -> b",
+    "a -> b -> c\nc->a\n",
+    "->\n[shape=\n-> b\n",
+    "",
+], ids=["crlf", "ports-and-indents", "node-lines", "junk-lines", "chained", "bare-tokens", "empty"])
+def test_the_parser_reads_a_graph_as_it_did_before(dot):
+    """It reads only the lines that contain "->" or "[shape=", in one scan, instead of
+    splitting the text into all of its lines first; those are the only lines either
+    regex could match, so the graph is the same, down to the order of its blocks and
+    edges, which the order of the loops follows."""
+    graph = cfg_explorer_detector.parse_dot_to_graph(dot)
+    reference = _reference_parse_dot_to_graph(dot)
+    assert list(graph.nodes(data=True)) == list(reference.nodes(data=True))
+    assert list(graph.edges()) == list(reference.edges())
+
+
+def test_the_parser_reads_the_captured_graphs_as_it_did_before(cfg_loop_functions):
+    for function_id in FIXTURE_FUNCTION_IDS:
+        dot = _dot_for_loops(_reference_dot_graph(cfg_loop_functions[function_id]))
+        graph = cfg_explorer_detector.parse_dot_to_graph(dot)
+        reference = _reference_parse_dot_to_graph(dot)
+        assert list(graph.nodes(data=True)) == list(reference.nodes(data=True)), function_id
+        assert list(graph.edges()) == list(reference.edges()), function_id
+
+
+# --- the body, capped before it is read ---------------------------------------------
+
+#: A cap the tests can cross cheaply; FIND_LOOPS_MAX_BYTES is 32 MiB.
+SMALL_CAP = 4096
+
+#: A chunked body: the test client always declares a length, so the declaration is
+#: blanked in the environ and the body is marked as framed by the server.
+CHUNKED = {"CONTENT_LENGTH": "", "HTTP_TRANSFER_ENCODING": "chunked", "wsgi.input_terminated": True}
+
+
+@pytest.fixture
+def small_cap(app):
+    app.config["FIND_LOOPS_MAX_BYTES"] = SMALL_CAP
+    return SMALL_CAP
+
+
+def _post_body(client, body, declared):
+    """Posts `body` from a stream the test can ask afterwards how far it was read."""
+    stream = io.BytesIO(body)
+    environ = {"wsgi.input": stream}
+    environ.update({"CONTENT_LENGTH": str(len(body))} if declared else CHUNKED)
+    response = client.post("/explore/findLoops/", content_type="text/plain", environ_overrides=environ)
+    return response, stream
+
+
+def test_the_cap_is_32_mib(app):
+    assert app.config["FIND_LOOPS_MAX_BYTES"] == 32 * 2**20
+
+
+def test_a_body_over_the_cap_is_answered_without_being_read(client, as_role, small_cap, monkeypatch):
+    """The cost was in the reading: the bounds can only be checked on a parsed graph,
+    and MAX_CONTENT_LENGTH lets 1 GiB through. A body declaring more than the cap is
+    answered on that declaration alone, as one past the bounds is answered."""
+    from werkzeug.wrappers import Request
+
+    reads = []
+    real_get_data = Request.get_data
+    monkeypatch.setattr(Request, "get_data", lambda self, *args, **kwargs: reads.append(1) or real_get_data(self, *args, **kwargs))
+    monkeypatch.setattr(cfg_explorer_detector, "run", lambda dot_content: pytest.fail("the body was analysed"))
+    as_role("visitor")
+
+    response, stream = _post_body(client, _fan(1000).encode(), declared=True)
+
+    assert response.status_code == 200
+    assert json.loads(response.data) == []
+    assert response.headers["X-Loop-Analysis"] == f"skipped; max-bytes={SMALL_CAP}"
+    assert stream.tell() == 0, "the body was read"
+    assert not reads, "the body was read"
+
+
+@pytest.mark.parametrize("size", [SMALL_CAP + 1, 64 * SMALL_CAP])
+def test_a_body_that_declares_no_length_is_read_no_further_than_the_cap(client, as_role, small_cap, monkeypatch, size):
+    """Only reading a chunked body tells its size, so it is read up to one byte past
+    the cap, and no further."""
+    monkeypatch.setattr(cfg_explorer_detector, "run", lambda dot_content: pytest.fail("the body was analysed"))
+    as_role("visitor")
+
+    response, stream = _post_body(client, b"a -> b\n" * (size // 7 + 1), declared=False)
+
+    assert response.status_code == 200
+    assert json.loads(response.data) == []
+    assert response.headers["X-Loop-Analysis"] == f"skipped; max-bytes={SMALL_CAP}"
+    assert stream.tell() <= SMALL_CAP + 1
+
+
+@pytest.mark.parametrize("declared", [True, False], ids=["declared", "chunked"])
+def test_a_body_of_exactly_the_cap_is_analysed(client, as_role, small_cap, declared):
+    as_role("visitor")
+    dot = _fan(20)
+    body = dot.encode().ljust(SMALL_CAP, b"\n")
+
+    response, _ = _post_body(client, body, declared)
+
+    assert response.status_code == 200
+    assert response.data.decode() == _reference_run(dot)
+    assert json.loads(response.data)
+    assert "X-Loop-Analysis" not in response.headers
 
 
 if __name__ == "__main__":
