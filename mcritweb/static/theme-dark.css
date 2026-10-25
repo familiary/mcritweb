@@ -385,7 +385,13 @@
   border-color: var(--primary);
 }
 
-:root .form-check-input:focus,
+:root .form-check-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.25rem var(--focus-ring);
+}
+
+/* a rule of its own: a prefixed pseudo-element in a list can take the whole rule down
+   (tests/testSelectorLists.py) */
 :root .form-range:focus::-webkit-slider-thumb {
   border-color: var(--accent);
   box-shadow: 0 0 0 0.25rem var(--focus-ring);

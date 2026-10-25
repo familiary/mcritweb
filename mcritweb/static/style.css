@@ -419,9 +419,10 @@ form.form-inline input {
     appearance: auto;
   }
 
-  /* the slider's track and thumb are fills too. One rule each, because a pseudo-element the
-     browser does not know drops the whole rule; they start at :root and name the element to
-     outrank theme-dark.css, which paints the same parts from :root and is linked later */
+  /* the slider's track and thumb are fills too. One rule each, because a -moz- pseudo-element
+     drops the whole rule it is grouped in elsewhere (tests/testSelectorLists.py); they start at
+     :root and name the element to outrank theme-dark.css, which paints the same parts from :root
+     and is linked later */
   :root input.form-range::-webkit-slider-thumb {
     background-color: Highlight;
   }
