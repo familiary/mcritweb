@@ -134,6 +134,9 @@ rather than reconstructing it from the commit log at release time.
   `action`, the settings page gave all seven column lists the same id, and the 1 vs 1 page printed
   the sample edit dialog twice, so the second copy's labels named the first copy's fields. That
   page has no edit control, so the dialog is now printed only where a row can open it.
+- The link hunt's link score filter survives a second Filter. Its field showed the link score only
+  while a library score was set, so a link score on its own showed nothing and was dropped by the
+  next submit, and a library score on its own put the word "None" in the link score field.
 
 ### Security
 
