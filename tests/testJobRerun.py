@@ -364,6 +364,21 @@ def test_a_job_id_nobody_knows_is_reported_not_crashed(client, as_role, fake_mcr
     assert queued_calls(fake_mcrit) == []
 
 
+@pytest.mark.parametrize("job_id", ["%2E%2E", "..", "not-a-job", "0123abcd%0A"])
+def test_an_id_that_is_not_a_job_id_is_refused_before_the_backend_is_asked(client, as_role, fake_mcrit, job_id):
+    """McritClient puts the id into its request path unquoted, so ".." asked the backend
+    for another path and its answer was read as the job. #279 checks the id in every
+    job route that hands one to the client, and this one is checked the same way."""
+    as_role("visitor")
+    fake_mcrit.calls.clear()
+
+    response = client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/data/jobs"
+    assert fake_mcrit.calls == [], "the id reached the client"
+
+
 def test_a_backend_that_refuses_the_rerun_does_not_redirect_to_a_missing_job(client, as_role, fake_mcrit):
     """`requestMatchesForSample` answers None when the backend refuses - a sample
     deleted since the original run is the obvious way to get there. Redirecting on

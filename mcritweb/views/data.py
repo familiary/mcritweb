@@ -2298,11 +2298,12 @@ def rerun_job_by_id(job_id):
     /analyze/start_cross_compare, `rematch` included.
 
     Nothing from the request is forwarded to the backend except `job_id` itself, which
-    goes to the same getJobData that `job_by_id` already calls for any visitor. What is
-    submitted is rebuilt here from the stored job, not from anything the caller sent.
+    goes to the same getJobData that `job_by_id` already calls for any visitor, and only
+    once it is a job id by JOB_ID_PATTERN, as there. What is submitted is rebuilt here
+    from the stored job, not from anything the caller sent.
     """
     client = get_client()
-    job_info = client.getJobData(job_id)
+    job_info = client.getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if job_info is None:
         flash('There is no job with that id.', category='error')
         return redirect(url_for('data.jobs'))
