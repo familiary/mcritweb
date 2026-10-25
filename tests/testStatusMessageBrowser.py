@@ -193,3 +193,14 @@ def test_a_copy_that_cannot_be_made_leaves_the_text_selected(open_page):
     assert page.evaluate(STATUS)["drawn"], "a message to act on went away by itself"
     page.click(".status-message .btn-close")
     assert not page.evaluate(STATUS)["drawn"]
+
+
+
+def test_the_script_fills_the_box_the_page_already_has(open_page):
+    """An element added to <body> after the page loaded makes the browser restyle all of it
+    (bootstrap's `legend + *`): 300 ms on a 100 by 100 cross compare matrix. The empty box
+    comes with the page, and the script fills that one instead of adding its own."""
+    page = open_page("/explore/samples", role="visitor")
+    assert page.evaluate("() => document.querySelectorAll('.status-message').length") == 1
+    assert page.evaluate("() => document.querySelector('.status-message').parentElement === document.body")
+    assert page.evaluate("() => document.querySelector('.status-message [role=status]') !== null")

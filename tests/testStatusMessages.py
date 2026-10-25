@@ -100,3 +100,15 @@ def test_the_clipboard_button_copies_without_a_secure_context(client, as_role):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_the_empty_message_box_is_on_every_page_from_the_start(client, as_role):
+    """status_message.js used to add its box to <body> once the page had loaded, and any
+    element added there makes the browser restyle the whole page (bootstrap's `legend +
+    *`): 300 ms on a 100 by 100 cross compare matrix. The box is in the markup, empty and
+    before <main>, and the script only fills it."""
+    as_role("visitor")
+    for path in ("/explore/samples", "/help"):
+        page = client.get(path).get_data(as_text=True)
+        assert page.count('<div class="status-message"></div>') == 1, path
+        assert page.index('<div class="status-message">') < page.index('<main class="content">'), path

@@ -137,7 +137,10 @@ rather than reconstructing it from the commit log at release time.
   that shows it across the foot of the window. A hidden tooltip is no longer laid out at all: it
   made the cross compare pages 1120px wide in any narrower window, and the two hidden boxes behind
   every matrix square were most of the time a large matrix took to draw, so loading one and
-  switching its tabs now take about half the layout work.
+  switching its tabs now take about half the layout work. The rules that do this are written to be
+  cheap to match, and the message box of the copy buttons is on the page from the start instead of
+  being added to it once it has loaded, so a 100 by 100 cross compare matrix styles as fast as it
+  did before the tooltips changed, rather than 250 ms slower.
 - What the tooltips say no longer needs a mouse. The byte counts behind each score, a sample's
   details in the sample pickers and the families an aggregated function matched follow their cell
   as text a screen reader reads; "Total (since queued)", "(whole job)" and the cross compare

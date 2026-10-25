@@ -17,8 +17,15 @@
 
 var mcritStatus = (function () {
     var SHOWN = "status-message-shown";
-    var box = document.createElement("div");
-    box.className = "status-message";
+    // base.html puts the empty box on the page, since an element added to <body> or <main>
+    // once the page is loaded made the browser restyle all of it (bootstrap's `legend + *`):
+    // 300 ms on a 100 by 100 cross compare matrix. Only a page without it makes its own.
+    var box = document.querySelector(".status-message");
+    if (!box) {
+        box = document.createElement("div");
+        box.className = "status-message";
+        document.body.appendChild(box);
+    }
     var text = document.createElement("span");
     text.setAttribute("role", "status");
     // what to copy by hand, outside the live region so that it is shown but not read out
@@ -30,7 +37,6 @@ var mcritStatus = (function () {
     close.setAttribute("aria-label", "Close the message");
     close.hidden = true;
     box.append(text, value, close);
-    document.body.appendChild(box);
     if ("popover" in HTMLElement.prototype) {
         box.popover = "manual";
         box.showPopover();
