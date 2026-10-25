@@ -137,6 +137,9 @@ rather than reconstructing it from the commit log at release time.
 - The link hunt's link score filter survives a second Filter. Its field showed the link score only
   while a library score was set, so a link score on its own showed nothing and was dropped by the
   next submit, and a library score on its own put the word "None" in the link score field.
+- Adding a file to the upload form keeps the family and version typed before it. A file that
+  declares neither, which is any file but an SMDA report, emptied both fields. What a file filled
+  in is still taken back by the next file, unless it was edited.
 
 ### Security
 

@@ -51,11 +51,26 @@ function fill_form(data) {
     } else if (data["bitness"] == 64) {
         $("#bitness64").click();
     }
-    // set base address
-    $("#base_addr").val(data["base_addr"]);
-    // set family and version
-    $("#family").val(data["family"]);
-    $("#version").val(data["version"]);
+    prefill("base_addr", data["base_addr"]);
+    prefill("family", data["family"]);
+    prefill("version", data["version"]);
+}
+
+// A value the file declares goes into its field. One the file does not declare leaves the
+// field as it is, since the page focuses the family field and people type before they drop:
+// writing the probe's missing value emptied what they had typed. What an earlier file filled
+// in and nobody changed is that file's, though, and goes with it.
+function prefill(id, value) {
+    const field = document.getElementById(id);
+    if (value) {
+        field.value = value;
+        field.dataset.prefilled = value;
+        return;
+    }
+    if (field.value === field.dataset.prefilled) {
+        field.value = "";
+    }
+    delete field.dataset.prefilled;
 }
 
 function mcritInitDropzone() {
