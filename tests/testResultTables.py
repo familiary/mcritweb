@@ -398,7 +398,7 @@ def test_a_sort_link_starts_again_at_page_one_and_keeps_the_rest(client, as_role
     as_role("visitor")
     job_id = job_id_of("matches_for_sample")
     page = client.get(f"/data/result/{job_id}?famp=1&funl=10&funp=3&filter_function_min_score=50").get_data(as_text=True)
-    links = re.findall(r"window\.location\.href='([^']*funpsort=offset[^']*)'", page)
+    links = re.findall(r'class="table-sort" href="([^"]*funpsort=offset[^"]*)"', page)
     assert links, "the offset header carries no sort link"
     link = links[0].replace("&amp;", "&")
     assert "funp=1" in link and "funp=3" not in link

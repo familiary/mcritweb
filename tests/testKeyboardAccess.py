@@ -172,3 +172,43 @@ def test_the_yara_tab_of_a_report_without_a_rule_is_disabled_for_a_screen_reader
     tab = next(attrs for tag, attrs, _ in tags if attrs.get("id") == "pills-yara-tab")
     assert "disabled" in tab["class"].split()
     assert tab.get("aria-disabled") == "true"
+
+
+def headers(html):
+    """Each <th> of a page as (attributes, the markup inside it)."""
+    return [(dict(start_tags(match.group(1))[0][1]), match.group(2))
+            for match in re.finditer(r"(<th\b[^>]*>)(.*?)</th>", html, re.S)]
+
+
+@pytest.mark.parametrize("path, label, direction", [
+    ("/explore/samples", "Sample ID", "ascending"),
+    ("/explore/samples?sort=family&ascending=False", "Family", "descending"),
+    ("/explore/functions?sort=offset&ascending=True", "Offset", "ascending"),
+    (f"/data/result/{job_id_of('matches_for_sample')}?fampsort=family_name&fampasc=false", "Family", "descending"),
+])
+def test_a_sortable_header_stays_a_column_header_and_says_how_the_table_is_sorted(client, as_role, path, label, direction):
+    """The header was a `th role="button"`, which made it a button rather than the
+    column header of the cells below it, and nothing said which column the table was
+    sorted by or which way. It is a plain header holding a link that sorts."""
+    table_headers = headers(render(client, as_role, path))
+
+    assert [attrs for attrs, _ in table_headers if "role" in attrs] == []
+    assert all('class="table-sort" href="' in inner for attrs, inner in table_headers if "onclick" in attrs or "tabindex" in attrs)
+    sorted_headers = [(attrs["aria-sort"], inner) for attrs, inner in table_headers if "aria-sort" in attrs]
+    assert len(sorted_headers) == 1, sorted_headers
+    assert sorted_headers[0][0] == direction
+    assert label in sorted_headers[0][1] and 'class="table-sort"' in sorted_headers[0][1]
+
+
+def test_a_header_with_nothing_to_sort_by_is_no_link(client, as_role):
+    """A sortable_header_col given no pagination used to carry an onclick that loaded
+    the page it was on."""
+    from flask import render_template_string
+
+    as_role("visitor")
+    with client.application.test_request_context("/"):
+        html = render_template_string(
+            "{% from 'table/pagination_widget.html' import sortable_header_col %}"
+            "{% call sortable_header_col(none, 'family') %}Family{% endcall %}")
+
+    assert "onclick" not in html and "<a" not in html and "aria-sort" not in html

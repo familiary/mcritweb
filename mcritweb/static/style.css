@@ -391,3 +391,20 @@ form.form-inline input {
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }
+
+/* Keyboard access. A sortable column's header holds what sorts it: a link where the sort
+   loads the page sorted another way (sortable_header_col), a button where it reorders the
+   rows in place (the Unique Blocks statistics). Either keeps the look the header had while
+   the cell itself took the click - its colour and weight, no underline or button face -
+   and the cell's width to click on. */
+th > .table-sort {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  text-decoration: none;
+}

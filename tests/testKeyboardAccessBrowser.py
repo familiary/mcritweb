@@ -126,3 +126,34 @@ def test_space_opens_a_menu(open_as, path, toggle):
 
     assert page.locator(toggle).first.get_attribute("aria-expanded") == "true"
     assert page.locator(f"{toggle} + .dropdown-menu.show").count() == 1
+
+
+def test_a_column_sorts_from_the_keyboard(open_as):
+    page = open_as("visitor", "/explore/samples")
+    assert page.get_attribute("thead th:has(a.table-sort) >> nth=0", "aria-sort") == "ascending"
+
+    tab_to(page, "thead th a.table-sort")
+    with page.expect_navigation():
+        page.keyboard.press("Enter")
+
+    assert "ascending=False" in page.url
+    assert page.get_attribute("thead th:has(a.table-sort) >> nth=0", "aria-sort") == "descending"
+
+
+def test_the_unique_blocks_statistics_sort_from_the_keyboard(open_as):
+    """They sort in the page, and their headers took a click and nothing else."""
+    page = open_as("visitor", f"/data/result/{job_id_of('unique_blocks')}")
+    header = page.locator("table.sortable-table thead th").nth(4)
+    assert header.inner_text().startswith("Unique Blocks")
+    cells = "table.sortable-table tbody tr td:nth-child(5)"
+    before = page.eval_on_selector_all(cells, "cells => cells.map(cell => Number(cell.dataset.sortValue))")
+
+    tab_to(page, "table.sortable-table thead th:nth-child(5) button")
+    page.keyboard.press("Enter")
+    assert header.get_attribute("aria-sort") == "descending"
+    assert page.eval_on_selector_all(cells, "cells => cells.map(cell => Number(cell.dataset.sortValue))") == sorted(before, reverse=True)
+
+    page.keyboard.press("Space")
+    assert header.get_attribute("aria-sort") == "ascending"
+    assert page.eval_on_selector_all(cells, "cells => cells.map(cell => Number(cell.dataset.sortValue))") == sorted(before)
+    assert page.locator("table.sortable-table thead th[aria-sort]").count() == 1

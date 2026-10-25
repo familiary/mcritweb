@@ -163,70 +163,58 @@
   {% if not pagination is none %}
     {% if pagination.sort_by is none %}
       {# we do not know the search order #}
-      <i class="fa-solid fa-sort"></i>
+      <i class="fa-solid fa-sort" aria-hidden="true"></i>
     {% else %}
       {% if pagination.sort_by == sort_by %}
         {# we are considering the column that is sorted by #}
         {% if pagination.is_ascending %}
-          <i class="fa-solid fa-sort-up"></i>
+          <i class="fa-solid fa-sort-up" aria-hidden="true"></i>
         {% else %}
-          <i class="fa-solid fa-sort-down"></i>
+          <i class="fa-solid fa-sort-down" aria-hidden="true"></i>
         {% endif %}
       {% else %}
         {# a column not used for sort right now #}
-        <i class="fa-solid fa-sort"></i>
-      {% endif %}
-    {% endif %}
-  {% endif %}
-{%- endmacro -%}
-
-{# Only used inside the single-quoted JS strings of sortable_header_col, so the quote
-    is escaped here, on the plain URL. Escaping the macro's output instead does nothing:
-    it is markup by then, with every quote already turned into &#39;, which the HTML
-    parser turns back into a quote before the handler runs. #}
-{%- macro cursor_pagination_sort_link(pagination, sort_by) -%}
-  {% if not pagination is none %}
-    {% if pagination.sort_by is none %}
-      {# we do not know the search order #}
-      {{ pagination.get_sort_link(sort_by, True, **kwargs).replace("'", "\\'") }}
-    {% else %}
-      {% if pagination.sort_by == sort_by %}
-        {# we are considering the column that is sorted by #}
-        {% if pagination.is_ascending %}
-          {{ pagination.get_sort_link(sort_by, False, **kwargs).replace("'", "\\'") }}
-        {% else %}
-          {{ pagination.get_sort_link(sort_by, True, **kwargs).replace("'", "\\'") }}
-        {% endif %}
-      {% else %}
-        {# a column not used for sort right now #}
-        {{ pagination.get_sort_link(sort_by, True, **kwargs).replace("'", "\\'") }}
+        <i class="fa-solid fa-sort" aria-hidden="true"></i>
       {% endif %}
     {% endif %}
   {% endif %}
 {%- endmacro -%}
 
 {# `colspan` is for the result pages, where one header covers a score column and its
-   library-excluded twin. Only the named column sorts; the twin has no header of its own. #}
+   library-excluded twin. Only the named column sorts; the twin has no header of its own.
+
+   A header that sorts is still the column's header, and says with aria-sort whether the
+   table is sorted by it and which way. What sorts is a link inside it, since a sort loads
+   the page sorted another way: it used to be the cell, as role="button", which took the
+   column header away from every cell below it and left the sort order unsaid. #}
 {%- macro sortable_header_col(pagination, sort_by, align='left', colspan=none, caller='') -%}
-
-  {%- macro _get_onclick(_js_argument_provider=none) -%}
-    {% if _js_argument_provider is not none %}
-      pagination_js_helper('{{ cursor_pagination_sort_link(pagination, sort_by, **kwargs).strip() }}', {{ _js_argument_provider }}() )
+  {%- set params = {} -%}
+  {{- params.update(pagination|getattr("_extra_pagination_params", {}))|silent -}}
+  {%- set js_argument_provider = params.pop("_js_argument_provider", none) -%}
+  {%- set sorted_here = pagination is not none and pagination.sort_by == sort_by %}
+  <th style="text-align:{{align}};" scope="col" {% if colspan is not none %}colspan="{{ colspan }}" {% endif %}{% if sorted_here %}aria-sort="{{ 'ascending' if pagination.is_ascending else 'descending' }}"{% endif %}>
+    {% if pagination is not none %}
+    {# a click on the column sorted ascending sorts it descending, any other ascending #}
+    {% set sort_link = pagination.get_sort_link(sort_by, not (sorted_here and pagination.is_ascending), **params) %}
+    {# the href keeps the link middle-clickable; the handler adds the other tables' state.
+       The quote is escaped on the plain URL, before autoescaping turns it into &#39;,
+       which the HTML parser turns back into a quote before the handler runs #}
+    <a class="table-sort" href="{{ sort_link }}"{% if js_argument_provider is not none %} onclick="pagination_js_helper('{{ sort_link.replace("'", "\\'") }}', {{ js_argument_provider }}() ); return false"{% endif %}>
+      <span>
+        {{ caller() }}
+      </span>
+      &nbsp;
+      <span style="float: right;">
+        {{ cursor_pagination_sort_symbol(pagination, sort_by) }}
+      </span>
+    </a>
     {% else %}
-      window.location.href='{{ cursor_pagination_sort_link(pagination, sort_by, **kwargs).strip() }}'
-    {% endif %}
-  {%- endmacro -%}
-
-  {% set params = {} %}
-  {{ params.update(pagination|getattr("_extra_pagination_params", {}))|silent }}
-  <th style="text-align:{{align}};" scope="col" {% if colspan is not none %}colspan="{{ colspan }}" {% endif %}{% if pagination is not none %}class="pointer" role="button" tabindex="0" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }"{% endif %} onclick="{{ _get_onclick(**params).strip() }}">
     <span>
       {{ caller() }}
     </span>
     &nbsp;
-    <span style="float: right;">
-      {{ cursor_pagination_sort_symbol(pagination, sort_by) }}
-    </span>
+    <span style="float: right;"></span>
+    {% endif %}
   </th>
 {%- endmacro -%}
 

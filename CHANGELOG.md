@@ -128,6 +128,11 @@ rather than reconstructing it from the commit log at release time.
   that reloaded the page; the search pager's Last page was a tab stop without a role whose reason
   was only in its tooltip; a jobs category with nothing in it, and the YARA tab of a report without
   a rule, were greyed out with nothing to say why.
+- A sortable column's header is still read as the header of its column, and says whether the table
+  is sorted by it and which way. It used to be a button standing in for the header, so a screen
+  reader named no column for the cells below it and never said how the table was sorted. The sort
+  is a link inside the header now, which also opens in a new tab with a middle click, and the Unique
+  Blocks statistics, which only took a mouse click, sort from the keyboard too.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files
