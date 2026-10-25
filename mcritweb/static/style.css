@@ -430,3 +430,11 @@ form.form-inline input {
   margin-top: 0.5rem;
   color: var(--text-danger);
 }
+
+/* The MinHash sliders (the compare pages and the upload form). Bootstrap takes a focused range's
+   outline away and leaves a faint halo on its thumb, about 1.05:1 against the unfocused slider,
+   so a keyboard user could not see where focus was. */
+.form-range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}

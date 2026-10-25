@@ -180,6 +180,9 @@ rather than reconstructing it from the commit log at release time.
   Submit button is enabled as soon as the page's script is in and says "Choose a file first" when
   there is none, instead of staying disabled without a reason. Family and version are marked
   optional.
+- The MinHash matching slider tells a screen reader its setting in words, "Standard" rather than
+  "2", as the page shows it, and draws a focus ring when it is reached by keyboard: Bootstrap's faint
+  halo was all there was.
 
 ### Security
 

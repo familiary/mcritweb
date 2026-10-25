@@ -194,6 +194,28 @@ def test_every_password_field_has_a_show_password_button(client, as_role, make_u
             assert (toggles[field].get("type"), toggles[field].get("aria-pressed")) == ("button", "false"), (page, field)
 
 
+#: page -> the id of its MinHash slider; every page that is signed in carries the drop
+#: overlay's as well
+SLIDERS = {
+    "/analyze/compare?minhashBandRange=1": "minhashBandRange",
+    "/analyze/compare_versus": "minhashBandRange",
+    "/analyze/cross_compare?minhashBandRange=3": "minhashBandRange",
+    "/analyze/query": "minhashBandRange_dropzone",
+}
+SLIDER_WORDS = ["Off", "Fast", "Standard", "Complete"]
+
+
+@pytest.mark.parametrize("path", sorted(SLIDERS))
+def test_a_minhash_slider_says_what_its_position_means(client, as_role, path):
+    """The slider's value is 0-3 and its meaning is the word printed beside it, which was
+    tied to nothing: a screen reader said "2" where the page said "Standard"."""
+    as_role("contributor")
+    sliders = {dict(attrs)["id"]: dict(attrs) for tag, attrs in Tags(page_of(client, path)).tags
+               if tag == "input" and dict(attrs).get("type") == "range"}
+    slider = sliders[SLIDERS[path]]
+    assert slider.get("aria-valuetext") == SLIDER_WORDS[int(slider["value"])]
+
+
 def test_a_page_that_edits_samples_still_has_its_dialog(client, as_role):
     """The dialog is printed where an edit control can open it, and once."""
     as_role("contributor")

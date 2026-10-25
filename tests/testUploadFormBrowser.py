@@ -190,3 +190,19 @@ def test_a_refused_upload_keeps_the_file_and_the_fields_and_can_go_again(open_pa
     page.wait_for_function("() => document.getElementById('upload-feedback').textContent.indexOf('400') >= 0")
     assert "gateway" not in page.inner_text("#upload-feedback")
     assert page.errors == []
+
+
+@pytest.mark.parametrize("path, slider", [("/analyze/compare", "#minhashBandRange"), ("/analyze/query", "#minhashBandRange_dropzone")])
+def test_moving_the_minhash_slider_says_its_new_setting(open_page, path, slider):
+    """A screen reader reads aria-valuetext in place of the number; it has to follow the
+    slider as the word beside it does."""
+    page = open_page(path)
+    assert page.get_attribute(slider, "aria-valuetext") == "Standard"
+    page.focus(slider)
+    page.keyboard.press("ArrowRight")
+    assert page.get_attribute(slider, "aria-valuetext") == "Complete"
+    page.keyboard.press("Home")
+    assert page.get_attribute(slider, "aria-valuetext") == "Off"
+    # and it is drawn as focused: Bootstrap takes the outline away and leaves a faint halo
+    assert page.evaluate(f"() => getComputedStyle(document.querySelector('{slider}')).outlineStyle") != "none"
+    assert page.errors == []
