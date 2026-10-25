@@ -1,11 +1,12 @@
 #!/usr/bin/python
 """The mcrit floor is declared twice, and the two declarations have to agree.
 
-`setup.py` is what `pip install -e .` reads and `requirements.txt` is what
+`pyproject.toml` is what `pip install -e .` reads and `requirements.txt` is what
 `pip install -r` reads, and AGENTS.md says the two move together. The admin page's
-three repair jobs raised `requirements.txt` to mcrit 1.9.0 and left `setup.py` at
-1.5.3, so an editable install could resolve an mcrit without the client methods those
-buttons call - an AttributeError, and a 500, on the first click.
+three repair jobs raised `requirements.txt` to mcrit 1.9.0 and left the package
+metadata (then `setup.py`) at 1.5.3, so an editable install could resolve an mcrit
+without the client methods those buttons call - an AttributeError, and a 500, on the
+first click. tests/testPackaging.py holds the whole dependency list to the same rule.
 """
 
 import logging
@@ -32,10 +33,10 @@ def _version(text):
     return tuple(int(part) for part in text.split("."))
 
 
-def setup_py_specifier():
-    # the operator is what tells the dependency from `name="mcritweb"`
-    pin = re.search(r"['\"]mcrit\s*([<>=!~][^'\"]*)['\"]", (ROOT / "setup.py").read_text(encoding="utf8"))
-    assert pin, "setup.py no longer names mcrit - this test reads the wrong place now"
+def pyproject_specifier():
+    # the operator is what tells the dependency from `name = "mcritweb"`
+    pin = re.search(r"['\"]mcrit\s*([<>=!~][^'\"]*)['\"]", (ROOT / "pyproject.toml").read_text(encoding="utf8"))
+    assert pin, "pyproject.toml no longer names mcrit - this test reads the wrong place now"
     return pin.group(1).replace(" ", "")
 
 
@@ -45,13 +46,13 @@ def requirements_specifier():
     return pin.group(1)
 
 
-def test_setup_py_and_requirements_txt_ask_for_the_same_mcrit():
-    assert setup_py_specifier() == requirements_specifier()
+def test_pyproject_toml_and_requirements_txt_ask_for_the_same_mcrit():
+    assert pyproject_specifier() == requirements_specifier()
 
 
 def test_the_floor_has_every_client_method_the_admin_page_calls():
-    floor = re.search(r">=([\d.]+)", setup_py_specifier())
-    assert floor, f"mcrit{setup_py_specifier()} states no floor"
+    floor = re.search(r">=([\d.]+)", pyproject_specifier())
+    assert floor, f"mcrit{pyproject_specifier()} states no floor"
     for method, since in MAINTENANCE_METHODS_SINCE.items():
         assert _version(floor.group(1)) >= since, f"mcrit {floor.group(1)} has no McritClient.{method}"
 

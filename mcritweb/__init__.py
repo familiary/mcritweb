@@ -103,7 +103,7 @@ def create_app(test_config=None, instance_path=None):
         describable_jobs,
         ensure_local_data_paths,
         forget_server_probe,
-        get_mcritweb_version_from_setup,
+        get_mcritweb_version,
         job_is_describable,
     )
 
@@ -286,7 +286,7 @@ def create_app(test_config=None, instance_path=None):
     app.register_blueprint(api.bp)
     # a failed backend call answers with a page saying so, not a stack trace (#43)
     backend_errors.register(app)
-    app.config['MCRITWEB_VERSION'] = get_mcritweb_version_from_setup()
+    app.config['MCRITWEB_VERSION'] = get_mcritweb_version()
     # gzip the text responses for deployments without a compressing proxy (issue #63)
     compression.register(app)
     app.config['DROPZONE_DEFAULT_MESSAGE'] = "Drop file or click here to import"

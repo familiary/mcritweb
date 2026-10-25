@@ -3,8 +3,7 @@
 # requirements.txt` does not bring them in. Pinned to the same versions CI installs -
 # see .github/workflows/test.yml. ruff is likewise not a runtime dependency.
 init:
-	pip install -r requirements.txt
-	pip install "pytest==9.1.1" "pytest-cov==7.1.0" "ruff==0.16.0"
+	pip install -e ".[dev]"
 lint:
 	python3 -m ruff check .
 test:

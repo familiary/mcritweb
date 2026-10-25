@@ -118,8 +118,8 @@ def quote_backend_query_value(value):
     "100%" stays "100%", "%41" stays "%41", "C++_sample.exe" keeps its plusses.
 
     Correct only while the client concatenates rather than passing `params=` to
-    requests, which would encode these a second time. `setup.py` has no ceiling on
-    mcrit, so tests/testSubmitMetadata.py asserts the concatenation is still there.
+    requests, which would encode these a second time. `pyproject.toml` has no ceiling
+    on mcrit, so tests/testSubmitMetadata.py asserts the concatenation is still there.
 
     Used for `addBinarySample`'s three text fields. `getQueueData` and
     `deleteQueueData` build their query strings the same way and are reached with
