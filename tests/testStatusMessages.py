@@ -80,7 +80,7 @@ def test_every_page_queues_the_status_message(client, as_role):
     """The clipboard buttons are on every kind of page, and every page reports a copy."""
     as_role("visitor")
     page = client.get("/explore/samples").get_data(as_text=True)
-    assert re.search(r"<script>later\(\"/static/status_message\.js\"\)</script>", page)
+    assert re.search(r"<script( nonce=\"[^\"]*\")?>later\(\"/static/status_message\.js(\?v=\w+)?\"\)</script>", page)
 
 
 def test_the_clipboard_button_copies_without_a_secure_context(client, as_role):
