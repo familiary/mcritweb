@@ -123,7 +123,7 @@ def test_logging_out_forgets_the_sort(client, as_role, fake_mcrit):
     The manual states this, which makes it worth pinning."""
     as_role("visitor")
     client.get("/explore/samples?sort=filename&ascending=false")
-    client.get("/logout")
+    client.post("/logout")
 
     as_role("visitor", username="nextuser")
     client.get("/explore/samples")

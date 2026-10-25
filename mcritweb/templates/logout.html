@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}
+Logout
+{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Log out</h1>
+<p>Logging out ends this account's sessions in every browser it is logged in to.</p>
+<form method="post" action="{{ url_for('authentication.logout') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button type="submit" class="btn btn-primary">Log out</button>
+</form>
+{% endblock %}

@@ -459,13 +459,20 @@ def token_required(view):
     return wrapped_view
 
 
-@bp.route('/logout')
+@bp.route('/logout', methods=['GET', 'POST'])
 @login_required
 def logout():
+    if request.method != 'POST':
+        # ending every session of the account is a write, so a link - one on another
+        # site, followed with the Lax cookie, among them - only gets to ask
+        return render_template('logout.html')
     # clearing the cookie only ends this browser's copy of the session, and a copy taken
     # elsewhere would stay valid for PERMANENT_SESSION_LIFETIME. Moving the generation on
     # ends every session of the account, this one included
     g.user.endSessions()
+    # and nobody is logged in for the rest of this request, so the cleared session is
+    # not given a mark on its way out
+    g.user = None
     session.clear()
     flash('You\'re logged out now', category='success')
     return redirect(url_for('index'))

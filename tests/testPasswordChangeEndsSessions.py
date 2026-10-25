@@ -151,7 +151,7 @@ def test_a_copied_session_ends_when_its_owner_logs_out(app, carol):
     copy = copy_of(app, owner)
     assert is_logged_in(copy)
 
-    owner.get("/logout")
+    owner.post("/logout")
 
     assert not is_logged_in(copy)
 
@@ -160,7 +160,7 @@ def test_logging_out_ends_the_other_logins_of_the_account_too(app, carol):
     laptop = logged_in(app)
     phone = logged_in(app)
 
-    laptop.get("/logout")
+    laptop.post("/logout")
 
     assert not is_logged_in(phone)
     # and logging in again starts a session the logout does not reach
@@ -171,6 +171,28 @@ def test_logging_out_leaves_other_accounts_logged_in(app, carol):
     boss = app.test_client()
     boss.post("/login", data={"username": "boss", "inputPassword": "password"})
 
-    logged_in(app).get("/logout")
+    logged_in(app).post("/logout")
 
     assert boss.get("/settings").status_code == 200
+
+
+def test_a_link_to_logout_only_asks(app, carol):
+    """Ending every session of the account is a write, and a GET can come from a link on
+    another site, which the Lax cookie follows. The page posts it."""
+    owner = logged_in(app)
+    other = logged_in(app)
+
+    page = owner.get("/logout")
+
+    assert page.status_code == 200
+    assert 'method="post" action="/logout"' in page.get_data(as_text=True)
+    assert is_logged_in(owner) and is_logged_in(other)
+
+
+def test_the_menu_logs_out_with_a_post(app, carol):
+    owner = logged_in(app)
+
+    page = owner.get("/settings").get_data(as_text=True)
+
+    assert 'href="/logout"' not in page
+    assert '<form method="post" action="/logout">' in page
