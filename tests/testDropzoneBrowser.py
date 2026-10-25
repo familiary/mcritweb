@@ -275,5 +275,43 @@ def test_a_file_let_go_beside_the_drop_zone_does_not_replace_the_page(app, live_
     assert taken == ["sample.exe"], taken
 
 
+@pytest.mark.parametrize("path", ["/analyze/query", "/data/submit", "/data/import"])
+def test_a_file_let_go_beside_the_zone_of_an_upload_page_does_not_replace_the_page(app, live_url, make_user, path):
+    """The same guard, on the pages where the zone is the content and there is no overlay:
+    the zone is a box in the middle of the page, and a file let go a little off it, on the
+    form's other fields or the empty page around, was opened by the browser in the tab in
+    place of the page. The import page loads no upload form, so it had no guard at all. A
+    file let go on the zone is still the zone's, and a drag of text is left alone."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+    user_id = make_user("contributor")
+
+    with sync_api.sync_playwright() as playwright:
+        browser, page = open_samples_page(playwright, app, live_url, user_id)
+        try:
+            page.route("**/data/request_filename_info", lambda route: route.fulfill(status=200, content_type="application/json", body="{}"))
+            # a dropped file is sent at once on the import page; a refusal leaves the page where it is
+            page.route("**/data/import", lambda route: route.fulfill(status=400, content_type="text/plain", body="no") if route.request.method == "POST" else route.fallback())
+            page.goto(live_url + path)
+            page.evaluate(WAIT_FOR_THE_QUEUE)
+            page.wait_for_function("() => window.Dropzone && Dropzone.instances.length === 1")
+
+            beside = {target: [page.evaluate(DRAG, [target, kind, "file"]) for kind in ("dragover", "drop")]
+                      for target in ("main", "body", "window")}
+            text = [page.evaluate(DRAG, ["body", kind, "text"])[0] for kind in ("dragover", "drop")]
+            on_the_zone = page.evaluate(DRAG, ["#myDropzone", "drop", "file"])
+            page.wait_for_function("() => Dropzone.forElement('#myDropzone').files.length === 1")
+            taken = page.evaluate("() => Dropzone.forElement('#myDropzone').files.map((file) => file.name)")
+            kept = page.evaluate("() => Dropzone.forElement('#myDropzone').files.length")
+        finally:
+            browser.close()
+
+    for target, (over, drop) in beside.items():
+        assert over == [True, "none"], f"a file dragged over {target} is offered a drop: {over}"
+        assert drop[0] is True, f"a file let go on {target} is left to the browser"
+    assert text == [False, False], "a drag of text is cancelled too"
+    assert on_the_zone[0] is True
+    assert taken == ["sample.exe"] and kept == 1, taken
+
+
 if __name__ == "__main__":
     unittest.main()

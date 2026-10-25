@@ -147,7 +147,8 @@ rather than reconstructing it from the commit log at release time.
 - A file let go beside the drop zone no longer replaces the page. The overlay opens under the
   pointer on the first drag, and a file dropped a little off the zone, on the overlay or the page,
   was opened by the browser in place of the page (a `.smda` report as JSON) or downloaded. Only the
-  zone takes a dragged file now; elsewhere the pointer shows that it cannot be dropped.
+  zone takes a dragged file now; elsewhere the pointer shows that it cannot be dropped. The query,
+  submit and import pages, where the zone is the page's own content, are covered the same way.
 - A copy says whether it worked in a message at the foot of the window, which screen readers
   announce. The YARA rule and the registration URL answered with an alert dialog, which took the
   focus until it was dismissed, and the other copy buttons only with a "Copied!" tooltip, which a
