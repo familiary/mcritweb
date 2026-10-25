@@ -3,6 +3,8 @@
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro sample_row_std_js() %}
+{# the Analyze menu of a row, out of reach of the box that scrolls the table #}
+<script>later({{ url_for('static', filename='table_scroll.js')|tojson }})</script>
 <script>
   var button_clicked = false;
   

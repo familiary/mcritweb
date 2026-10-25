@@ -391,3 +391,36 @@ form.form-inline input {
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }
+
+/* Tables wider than the screen.
+
+   A data table is as wide as the cells issue #52 keeps on one line - headings, ids,
+   families, action buttons - which is up to 1,064px on the samples page and 1,120px on a
+   result page. Nothing held it, so it widened the page: on a phone or a tablet the
+   heading, the filters and the pagination slid sideways with it, the title and the table
+   were never on screen together, and nothing said the page scrolled. Each data table now
+   sits in a .table-scroll, which scrolls it on its own below 1200px.
+
+   Only below. A box that scrolls sideways also clips what overflows it at the top and
+   bottom, which on a wide screen, where the tables fit, would cut off the hover tooltips
+   of the first rows; and a box that scrolls is what a sticky heading sticks to (below).
+
+   position: relative because Bootstrap's .visually-hidden is position: absolute, and a
+   scroll box clips an absolutely positioned descendant only when it is the descendant's
+   containing block: without it the box scrolls and the page is still 922px wide. The
+   table's bottom margin goes to the box, so the spacing below a table stays what it was
+   whether the box scrolls (and so holds the margin in) or not, and a scrollbar sits right
+   under the table. Bootstrap's dropdown menus in a row, which the box would clip as well,
+   are placed by static/table_scroll.js. */
+.table-scroll {
+  position: relative;
+  margin-bottom: 1rem;
+}
+.table-scroll > .table {
+  margin-bottom: 0;
+}
+@media (max-width: 1199.98px) {
+  .table-scroll {
+    overflow-x: auto;
+  }
+}

@@ -81,5 +81,70 @@ def test_a_rendered_sample_table_carries_the_class(client, as_role):
     assert 'class="table table-hover"' in page, "the stylesheet's selector needs this"
 
 
+# --- tables wider than the screen -------------------------------------------------
+#
+# What #52 keeps on one line makes a data table as wide as those cells, 1,064px on the
+# samples page, and that widened the whole page on a phone or a tablet. A data table now
+# sits in a `.table-scroll` box that scrolls it on its own below 1200px. The browser side
+# is tests/testTableScrollBrowser.py, which CI does not run.
+
+#: The tables that are not in a box, because they list the fields of one thing - a
+#: sample, a function, a job, an account - and break a long value instead of scrolling.
+#: A table missing from here and from a box widens the page again.
+TABLES_THAT_WRAP = {
+    "admin_server.html": 1,
+    "import_complete.html": 1,
+    "result_unique_blocks.html": 1,
+    "settings.html": 1,
+    "single_query_sample.html": 2,
+    "statistics.html": 1,
+    "table/column_table.html": 3,
+    "table/function_details.html": 3,
+    "table/matching_statistics_table.html": 1,
+}
+
+
+def tables_outside_a_box():
+    """{template: number of its Bootstrap tables whose line before is not a .table-scroll}"""
+    found = {}
+    for path in sorted(TEMPLATES.rglob("*.html")):
+        lines = path.read_text().splitlines()
+        for number, line in enumerate(lines):
+            if re.search(r'<table class="table\b', line):
+                before = next((lines[i] for i in range(number - 1, -1, -1) if lines[i].strip()), "")
+                if 'class="table-scroll' not in before:
+                    name = path.relative_to(TEMPLATES).as_posix()
+                    found[name] = found.get(name, 0) + 1
+    return found
+
+
+def test_every_data_table_sits_in_a_box_that_scrolls_it():
+    assert tables_outside_a_box() == TABLES_THAT_WRAP
+
+
+def test_the_box_scrolls_below_1200px_and_holds_what_bootstrap_hides():
+    """`position: relative` is what makes the box clip Bootstrap's .visually-hidden, which
+    is absolutely positioned: without it the box scrolled and the page was still 922px."""
+    css = STYLESHEET.read_text()
+
+    box = re.search(r"\n\.table-scroll\s*\{([^}]*)\}", css)
+    assert box and re.search(r"position:\s*relative", box.group(1))
+    assert re.search(r"@media \(max-width: 1199\.98px\)\s*\{\s*\.table-scroll\s*\{\s*overflow-x:\s*auto;", css)
+
+
+def test_a_rendered_table_is_in_its_box(client, as_role):
+    as_role("visitor")
+    page = client.get("/explore/samples").get_data(as_text=True)
+
+    assert re.search(r'<div class="table-scroll">\s*<table class="table table-hover" id="sample-table">', page)
+
+
+@pytest.mark.parametrize("template", ["table/sample_row.html", "users.html"])
+def test_the_rows_with_a_menu_queue_what_keeps_it_out_of_the_box(template):
+    """A menu in a row of a box that scrolls is clipped by the box, unless Popper places it
+    with position: fixed - which static/table_scroll.js asks for."""
+    assert "later({{ url_for('static', filename='table_scroll.js')|tojson }})" in (TEMPLATES / template).read_text()
+
+
 if __name__ == "__main__":
     unittest.main()

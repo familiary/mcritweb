@@ -50,6 +50,7 @@ Results for Job: {{ job_info.job_id }}
   </div>
 </form>
 {{ set_pagination_params(samp, _anchor="sample-matches") }}
+<div class="table-scroll">
 <table class="table table-hover">
   <thead class="table-light">
     <tr>
@@ -64,6 +65,7 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
   </table>
+  </div>
 
   {{ pagination_widget(samp, _anchor="sample-matches")}}
   <p><a href="{{ url_for(request.endpoint, **request.view_args) }}#family-matches">back to all family overview</a></p>
@@ -98,6 +100,7 @@ Results for Job: {{ job_info.job_id }}
   </div>
 </form>
 {{ set_pagination_params(funp, _anchor="function-matches") }}
+<div class="table-scroll">
 <table class="table table-hover">
   <thead class="table-light">
     <tr>
@@ -112,6 +115,7 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
   </table>
+  </div>
 
   {{ pagination_widget(funp, _anchor="function-matches")}}
 

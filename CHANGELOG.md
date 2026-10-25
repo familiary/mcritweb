@@ -130,6 +130,12 @@ rather than reconstructing it from the commit log at release time.
   its longest instruction and stays inside its pane and the window; it was sized from the drawn
   block, so most instructions ran out of the box, and the combined view's "B's code" tooltip was not
   held inside the pane at all.
+- On a phone, a tablet or a small laptop a wide table scrolls sideways in a box of its own instead of
+  widening the whole page. A data table is as wide as the headings, ids, families and buttons it
+  keeps on one line, 1,064px on the samples list, and below about 1,100px the page scrolled sideways
+  with it, taking the heading, the filters and the pagination along. Below 1200px each data table
+  now scrolls on its own, and the menus in its rows, a sample's Analyze menu and a user's actions,
+  open over the edge of the box rather than being cut off by it.
 
 ### Security
 

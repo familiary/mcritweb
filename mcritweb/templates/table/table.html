@@ -31,6 +31,7 @@
 {# `highlight_terms` is named rather than left in kwargs so it reaches the row macros
    only - a header has no search hit to mark, and half of them do not accept kwargs. #}
 {% macro _table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table", highlight_terms=None) %}
+  <div class="table-scroll">
   <table class="table table-hover" id="{{table_id}}">
     <thead class="table-light">
       {{ header_macro(**kwargs) }}
@@ -41,10 +42,12 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 {% endmacro %}
 
 {% macro _half_table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table") %}
 
+  <div class="table-scroll">
   <table class="table table-hover" style="width: 66%;" id="{{table_id}}">
     <thead class="table-light">
       {{ header_macro(**kwargs) }}
@@ -55,6 +58,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 {% endmacro %}
 
 {% macro job_table(jobs, table_id="job-table", empty_message=None, empty_link=None) %}

@@ -49,6 +49,7 @@ Results for Job: {{ job_info.job_id }}
   </div>
 </form>
 {{ set_pagination_params(funp, _anchor="function-matches") }}
+<div class="table-scroll">
 <table class="table table-hover">
   <thead class="table-light">
     <tr>
@@ -114,6 +115,7 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
 </table>
+</div>
 
   {{ pagination_widget(funp, _anchor="function-matches")}}
 
