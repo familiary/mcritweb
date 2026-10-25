@@ -130,7 +130,8 @@ def test_a_pager_entry_that_goes_nowhere_is_no_tab_stop_and_says_it_is_disabled(
         assert [tag for tag, attrs, _ in tags if tag == "a" and "href" in attrs] == [], item
         assert all(attrs.get("aria-disabled") == "true" for tag, attrs, _ in tags if tag == "a"), item
         stops = [(tag, attrs) for tag, attrs, _ in tags if "tabindex" in attrs]
-        assert all(tag == "a" and attrs.get("aria-label", "").startswith("Last page,") for tag, attrs in stops), item
+        # "Last page of <table>, ..." where the pager is named after its table
+        assert all(tag == "a" and re.match(r"Last page( of [^,]+)?,", attrs.get("aria-label", "")) for tag, attrs in stops), item
 
 
 @pytest.mark.parametrize("path", SIGNED_IN_PAGES)

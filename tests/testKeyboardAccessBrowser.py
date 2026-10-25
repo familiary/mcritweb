@@ -172,7 +172,7 @@ def test_rows_per_page_waits_for_enter_when_changed_with_the_keyboard(open_as, p
     """A select changes its value at every arrow key, and the page loaded at the first
     one: a keyboard user could not step from 25 to 100 without loading the page at 50."""
     page = open_as("visitor", path)
-    select = page.locator("select[aria-label='Rows per page']").first
+    select = page.locator("select[aria-label^='Rows per page']").first
     start = page.url
 
     select.focus()
@@ -191,14 +191,14 @@ def test_rows_per_page_chosen_with_the_pointer_loads_at_once(open_as):
     page = open_as("visitor", "/explore/functions")
 
     with page.expect_navigation():
-        page.locator("select[aria-label='Rows per page']").first.select_option("100")
+        page.locator("select[aria-label^='Rows per page']").first.select_option("100")
 
     assert "limit=100" in page.url
 
 
 def test_rows_per_page_changed_with_the_keyboard_loads_when_focus_leaves(open_as):
     page = open_as("visitor", "/explore/functions")
-    select = page.locator("select[aria-label='Rows per page']").first
+    select = page.locator("select[aria-label^='Rows per page']").first
 
     select.focus()
     page.keyboard.press("ArrowUp")
