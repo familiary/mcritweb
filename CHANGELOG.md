@@ -128,6 +128,8 @@ rather than reconstructing it from the commit log at release time.
 - A running job's overview stops polling its status, and its elapsed time stops counting, while
   its tab is hidden; it polls at once when the tab is shown again. A long job watched from a
   background tab cost the backend a status read every interval for as long as the tab was open.
+- A function page shows its code without waiting for the match lookup of every block: each block's
+  "Matches" line says "looking up..." until its answer arrives.
 - A cross compare result no longer waits for jQuery UI's 36 KB theme stylesheet before its first
   paint; the one rule of it the sample list uses is in `style.css`.
 
