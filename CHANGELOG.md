@@ -122,6 +122,9 @@ rather than reconstructing it from the commit log at release time.
 - The help page asks for its first screenshot, its largest paint, at high priority.
 - Phones and tablets no longer download the Fraunhofer logo, which the navbar shows only from 992px
   up.
+- The help page and the query, submit, import and export forms preload the icon font only from
+  992px up. Below that they draw no icon until the menu is opened, and their first paint on a phone
+  comes about 50 ms sooner.
 - A cross compare result no longer waits for jQuery UI's 36 KB theme stylesheet before its first
   paint; the one rule of it the sample list uses is in `style.css`.
 
