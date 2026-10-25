@@ -144,6 +144,10 @@ rather than reconstructing it from the commit log at release time.
 - Every data table has a name screen readers announce and list (a visually hidden caption), and the
   label column of the job, sample, function, statistics, settings and server tables is the header of
   its row, so each value is read with its label. The label cells take the bold of a header cell.
+- Screen readers no longer read a control flow graph as the code of all its blocks run together. On
+  a function's page the graph is hidden from them, since the code panel beside it is its text, and
+  the panel can be scrolled from the keyboard in every browser; on the comparison page each graph is
+  one image named after its function.
 
 ### Security
 

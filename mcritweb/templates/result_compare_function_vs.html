@@ -182,7 +182,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
           </span>
         </div>
         <div class="mb-1">{{ cfg_legend(combined=True) }}</div>
-        <div style="font-size: 0.85em; color: var(--text-muted);">Hover a block to outline its matches, click to centre the other graph on the first match. In the combined view, hovering a block that differs shows B's code.</div>
+        <div id="xcfg_hint" style="font-size: 0.85em; color: var(--text-muted);">Hover a block to outline its matches, click to centre the other graph on the first match. In the combined view, hovering a block that differs shows B's code.</div>
         {# main_duo.js says here when a panel's loop analysis was skipped; empty, they take no space #}
         <div id="loopAnalysisNote_a" role="status"></div>
         <div id="loopAnalysisNote_b" role="status"></div>
@@ -196,8 +196,8 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
             <div id="loading_a" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--text-progress); ">
             Loading. Please Wait!
             </div>
-            <svg id="graphContainer_a" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
-            <g/>
+            <svg id="graphContainer_a" role="img" aria-label="Control flow graph of function A, {{ function_id_a }}" aria-describedby="xcfg_hint" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
+            <g aria-hidden="true"/>
             </svg>
         </div>
         <div id="xcfg_right">
@@ -207,8 +207,8 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
             <div id="loading_b" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--text-progress); ">
             Loading. Please Wait!
             </div>
-            <svg id="graphContainer_b" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
-            <g/>
+            <svg id="graphContainer_b" role="img" aria-label="Control flow graph of function B, {{ function_id_b }}" aria-describedby="xcfg_hint" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
+            <g aria-hidden="true"/>
             </svg>
         </div>
     </div>
@@ -222,8 +222,8 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
         <div id="combined_error" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--status-no);">
         The combined graph could not be loaded.
         </div>
-        <svg id="graphContainer_c" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
-        <g/>
+        <svg id="graphContainer_c" role="img" aria-label="Combined control flow graph of functions {{ function_id_a }} and {{ function_id_b }}" aria-describedby="xcfg_hint" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
+        <g aria-hidden="true"/>
         </svg>
     </div>
     <!--

@@ -84,3 +84,31 @@ def test_a_cross_compare_pane_filled_on_first_click_keeps_the_table_s_name(page,
     captions = page.locator("#pills-tabContent table > caption").all_inner_texts()
     assert captions == ["Cross comparison matrix"] * 2
     assert page.errors == []
+
+
+def test_the_drawn_function_graph_is_not_read_as_its_code_run_together(page, live_server):
+    """The code panel beside the graph is the text of the same blocks."""
+    open_page(page, f"{live_server}/explore/functions/84")
+    page.evaluate("document.getElementById('xcfg_top').scrollIntoView()")
+    page.wait_for_selector("#graphContainer g.node", state="attached")
+    page.wait_for_function("document.querySelectorAll('#text_code p').length > 0")
+
+    tree = page.locator("#xcfg_container").aria_snapshot()
+
+    assert "- img" not in tree
+    assert 'region "Code of function 84"' in tree
+    assert page.errors == []
+
+
+def test_each_drawn_comparison_graph_is_one_named_image(page, live_server):
+    open_page(page, f"{live_server}/data/matches/function/84/943")
+    page.evaluate("document.getElementById('xcfg_container').scrollIntoView()")
+    for panel in ("a", "b"):
+        page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
+
+    tree = page.locator("#xcfg_container").aria_snapshot()
+
+    images = [line.strip() for line in tree.splitlines() if line.strip().startswith("- img")]
+    assert images == ['- img "Control flow graph of function A, 84"', '- img "Control flow graph of function B, 943"']
+    assert "push ebp" not in tree
+    assert page.errors == []

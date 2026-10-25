@@ -268,11 +268,11 @@ Function: {{ function_id }}
                     <p id="cfgDeferredNote" role="status" aria-live="polite" tabindex="-1">This function has <span id="cfgDeferredBlocks"></span> blocks. Its code is on the right; its graph is drawn when asked, since laying out and drawing this many blocks takes a while.</p>
                     <button type="button" class="btn btn-primary" id="drawGraph">Draw the graph</button>
                   </div>
-                  <svg id="graphContainer" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
+                  <svg id="graphContainer" aria-hidden="true" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
                   <g/>
                   </svg>
               </div>
-              <div id="xcfg_text_right">
+              <div id="xcfg_text_right" role="region" aria-label="Code of function {{ function_id }}" tabindex="0">
                   <pre id="text_code"></pre>
               </div>
           </div>
