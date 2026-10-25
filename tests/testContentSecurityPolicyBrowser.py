@@ -254,7 +254,8 @@ def test_a_matrix_cell_leads_to_its_matches_before_the_queued_scripts_are_in(adm
     onclick used to be, so a click does not wait for jQuery."""
     page = admin.page
     page.route("**/static/jquery.js", lambda route: None)
-    page.goto(live_server + f"/data/result/{job_id_of('cross_compare')}")
+    # not "load": the held script can keep the page from ever reaching it
+    page.goto(live_server + f"/data/result/{job_id_of('cross_compare')}", wait_until="domcontentloaded")
     with page.expect_navigation():
         page.locator("span.score-swatch[data-href]").first.click()
     assert re.search(r"/data/result/[0-9a-f]{24}\?samid=\d+$", page.url), page.url
