@@ -71,3 +71,10 @@ def test_the_manual_s_lines_are_at_most_80_characters_long(open_page, live_serve
         " return element.getBoundingClientRect().width / ch; }))"
     )
     assert longest <= 80.5, f"a manual line is {longest:.0f} characters wide"
+
+
+def test_the_pages_are_set_in_the_font_they_always_were(open_page, live_server):
+    """The font moved from a style attribute on <body> to style.css; the pages look as
+    they did."""
+    page = open_page(live_server + "/explore/samples", 1280)
+    assert page.evaluate("() => [getComputedStyle(document.body).fontFamily, getComputedStyle(document.querySelector('main h1')).fontFamily]") == ["sans-serif", "sans-serif"]

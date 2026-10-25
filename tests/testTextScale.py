@@ -83,3 +83,18 @@ def test_the_copy_button_grows_with_its_icon():
     rule = re.search(r"\.btn-clipboard\s*\{([^}]*)\}", STYLESHEET.read_text()).group(1)
     assert "max-height" not in rule and "max-width" not in rule
     assert re.search(r"min-height:\s*24px", rule) and re.search(r"min-width:\s*24px", rule)
+
+
+# --- the font the pages are set in ---------------------------------------------------
+
+def test_the_font_is_set_in_the_stylesheet_and_nowhere_else():
+    """`<body style="font-family: sans-serif">` outweighed style.css's
+    `html { font-family: 'Roboto', sans-serif }`, which was dead (no Roboto is shipped, and
+    Bootstrap sets body's font anyway), and Bootstrap's system-ui stack: the pages were set
+    in the generic sans-serif, which style.css's body rule now says itself."""
+    assert re.search(r"<body[^>]*\bstyle=", BASE.read_text()) is None
+
+    css = re.sub(r"/\*.*?\*/", "", STYLESHEET.read_text(), flags=re.S)
+    assert "Roboto" not in css
+    body = re.search(r"(?:^|\n)body\s*\{([^}]*)\}", css).group(1)
+    assert re.search(r"font-family:\s*sans-serif;", body)

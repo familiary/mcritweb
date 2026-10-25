@@ -88,12 +88,16 @@
 }
 
 html {
-    font-family: 'Roboto', sans-serif;
     background: var(--surface-page);
 }
   
 body {
     max-width: 1824px;
+    /* the generic sans-serif the pages have always been set in, from a style attribute on
+       <body> until now: Bootstrap's body rule would set system-ui, and the 'Roboto' this
+       sheet named on html never reached a page (no text font is shipped, and Bootstrap's
+       rule is on body) */
+    font-family: sans-serif;
     font-size: 0.9em;
     margin: 0 auto;
     background: var(--surface-page);
