@@ -468,3 +468,61 @@ def test_a_cross_compare_sample_moves_by_touch(open_as, live_server):
     with page.expect_navigation():
         page.tap("text=Change order")
     assert page.url.endswith("?custom=" + ",".join([order[1], order[0]] + order[2:]))
+
+
+FOCUSED_SCORE = """() => {
+    const score = document.activeElement;
+    return score.classList.contains('score-swatch') ? [score.closest('tr').querySelector('th.id').textContent.trim(),
+        score.closest('table').rows[1].cells[score.parentNode.cellIndex].textContent.trim(), score.getAttribute('aria-label')] : null;
+}"""
+
+
+def test_the_matrix_is_read_and_followed_from_the_keyboard(open_as, live_server):
+    """Its scores showed on hover alone and opened a pair's report from a click alone."""
+    report = load("cross_compare.result")["unweighted"]
+    order = report["clustered_sequence"]
+    page = open_as("visitor", f"/data/result/{job_id_of('cross_compare')}")
+
+    def score(row, col):
+        return [order[row], order[col], "%.2f%% (%d matches)" % (report["matching_percent"][order[row]][order[col]], report["matching_matches"][order[row]][order[col]])]
+
+    tab_to(page, "#pills-unweighted .score-swatch")
+    assert page.evaluate(FOCUSED_SCORE) == score(0, 0)
+    # the tooltip shows on focus as on hover, with the pair it is for
+    assert page.evaluate("() => getComputedStyle(document.activeElement, '::after').visibility") == "visible"
+    assert "vs." in page.evaluate("() => document.activeElement.getAttribute('data-hint')")
+
+    page.keyboard.press("ArrowRight")
+    assert page.evaluate(FOCUSED_SCORE) == score(0, 1)
+    page.keyboard.press("ArrowDown")
+    page.keyboard.press("ArrowDown")
+    assert page.evaluate(FOCUSED_SCORE) == score(2, 1)
+    page.keyboard.press("End")
+    assert page.evaluate(FOCUSED_SCORE) == score(2, len(order) - 1)
+    page.keyboard.press("Home")
+    assert page.evaluate(FOCUSED_SCORE) == score(2, 0)
+
+    # one tab stop: Tab leaves the matrix, and Shift+Tab comes back to the score it left
+    page.keyboard.press("Tab")
+    assert page.evaluate(FOCUSED_SCORE) is None
+    page.keyboard.press("Shift+Tab")
+    assert page.evaluate(FOCUSED_SCORE) == score(2, 0)
+
+    page.keyboard.press("ArrowRight")
+    with page.expect_navigation():
+        page.keyboard.press("Enter")
+    assert page.url.endswith(f"?samid={order[1]}")
+
+
+def test_a_matrix_filled_on_its_tab_is_named_and_one_tab_stop_too(open_as):
+    page = open_as("visitor", f"/data/result/{job_id_of('cross_compare')}")
+    page.focus("#pills-unweighted-tab")
+    page.keyboard.press("ArrowRight")
+    page.keyboard.press("Enter")
+    wait_until_shown(page, "pills-score_weighted-tab")
+
+    scores = page.eval_on_selector_all("#pills-score_weighted .score-swatch", """scores => scores.map(score =>
+        [score.tabIndex, score.getAttribute('aria-label'), score.getAttribute('data-hint')])""")
+    assert [tab_index for tab_index, _, _ in scores].count(0) == 1 and scores[0][0] == 0
+    assert all(hint.startswith("MCRIT: " + label) for _, label, hint in scores)
+    assert page.locator("#pills-score_weighted caption").count() == 1

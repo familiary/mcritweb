@@ -1,6 +1,9 @@
 {% macro cross_table(method, samples, matching_percent, matching_matches, fifth_indices, job_info) %}
 
   <table>
+    {# what the table is, for a screen reader moving between the tables of the page; a pane
+       filled in the browser clones it with the rest (see the script at the end) #}
+    <caption class="visually-hidden">MCRIT score of each pair of samples, the row's sample against the column's. The arrow keys move between the scores, and Enter opens the report of a pair with matches.</caption>
     {# header cells, so every cell below has one (axe's td-has-header); normal weight,
        because they looked like the rest of the table when they were <td> #}
     <tr>
@@ -22,12 +25,14 @@
         <td></td>
         <td></td>
         <td></td>
-    {% for id in fifth_indices %}
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td align="middle" style="font-size: 10px; color: var(--text-strong)">{{id}}</td>
+    {# a header for every column of the matrix, so a score is read with the pair it is for;
+       every fifth shows its sample id, as the axis label it was #}
+    {% for column_sample in samples %}
+      {% if column_sample.sample_id in fifth_indices %}
+        <th scope="col" class="matrix-col" style="font-size: 10px; font-weight: normal; text-align: center; color: var(--text-strong)">{{ column_sample.sample_id }}</th>
+      {% else %}
+        <th scope="col" class="matrix-col"><span class="visually-hidden">{{ column_sample.sample_id }}</span></th>
+      {% endif %}
     {% endfor %}
     </tr>
 
@@ -49,9 +54,16 @@
         {# a pair without matches links nowhere: the row's report has no entry for the column's
            sample, so its page would list nothing and its diagram would 404, as
            data.render_missing_match_diagram draws none for it. The diagonal is always such a
-           pair, since mcrit counts a sample's matches with itself apart #}
-        <td><span{% if matching_matches[sample.sample_id|string][sample2.sample_id|string] %} onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}';"{% endif %} class="hint--top score-swatch" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
-            style="background-color: #{{ score_to_color(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }}; width: 25px; height: 25px; "></span>
+           pair, since mcrit counts a sample's matches with itself apart.
+
+           A pair with matches is a link, one without an image of its colour, and either is
+           named by its score, which the tooltip showed a pointer alone. The matrix is one tab
+           stop, its first score; the arrow keys move from there (the script at the end), so
+           a link is out of the tab order, or Tab would stop on every one of up to N*N #}
+        {% set percent = matching_percent[sample.sample_id|string][sample2.sample_id|string] %}
+        {% set matches = matching_matches[sample.sample_id|string][sample2.sample_id|string] %}
+        <td>{% if matches %}<a href="{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}" tabindex="{{ '0' if outer_loop.first and loop.first else '-1' }}"{% else %}<span role="img"{% if outer_loop.first and loop.first %} tabindex="0"{% endif %}{% endif %} class="hint--top score-swatch" aria-label="{{ '%.2f%%'|format(percent) }} ({{ matches }} matches)" data-hint="MCRIT: {{ '%.2f%%'|format(percent) }} ({{ matches }} matches) "
+            style="background-color: #{{ score_to_color(percent) }}; width: 25px; height: 25px; ">{% if matches %}</a>{% else %}</span>{% endif %}
         </td>
       {% endfor %}
       </tr>
@@ -92,12 +104,13 @@ Results for Job: {{ job_info.job_id }}
   // A matrix cell's tooltip names both of its samples. That part is the same along a whole
   // row and down a whole column, so it is no longer written into every cell of every matrix
   // (issue #198): a cell carries its score line, a row the line naming its sample, and the
-  // two are put together when the pointer first reaches the cell. The cell's own row names
-  // the first sample and the row at the cell's column the second - rows and columns come in
-  // the same order. hint.css shows the text as it is (white-space: pre), so the line breaks
-  // and indentation are the ones the template used to write into the attribute.
+  // two are put together when the pointer or focus first reaches the cell. The cell's own
+  // row names the first sample and the row at the cell's column the second - rows and
+  // columns come in the same order. hint.css shows the text as it is (white-space: pre), so
+  // the line breaks and indentation are the ones the template used to write into the
+  // attribute.
   whenReady(function(){
-    $(document).on("mouseover", "#pills-tabContent tr.sample-row span[data-hint]", function(){
+    $(document).on("mouseover focusin", "#pills-tabContent tr.sample-row .score-swatch", function(){
       var hint = this.getAttribute("data-hint");
       if (hint.indexOf("\n") >= 0) {
         return;
@@ -107,6 +120,37 @@ Results for Job: {{ job_info.job_id }}
       var column = sampleRows[this.parentNode.cellIndex - (row.cells.length - sampleRows.length)];
       var indent = "\n            ";
       this.setAttribute("data-hint", hint + "\n" + indent + row.getAttribute("data-hint-sample") + indent + "\nvs.\n" + indent + column.getAttribute("data-hint-sample"));
+    });
+
+    // The matrix is one tab stop, and the score focused keeps it: the arrow keys move
+    // between the scores, Home and End to the first and last of a row, and Enter follows a
+    // score's link. A score was a coloured square a pointer alone could read or follow.
+    $(document).on("keydown", "#pills-tabContent .score-swatch", function(event){
+      var cell = this.parentNode;
+      var row = cell.parentNode;
+      var target = null;
+      if (event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      } else if (event.key === "ArrowLeft") {
+        target = cell.previousElementSibling;
+      } else if (event.key === "ArrowRight") {
+        target = cell.nextElementSibling;
+      } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        var other = event.key === "ArrowUp" ? row.previousElementSibling : row.nextElementSibling;
+        target = other !== null && other.classList.contains("sample-row") ? other.cells[cell.cellIndex] : null;
+      } else if (event.key === "Home" || event.key === "End") {
+        var scores = row.querySelectorAll(".score-swatch");
+        target = scores[event.key === "Home" ? 0 : scores.length - 1].parentNode;
+      } else {
+        return;
+      }
+      event.preventDefault();
+      var next = target ? target.querySelector(".score-swatch") : null;
+      if (next !== null) {
+        this.tabIndex = -1;
+        next.tabIndex = 0;
+        next.focus();
+      }
     });
   });
 </script>
@@ -245,6 +289,14 @@ Results for Job: {{ job_info.job_id }}
     </div>
   </div>
 
+{# what the colours of the matrix stand for: a score shows on hover and on focus, and to a
+   screen reader, but the scale itself was named nowhere #}
+<p class="text-center small">Score:
+  {% for low, label in [(90, "90–100%"), (80, "80–90%"), (70, "70–80%"), (60, "60–70%"), (50, "50–60%"), (40, "40–50%"), (30, "30–40%"), (20, "20–30%"), (10, "10–20%"), (0.01, "under 10%"), (0, "0%")] %}
+  <span class="score-key-entry"><span class="score-swatch score-key" style="background-color: #{{ score_to_color(low) }}"></span> {{ label }}</span>
+  {% endfor %}
+</p>
+
 {% set cross_method_labels = {"unweighted": "Unweighted", "score_weighted": "Score Weighted", "frequency_weighted": "Frequency Weighted", "nonlib_unweighted": "Non-Library Unweighted", "nonlib_score_weighted": "Non-Library Score Weighted", "nonlib_frequency_weighted": "Non-Library Frequency Weighted"} %}
 {# each tab builds its matrix the first time it is shown, so an arrow key only moves to it
    and Enter shows it (see static/keyboard.js) #}
@@ -301,11 +353,13 @@ Results for Job: {{ job_info.job_id }}
         sourceIndex[row.querySelector("th.id").textContent.trim()] = index;
       });
       var table = rendered.cloneNode(false);
+      table.appendChild(rendered.caption.cloneNode(true));
       var body = table.appendChild(rendered.tBodies[0].cloneNode(false));
       body.appendChild(rendered.rows[0].cloneNode(true));
       var indices = body.appendChild(rendered.rows[1].cloneNode(true));
-      indices.querySelectorAll("td[align]").forEach(function(cell, k){
-        cell.textContent = data.order[(k + 1) * 5 - 1];
+      // every column's header, shown or only read out (cross_table)
+      indices.querySelectorAll("th.matrix-col").forEach(function(cell, k){
+        (cell.firstElementChild || cell).textContent = data.order[k];
       });
       data.order.forEach(function(sampleId, i){
         var sourceRow = sourceRows[sourceIndex[sampleId]];
@@ -317,11 +371,15 @@ Results for Job: {{ job_info.job_id }}
         }
         data.order.forEach(function(otherId, j){
           var cell = row.appendChild(sourceCells[numLeading + sourceIndex[otherId]].cloneNode(true));
-          var span = cell.querySelector("span[data-hint]");
+          var span = cell.querySelector(".score-swatch");
+          var score = data.percent[i][j].toFixed(2) + "% (" + data.matches[i][j] + " matches)";
           // the score line, all of the hint cross_table writes - the samples' part is added
           // on hover, from the rows, which are cloned with the line naming their sample
-          span.setAttribute("data-hint", "MCRIT: " + data.percent[i][j].toFixed(2) + "% (" + data.matches[i][j] + " matches) ");
+          span.setAttribute("data-hint", "MCRIT: " + score + " ");
+          span.setAttribute("aria-label", score);
           span.style.backgroundColor = "#" + lazy.palette[data.color[i][j]];
+          // the one tab stop is the first score, wherever the clone it came from was
+          span.tabIndex = i === 0 && j === 0 ? 0 : -1;
         });
         row.querySelector("[data-bs-target='#editSampleModal']").id = method + "_sample_" + sampleId + "_edit";
       });

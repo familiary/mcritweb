@@ -285,3 +285,37 @@ def test_every_listing_row_holds_a_link_to_where_it_goes(client, as_role, path):
     for kind, header in rows:
         links = [attrs.get("href", "") for tag, attrs, _ in start_tags(header) if tag == "a"]
         assert len(links) == 1 and re.fullmatch(ROW_TARGET[kind], links[0]), f"{path}: a {kind} leads nowhere: {header}"
+
+
+def test_every_score_of_the_cross_compare_matrix_is_named_and_the_matrix_is_one_tab_stop(client, as_role):
+    """A score was an empty coloured span: its number lived in a hover tooltip, a pair's
+    report opened from an onclick on it, and the cells had no headers to say which pair
+    they were for. Each is a link or an image named by its score now, under a header
+    naming its row's sample and one naming its column's, and only the first is a tab stop:
+    the arrow keys move on from there."""
+    report = load("cross_compare.result")["unweighted"]
+    order = report["clustered_sequence"]
+    html = render(client, as_role, f"/data/result/{job_id_of('cross_compare')}")
+    pane = html[html.index('id="pills-unweighted"'):html.index('id="cross-lazy-panes"')]
+    tags = start_tags(pane)
+
+    assert re.search(r"<table>\s*(?:\{#.*?#\}\s*)?<caption class=\"visually-hidden\">MCRIT score of each pair", pane, re.S)
+    assert [attrs.get("class") == "matrix-col" and attrs.get("scope") for tag, attrs, _ in tags if tag == "th" and attrs.get("class") == "matrix-col"] == ["col"] * len(order)
+    assert len([attrs for tag, attrs, _ in tags if tag == "th" and attrs.get("scope") == "row"]) == len(order)
+    scores = [(tag, attrs) for tag, attrs, _ in tags if "score-swatch" in (attrs.get("class") or "").split()]
+    assert len(scores) == len(order) ** 2
+    expected = ["%.2f%% (%d matches)" % (report["matching_percent"][row][col], report["matching_matches"][row][col]) for row in order for col in order]
+    assert [attrs["aria-label"] for _, attrs in scores] == expected
+    assert all(tag == "a" if "href" in attrs else (tag, attrs.get("role")) == ("span", "img") for tag, attrs in scores)
+    assert [attrs.get("tabindex") for tag, attrs in scores if tag == "a" or "tabindex" in attrs][0] == "0"
+    assert [index for index, (tag, attrs) in enumerate(scores) if attrs.get("tabindex") == "0"] == [0]
+    assert all(attrs.get("tabindex") == "-1" for tag, attrs in scores[1:] if tag == "a")
+
+
+def test_the_cross_compare_result_names_the_colours_of_its_matrix(client, as_role):
+    """A colour alone stood for a range of scores, and nothing said which."""
+    html = render(client, as_role, f"/data/result/{job_id_of('cross_compare')}")
+
+    key = re.search(r'<p class="text-center small">Score:(.*?)</p>', html, re.S).group(1)
+    assert key.count('class="score-swatch score-key"') == 11
+    assert "90–100%" in key and "under 10%" in key and "0%</span>" in key

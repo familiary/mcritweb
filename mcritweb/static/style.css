@@ -443,3 +443,17 @@ th[scope="row"] > a:not(.btn) {
   padding: 0 6px;
   line-height: 22px;
 }
+
+/* The key to the colours of a cross compare's matrix: a square of each colour, of the
+   matrix's .score-swatch so that whatever the theme does to those squares it does here,
+   beside the range of scores it stands for. */
+.score-key {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  border: 1px solid var(--border-swatch);
+  vertical-align: middle;
+}
+.score-key-entry {
+  white-space: nowrap;
+}

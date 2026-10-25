@@ -164,6 +164,13 @@ rather than reconstructing it from the commit log at release time.
   a phone could not set a custom sample order. Each item has buttons to move it up and down, and a
   column one to move it between Active and Available; a screen reader is told where it went.
   Dragging works as before.
+- A cross compare's matrix can be read and followed with the keyboard and a screen reader. Each
+  score was an empty coloured square: its number showed in a tooltip on hover alone, a pair's
+  report opened from a mouse click alone, and nothing named the pair a square stood for. A score is
+  now a link (or, for a pair without matches, an image) named by its percentage and match count,
+  under headers naming its row's and its column's sample; the matrix is one tab stop, the arrow keys
+  move between its scores and show each one's tooltip, and Enter opens a pair's report. A key above
+  the tabs says which range of scores each colour stands for.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files

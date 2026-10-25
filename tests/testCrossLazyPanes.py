@@ -183,7 +183,7 @@ class _Rows(HTMLParser):
         elif tag in ("td", "th"):
             self._cell = {"attrs": attrs, "text": "", "hint": None, "edit": False}
             self.rows[-1]["cells"].append(self._cell)
-        elif tag == "span" and "data-hint" in attrs:
+        elif tag in ("span", "a") and "data-hint" in attrs:
             self._cell["hint"] = attrs["data-hint"]
         elif tag == "button" and attrs.get("data-bs-target") == "#editSampleModal":
             self._cell["edit"] = True
@@ -207,10 +207,13 @@ def test_the_rendered_matrix_has_the_shape_the_script_clones_from(client, as_rol
     parser.feed(_pane(_page(client, as_role), RENDERED))
     rows = parser.rows
 
-    # rows[0] and rows[1] are the two header rows, the second holds every fifth id
+    # rows[0] and rows[1] are the two header rows, the second names every column, and
+    # shows every fifth name
     assert "sample-row" not in rows[0]["attrs"].get("class", "")
-    fifths = [cell["text"].strip() for cell in rows[1]["cells"] if "align" in cell["attrs"]]
-    assert fifths == [order[(k + 1) * 5 - 1] for k in range(len(order) // 5)]
+    columns = [cell for cell in rows[1]["cells"] if "matrix-col" in cell["attrs"].get("class", "")]
+    assert [cell["text"].strip() for cell in columns] == order
+    shown = [cell["text"].strip() for cell in columns if "style" in cell["attrs"]]
+    assert shown == [order[(k + 1) * 5 - 1] for k in range(len(order) // 5)]
     sample_rows = rows[2:]
     assert [row["attrs"].get("class") for row in sample_rows] == ["sample-row"] * len(order)
     num_leading = len(sample_rows[0]["cells"]) - len(order)
