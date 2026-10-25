@@ -554,15 +554,30 @@ def test_no_template_puts_a_blocking_script_in_head(path):
 NAMES_JQUERY_BUT_DOES_NOT_NEED_IT = {"dropzone.js": 'if (typeof jQuery !== "undefined" && jQuery !== null) {'}
 
 
-def plain_scripts():
-    """Every static file a template loads with a plain, not deferred, `<script src>`."""
+#: The function page and the function comparison can load their graph viewer - d3, dagre
+#: and the CFG scripts - from a `var viewer = [...]` list of url_for() URLs in an inline
+#: script, which adds them once the graph comes into view (#310, #312). That can be before
+#: the queue has run jQuery, so the viewer's files are held to what a plain script is.
+VIEWER_LIST = re.compile(r"\bvar\s+viewer\s*=\s*\[(.*?)\]", re.S)
+
+
+def plain_scripts_in(code):
+    """The static files one template loads with a plain, not deferred, `<script src>`,
+    or from a viewer list."""
     loaded = set()
-    for path in templates():
-        for _, tag, _ in external_scripts(code_of(path)):
-            filename = STATIC_FILENAME.search(tag)
-            if filename and not is_deferred(tag):
-                loaded.add(filename.group(1))
-    return sorted(loaded)
+    for _, tag, _ in external_scripts(code):
+        filename = STATIC_FILENAME.search(tag)
+        if filename and not is_deferred(tag):
+            loaded.add(filename.group(1))
+    for _, source in inline_scripts(code):
+        for listing in VIEWER_LIST.finditer(source):
+            loaded.update(STATIC_FILENAME.findall(listing.group(1)))
+    return loaded
+
+
+def plain_scripts():
+    """Every static file a template loads with a plain `<script src>` or a viewer list."""
+    return sorted({filename for path in templates() for filename in plain_scripts_in(code_of(path))})
 
 
 def names_jquery(filename):
@@ -577,6 +592,31 @@ def names_jquery(filename):
 def test_the_plain_scripts_are_the_expected_ones():
     """So that the check below cannot pass on an empty list."""
     assert {"dropzone.js", "trace_CFG/main.js", "trace_CFG/main_duo.js", "trace_CFG/lib/d3.min.js"} <= set(plain_scripts())
+
+
+def test_a_viewer_list_counts_as_plain_scripts():
+    """The form #310 and #312 give the CFG pages: the viewer's tags become a list that an
+    onload handler adds to the page later. They still run before jQuery may have."""
+    page = """
+    <script type="text/javascript">
+    window.onload = function() {
+        var js_function_id = {{ function_id }};
+        var viewer = [
+            {{ url_for('static', filename='trace_CFG/lib/d3.min.js')|tojson }},
+            {{ url_for('static', filename='trace_CFG/lib/dagre-d3.min.js')|tojson }},
+            {{ url_for('static', filename='trace_CFG/main.js')|tojson }}
+        ];
+        viewer.forEach(function (url) {
+            var script = document.createElement("script");
+            script.src = url;
+            script.async = false;
+            document.body.appendChild(script);
+        });
+    };
+    </script>
+    <script defer src="{{ url_for('static', filename='later.js') }}"></script>
+    """
+    assert plain_scripts_in(page) == {"trace_CFG/lib/d3.min.js", "trace_CFG/lib/dagre-d3.min.js", "trace_CFG/main.js"}
 
 
 @pytest.mark.parametrize("filename", plain_scripts())
