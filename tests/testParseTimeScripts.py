@@ -639,6 +639,7 @@ def test_a_plain_script_does_not_need_jquery(filename):
 
 def test_the_library_check_would_catch_jquery_ui():
     assert names_jquery("jquery-ui.js")
+    assert names_jquery("jquery-ui-sortable.js")
     assert not names_jquery("trace_CFG/main.js")
 
 

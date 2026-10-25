@@ -145,9 +145,10 @@
 
      The same ordering is why Bootstrap is queued below {% block style %} rather than
      here. Bootstrap 5.0.2 defines its jQuery plugins as it runs, once the document has
-     been parsed - which it has, by the time the queue runs - and jQuery UI has a
-     `.tooltip()` and a `.button()` of its own, so whichever of the two runs last owns
-     those names. It has to be Bootstrap: copy_to_clipboard asks
+     been parsed - which it has, by the time the queue runs - and a page's own plugin
+     can define the same names: the full jQuery UI build has a `.tooltip()` and a
+     `.button()` (the sortable cut the cross compare loads has neither), so whichever
+     runs last owns those names. It has to be Bootstrap: copy_to_clipboard asks
      `bootstrap.Tooltip.getInstance()` for the tooltip that `.tooltip()` built. A library
      loaded on demand, after the queue has run, would run after Bootstrap whatever the
      order of the tags, and take the names. See ADR-0015. #}
