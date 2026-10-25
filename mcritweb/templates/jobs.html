@@ -223,7 +223,7 @@ Jobs
                                else (empty_for_category[0] if empty_for_category else None),
                  empty_link=None if state else (empty_for_category[1] if empty_for_category else None)) }}
     {% if p %}
-      {{ pagination_widget(p) }}
+      {{ pagination_widget(p, _label="jobs") }}
     {% endif %}
   {% endif %}
 

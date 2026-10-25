@@ -220,7 +220,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
           {% endfor %}
         </tbody>
       </table>
-      {{ pagination_widget(blkp, _anchor="unique-blocks")}}
+      {{ pagination_widget(blkp, _label="unique blocks", _anchor="unique-blocks")}}
   </div>
   <div class="tab-pane fade {% if active_tab=='yara' %}show active{%endif%}" id="pills-yara" role="tabpanel" aria-labelledby="pills-yara-tab">
     <h2 class="h3" id="yara">Proposed YARA rule</h2>

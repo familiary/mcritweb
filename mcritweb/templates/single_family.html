@@ -27,7 +27,7 @@ Family: {{ family.family }}
 {{ sample_table(samples, job_collection=job_collection, show_edit=True, no_family=True, caption="Samples of family " ~ family.family, sort_pagination=pagination, column_setup=user_column_setup,
                 empty_message=("No samples in this family match \"" ~ query ~ "\".") if query else "This family has no samples.", highlight_terms=query|search_terms) }}
 {% if samples %}
-{{ pagination_widget(pagination) }}
+{{ pagination_widget(pagination, _label="family samples") }}
 {% endif %}
   </div>
 <script>later({{ url_for('static', filename='live_search.js')|tojson }})</script>

@@ -147,7 +147,7 @@ Unique Blocks
   <h2 class="h4">Selected samples will show here</h2>
   </div>
   {% else %}
-  {{ pagination_widget(pagination_selected, _js_argument_provider="fetchState") }}
+  {{ pagination_widget(pagination_selected, _label="selected samples", _js_argument_provider="fetchState") }}
   {% endif %}
   <br>
   <search>
@@ -179,7 +179,7 @@ Unique Blocks
         {% endfor %}
       </tbody>
     </table>
-    {{ pagination_widget(pagination) }}
+    {{ pagination_widget(pagination, _label="samples") }}
     <div class="text-center">
       <button type="button" onclick="setSelected()" class="btn btn-outline-primary">Add</button>
       {% if selected_ids %}

@@ -50,7 +50,7 @@ Results for Job: {{ job_info.job_id }}
   </tbody>
   </table>
 
-  {{ pagination_widget(samp, _anchor="sample-matches")}}
+  {{ pagination_widget(samp, _label="sample matches", _anchor="sample-matches")}}
   <p><a href="{{ url_for(request.endpoint, **request.view_args) }}#family-matches">back to all family overview</a></p>
 
 <h2 class="h3">MCRIT Diagram</h2>
@@ -94,7 +94,7 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
   </table>
-  {{ pagination_widget(funp, _anchor="function-matches")}}
+  {{ pagination_widget(funp, _label="function matches", _anchor="function-matches")}}
 
 
 <h2 class="h3">Matching Method Statistics </h2>

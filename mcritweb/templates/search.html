@@ -75,7 +75,7 @@ Search
     {{ family_table(families, sort_pagination=family_pagination, column_setup=family_column_setup, row_decorations=family_decorations,
                     empty_message="No more families match \"" ~ query ~ "\" on this page.", highlight_terms=query|search_terms) }}
     {% if families %}
-    {{ pagination_widget(family_pagination) }}
+    {{ pagination_widget(family_pagination, _label="families") }}
     {% endif %}
   {% endif %}
 
@@ -86,7 +86,7 @@ Search
     {{ sample_table(samples, sort_pagination=sample_pagination, column_setup=sample_column_setup, row_decorations=sample_decorations,
                     empty_message="No more samples match \"" ~ query ~ "\" on this page.", highlight_terms=query|search_terms) }}
     {% if samples %}
-    {{ pagination_widget(sample_pagination) }}
+    {{ pagination_widget(sample_pagination, _label="samples") }}
     {% endif %}
   {% endif %}
 
@@ -108,7 +108,7 @@ Search
     {{ function_table(functions, sort_pagination=function_pagination, column_setup=function_column_setup, row_decorations=function_decorations,
                       empty_message="No more functions match \"" ~ query ~ "\" on this page.", highlight_terms=query|search_terms) }}
     {% if functions %}
-    {{ pagination_widget(function_pagination) }}
+    {{ pagination_widget(function_pagination, _label="functions") }}
     {% endif %}
   {% endif %}
 

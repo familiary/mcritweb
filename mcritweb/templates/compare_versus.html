@@ -143,7 +143,7 @@ function handleSliderChange(val) {
                 empty_message="No sample matches \"" ~ query_a ~ "\"." if query_a else "No samples available. Click here to upload your first sample",
                 empty_link=none if query_a else url_for("data.submit")) }}
     {% if samples_a %}
-      {{ pagination_widget(pagination_a)}}
+      {{ pagination_widget(pagination_a, _label="first sample candidates")}}
     {% endif %}
   </div>
   <div class="col-12 col-lg-6 mb-3">
@@ -157,7 +157,7 @@ function handleSliderChange(val) {
                 empty_message="No sample matches \"" ~ query_b ~ "\"." if query_b else "No samples available. Click here to upload your first sample",
                 empty_link=none if query_b else url_for("data.submit")) }}
     {% if samples_b %}
-      {{ pagination_widget(pagination_b)}}
+      {{ pagination_widget(pagination_b, _label="second sample candidates")}}
     {% endif %}
   </div>
 </div>

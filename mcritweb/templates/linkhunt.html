@@ -99,7 +99,7 @@ LinkHunt for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
 </table>
-{{ pagination_widget(clup, _anchor="linkhunt-clusters")}}
+{{ pagination_widget(clup, _label="link clusters", _anchor="linkhunt-clusters")}}
 <h3 class="h4" id="linkhunt-links">Individual Links</h3>
 <p>Family-unique matches in bold.</p>
 <table class="table table-hover">
@@ -140,7 +140,7 @@ LinkHunt for Job: {{ job_info.job_id }}
       {% endfor %}
     </tbody>
   </table>
-  {{ pagination_widget(funp, _anchor="linkhunt-links")}}
+  {{ pagination_widget(funp, _label="individual links", _anchor="linkhunt-links")}}
 
 {% endblock %}
 

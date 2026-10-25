@@ -172,7 +172,7 @@ function handleSliderChange(val) {
   <h2 class="h4">Selected samples will show here</h2>
   </div>
   {% else %}
-  {{ pagination_widget(pagination_selected, _js_argument_provider="fetchState") }}
+  {{ pagination_widget(pagination_selected, _label="selected samples", _js_argument_provider="fetchState") }}
   {% endif %}
   <br>
   <search>
@@ -204,7 +204,7 @@ function handleSliderChange(val) {
         {% endfor %}
       </tbody>
     </table>
-    {{ pagination_widget(pagination) }}
+    {{ pagination_widget(pagination, _label="samples") }}
     <div class="text-center">
     <div class="form-group">
       <div class="col-sm-6 d-inline-flex justify-content-center">

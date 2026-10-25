@@ -160,7 +160,7 @@ Sample: {{ entry.sample_id }}
 {{ function_table(functions, for_sample_view=True, caption="Functions of sample " ~ entry.sample_id, sort_pagination=pagination, column_setup=user_column_setup,
                   empty_message=("No functions in this sample match \"" ~ query ~ "\".") if query else "This sample has no functions on record.", highlight_terms=query|search_terms) }}
 {% if functions %}
-{{ pagination_widget(pagination) }}
+{{ pagination_widget(pagination, _label="functions") }}
 {% endif %}
   </div>
 <script>later({{ url_for('static', filename='live_search.js')|tojson }})</script>

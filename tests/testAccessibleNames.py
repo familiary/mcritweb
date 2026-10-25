@@ -7,14 +7,17 @@ job" and "Show result", every copy button "Copy to Clipboard": a list of links, 
 with Tab, read out a hundred identical entries that each go somewhere else. Two controls
 may share a name only when they do the same thing.
 
-Not checked here: the numbered pagination links, which repeat per table, and links named
-by the id they show, which the column header around them qualifies.
+Not checked above: links named by the id they show, which the column header around them
+qualifies. The pagers have their own checks at the end: a page with several tables has a
+pager under each, and each one's nav and links are named after its table.
 """
 
 import collections
+import urllib.parse
 
 import pytest
-from testAccessibility import ADMIN_PAGES, CONTRIBUTOR_PAGES, VISITOR_PAGES, Page
+from fixtureData import job_id_of
+from testAccessibility import ADMIN_PAGES, CONTRIBUTOR_PAGES, VISITOR_PAGES, Page, descendants
 
 
 @pytest.fixture
@@ -87,3 +90,65 @@ def test_the_checker_sees_a_shared_name():
             '<ul class="pagination"><li><a aria-label="Next page" href="?q=2"></a></li></ul>')
 
     assert shared_names(page) == {"Filter": 2, "Copy": 2, "Remove": 2, "Edit": 2}
+
+
+#: Pages with more than one table, hence more than one pager.
+PAGES_WITH_SEVERAL_PAGERS = [
+    "/explore/search?query=a",
+    "/analyze/compare_versus",
+    "/analyze/cross_compare?samples=0,1",
+    "/analyze/unique_blocks?samples=0,1",
+    f"/data/linkhunt/{job_id_of('matches_for_sample')}",
+    f"/data/result/{job_id_of('matches_for_sample')}",
+    f"/data/result/{job_id_of('matches_for_sample')}?famid=1",
+    f"/data/result/{job_id_of('matches_for_sample_vs')}?samid=3",
+]
+
+
+def pagers_of(html):
+    """[(the nav's name, [(the link's name, its href), ...])] for each pager on the page."""
+    pagers = []
+    for nav in Page(html).all("nav"):
+        links = [link for list_ in descendants(nav, "ul") if "pagination" in list_.classes()
+                 for link in descendants(list_, "a")]
+        if links:
+            pagers.append((nav.attrs.get("aria-label"),
+                           [(link.attrs.get("aria-label") or link.text_content().strip(), link.attrs.get("href"))
+                            for link in links]))
+    return pagers
+
+
+@pytest.mark.parametrize("path", PAGES_WITH_SEVERAL_PAGERS)
+def test_every_pager_on_a_page_is_named_after_its_table(client, as_role, path):
+    """Each table's pager carried a nav named "Pagination" and links named "Next page",
+    "Previous page" and so on: a list of the page's landmarks or links read out the same
+    names several times over, each going to a different table."""
+    as_role("visitor")
+    pagers = pagers_of(client.get(path).get_data(as_text=True))
+    assert len(pagers) > 1, "the page has no second pager to tell apart"
+
+    nav_names = [name for name, _ in pagers]
+    assert len(set(nav_names)) == len(nav_names), nav_names
+
+    targets = collections.defaultdict(set)
+    for _, links in pagers:
+        for name, href in links:
+            if href:
+                targets[name].add(href)
+    assert {name for name, found in targets.items() if len(found) > 1} == set()
+
+
+@pytest.mark.parametrize("path, expected", [
+    (f"/data/result/{job_id_of('matches_for_sample')}", {"famp", "libp", "funp"}),
+    (f"/data/result/{job_id_of('matches_for_sample')}?famid=1", {"famid", "samp", "funp"}),
+    (f"/data/linkhunt/{job_id_of('matches_for_sample')}", {"clup", "funp"}),
+])
+def test_naming_a_pager_adds_no_parameter_to_its_urls(client, as_role, path, expected):
+    """The name is given to the widget beside the arguments that become URL parameters,
+    so it must not turn up in the address a pager link leads to."""
+    as_role("visitor")
+    pagers = pagers_of(client.get(path).get_data(as_text=True))
+
+    keys = {key for _, links in pagers for _, href in links if href
+            for key in urllib.parse.parse_qs(urllib.parse.urlparse(href).query)}
+    assert keys == expected

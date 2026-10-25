@@ -134,5 +134,5 @@ def test_the_job_page_s_pagers_are_named(client, as_role):
     as_role("visitor")
     page = Page(client.get(f"/data/result/{job_id_of('matches_for_sample')}").get_data(as_text=True))
 
-    pagers = [nav for nav in page.all("nav") if nav.attrs.get("aria-label") == "Pagination"]
+    pagers = [nav for nav in page.all("nav") if nav.attrs.get("aria-label", "").endswith(" pages")]
     assert len(pagers) >= 2

@@ -148,7 +148,9 @@ rather than reconstructing it from the commit log at release time.
 - Icon buttons and links say which row they act on, for screen readers and voice control: "Filter by
   function 84", "Compare function 84 with function 943", "Delete job 12", "Show result of job 12",
   "Remove sample 3", "Copy SHA256 634df40e" and so on. A result page read out a hundred identical
-  "Filter by this function" links that each went somewhere else.
+  "Filter by this function" links that each went somewhere else. Likewise each table's pager is named
+  after its table, "Library matches pages" with "Next page of library matches" and "Page 2 of
+  library matches", where every pager on a result page was "Pagination" with the same links.
 - Every data table has a name screen readers announce and list (a visually hidden caption), and the
   label column of the job, sample, function, statistics, settings and server tables is the header of
   its row, so each value is read with its label. The label cells take the bold of a header cell.
