@@ -1,15 +1,17 @@
 {% macro cross_table(method, samples, matching_percent, matching_matches, fifth_indices, job_info) %}
 
   <table>
+    {# header cells, so every cell below has one (axe's td-has-header); normal weight,
+       because they looked like the rest of the table when they were <td> #}
     <tr>
-      <td style="font-size: 13px;color: black">#</td>
-      <td style="font-size: 13px;color: black">family</td>
-      <td style="font-size: 13px;color: black">version</td>
-      <td></td>
-        <td style="font-size: 13px;color: black">ID</td>
-        <td style="font-size: 13px;color: black">Bit</td>
-        <td style="font-size: 13px;color: black">FNs</td>
-        <td style="font-size: 13px;color: black" colspan="{{ samples|length }}">Matrix</td>
+      <th scope="col" style="font-size: 13px;color: black;font-weight: normal">#</th>
+      <th scope="col" style="font-size: 13px;color: black;font-weight: normal">family</th>
+      <th scope="col" style="font-size: 13px;color: black;font-weight: normal">version</th>
+      <th scope="col"><span class="visually-hidden">Actions</span></th>
+        <th scope="col" style="font-size: 13px;color: black;font-weight: normal">ID</th>
+        <th scope="col" style="font-size: 13px;color: black;font-weight: normal">Bit</th>
+        <th scope="col" style="font-size: 13px;color: black;font-weight: normal">FNs</th>
+        <th scope="col" style="font-size: 13px;color: black;font-weight: normal" colspan="{{ samples|length }}">Matrix</th>
     </tr>
     
     <tr>

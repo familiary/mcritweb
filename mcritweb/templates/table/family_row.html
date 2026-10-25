@@ -62,7 +62,7 @@
   {% for column_type in column_setup %}
     {% if column_type == "family_id" %}
       {% call sortable_header_col(sort_pagination, "family_id") %}
-        <i class="fa-solid fa-bug" title="Family ID"></i>
+        <i class="fa-solid fa-bug" title="Family ID" aria-hidden="true"></i><span class="visually-hidden">Family ID</span>
       {% endcall %}
     {% elif column_type == "family_name" %}
       {% call sortable_header_col(sort_pagination, "family_name") %}
@@ -82,7 +82,7 @@
       {% endcall %}
     {% endif %}
   {% endfor %}
-    <th scope="col"></th>
+    <th scope="col"><span class="visually-hidden">Actions</span></th>
   </tr>
 {% endmacro %}  
   

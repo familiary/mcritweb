@@ -37,11 +37,11 @@ Results for Job: {{ job_info.job_id }}
       {% endif %}
       {% for column_type in ucs_famlib %}
         {% if column_type == "family_name" %}
-        <th scope="col"><i class="fa-solid fa-bug " title="Family ID"></th>
+        <th scope="col"><i class="fa-solid fa-bug " title="Family" aria-hidden="true"></i><span class="visually-hidden">Family</span></th>
         {% elif column_type == "version" %}
           <th scope="col">Version</th>
         {% elif column_type == "sample_id" %}
-        <th style="text-align: right;" scope="col"><i class="fa-solid fa-virus" title="Sample ID"></th>
+        <th style="text-align: right;" scope="col"><i class="fa-solid fa-virus" title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample ID</span></th>
         {% elif column_type == "sha256" %}
           <th style="text-align: right;" scope="col">SHA256</th>
         {% elif column_type == "filename" %}
@@ -71,7 +71,7 @@ Results for Job: {{ job_info.job_id }}
       <tr style="background-color:#{{ scp.getMatchHexColorFromResult(matched_sample, 'matched_percent_score_weighted') }}">
         {% for column_type in ucs_famlib %}
           {% if column_type == "family_name" %}
-            <td valign="middle">{{ format_family_name(matched_sample.family, matched_sample.family_id) }}&nbsp;<a aria-label="Filter by this family" title="Filter by this family" href="{{ url_for(request.endpoint, famid=matched_sample.family_id, samp=1, funp=1, **request.view_args) }}#sample-matches"><i class="fa-solid fa-filter"></i></a></td>
+            <td valign="middle" class="family">{{ format_family_name(matched_sample.family, matched_sample.family_id) }}&nbsp;<a aria-label="Filter by this family" title="Filter by this family" href="{{ url_for(request.endpoint, famid=matched_sample.family_id, samp=1, funp=1, **request.view_args) }}#sample-matches"><i class="fa-solid fa-filter"></i></a></td>
           {% elif column_type == "version" %}
             <td valign="middle">{{ matched_sample.version }}</td>
           {% elif column_type == "sample_id" %}
