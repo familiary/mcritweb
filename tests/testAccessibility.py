@@ -173,6 +173,18 @@ def descendants(element, tag):
     return found
 
 
+def in_named_group(element):
+    """Inside a <fieldset> with a <legend>, or inside an element with a group role and a name."""
+    node = element.parent
+    while node is not None:
+        if node.tag == "fieldset" and any(child.tag == "legend" for child in node.children):
+            return True
+        if node.attrs.get("role") in ("group", "radiogroup") and (node.attrs.get("aria-label") or node.attrs.get("aria-labelledby")):
+            return True
+        node = node.parent
+    return False
+
+
 def problems_of(html):
     page = Page(html)
     problems = []
@@ -262,6 +274,11 @@ def problems_of(html):
             node = node.parent
         if node is None:
             problems.append(f"<{control.tag} {attrs}> has no label")
+    for radio in page.all("input"):
+        # a radio is one answer to a question, and the group says what the question is: "Dumped,
+        # radio button" alone did not
+        if (radio.attrs.get("type") or "").lower() == "radio" and not in_named_group(radio):
+            problems.append(f"<input {radio.attrs}> is a radio outside a named group")
     previous = 0
     for heading in page.all("h1", "h2", "h3", "h4", "h5", "h6"):
         if heading.in_hidden_container():
@@ -356,11 +373,15 @@ def test_the_checker_catches_what_it_claims_to():
               '<label for="named">Score</label><input id="named" placeholder="0-100">'
               '<label class="col-6">Filter results to</label><label>Wrapped <input id="wrapped"></label>'
               '<label for="renamed">Sample IDs</label><input id="renamed" aria-label="Export these">'
+              '<input type="radio" name="loose" id="loose"><label for="loose">Loose</label>'
+              '<fieldset><legend>Mode</legend><input type="radio" name="kept" id="kept"><label for="kept">Kept</label></fieldset>'
               '</main></body></html>')
     field_problems = "\n".join(problems_of(fields))
     assert "'Filter results to' names no field" in field_problems
     assert "'Wrapped' names no field" not in field_problems and "'id': 'wrapped'" not in field_problems
     assert "'id': 'renamed'" in field_problems and "an aria-label that replaces it" in field_problems
+    assert "'id': 'loose'" in field_problems and "a radio outside a named group" in field_problems
+    assert "'id': 'kept'" not in field_problems
     assert "'id': 'by-placeholder'" in field_problems and "has no label" in field_problems
     assert "'id': 'self'" in field_problems and "is described by itself" in field_problems
     assert "'id': 'named'" not in field_problems

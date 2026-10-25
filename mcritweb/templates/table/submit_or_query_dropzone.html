@@ -63,7 +63,8 @@ function handleSliderChange_dropzone(val) {
     {%- if show_submit_fields %} data-submit-fields{% endif %}
     {%- if lazy %} data-lazy data-dropzone-css="{{ url_for('static', filename='dropzone.min.css') }}" data-dropzone-js="{{ url_for('static', filename='dropzone-patched.min.js') }}"{% endif %}>
   {% if select_form_type %}
-    <div class="container-fluid">
+    <fieldset class="container-fluid">
+      <legend class="visually-hidden">What to do with the file</legend>
       <div class="form-check form-check-inline col-xs-6" align="left">
           <input class="form-check-input" type="radio" name="form_type" id="query_form" value="query_form" checked>
           <label class="form-check-label" for="query_form">Match against database</label>
@@ -72,7 +73,7 @@ function handleSliderChange_dropzone(val) {
           <input class="form-check-input" type="radio" name="form_type" id="submit_form" value="submit_form">
           <label class="form-check-label" for="submit_form">Add to database</label>
       </div>
-    </div>
+    </fieldset>
   {% endif %}
     <div class="form-group submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
       <label for="family" class="form-label">Family (optional)</label>
@@ -83,16 +84,21 @@ function handleSliderChange_dropzone(val) {
     <div class="form-group" style="display:none" id='extendedFields'>
         <label for="base_addr" class="form-label">Base address</label>
         <input name='base_addr' class="form-control" id="base_addr" placeholder="e.g. 0x400000" title="A hexadecimal address of up to 16 digits, e.g. 0x400000" spellcheck="false" autocapitalize="off" autocorrect="off">
-        <div class="form-check form-check-inline submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
+        <fieldset class="submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
+        <legend class="visually-hidden">Bitness</legend>
+        <div class="form-check form-check-inline">
           <input class="form-check-input" type="radio" name="bitness" id="bitness32" value="32">
           <label class="form-check-label" for="bitness32">32bit</label>
         </div>
-        <div class="form-check form-check-inline submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
+        <div class="form-check form-check-inline">
           <input class="form-check-input" type="radio" name="bitness" id="bitness64" value="64">
           <label class="form-check-label" for="bitness64">64bit</label>
         </div>
+        </fieldset>
       </div>
 
+      <fieldset class="d-inline-block">
+      <legend class="visually-hidden">File type</legend>
       <div class="form-check form-check-inline" align="left">
         <input class="form-check-input" type="radio" name="options" id="unmapped" value="unmapped" checked>
         <label class="form-check-label" for="unmapped">Unmapped</label>
@@ -105,6 +111,7 @@ function handleSliderChange_dropzone(val) {
           <input class="form-check-input" type="radio" name="options" id="smda" value="smda">
           <label class="form-check-label" for="smda">SMDA</label>
       </div>
+      </fieldset>
      <!-- TODO: only show if file available -->
     <div class="form-group query-form-exclusive" {% if not show_query_fields %}style="display:none"{% endif %}>
     <div class="col-sm-12 d-inline-flex justify-content-center">

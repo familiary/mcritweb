@@ -54,6 +54,8 @@ Register
         <input name='setRegistrationToken' class="form-control" id="set-registration-token" value="{{ proposed_registration_token }}" pattern="^[a-zA-Z0-9._\-]{3,36}$" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">
       </div>
     <h3 class="mt-4 mb-3">Define Operation Mode:</h3>
+    <fieldset>
+    <legend class="visually-hidden">Operation mode</legend>
     <div class="form-check mb-2">
         <input class="form-check-input" type="radio" name="operationMode" id="radio_single" value="single" {% if entered.operationMode != "multi" %}checked{% endif %}>
         <label class="form-check-label" for="radio_single">
@@ -66,6 +68,7 @@ Register
           Multi-user
         </label>
     </div>
+    </fieldset>
     {% endif %}
     <button type="submit" class="btn btn-primary w-100">Register</button>
   </form>

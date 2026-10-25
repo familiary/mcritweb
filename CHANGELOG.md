@@ -183,6 +183,10 @@ rather than reconstructing it from the commit log at release time.
 - The MinHash matching slider tells a screen reader its setting in words, "Standard" rather than
   "2", as the page shows it, and draws a focus ring when it is reached by keyboard: Bootstrap's faint
   halo was all there was.
+- Radio buttons sit in named groups: the upload form's "what to do with the file", file type and
+  bitness, the registration's operation mode and the function comparison's graph view, and the
+  search page's "search in" checkboxes. A screen reader announced "Dumped, radio button" without the
+  question it answers.
 
 ### Security
 
