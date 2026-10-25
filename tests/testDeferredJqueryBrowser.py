@@ -236,12 +236,23 @@ def held_back(open_as):
     def _held_back(role):
         page = open_as(role)
         waiting = []
-        page.route("**/static/jquery.js", lambda route: waiting.append(route))
+        released = []
+
+        def hold(route):
+            # one that reaches the handler after release() goes on at once. Unrouting in
+            # release() instead lost a request the browser had caught but not yet handed
+            # over: called as the queue started, it drained nothing, and jquery.js then
+            # never loaded
+            if released:
+                route.continue_()
+            else:
+                waiting.append(route)
+        page.route("**/static/jquery.js", hold)
 
         def release(settle=True):
+            released.append(True)
             while waiting:
                 waiting.pop().continue_()
-            page.unroute("**/static/jquery.js")
             if settle:
                 page.wait_for_function("() => window.jQuery !== undefined")
                 assert page.evaluate(AFTER_THE_READY_HANDLERS)
