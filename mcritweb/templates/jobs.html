@@ -88,7 +88,6 @@ Jobs
       </td>
     </tr>
     </table>
-  </p>
 {% endif %}
 
   <nav class="navbar navbar-expand-lg navbar-light bg-light" aria-label="Job categories">
@@ -99,6 +98,7 @@ Jobs
       <ul class="navbar-nav">
         <li class="nav-item  px-2">
           <a aria-label="All jobs" title="All jobs" class="btn btn-outline-dark btn-sm" href="{{ url_for('data.jobs') }}"  role="button" target="_self"><i class="fa-solid fa-house"></i></a>
+        </li>
         {% for entry in menu_configuration["menu"] %}
         {% if entry['available'] %}
           {% if 'submenu' in entry %}
@@ -117,12 +117,14 @@ Jobs
             <a class="nav-link {% if entry['active'] %}active{% endif %}"{% if entry['active'] %} aria-current="page"{% endif %} href="{{ url_for('data.jobs', active=entry['group']) }}" id="navbar-{{entry['group']}}">
               {{ entry["title"] }}
             </a>
+          </li>
           {% endif %}
         {% else %}
           <li class="nav-item px-2">
             <a class="nav-link {% if entry['active'] %}active{% endif %}" href="#" id="navbar-{{entry['group']}}">
               {{ entry["title"] }}
             </a>
+          </li>
         {% endif %}
         {% endfor %}
       </ul>

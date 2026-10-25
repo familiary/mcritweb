@@ -169,6 +169,9 @@ rather than reconstructing it from the commit log at release time.
   submit, import, export, register, and search before anything is searched), and its sections and
   dialogs follow it without skipping a level. The 1vsN, 1vs1 and cross compare pages, all titled
   "Compare", and a link hunt, titled as its result page, have titles of their own.
+- The navbar, the jobs page's menu and the family table's header row close the elements they open,
+  and the jobs page no longer closes a paragraph it never opened; browsers had repaired each, by
+  rules nobody reading the templates could see.
 
 ### Security
 
