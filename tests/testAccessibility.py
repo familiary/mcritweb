@@ -101,6 +101,20 @@ class Element:
         found = [self.attrs["title"]] if self.attrs.get("title") else []
         return found + [title for child in self.children for title in child.titles()]
 
+    def visible_words(self):
+        """The words the element shows, its text and its children's, as a set of lowercase
+        words without punctuation: what is visually hidden or hidden from assistive
+        technology is left out, and so is a lone symbol like the x of a close button.
+        A word check, so it does not see the order of the words."""
+        hidden_style = re.sub(r"\s", "", self.attrs.get("style") or "").lower()
+        if (self.classes() & {"visually-hidden", "visually-hidden-focusable", "sr-only", "d-none"}
+                or self.attrs.get("aria-hidden") == "true" or "hidden" in self.attrs or "display:none" in hidden_style):
+            return []
+        words = re.findall(r"\w+", self.text.lower())
+        for child in self.children:
+            words += child.visible_words()
+        return words
+
     def accessible_name(self):
         # axe's button-name documents title as a name, its link-name does not
         name_attrs = ("aria-label", "aria-labelledby", "title") if self.tag == "button" else ("aria-label", "aria-labelledby")
@@ -167,9 +181,13 @@ def problems_of(html):
         problems.append("<html> has no lang")
     if len(page.all("main")) != 1:
         problems.append(f"{len(page.all('main'))} <main> landmarks, expected one")
-    if not any(meta.attrs.get("name") == "description" and (meta.attrs.get("content") or "").strip()
-               for meta in page.all("meta")):
+    descriptions = [meta for meta in page.all("meta") if meta.attrs.get("name") == "description"]
+    if not any((meta.attrs.get("content") or "").strip() for meta in descriptions):
         problems.append("no meta description")
+    # a second one is not a fallback: crawlers take either, and a page's own description
+    # (the {% block description %} in base.html) must be the only one
+    if len(descriptions) > 1:
+        problems.append(f"{len(descriptions)} meta descriptions, expected one")
     for img in page.all("img"):
         if "alt" not in img.attrs:
             problems.append(f"<img src={img.attrs.get('src')}> has no alt")
@@ -186,6 +204,13 @@ def problems_of(html):
             continue
         if not element.accessible_name():
             problems.append(f"<{element.tag} {element.attrs}> has no accessible name")
+        # WCAG 2.5.3, Lighthouse's label-content-name-mismatch: an aria-label replaces the
+        # text, so a word the control shows but its label leaves out is one a voice user
+        # says and the control does not answer to
+        label = re.findall(r"\w+", (element.attrs.get("aria-label") or "").lower())
+        missing = [word for word in element.visible_words() if label and word not in label]
+        if missing:
+            problems.append(f"<{element.tag} {element.attrs}> shows {missing} but its aria-label leaves it out")
     for header in page.all("th"):
         # td-has-header reads a column's header as text. An icon's title is its tooltip, which
         # assistive technology may skip, so only text inside the cell counts; a visually-hidden
@@ -305,6 +330,16 @@ def test_the_checker_catches_what_it_claims_to():
                 if "may wrap them" in problem]
     assert not [problem for problem in problems_of(grid.replace("<td>#</td>", "<th>#</th>", 1))
                 if "has no header cell" in problem]
+    shown = ('<!doctype html><html lang="en"><body><main><button aria-label="Analyze sample">'
+             '<i aria-hidden="true">x</i>&nbsp;3</button><button aria-label="Edit sample 3">'
+             '<i aria-hidden="true">x</i><span class="visually-hidden">Edit</span></button>'
+             '<a href="/s" aria-label="Open sample 3">3,</a><button aria-label="Close">&times;</button>'
+             '<button aria-label="Open"><span class="d-none">hidden</span>Open</button></main></body></html>')
+    mismatches = [problem for problem in problems_of(shown) if "aria-label leaves it out" in problem]
+    assert len(mismatches) == 1 and "Analyze sample" in mismatches[0], mismatches
+    twice = ('<!doctype html><html lang="en"><head><meta name="description" content="a">'
+             '<meta name="description" content="b"></head><body><main></main></body></html>')
+    assert "2 meta descriptions, expected one" in problems_of(twice)
 
 
 def test_an_id_hit_brings_the_badge_column(client, as_role):

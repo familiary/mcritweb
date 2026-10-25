@@ -45,9 +45,10 @@ def fake_mcrit(corpus_mcrit):
 #: that defines the clipboard helper, so an unrelated script is never the offender.
 SCRIPT_BLOCK = re.compile(r"<script\b[^>]*>(.*?)</script\s*>", re.IGNORECASE | re.DOTALL)
 
-#: The copy icon and the textarea it copies, tied together: a helper wired to the
-#: wrong id is as broken as no helper.
-COPY_ICON = re.compile(r"<i\b[^>]*onclick=\"copyTextAreaToClipboard\('#yara_text'\)\"")
+#: The copy control and the textarea it copies, tied together: a helper wired to the
+#: wrong id is as broken as no helper. The control is a button holding the copy icon
+#: (#253); a click on the icon bubbles to it.
+COPY_ICON = re.compile(r"<(?:i|button)\b[^>]*onclick=\"copyTextAreaToClipboard\('#yara_text'\)\"")
 
 #: `// ...` to end of line. The helper's own comment names the old implementation on
 #: purpose, so the lint below reads the code with the comments taken out.

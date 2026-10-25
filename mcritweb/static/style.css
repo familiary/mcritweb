@@ -1,206 +1,88 @@
 html {
     font-family: 'Roboto', sans-serif;
     background: white;
-    padding: 1rem;
-  }
+}
   
-  body {
-    min-width: 900px;
+body {
     max-width: 1824px;
     font-size: 0.9em;
     margin: 0 auto;
     background: white;
-  }
+}
   
-  h1, h2, h3, h4, h5, h6 {
+h1, h2, h3, h4, h5, h6 {
     color: #377ba8;
     margin: 1rem 0;
-  }
+}
 
-  /* headings moved to h2/h3 for a correct outline keep their old look through Bootstrap's
-     .h3/.h4 classes, but those also reset the margin; restore the one above */
-  h2.h3, h2.h4, h3.h4 {
-    margin: 1rem 0;
-  }
+/* headings moved to h2/h3 for a correct outline keep their old look through Bootstrap's
+   .h3/.h4 classes, but those also reset the margin; restore the one above */
+h2.h3, h2.h4, h3.h4 {
+  margin: 1rem 0;
+}
   
-  a {
+a {
     color: #377ba8;
-  }
+}
 
-  /* rows tinted inline by score or selection: #377ba8 falls below 4.5:1 on the palest of
-     the 40% score tints (#99b4e3), this stays above it on every one of them */
-  tr[style*="background-color"] a {
-    color: #17466b;
-  }
+/* rows tinted inline by score or selection: #377ba8 falls below 4.5:1 on the palest of
+   the 40% score tints (#99b4e3), this stays above it on every one of them */
+tr[style*="background-color"] a {
+  color: #17466b;
+}
 
-  /* a table link is often one digit or one icon; 24x24 is the WCAG 2.5.8 minimum target */
-  td > a:not(.btn) {
-    display: inline-block;
-    min-width: 24px;
-  }
+/* a table link is often one digit or one icon; 24x24 is the WCAG 2.5.8 minimum target */
+td > a:not(.btn) {
+  display: inline-block;
+  min-width: 24px;
+}
 
-  /* the link hunt's cluster cell stacks four matches to a line, so its links sit one
-     21.6px line apart - closer than the 24px WCAG 2.5.8 asks - and the "N more" toggle
-     sits right under them; give that one cell 24px lines instead of every table */
-  .linkhunt-links a {
-    display: inline-block;
-    min-height: 24px;
-    line-height: 24px;
-  }
-  /* a summary keeps display: list-item, which is what draws its disclosure triangle */
-  .linkhunt-links summary {
-    line-height: 24px;
-  }
+/* the link hunt's cluster cell stacks four matches to a line, so its links sit one
+   21.6px line apart - closer than the 24px WCAG 2.5.8 asks - and the "N more" toggle
+   sits right under them; give that one cell 24px lines instead of every table */
+.linkhunt-links a {
+  display: inline-block;
+  min-height: 24px;
+  line-height: 24px;
+}
+/* a summary keeps display: list-item, which is what draws its disclosure triangle */
+.linkhunt-links summary {
+  line-height: 24px;
+}
   
-  hr {
+hr {
     border: none;
     border-top: 1px solid #377ba8;
-  }
-  
+}
 
-
-  nav {
-    background: rgb(240, 240, 240);
-    display: flex;
-    align-items: center;
-    padding: 0 0.5rem;
-  }
-  
-  nav h1 {
-    flex: auto;
-    margin: 0;
-  }
-  
-  nav h1 a {
-    text-decoration: none;
-    padding: 0.25rem 0.5rem;
-  }
-  
-  nav ul  {
-    display: flex;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  
-  nav ul li a, nav ul li span, header .action {
-    display: block;
-    padding: 0.5rem;
-  }
-  
-  .content {
+.content {
     padding: 0 1rem 1rem;
-  }
-  
-  .content > header {
-    border-bottom: 1px solid lightgray;
-    display: flex;
-    align-items: flex-end;
-  }
-  
-  .content > header h1 {
-    flex: auto;
-    margin: 1rem 0 0.25rem 0;
-  }
-  
-  .flash {
-    margin: 1em 0;
-    padding: 1em;
-    background: #cae6f6;
-    border: 1px solid #377ba8;
-  }
-  
-  .post > header {
-    display: flex;
-    align-items: flex-end;
-    font-size: 0.85em;
-  }
-  
-  .post > header > div:first-of-type {
-    flex: auto;
-  }
-  
-  .post > header h1 {
-    font-size: 1.5em;
+}
+
+.content:last-child {
     margin-bottom: 0;
-  }
-  
-  .post .about {
-    color: slategray;
-    font-style: italic;
-  }
-  
-  .post .body {
-    white-space: pre-line;
-  }
-  
-  .content:last-child {
-    margin-bottom: 0;
-  }
-  
-  .content form {
-    margin: 1em 0;
-    display: flex;
-    flex-direction: column;
-    width: 50%;
-  }
-  
-  .content label {
-    font-weight: bold;
-    margin-bottom: 0.5em;
-  }
-  
-  .content input, .content textarea {
-    margin-bottom: 1em;
-  }
-  
-  .content textarea {
-    min-height: 12em;
-    resize: vertical;
-  }
-  
-  input.danger {
-    color: #cc2f2e;
-  }
-  
-  input[type=submit] {
-    align-self: start;
-    min-width: 10em;
-  }
-  .nav-pills .nav-link.active { background-color: rgb(240, 240, 240); color:black}
-  .nav-pills .nav-link{color:black}
-  .thead-light { background-color: rgb(240, 240, 240); color:black}
- a > * {
-    pointer-events: none;
-  }
+}
 
-  .accordion-button:link, .accordion-button:visited, .accordion-button:hover, .accordion-button:active  {
-    background-color: rgb(240, 240, 240)!important;
-      color:black !important;
-      text-decoration: none !important;
-         border-color: rgb(240, 240, 240) !important;
-      box-shadow: 0px !important;   
-  }
-
-  .accordion-button:focus {
-    z-index: 3;
-    border-color: rgb(240, 240, 240)!important;
-    outline: 0;
-    box-shadow: 0 0 0 .25rem #FFF !important;
-  }
-  .accordion-button:not(.collapsed) {
-    color:black  !important;
-    background-color: rgb(240, 240, 240)!important;
-    border-color: rgb(240, 240, 240)!important;
-  }
-
-  .page-link {
+.thead-light, .table-light {
+    background-color: rgb(240, 240, 240);
     color: black;
-  }
-  .page-item.active .page-link{ 
-    color:black;
-    background-color:rgb(240, 240, 240);
-    border-color:rgb(240, 240, 240)}
+}
+
+.btn-clipboard {
+    max-height: 24px;
+    max-width: 24px;
+    padding: 0;
+    line-height: 1;
+}
+
+.page-link {
+    color: black;
+}
+.page-item.active .page-link {
+    color: black;
+    background-color: rgb(240, 240, 240);
+    border-color: rgb(240, 240, 240);
+}
 
   .fa-sort {
     color: rgba(0, 0, 0, 0.3);
@@ -327,6 +209,15 @@ table.table td.buttons {
    asks; side by side, the &nbsp; between them keeps both 24px targets clear of each other */
 table.table td.id, table.table td.family {
   white-space: nowrap;
+}
+
+/* The result pages' filter forms set a checkbox under each row of fields, less than 24px
+   tall at desktop width: under what WCAG 2.5.8 asks of a target unless it keeps 12px clear
+   of the next one. The 1em gap below every field that `.content input` gave them kept it
+   clear; without it, a checkbox sits flush against the field above and the Filter button
+   below. */
+form.form-inline input {
+  margin-bottom: 1em;
 }
 
 /* function comparison page (data.match_functions), issue #74 */
