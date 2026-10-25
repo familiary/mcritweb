@@ -546,14 +546,6 @@ def test_no_template_puts_a_blocking_script_in_head(path):
 
 # --- the libraries ------------------------------------------------------------------------
 
-#: The one plain script that names jQuery, and why it may: Dropzone attaches a
-#: `$.fn.dropzone` plugin if, and only if, jQuery is already there when it runs. On the
-#: upload pages, where it is a plain script, jQuery is not there yet and the plugin is
-#: not attached; everywhere else the drop overlay's loader inserts it after
-#: DOMContentLoaded, jQuery is there, and it is. Nothing calls it either way.
-NAMES_JQUERY_BUT_DOES_NOT_NEED_IT = {"dropzone.js": 'if (typeof jQuery !== "undefined" && jQuery !== null) {'}
-
-
 #: The function page and the function comparison can load their graph viewer - d3, dagre
 #: and the CFG scripts - from a `var viewer = [...]` list of url_for() URLs in an inline
 #: script, which adds them once the graph comes into view (#310, #312). That can be before
@@ -591,7 +583,13 @@ def names_jquery(filename):
 
 def test_the_plain_scripts_are_the_expected_ones():
     """So that the check below cannot pass on an empty list."""
-    assert {"dropzone.js", "trace_CFG/main.js", "trace_CFG/main_duo.js", "trace_CFG/lib/d3.min.js"} <= set(plain_scripts())
+    assert {"trace_CFG/main.js", "trace_CFG/main_duo.js", "trace_CFG/lib/d3.min.js"} <= set(plain_scripts())
+
+
+def test_dropzone_is_not_a_plain_script_anywhere():
+    """It names jQuery, to attach a `$.fn.dropzone` plugin when jQuery is there. Every page
+    queues it after jQuery now, or fetches it after DOMContentLoaded (the drop overlay)."""
+    assert "dropzone.js" not in plain_scripts()
 
 
 def test_a_viewer_list_counts_as_plain_scripts():
@@ -625,15 +623,6 @@ def test_a_plain_script_does_not_need_jquery(filename):
     scripts are the bulk of these, and they do not use jQuery, although ADR-0015 counted
     two of them among its users: every `$(...)` in trace_CFG/main.js and main_duo.js is
     in a comment. A library that does use it - jQuery UI - has to be deferred, after jQuery."""
-    if filename in NAMES_JQUERY_BUT_DOES_NOT_NEED_IT:
-        source = (STATIC_ROOT / filename).read_text()
-        start = source.index(NAMES_JQUERY_BUT_DOES_NOT_NEED_IT[filename])
-        end = source.index("\n}", start)
-        outside = [token for token in js_tokens(source) if token.text == "jQuery" and not start <= token.position < end]
-        assert outside == [], f"{filename} names jQuery outside its guard"
-        callers = [path.name for path in templates() if ".dropzone(" in code_of(path)]
-        assert callers == [], f"{callers} call $.fn.dropzone, which the upload pages no longer attach"
-        return
     assert not names_jquery(filename), f"{filename} uses jQuery, which loads after the first paint: queue it with later(), after jquery.js"
 
 

@@ -111,13 +111,29 @@ def test_the_upload_form_and_the_family_type_ahead_are_static_files(client, as_r
     assert "/static/upload_form.js" in page and "/static/family_names.js" in page
 
 
-def test_the_upload_pages_load_dropzone_up_front(client, as_role):
+@pytest.mark.parametrize("path", ["/analyze/query", "/data/submit", "/data/import"])
+def test_the_upload_pages_queue_dropzone_and_attach_it_with_their_options(client, as_role, path):
+    """A tag in the body had the first paint share the network with the library's 77 KB,
+    which put Lighthouse's largest paint on mobile 0.7 s later. It is queued after the paint now,
+    and dropzone_attach.js, queued right after it, attaches the form with the options the
+    page parked, before auto-discovery could attach it without them."""
     as_role("contributor")
-    for path in ("/analyze/query", "/data/submit", "/data/import"):
-        page = client.get(path).get_data(as_text=True)
-        assert 'src="/static/dropzone.js"' in page, f"{path} does not load the patched Dropzone"
-        assert "dropzone.min.css" in page, f"{path} does not load Dropzone's stylesheet"
-        assert 'class="dropzone"' in page, f"{path} does not render the form for auto-discovery"
+    page = client.get(path).get_data(as_text=True)
+    assert re.search(r'<script[^>]* src="[^"]*dropzone[^"]*"', page) is None, f"{path} loads Dropzone with a tag"
+    queued = re.findall(r'later\("([^"]+)"\)', page)
+    assert "/static/dropzone.js" in queued, f"{path} does not queue the patched Dropzone"
+    assert queued.index("/static/dropzone_attach.js") == queued.index("/static/dropzone.js") + 1, queued
+    assert re.search(r'<link[^>]*dropzone\.min\.css', page), f"{path} does not link Dropzone's stylesheet"
+    # styled as it will be from the first paint, and parked options instead of an
+    # assignment to a Dropzone that is not there yet
+    assert re.search(r'<form[^>]* class="dropzone"[^>]* id="myDropzone"', page), f"{path} does not render the form as a drop zone"
+    assert "window.mcritDropzoneOptions = {" in page and "Dropzone.options.myDropzone" not in page
+
+
+def test_the_attach_file_attaches_before_auto_discovery_with_the_parked_options():
+    script = (STATIC / "dropzone_attach.js").read_text()
+    assert script.index("Dropzone.autoDiscover = false") < script.index("new Dropzone(element, window.mcritDropzoneOptions)")
+    assert "!element.dropzone" in script, "a zone attached already would be attached twice"
 
 
 def test_the_lazy_loader_attaches_by_hand_and_runs_the_handlers_once(client, as_role):
