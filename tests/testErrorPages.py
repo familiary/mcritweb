@@ -8,6 +8,8 @@ for JSON, read the status and not the page, and keep Werkzeug's answer as it was
 these pages may need the backend: an error is the moment it is least likely to be there.
 """
 
+import re
+
 import pytest
 from conftest import log_in_as
 from werkzeug.security import generate_password_hash
@@ -48,12 +50,13 @@ def assert_the_sites_page(response, status, theme="dark"):
     assert response.status_code == status
     assert response.mimetype == "text/html"
     assert not response.data.startswith(WERKZEUG_PAGE), "Werkzeug's own error document"
-    assert 'href="/static/style.css"' in page, "the page does not have the site's stylesheet"
+    # url_for appends a `?v=` version to a static URL
+    assert re.search(r'href="/static/style\.css(\?v=[^"]*)?"', page), "the page does not have the site's stylesheet"
     assert 'class="navbar' in page, "the page is not in the site's layout"
     assert f'<html lang="en" data-theme="{theme}">' in page
     if theme == "dark":
         assert '<meta name="color-scheme" content="dark">' in page
-        assert f'href="{DARK_STYLESHEET}" media="all"' in page, "a dark account is shown the light page"
+        assert re.search(rf'href="{re.escape(DARK_STYLESHEET)}(\?v=[^"]*)?" media="all"', page), "a dark account is shown the light page"
     return page
 
 
