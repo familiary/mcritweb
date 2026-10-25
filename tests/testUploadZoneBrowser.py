@@ -20,6 +20,7 @@ from werkzeug.serving import make_server
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
 
 ZONE_WIDTH = "() => document.getElementById('myDropzone').getBoundingClientRect().width"
+WAIT_FOR_THE_QUEUE = "() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })"
 
 
 @pytest.fixture
@@ -57,9 +58,14 @@ def test_the_drop_zone_is_as_wide_before_dropzone_has_filled_it_as_after(app, li
                 context.add_cookies([{"name": app.config["SESSION_COOKIE_NAME"], "value": cookie, "domain": "127.0.0.1", "path": "/"}])
                 page = context.new_page()
                 if held_back:
-                    page.route("**/static/dropzone.js", lambda route: route.abort())
+                    # the pages load the minified build, and a versioned URL ends in a query
+                    page.route("**/static/dropzone-patched.min.js*", lambda route: route.abort())
                 page.goto(live_server + path)
-                if not held_back:
+                if held_back:
+                    # once the queue has run without it, nothing has filled the zone
+                    page.evaluate(WAIT_FOR_THE_QUEUE)
+                    assert page.evaluate("() => typeof Dropzone === 'undefined' && !document.querySelector('#myDropzone .dz-message')"), f"{path} has Dropzone although its script was held back"
+                else:
                     page.wait_for_selector("#myDropzone .dz-message")
                 widths[held_back] = page.evaluate(ZONE_WIDTH)
                 column = page.evaluate("() => document.getElementById('myDropzone').parentElement.getBoundingClientRect().width")
