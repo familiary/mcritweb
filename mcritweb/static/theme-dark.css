@@ -48,9 +48,13 @@
   --border-strong: #657790;
   --border-swatch: #8796a8;
   --dropzone-border: #657790;
+  /* control borders: 3:1 or more on every surface a control sits on, the chrome (3.4)
+     and the raised dialogs (3.1) included */
+  --border-control: #657790;
 
   --sort-idle: rgba(207, 215, 224, 0.45);
   --sort-active: var(--text-strong);
+  --focus-ring: rgba(122, 180, 220, 0.6);
   --accordion-focus-ring: var(--focus-ring);
   /* a muted sage: the light theme's yellowgreen family, without its glare */
   --row-selected: #2c4a38;
@@ -69,12 +73,8 @@
   --surface-hover: rgba(255, 255, 255, 0.06);
   --surface-active: #2a3542;
   --border: #34404e;
-  /* control borders: 3:1 or more on every surface a control sits on, the chrome (3.4)
-     and the raised dialogs (3.1) included */
-  --border-control: #657790;
   --primary: #2c6fb7;
   --primary-hover: #3678bf;
-  --focus-ring: rgba(122, 180, 220, 0.6);
   --shadow-raised: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
   /* tooltips: a raised dark bubble with a hairline, rather than a bright one that flares
      up over the page every time the pointer rests on a score */

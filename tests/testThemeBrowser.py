@@ -1285,3 +1285,81 @@ def test_in_forced_colours_a_page_link_that_leads_nowhere_looks_it(open_in, them
     colour = "(element) => getComputedStyle(element).color"
 
     assert page.locator(".page-item.disabled .page-link").first.evaluate(colour) != page.locator(".page-item:not(.active):not(.disabled) a.page-link").first.evaluate(colour)
+
+
+# --- the light theme's own contrast ------------------------------------------------------------
+#
+# The light pages keep master's colours (testTheme.py pins them) except where a pair of them was
+# measured short of WCAG: those changes are named in testTheme.py's LIGHT_CHANGES, and measured on
+# the pages here.
+
+#: (what it is, the page it is on, the element) whose edge is all that shows where it is
+LIGHT_EDGES = [
+    ("a field", "/admin/server", "#mcrit_server_url"),
+    ("a search field", "/explore/samples", "input.form-control"),
+    ("a checkbox", "/explore/search?query=citadel", "#functions_checkbox"),
+    ("a radio button", "/data/submit", "#dumped"),
+]
+
+
+@pytest.mark.parametrize("what, path, selector", LIGHT_EDGES, ids=[control[0] for control in LIGHT_EDGES])
+def test_in_the_light_theme_the_edge_of_a_field_or_a_box_holds_3_to_1(open_in, what, path, selector):
+    """WCAG 1.4.11. Bootstrap's grey edge was 1.5:1 on the page (a check box's 1.8:1): an empty field,
+    an unticked box, showed hardly at all."""
+    page = open_in("light", path)
+    element = page.locator(f"{selector}:visible").first
+    assert element.count() == 1, f"{path} has no {what} ({selector})"
+
+    found = element.evaluate("(element) => {" + HELPERS + """
+      const behind = background(element.parentElement).rgb, own = background(element).rgb;
+      const edge = over(parse(getComputedStyle(element).borderTopColor), behind);
+      return [ratio(edge, behind), ratio(edge, own)];
+    }""")
+
+    assert min(found) >= 3, f"{what}: its edge is {found[0]:.2f}:1 against the page and {found[1]:.2f}:1 against its own fill"
+
+
+#: How visible the ring or the outline of the element in focus is, laid over what is behind it. Unlike
+#: FOCUS_INDICATOR_OF, the border is left out: here it is there before the focus as well.
+FOCUS_RING_OF = (
+    "(element) => {" + HELPERS + """
+  const behind = background(element.parentElement).rgb;
+  const style = getComputedStyle(element);
+  const found = { ring: null, outline: null, behind: behind.map(Math.round) };
+  const ring = style.boxShadow.match(/(rgba?\\([^)]*\\)|color\\(srgb[^)]*\\))\\s+0px\\s+0px\\s+0px\\s+([\\d.]+)px(?!\\s+inset)/);
+  if (ring && parseFloat(ring[2]) >= 2) found.ring = Math.round(ratio(over(parse(ring[1]), behind), behind) * 100) / 100;
+  if (!["none", "hidden"].includes(style.outlineStyle) && parseFloat(style.outlineWidth) >= 2) found.outline = Math.round(ratio(over(parse(style.outlineColor), behind), behind) * 100) / 100;
+  return found;
+}"""
+)
+
+#: (what it is, the page it is on, the element): one of each kind of control the light pages focus
+LIGHT_FOCUS = [
+    ("a page link", "/explore/functions", ".page-item:not(.active):not(.disabled) a.page-link"),
+    ("the rows-per-page menu", "/explore/samples", "select.page-link"),
+    ("an outline button", "/explore/samples", ".btn-outline-dark"),
+    ("a primary button", "/admin/server", ".btn-primary"),
+    ("a field", "/admin/server", "#mcrit_server_url"),
+    ("a search field without the ring", "/explore/samples", "input.form-control.shadow-none"),
+    ("a radio button", "/data/submit", "#dumped"),
+    ("a checkbox without the ring", "/explore/search?query=citadel", "#functions_checkbox"),
+    ("an accordion header", f"/explore/functions/{FUNCTION_A}", ".accordion-button"),
+]
+
+
+@pytest.mark.parametrize("what, path, selector", LIGHT_FOCUS, ids=[control[0] for control in LIGHT_FOCUS])
+def test_in_the_light_theme_the_keyboards_focus_holds_3_to_1_against_what_is_behind_the_control(open_in, what, path, selector):
+    """WCAG 1.4.11 again, for what shows where the keyboard is. Bootstrap's ring was 1.4:1 on the
+    light page; the search boxes and check boxes that turn it off (`.shadow-none`) showed a 1px
+    border going a paler blue, 2.1:1, and five pages open with the focus in such a box."""
+    page = open_in("light", path)
+    element = page.locator(f"{selector}:visible").first
+    assert element.count() == 1, f"{path} has no {what} ({selector})"
+    element.scroll_into_view_if_needed()
+
+    keyboard_focus(page, element)
+    found = element.evaluate(FOCUS_RING_OF)
+
+    best = max([value for value in (found["ring"], found["outline"]) if value is not None], default=0)
+    assert best >= 3, f"{what} in focus: ring {found['ring']}:1, outline {found['outline']}:1 against rgb{tuple(found['behind'])}"
+

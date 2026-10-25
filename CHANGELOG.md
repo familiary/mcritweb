@@ -136,6 +136,11 @@ rather than reconstructing it from the commit log at release time.
   and page looked like the others, and the cross compare matrix and the CFG comparison's legend
   were blank. Each now has something the forced palette keeps: the browser's own boxes, outlines
   in the user's highlight colour, and the data colours left as they are.
+- In the light theme, the edges of fields, check boxes and radio buttons, and the ring the
+  keyboard's focus draws, can be seen: Bootstrap's grey edge was 1.5:1 against the page (a check
+  box's 1.8:1) and its focus ring 1.4:1, where WCAG asks 3:1. They are 3.2:1 or more now, on the
+  page and on the grey chrome. The search boxes and check boxes that turn the ring off (five pages
+  open with the focus in one) show an outline in the accent colour instead, in both themes.
 
 ### Security
 

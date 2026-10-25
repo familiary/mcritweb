@@ -1160,8 +1160,23 @@ MASTER_LIGHT = {
     "--cfg-tooltip-shadow": "4px 4px 10px rgba(0, 0, 0, 0.4)",
     # result_compare_function_vs.html:82 and single_function.html:203, the first loop colour
     "--cfg-loop-label": "#fdd0a2",
+    # Bootstrap 5.0.2's border of .form-control and .form-select (a check box's is rgba(0, 0, 0, 0.25)),
+    # which master never overrode
+    "--border-control": "#ced4da",
+    # Bootstrap 5.0.2's focus ring of fields, check boxes, buttons and the pager
+    "--focus-ring": "rgba(13, 110, 253, 0.25)",
 }
-PINNED_LIGHT = {**MASTER_LIGHT, **LIGHT_CFG_COLORS}
+MASTER_PALETTE = {**MASTER_LIGHT, **LIGHT_CFG_COLORS}
+
+#: Light values that are not master's, on purpose: name -> (value, why). The light pages were to stay
+#: as they were, and did, until a pair of their colours was measured short of what WCAG asks; each
+#: line here is one such change. test_the_light_theme_is_no_worse_than_master_on_any_of_these_pairs
+#: still holds every pair to master's.
+LIGHT_CHANGES = {
+    "--border-control": ("#80868b", "the edge of a field was 1.5:1 on the page and a check box's 1.8:1; WCAG 1.4.11 asks 3:1"),
+    "--focus-ring": ("rgba(13, 110, 253, 0.85)", "Bootstrap's ring was 1.4:1 on the page; its blue at 85% is 3.6:1 there and 3.2:1 on the chrome"),
+}
+PINNED_LIGHT = {**MASTER_PALETTE, **{name: value for name, (value, _why) in LIGHT_CHANGES.items()}}
 
 
 def colour_or_text(value, properties):
@@ -1230,7 +1245,8 @@ def test_a_light_value_is_what_master_had(name):
     assert name in light_properties(), f"{name} is gone from style.css"
 
     assert colour_or_text(light_properties()[name], light_properties()) == colour_or_text(PINNED_LIGHT[name], PINNED_LIGHT), (
-        f"{name} is {light_properties()[name]!r} in style.css; master painted {PINNED_LIGHT[name]!r}, and the light pages are meant to stay as they were"
+        f"{name} is {light_properties()[name]!r} in style.css; it is pinned at {PINNED_LIGHT[name]!r}, and the light pages are meant to stay as they were"
+        + (" (see LIGHT_CHANGES)" if name in LIGHT_CHANGES else ", which is what master painted")
     )
 
 
@@ -1508,6 +1524,38 @@ def test_the_dark_focus_ring_and_the_focus_border_hold_3_to_1_against_what_they_
     assert failures == [], f"below 3:1 {failures}"
 
 
+def test_light_control_borders_hold_3_to_1_on_the_surfaces_a_control_is_drawn_on():
+    """WCAG 1.4.11: the edge of a field, a check box or a radio button is what shows where it is.
+    Bootstrap's grey was 1.5:1 on the light page (a check box's 1.8:1), so an empty field had no
+    visible edge; style.css draws the three with --border-control."""
+    failures = []
+    for surface in ("--surface-page", "--surface-subtle", "--surface-chrome"):
+        ratio = contrast(rgb_of(light_properties(), "--border-control"), rgb_of(light_properties(), surface))
+        if ratio < 3:
+            failures.append(f"--border-control on {surface}: {ratio:.3f}")
+
+    assert failures == [], f"below 3:1 {failures}"
+
+
+def test_the_light_focus_ring_and_the_focus_border_hold_3_to_1_against_what_they_surround():
+    """Bootstrap's ring, rgba(13, 110, 253, 0.25), was 1.4:1 on the light page: the keyboard's focus
+    on a field, a box, a button or the pager barely showed. The fields that turn the ring off
+    (`.shadow-none`) show the accent instead."""
+    lookup = themeCss.resolver(light_properties())
+    ring = parse_colour("var(--focus-ring)", lookup)
+    failures = []
+    for surface in ("--surface-page", "--surface-subtle", "--surface-chrome"):
+        ground = rgb_of(light_properties(), surface)
+        ratio = contrast(themeCss.composite(ring, ground), ground)
+        if ratio < 3:
+            failures.append(f"--focus-ring over {surface}: {ratio:.3f}")
+    accent = contrast(rgb_of(light_properties(), "--accent"), rgb_of(light_properties(), "--surface-page"))
+    if accent < 3:
+        failures.append(f"--accent on --surface-page: {accent:.3f}")
+
+    assert failures == [], f"below 3:1 {failures}"
+
+
 def test_the_idle_sort_arrow_is_at_least_as_visible_in_dark_as_it_was_on_master():
     """The arrow of a sortable column head, before the column is sorted, is faint by design: master
     drew it at 30% black on the grey head, 2.09:1. testThemeBrowser.py leaves it out of the 3:1 it
@@ -1565,14 +1613,20 @@ def light_measurements(properties):
     for row in ("--row-selected", "--row-pending"):
         for foreground in ("--text-body", "--text-strong", "--link-on-tint", "--status-yes", "--status-no"):
             measured[f"{foreground} on {row}"] = contrast(rgb_of(properties, foreground), rgb_of(properties, row))
+    ring = parse_colour(properties["--focus-ring"])
+    for surface in LIGHT_SURFACES:
+        ground = rgb_of(properties, surface)
+        measured[f"--border-control on {surface}"] = contrast(rgb_of(properties, "--border-control"), ground)
+        measured[f"--focus-ring over {surface}"] = contrast(themeCss.composite(ring, ground), ground)
     return measured
 
 
 def test_the_light_theme_is_no_worse_than_master_on_any_of_these_pairs():
-    """The light values are master's, so this is a record more than a test: every pair the dark
-    theme is held to, measured at the light values and at the literals master had."""
+    """The light values are master's but for LIGHT_CHANGES, so this is a record more than a test:
+    every pair the dark theme is held to, measured at the light values and at the literals master
+    had. A change made for one pair must not cost another."""
     now = light_measurements(light_properties())
-    master = light_measurements(PINNED_LIGHT)
+    master = light_measurements(MASTER_PALETTE)
 
     worse = {pair: (round(now[pair], 3), round(master[pair], 3)) for pair in master if now[pair] < master[pair] - 1e-9}
 

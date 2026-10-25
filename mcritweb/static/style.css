@@ -1,7 +1,8 @@
 /* The palette (#70). Every colour this stylesheet and the templates paint is named here
    once, by the job it does, and the rules below use the names. These are the light values,
-   which are the colours the pages always had; static/theme-dark.css gives the same names
-   their dark values, and base.html links it only when the user's theme can be dark.
+   which are the colours the pages always had but for the few that were measured short of
+   WCAG (tests/testTheme.py lists them in LIGHT_CHANGES); static/theme-dark.css gives the same
+   names their dark values, and base.html links it only when the user's theme can be dark.
    A new colour gets a name here and in theme-dark.css - tests/testTheme.py fails on a
    colour written anywhere else, and on a name that only one of the two files defines. */
 :root {
@@ -42,10 +43,16 @@
   --border-strong: #333;
   --border-swatch: #444;
   --dropzone-border: black;
+  /* the edge of a field, a check box and a radio button: 3:1 or more on every surface a control
+     sits on (WCAG 1.4.11), where Bootstrap's #ced4da was 1.5:1 on the page */
+  --border-control: #80868b;
 
   /* states and indicators */
   --sort-idle: rgba(0, 0, 0, 0.3);
   --sort-active: rgba(0, 0, 0, 1);
+  /* the ring of the keyboard's focus: Bootstrap's blue at 85%, 3:1 or more on the page and the
+     chrome, where its own at 25% was 1.4:1 */
+  --focus-ring: rgba(13, 110, 253, 0.85);
   /* the ring an accordion header draws instead of Bootstrap's */
   --accordion-focus-ring: #FFF;
   /* a sample picker row: in the comparison, or already computed / just clicked */
@@ -465,4 +472,46 @@ form.form-inline input {
     outline: 2px solid Highlight;
     outline-offset: 2px;
   }
+}
+
+/* The edge of a field, a check box and a radio button, and the ring of the keyboard's focus
+   (WCAG 1.4.11): Bootstrap's were 1.5:1, 1.8:1 and 1.4:1 on the light page. theme-dark.css
+   paints the same parts from the same names. The focus rules start at :root to outrank
+   Bootstrap's own rings, which its button variants set as specifically as `.btn:focus`
+   (`.btn-primary:active:focus`). */
+.form-control,
+.form-select,
+.form-check-input {
+  border-color: var(--border-control);
+}
+
+:root .form-control:focus,
+:root .form-select:focus,
+:root .form-check-input:focus {
+  border-color: var(--accent);
+}
+
+:root .btn:focus,
+:root .btn-close:focus,
+:root .accordion-button:focus,
+:root .form-control:focus,
+:root .form-select:focus,
+:root .form-check-input:focus,
+:root .page-link:focus {
+  box-shadow: 0 0 0 0.25rem var(--focus-ring);
+}
+
+/* one rule each, as for the forced colours above */
+:root .form-range:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 1px var(--surface-page), 0 0 0 0.25rem var(--focus-ring);
+}
+
+:root .form-range:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 1px var(--surface-page), 0 0 0 0.25rem var(--focus-ring);
+}
+
+/* the search boxes and check boxes that turn the ring off (.shadow-none) showed a 1px border
+   going a paler blue; five pages open with the focus in one */
+:root .shadow-none:focus-visible {
+  outline: 2px solid var(--accent);
 }
