@@ -163,7 +163,9 @@ rather than reconstructing it from the commit log at release time.
   the cross compare's drag took no touch, so a keyboard user could not choose a table's columns and
   a phone could not set a custom sample order. Each item has buttons to move it up and down, and a
   column one to move it between Active and Available; a screen reader is told where it went.
-  Dragging works as before.
+  The page's script adds the buttons after the first paint, into room the stylesheet keeps, rather
+  than the server writing them into every item: the settings page is sent uncompressed, and with
+  the buttons in it would have gone from 42 KB to 100 KB. Dragging works as before.
 - A cross compare's matrix can be read and followed with the keyboard and a screen reader. Each
   score was an empty coloured square: its number showed in a tooltip on hover alone, a pair's
   report opened from a mouse click alone, and nothing named the pair a square stood for. A score is

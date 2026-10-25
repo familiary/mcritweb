@@ -260,14 +260,11 @@ Results for Job: {{ job_info.job_id }}
 <div class="container">
     <div class="row">
       <div class="col-sm-auto">
-        {# dragged by a pointer; the buttons move a sample by key or by touch
-           (static/reorder_list.js), which jQuery UI's drag takes neither of #}
+        {# dragged by a pointer; the buttons static/reorder_list.js adds move a sample by key
+           or by touch, which jQuery UI's drag takes neither of #}
         <ul style="list-style: none" id="sortable">
             {% for sample in samples[rendered_method] %}
-            <li class="reorder-item" data-reorder-item data-reorder-label="Sample {{ sample.sample_id }}" data-sample-id="{{ sample.sample_id }}"><span>{{ sample.sample_id ~' '~ sample.family ~ ' ' ~ sample.version}}</span>
-              <button type="button" class="btn btn-outline-dark btn-sm" data-reorder="up" aria-label="Move sample {{ sample.sample_id }} up" title="Move up"><i class="fa-solid fa-angle-right fa-rotate-270" aria-hidden="true"></i></button>
-              <button type="button" class="btn btn-outline-dark btn-sm" data-reorder="down" aria-label="Move sample {{ sample.sample_id }} down" title="Move down"><i class="fa-solid fa-angle-right fa-rotate-90" aria-hidden="true"></i></button>
-            </li>
+            <li data-reorder-item data-reorder-label="Sample {{ sample.sample_id }}" data-reorder-name="sample {{ sample.sample_id }}" data-sample-id="{{ sample.sample_id }}">{{ sample.sample_id ~' '~ sample.family ~ ' ' ~ sample.version}}</li>
             {% endfor %}
           </ul>
           <div id="reorder-status" class="visually-hidden" role="status"></div>

@@ -56,7 +56,7 @@ def open_as(app, live_server, make_user):
         except sync_api.Error as error:
             pytest.skip(f"no Chromium for playwright to drive: {error}")
         try:
-            def _open(role, path, **context_options):
+            def _open(role, path, init_script=None, **context_options):
                 context = browser.new_context(**{"viewport": {"width": 1280, "height": 900}, **context_options})
                 context.add_cookies([{
                     "name": app.config["SESSION_COOKIE_NAME"],
@@ -66,6 +66,8 @@ def open_as(app, live_server, make_user):
                 }])
                 page = context.new_page()
                 page.set_default_timeout(SCRIPT_TIMEOUT_MS)
+                if init_script:
+                    page.add_init_script(init_script)
                 page.goto(live_server + path)
                 ready(page)
                 return page
@@ -475,6 +477,67 @@ def test_a_cross_compare_sample_moves_by_touch(open_as, live_server):
     with page.expect_navigation():
         page.tap("text=Change order")
     assert page.url.endswith("?custom=" + ",".join([order[1], order[0]] + order[2:]))
+
+
+COUNT_LAYOUT_SHIFTS = """
+window.mcritShifts = [];
+new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+        if (entry.hadRecentInput) { continue; }
+        // the moved nodes that sit in a list the buttons are added to
+        const inList = entry.sources.some(({node}) => node && (node.closest ? node : node.parentNode).closest('[data-reorder-item], #sortable, .list-group'));
+        window.mcritShifts.push([entry.value, inList]);
+    }
+}).observe({type: "layout-shift", buffered: true});
+"""
+
+#: what the lists the script adds the buttons to shifted by; the token cell's copy button on
+#: /settings moves a hair too, which is not the buttons' doing
+SHIFTED_BY_THE_SCRIPT = """() => window.mcritShifts.filter(([, inList]) => inList).reduce((sum, [value]) => sum + value, 0)"""
+
+
+#: the box of every list item and of its name
+ITEM_BOXES = """() => Array.from(document.querySelectorAll('[data-reorder-item]'), (item) => {
+    const box = item.getBoundingClientRect(), range = document.createRange();
+    range.selectNodeContents(item.firstChild);
+    const name = range.getBoundingClientRect();
+    return [box.x, box.y, box.width, box.height, name.x, name.y, name.width, name.height];
+})"""
+
+
+#: the items whose name runs under their buttons, as "id: name right edge > buttons left edge"
+NAMES_UNDER_BUTTONS = """() => Array.from(document.querySelectorAll('[data-reorder-item]')).filter((item) => {
+    const range = document.createRange();
+    range.selectNodeContents(item.firstChild);
+    const right = Math.max(...Array.from(range.getClientRects(), (box) => box.right));
+    return right > item.querySelector('.reorder-buttons').getBoundingClientRect().left;
+}).map((item) => item.textContent)"""
+
+
+@pytest.mark.parametrize("width", [1280, 390])
+def test_the_move_buttons_are_added_by_the_script_and_move_nothing(open_as, width):
+    """Written by the server into every item, the buttons took /settings from 42 KB to
+    100 KB, and that page is sent uncompressed. The script makes them after the first
+    paint into room the stylesheet keeps at the end of each item, so the items must not change size, nor must
+    the page shift (a shift costs Lighthouse points, one in a hidden tab included)."""
+    for path, role in [("/settings", "contributor"), (f"/data/result/{job_id_of('cross_compare')}", "visitor")]:
+        page = open_as(role, path, init_script=COUNT_LAYOUT_SHIFTS, viewport={"width": width, "height": 900})
+        page.wait_for_selector("[data-reorder-item] [data-reorder]", state="attached")
+        page.evaluate("() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
+        # counted before the tab is opened, whose own reveal is not the buttons'
+        assert page.evaluate(SHIFTED_BY_THE_SCRIPT) == 0, path
+        if path == "/settings":
+            page.click("#pills-column-settings-tab")
+            page.wait_for_selector("#samples_table_active [data-reorder]", state="visible")
+        items = page.locator("[data-reorder-item]")
+        assert items.count() > 0
+        assert all(items.nth(at).locator("[data-reorder]").count() == (3 if path == "/settings" else 2) for at in range(items.count())), path
+        assert page.evaluate(NAMES_UNDER_BUTTONS) == [], path
+        # what an item measures with its buttons, and again with the buttons removed
+        full = page.evaluate(ITEM_BOXES)
+        page.evaluate("() => document.querySelectorAll('.reorder-buttons').forEach((holder) => holder.remove())")
+        empty = page.evaluate(ITEM_BOXES)
+        assert full == empty, path
 
 
 FOCUSED_SCORE = """() => {

@@ -323,3 +323,20 @@ def test_the_cross_compare_result_names_the_colours_of_its_matrix(client, as_rol
     key = re.search(r'<p class="text-center small">Score:(.*?)</p>', html, re.S).group(1)
     assert key.count('class="score-swatch score-key"') == 11
     assert "90–100%" in key and "under 10%" in key and "0%</span>" in key
+
+
+def test_the_move_buttons_are_not_in_the_page_but_made_by_the_script(client, as_role):
+    """Written into every item, the buttons took /settings from 42 KB to 100 KB, and the
+    page is sent uncompressed because it carries the API token, so its size is what a
+    phone downloads. The items are their names alone, and static/reorder_list.js adds
+    the buttons, into room the stylesheet keeps."""
+    as_role("contributor")
+    settings = client.get("/settings").get_data(as_text=True)
+    assert "data-reorder=" not in settings
+    assert "<button" not in settings[settings.index('id="pills-column-settings"'):settings.index('<button id="saveButton"')]
+    assert len(settings.encode()) < 48_000
+    assert settings.count("data-reorder-item") > 0
+
+    cross = client.get(f"/data/result/{job_id_of('cross_compare')}").get_data(as_text=True)
+    assert "data-reorder=" not in cross
+    assert cross.count("data-reorder-item") > 0

@@ -2,20 +2,13 @@
 {% extends 'base.html' %}
 
 {#- A column in the lists of the column settings. A pointer drags it within or between its
-    table's two lists; its buttons move it up, down, or across to the other list, by key
-    or by touch (static/reorder_list.js), which keeps the across button's name and arrow
-    right wherever the item goes. `active` is the list it starts in. -#}
+    table's two lists. Its buttons, to move it up, down, or across to the other list by key
+    or by touch, are made by static/reorder_list.js once the page has run: written here, the
+    seven tables' items took the page from 42 KB to 100 KB, and this page is sent
+    uncompressed. The stylesheet keeps room for them at the item's end, so adding them moves
+    nothing. -#}
 {% macro column_item(item, active) %}
-            <div class="list-group-item reorder-item" data-reorder-item data-reorder-label="{{ item }}" data-column="{{ item }}">
-              <span>{{ item }}</span>
-              <button type="button" class="btn btn-outline-dark btn-sm" data-reorder="up" aria-label="Move {{ item }} up" title="Move up"><i class="fa-solid fa-angle-right fa-rotate-270" aria-hidden="true"></i></button>
-              <button type="button" class="btn btn-outline-dark btn-sm" data-reorder="down" aria-label="Move {{ item }} down" title="Move down"><i class="fa-solid fa-angle-right fa-rotate-90" aria-hidden="true"></i></button>
-              {% if active %}
-              <button type="button" class="btn btn-outline-dark btn-sm" data-reorder="across" aria-label="Move {{ item }} to Available" title="Move to Available"><i class="fa-solid fa-angle-right" aria-hidden="true"></i></button>
-              {% else %}
-              <button type="button" class="btn btn-outline-dark btn-sm" data-reorder="across" aria-label="Move {{ item }} to Active" title="Move to Active"><i class="fa-solid fa-angle-left" aria-hidden="true"></i></button>
-              {% endif %}
-            </div>
+            <div class="list-group-item" data-reorder-item data-column="{{ item }}">{{ item }}</div>
 {%- endmacro %}
 {% block title%}
 Settings
