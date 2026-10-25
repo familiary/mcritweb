@@ -34,12 +34,14 @@
     {% for sample in samples %}
       {% set outer_loop = loop %}
       <tr class="sample-row" style="border: 0; line-height: 0.7em;" data-hint-sample="{{ sample.sample_id }}: {{sample.sha256[:8]}} -- {{ sample.family }} {{ sample.version }} -- ({{sample.statistics['num_functions']}} func)">
-        <td class="result clickable" style="display: none;">{{ sample_to_job_id[sample.sample_id|string] }}</td>
         <td class="sha256" style="font-size: 13px; min-width: 100px;">{{ format_sha_short_clipboard(sample.sha256) }}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.family}}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.version}}</td>
         <td><button type="button" aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square"></i></button></td>
-        <td class="id clickable" style="padding: 0 5px; font-size: 13px; color: var(--text-strong)">{{ sample.sample_id }}</td>
+        {# the row's sample, and a link to its own report: the cell itself was the link, which
+           only a mouse could follow #}
+        {% set row_job_id = sample_to_job_id.get(sample.sample_id|string) %}
+        <th scope="row" class="id" style="padding: 0 5px; font-size: 13px; font-weight: normal">{% if row_job_id %}<a href="{{ url_for('data.result', job_id=row_job_id) }}">{{ sample.sample_id }}</a>{% else %}{{ sample.sample_id }}{% endif %}</th>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.bitness}}</td>
         <td class="" style="padding: 0 5px; font-size: 13px; color: var(--text-strong)">{{sample.statistics['num_functions']}}</td>
       {# a pane filled in the browser writes its own score line into data-hint, see the script at the end #}
@@ -74,13 +76,6 @@ Results for Job: {{ job_info.job_id }}
 <script>later({{ url_for('static', filename='jquery-ui-sortable.js')|tojson }})</script>
 
 <script>
-  whenReady(function(){
-    // delegated, so that it also reaches the rows of a pane filled after load
-    $(document).on("click", "td.clickable", function(){
-      var result = $(this).parent().children("td.result").text();
-      window.location.href = "{{ url_for('data.result', job_id='') }}" + result;
-    });
-  });
   whenReady( function() {
     $( "#sortable" ).sortable();
   } );
@@ -296,7 +291,7 @@ Results for Job: {{ job_info.job_id }}
       var sourceRows = rendered.querySelectorAll("tr.sample-row");
       var sourceIndex = {};
       sourceRows.forEach(function(row, index){
-        sourceIndex[row.querySelector("td.id").textContent.trim()] = index;
+        sourceIndex[row.querySelector("th.id").textContent.trim()] = index;
       });
       var table = rendered.cloneNode(false);
       var body = table.appendChild(rendered.tBodies[0].cloneNode(false));

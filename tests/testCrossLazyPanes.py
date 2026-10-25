@@ -180,7 +180,7 @@ class _Rows(HTMLParser):
         attrs = dict(attrs)
         if tag == "tr":
             self.rows.append({"attrs": attrs, "cells": []})
-        elif tag == "td":
+        elif tag in ("td", "th"):
             self._cell = {"attrs": attrs, "text": "", "hint": None, "edit": False}
             self.rows[-1]["cells"].append(self._cell)
         elif tag == "span" and "data-hint" in attrs:
@@ -189,7 +189,7 @@ class _Rows(HTMLParser):
             self._cell["edit"] = True
 
     def handle_endtag(self, tag):
-        if tag == "td":
+        if tag in ("td", "th"):
             self._cell = None
 
     def handle_data(self, data):
@@ -215,7 +215,7 @@ def test_the_rendered_matrix_has_the_shape_the_script_clones_from(client, as_rol
     assert [row["attrs"].get("class") for row in sample_rows] == ["sample-row"] * len(order)
     num_leading = len(sample_rows[0]["cells"]) - len(order)
     for row_id, row in zip(order, sample_rows):
-        # td.id names the row's sample
+        # th.id names the row's sample
         ids = [cell["text"].strip() for cell in row["cells"] if "id" in cell["attrs"].get("class", "").split()]
         assert ids == [row_id]
         # the matrix is the last N cells, behind the same number of leading ones in every row

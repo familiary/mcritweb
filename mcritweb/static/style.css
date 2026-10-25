@@ -409,6 +409,14 @@ th > .table-sort {
   text-decoration: none;
 }
 
+/* A listing row's id is the link into what the row opens, and like the table links above
+   it is often a single digit: the same 24px minimum width keeps it a target WCAG 2.5.8
+   accepts. */
+th[scope="row"] > a:not(.btn) {
+  display: inline-block;
+  min-width: 24px;
+}
+
 /* A sample picker's chosen rows are tinted, and forced colours paint every row alike. The
    row's radio button or checkbox says it is chosen; the frame keeps the row easy to find. */
 @media (forced-colors: active) {

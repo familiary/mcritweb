@@ -251,3 +251,37 @@ def test_every_picker_row_leads_with_the_control_that_picks_it(client, as_role, 
         assert ("disabled" in attrs) == (tint.strip() == "row-selected"), first_cell
     if "cache=" in path or "samples=" in path:
         assert {tint.strip() for _, tint, _ in rows} >= {"row-selected"}
+
+
+#: a listing row, the start of its first header cell, and what that cell holds
+LISTING_ROW = re.compile(r'<tr class="(sample-row|family-row|function-row|job-row)\b[^"]*"[^>]*>.*?<th\b[^>]*>(.*?)</th>', re.S)
+#: where each kind of row goes: its entity's page, or on a cross compare result the row
+#: sample's own report
+ROW_TARGET = {
+    "sample-row": r"/explore/samples/-?\d+|/data/result/\w+",
+    "family-row": r"/explore/families/\d+",
+    "function-row": r"/explore/functions/-?\d+",
+    "job-row": r"/data/jobs/\w+",
+}
+
+
+@pytest.mark.parametrize("path", [
+    "/explore/samples",
+    "/explore/families",
+    "/explore/functions",
+    "/explore/search?query=citadel&type=sample",
+    "/explore/samples/0",
+    "/data/jobs?active=getMatchesForSample",
+    f"/data/jobs/{job_id_of('cross_compare')}",
+    f"/data/result/{job_id_of('cross_compare')}",
+])
+def test_every_listing_row_holds_a_link_to_where_it_goes(client, as_role, path):
+    """A click on the row was the only way from a list into a sample, family, function or
+    job, and a running job's page had no other way in at all. No key reaches a click
+    handler on a row; a link in its id cell is what a keyboard follows."""
+    rows = LISTING_ROW.findall(render(client, as_role, path))
+    assert rows, f"{path} lists nothing - this case has stopped guarding anything"
+
+    for kind, header in rows:
+        links = [attrs.get("href", "") for tag, attrs, _ in start_tags(header) if tag == "a"]
+        assert len(links) == 1 and re.fullmatch(ROW_TARGET[kind], links[0]), f"{path}: a {kind} leads nowhere: {header}"

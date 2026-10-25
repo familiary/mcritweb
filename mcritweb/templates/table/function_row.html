@@ -5,8 +5,13 @@
 {% macro function_row_std_js() %}
 <script>
   whenReady(function(){
-    // delegated, so rows a live search (live_search.js) swaps in follow too
-    $(document).on("click", "tr.function-row", function(){
+    // delegated, so rows a live search (live_search.js) swaps in follow too. A click on the
+    // row is a pointer's shortcut to the link its id cell holds; a link or button in the
+    // row, that one included, does its own thing
+    $(document).on("click", "tr.function-row", function(e){
+      if ($(e.target).closest("a, button").length) {
+        return;
+      }
       var function_id = $(this).children("th.function-id").text();
       window.location.href="{{ url_for('explore.functions') }}"+ "/" + function_id;
     });
@@ -72,7 +77,7 @@
     {{ badge_column_cell(row_decorations, function.function_id) }}
     {% for column_type in column_setup %}
       {% if column_type == "function_id" %}
-        <th align="left" valign="middle" scope="row" class="function-id">{{ "%d"|format(function.function_id) }}</th>
+        <th align="left" valign="middle" scope="row" class="function-id">{{ format_function_id(function.function_id) }}</th>
       {% elif column_type == "family_id" and not for_sample_view %}
         <td align="right" valign="middle" scope="row" class="family-id">{{ format_family_id(function.family_id) }}</td>
       {% elif column_type == "sample_id" and not for_sample_view %}

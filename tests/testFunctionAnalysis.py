@@ -50,7 +50,7 @@ def analyze_buttons(html):
     """function_id -> the href of the Analyze button on that row, None if it has none."""
     buttons = {}
     for row in re.findall(r'<tr class="function-row.*?</tr>', html, re.S):
-        function_id = int(re.search(r'class="function-id">(-?\d+)<', row).group(1))
+        function_id = int(re.search(r'class="function-id"><a href="[^"]*">(-?\d+)<', row).group(1))
         button = re.search(r'<a class="btn[^"]*" href="([^"]+)"', row)
         buttons[function_id] = button.group(1).replace("&amp;", "&") if button else None
     return buttons

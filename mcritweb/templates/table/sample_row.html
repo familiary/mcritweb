@@ -40,9 +40,11 @@
     }
     })
 
-    // delegated, so rows a live search swaps in follow too
+    // delegated, so rows a live search swaps in follow too. A click on the row is a
+    // pointer's shortcut to the link its id cell holds; a link or button in the row,
+    // that one included, does its own thing
     $(document).on("click", "tr.sample-row", function(e){
-      if ($(e.target).closest(".buttons").length) {
+      if ($(e.target).closest("a, button, .buttons").length) {
         return;
       }
       var sample_id = $(this).children("th.sample-id").text();
@@ -131,7 +133,8 @@
     {{ badge_column_cell(row_decorations, sample.sample_id) }}
     {% for column_type in column_setup %}
       {% if column_type == "sample_id" %}
-       <th align="left" valign="middle" scope="row" class="sample-id">{{ "%d"|format(sample.sample_id) }}</th>
+       {# the link is the way into the sample's page a keyboard has; a picker's row picks instead #}
+       <th align="left" valign="middle" scope="row" class="sample-id">{% if pick %}{{ "%d"|format(sample.sample_id) }}{% else %}{{ format_sample_id(sample.sample_id) }}{% endif %}</th>
       {% elif column_type == "sha256" %}
         <td align="right" valign="middle" class="font-monospace">{{ mark(sample.getShortSha256(), highlight_terms, "sha256") }}</td>
       {% elif column_type == "family" %}

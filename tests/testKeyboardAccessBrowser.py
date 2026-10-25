@@ -11,6 +11,7 @@ module skips there rather than failing.
 
 import copy
 import os
+import re
 import threading
 
 import pytest
@@ -390,3 +391,31 @@ def test_a_chosen_row_is_framed_in_forced_colours(open_as):
 
     assert [style for chosen, style in styles if chosen] == ["solid"]
     assert {style for chosen, style in styles if not chosen} == {"none"}
+
+
+@pytest.mark.parametrize("path, link, target", [
+    ("/explore/samples", "tr.sample-row th a", r"/explore/samples/\d+"),
+    ("/explore/families", "tr.family-row th a", r"/explore/families/\d+"),
+    ("/explore/functions", "tr.function-row th a", r"/explore/functions/\d+"),
+    ("/data/jobs?active=getMatchesForSample", "tr.job-row th a", r"/data/jobs/\w+"),
+    (f"/data/result/{job_id_of('cross_compare')}", "tr.sample-row th.id a", r"/data/result/\w+"),
+])
+def test_enter_on_a_row_s_id_opens_what_the_row_opens(open_as, live_server, path, link, target):
+    page = open_as("contributor", path)
+
+    tab_to(page, link)
+    with page.expect_navigation():
+        page.keyboard.press("Enter")
+
+    assert re.fullmatch(live_server + target, page.url)
+
+
+def test_a_click_elsewhere_on_a_row_still_opens_it(open_as, live_server):
+    """The row's own handler stays, for a pointer, beside the link in its id cell."""
+    page = open_as("visitor", "/explore/samples")
+    row = page.locator("tr.sample-row").first
+    sample_id = row.locator("th.sample-id").inner_text().strip()
+
+    with page.expect_navigation():
+        row.locator("td").nth(2).click()
+    assert page.url == f"{live_server}/explore/samples/{sample_id}"

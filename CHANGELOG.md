@@ -154,6 +154,10 @@ rather than reconstructing it from the commit log at release time.
   button (1vsN, and each side of 1vs1) or a checkbox, which a click anywhere on the row still ticks;
   a sample a cross compare or Unique Blocks already holds is ticked and disabled. In forced colours,
   where the tint is lost, a picked row is framed.
+- Every row of the sample, family, function and job lists, the search results and a cross compare
+  result opens its page from the keyboard: its id is a link now. A click on the row was the only
+  way in, which no key can make, and a queued or running job's page had no other way in at all. A
+  click elsewhere on the row still opens it.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files

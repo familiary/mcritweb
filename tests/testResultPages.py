@@ -1217,7 +1217,7 @@ def test_a_custom_order_naming_a_sample_twice_is_refused():
 def test_the_page_refuses_a_custom_order_with_a_repeated_sample(client, as_role):
     as_role("visitor")
     job_id = job_id_of("cross_compare")
-    sample_id = re.search(r'<td class="id clickable"[^>]*>\s*(\d+)\s*</td>', client.get(f"/data/result/{job_id}").data.decode()).group(1)
+    sample_id = re.search(r'<th scope="row" class="id"[^>]*><a href="[^"]*">(\d+)</a></th>', client.get(f"/data/result/{job_id}").data.decode()).group(1)
 
     response = client.get(f"/data/result/{job_id}?custom=" + ",".join([sample_id] * 200))
 
@@ -1698,7 +1698,7 @@ def matrix_orders(html):
     click from the page's `cross-lazy-panes` JSON, so their order is read from there."""
     panes = re.finditer(r'id="pills-(\w+)" role="tabpanel"(.*?)(?=<div class="tab-pane|\Z)', html, re.S)
     orders = {
-        pane.group(1): re.findall(r'<td class="id clickable"[^>]*>\s*(\d+)\s*</td>', pane.group(2))
+        pane.group(1): re.findall(r'<th scope="row" class="id"[^>]*><a href="[^"]*">(\d+)</a></th>', pane.group(2))
         for pane in panes
     }
     lazy = re.search(r'<script type="application/json" id="cross-lazy-panes">(.*?)</script>', html, re.S)

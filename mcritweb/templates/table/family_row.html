@@ -36,10 +36,11 @@
     })
 
 
-    // delegated, so rows a live search swaps in follow too
+    // delegated, so rows a live search swaps in follow too. A click on the row is a
+    // pointer's shortcut to the link its id cell holds
     $(document).on("click", "tr.family-row", function(e){
-      // links and buttons in the row (edit, compare, export, Malpedia) do their own thing;
-      // closest() also catches a click on the icon inside them
+      // links and buttons in the row (the id, edit, compare, export, Malpedia) do their own
+      // thing; closest() also catches a click on the icon inside them
       if ($(e.target).closest("a, button").length) {
         return;
       }
@@ -96,7 +97,7 @@
   {{ badge_column_cell(row_decorations, family.family_id) }}
   {% for column_type in column_setup %}
     {% if column_type == "family_id" %}
-      <th align="right" valign="middle" class="id" scope="row">{{ "%d"|format(family.family_id) }}</th>
+      <th align="right" valign="middle" class="id" scope="row">{{ format_family_id(family.family_id) }}</th>
     {% elif column_type == "family_name" %}
       <td valign="middle" >{{ format_family_name(family.family_name, None, highlight_terms, "family_name") }}<a aria-label="Show family on Malpedia" title="Show family on Malpedia" name="malpedia" href="https://malpedia.caad.fkie.fraunhofer.de/details/{{ family.family }}" target="_blank"><i class="fa-solid fa-external-link-alt "></i></a></td>
     {% elif column_type == "num_samples" %}
