@@ -23,7 +23,8 @@
   /* full-contrast text on the chrome and on a score tint */
   --text-strong: black;
   --text-muted: #6c757d;
-  --text-subtle: slategray;
+  /* a slate a step darker than slategray, which was 3.6:1 on the chrome it is written on */
+  --text-subtle: #5a6878;
   --text-danger: #cc2f2e;
   /* the project accent: headings and rules */
   --accent: #377ba8;
@@ -58,8 +59,9 @@
   /* a sample picker row: in the comparison, or already computed / just clicked */
   --row-selected: yellowgreen;
   --row-pending: var(--surface-chrome);
-  /* the tick and the cross of a yes/no column */
-  --status-yes: green;
+  /* the tick and the cross of a yes/no column. The tick is a deeper green than `green`, which
+     was 2.5:1 on the darkest of the score tints */
+  --status-yes: #0a5c0a;
   --status-no: darkred;
 
   /* score tints (ScoreColorProvider): the view picks the hue of a score, these decide
@@ -526,4 +528,10 @@ form.form-inline input {
 
 :root .page-item.active .page-link:focus {
   box-shadow: inset 0 -2px 0 var(--accent), 0 0 0 0.25rem var(--focus-ring);
+}
+
+/* a link in a table head: Bootstrap paints a .table-light cell #f8f9fa over the chrome the
+   head is given, and the accent is 4.4:1 on it (the jobs list's "#") */
+.table-light a {
+  color: var(--link-on-tint);
 }

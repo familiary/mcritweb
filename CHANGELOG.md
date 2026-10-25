@@ -144,6 +144,10 @@ rather than reconstructing it from the commit log at release time.
 - In the light theme the current page of a pager is underlined in the accent colour, as in the dark
   theme. Its grey fill alone was 1.14:1 against the white page, so the page you were on could hardly
   be told from the others.
+- Three light-theme colours that fell short of WCAG are a step darker: the tick of a yes/no column
+  (2.5:1 on the darker score tints, now 3.9:1), the "rendering diagram" caption shown while a match
+  diagram loads (3.6:1, now 5.0:1), and a link in a table head, such as the jobs list's "#" (4.4:1,
+  now 9.4:1).
 
 ### Security
 

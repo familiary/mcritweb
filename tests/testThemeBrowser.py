@@ -1393,3 +1393,27 @@ def test_in_the_light_theme_the_current_page_of_the_pager_shows_its_focus(open_i
     found = current.evaluate(FOCUS_RING_OF)
 
     assert found["ring"] is not None and found["ring"] >= 3, f"the current page in focus: {found}"
+
+
+def walked_in_light(walker, name):
+    """The probe's report on one of the WALKED pages under the light theme."""
+    if name in PAGES:
+        path, ready = PAGES[name]
+        return walker.walk(f"light: {name}", path, ready, context="light")
+    tab = name.removeprefix("settings, the ").removesuffix(" tab")
+    return walker.walk(f"light: {name}", "/settings", tab=tab, context="light")
+
+
+@pytest.mark.parametrize("name", WALKED)
+def test_in_the_light_theme_every_visible_text_node_and_icon_has_its_contrast(walker, name):
+    """The walk of the dark pages, over the light ones: 4.5:1 for text and 3:1 for icons. Two pairs
+    were short there. The tick of a yes/no column was `green`, 2.5:1 on the darker score tints; and
+    the job number's link in the head of the jobs list was the accent on the grey Bootstrap paints a
+    `.table-light` cell with, 4.4:1."""
+    report = walked_in_light(walker, name)
+
+    assert report["present"] and report["counts"]["judged"] >= 4, f"{name}: the page did not draw what the walk judges, {report['counts']}"
+    assert report["errors"] == [] and report["failed"] == [], f"{name}: {report['errors']} {report['failed']}"
+    assert report["text"] == [], f"{name}: text below 4.5:1:\n" + listed(report["text"])
+    assert report["fields"] == [], f"{name}: field values or placeholders below 4.5:1:\n" + listed(report["fields"])
+    assert report["icons"] == [], f"{name}: icons below 3:1:\n" + listed(report["icons"])

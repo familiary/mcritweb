@@ -1175,6 +1175,8 @@ MASTER_PALETTE = {**MASTER_LIGHT, **LIGHT_CFG_COLORS}
 LIGHT_CHANGES = {
     "--border-control": ("#80868b", "the edge of a field was 1.5:1 on the page and a check box's 1.8:1; WCAG 1.4.11 asks 3:1"),
     "--focus-ring": ("rgba(13, 110, 253, 0.85)", "Bootstrap's ring was 1.4:1 on the page; its blue at 85% is 3.6:1 there and 3.2:1 on the chrome"),
+    "--status-yes": ("#0a5c0a", "the tick of a yes/no column was 2.5:1 on the darkest score tint, under the 3:1 an icon needs; this is 3.9:1"),
+    "--text-subtle": ("#5a6878", "the diagram's \"rendering\" caption was 3.6:1 on the chrome it is written on; this is 5.0:1"),
 }
 PINNED_LIGHT = {**MASTER_PALETTE, **{name: value for name, (value, _why) in LIGHT_CHANGES.items()}}
 
@@ -1522,6 +1524,36 @@ def test_the_dark_focus_ring_and_the_focus_border_hold_3_to_1_against_what_they_
         failures.append(f"--accent on --surface-page: {accent:.3f}")
 
     assert failures == [], f"below 3:1 {failures}"
+
+
+def test_light_status_icons_hold_3_to_1_on_the_worst_tint_and_on_the_picker_rows():
+    """The tick of a yes/no column was `green`: 2.5:1 on the darkest of the 40% score tints (the
+    blue), where WCAG asks 3:1 of an icon that carries meaning; the cross is darkred, 6.6:1 there."""
+    failures = []
+    for foreground in ("--status-yes", "--status-no"):
+        ratio, hue = worst_on_tints(light_properties(), foreground)
+        if ratio < 3:
+            failures.append(f"{foreground} on the tint of #{hue}: {ratio:.2f}")
+        for row in ("--row-selected", "--row-pending"):
+            ratio = contrast(rgb_of(light_properties(), foreground), rgb_of(light_properties(), row))
+            if ratio < 3:
+                failures.append(f"{foreground} on {row}: {ratio:.2f}")
+
+    assert failures == [], f"below 3:1 {failures}"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_diagram_caption_is_readable_on_its_placeholder(theme):
+    """"rendering diagram..." shows on the grey box a match diagram fills once it has loaded, so for as
+    long as the diagram is slow; in slategray it was 3.6:1 there."""
+    def rule(selector):
+        return {d.name: d.value for r in light_rules() if selector in themeCss.selectors_of(r) for d in r.declarations}
+    caption, box = rule(".mcrit-diagram::before")["color"], rule(".mcrit-diagram")["background-color"]
+    properties = light_properties() if theme == "light" else dark_cascade()
+    lookup = themeCss.resolver(properties)
+    ground = themeCss.composite(parse_colour(box, lookup), rgb_of(properties, "--surface-page"))
+
+    assert contrast(themeCss.composite(parse_colour(caption, lookup), ground), ground) >= 4.5, f"{caption} on {box}"
 
 
 def test_light_control_borders_hold_3_to_1_on_the_surfaces_a_control_is_drawn_on():
