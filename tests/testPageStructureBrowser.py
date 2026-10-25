@@ -214,3 +214,80 @@ def test_the_first_tab_shows_the_skip_link_and_enter_moves_past_the_navbar(page,
     assert page.evaluate("document.activeElement.closest('main') !== null")
     assert page.evaluate("window.mcritShifted") == 0
     assert page.errors == []
+
+
+CLOSED_PANELS = ["collapse-minhash", "collapse-blocks"]
+OPEN_PANELS = ["collapse-info", "collapse-cfg"]
+
+
+def panel_state(page, panel):
+    return page.evaluate("""(id) => {
+        const panel = document.getElementById(id);
+        const button = document.querySelector(`[data-bs-target="#${id}"]`);
+        return {hidden: panel.getAttribute("hidden"), open: panel.classList.contains("show"),
+                height: panel.getBoundingClientRect().height, expanded: button.getAttribute("aria-expanded")};
+    }""", panel)
+
+
+def shifted_on_load(page, url):
+    """The layout shifts of loading `url`, added up as Lighthouse does, once its queue has run."""
+    page.add_init_script(COUNT_LAYOUT_SHIFTS)
+    open_page(page, url)
+    page.wait_for_timeout(500)
+    return page.evaluate("window.mcritShifted")
+
+
+def test_find_in_page_can_search_the_closed_panels_of_a_function_page(page, live_server):
+    """A closed panel was display: none, which the browser's search skips. Marked, it is
+    displayed again with its content hidden, so it must still take no room: the page
+    shifts no more than it does where the browser cannot mark the panels."""
+    shifted = shifted_on_load(page, f"{live_server}/explore/functions/84")
+
+    for panel in CLOSED_PANELS:
+        assert panel_state(page, panel) == {"hidden": "until-found", "open": False, "height": 0, "expanded": "false"}
+    for panel in OPEN_PANELS:
+        assert panel_state(page, panel)["hidden"] is None
+    assert page.errors == []
+    unmarked = page.context.new_page()
+    unmarked.add_init_script("delete HTMLElement.prototype.onbeforematch")
+    assert shifted == pytest.approx(shifted_on_load(unmarked, f"{live_server}/explore/functions/84"), abs=1e-4)
+    assert panel_state(unmarked, CLOSED_PANELS[0])["hidden"] is None
+
+
+def test_a_search_landing_in_a_closed_panel_opens_it_as_its_button_would(page, live_server):
+    open_page(page, f"{live_server}/explore/functions/84")
+
+    # what the browser fires on the panel before it shows a match inside
+    page.evaluate("document.getElementById('collapse-blocks').dispatchEvent(new Event('beforematch', {bubbles: true}))")
+    page.wait_for_function("document.getElementById('collapse-blocks').classList.contains('show')")
+
+    state = panel_state(page, "collapse-blocks")
+    assert state["hidden"] is None and state["expanded"] == "true" and state["height"] > 0
+    assert panel_state(page, "collapse-minhash")["hidden"] == "until-found"
+    assert page.errors == []
+
+
+def test_a_panel_closed_with_its_button_is_searchable_again(page, live_server):
+    open_page(page, f"{live_server}/explore/functions/84")
+    button = page.locator("[data-bs-target='#collapse-minhash']")
+
+    button.click()
+    page.wait_for_function("document.getElementById('collapse-minhash').classList.contains('show')")
+    page.wait_for_function("!document.getElementById('collapse-minhash').classList.contains('collapsing')")
+    opened = panel_state(page, "collapse-minhash")
+    button.click()
+    page.wait_for_function("document.getElementById('collapse-minhash').getAttribute('hidden') === 'until-found'")
+
+    assert opened["hidden"] is None and opened["height"] > 0
+    assert panel_state(page, "collapse-minhash") == {"hidden": "until-found", "open": False, "height": 0, "expanded": "false"}
+
+
+def test_without_until_found_the_panels_are_as_they_were(page, live_server):
+    """Safari has no hidden="until-found": there the panels stay Bootstrap's alone."""
+    page.add_init_script("delete HTMLElement.prototype.onbeforematch")
+    open_page(page, f"{live_server}/explore/functions/84")
+
+    for panel in CLOSED_PANELS:
+        assert panel_state(page, panel) == {"hidden": None, "open": False, "height": 0, "expanded": "false"}
+        assert page.evaluate("(id) => getComputedStyle(document.getElementById(id)).display", panel) == "none"
+    assert page.errors == []

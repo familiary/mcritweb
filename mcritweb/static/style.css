@@ -431,3 +431,12 @@ form.form-inline input {
   height: 1px;
   white-space: nowrap;
 }
+
+/* A closed accordion panel that find in page can search (static/collapsed_find.js marks
+   it, where the browser can): Bootstrap gives a closed panel and any [hidden] element
+   display: none, which would keep its text from the search. The browser hides an
+   until-found element's content itself, and the panel has no padding or border of its
+   own, so it still takes no room. */
+.accordion-collapse[hidden="until-found"] {
+  display: block !important;
+}

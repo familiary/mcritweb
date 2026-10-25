@@ -10,6 +10,8 @@ Query Sample: *{{ entry.sample_id|abs }}
 {% block style %}
 {{ function_row_std_js() }}
 {{ job_row_std_js() }}
+{# lets find in page search the closed panels below #}
+<script>later({{ url_for('static', filename='collapsed_find.js')|tojson }})</script>
 {% endblock %}
 
 {% block content %}

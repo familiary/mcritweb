@@ -70,6 +70,9 @@ rather than reconstructing it from the commit log at release time.
   navbar, the jobs page's category bar and every pager are named navigation landmarks, the search
   boxes are search landmarks, and the current page of a pager, the current compare picker and the
   current job category are announced as current rather than shown by colour alone.
+- Find in page (Ctrl+F) finds text in the closed panels of a function's page, such as a PicBlockHash
+  or the MinHash, and opens the panel it lands in, in browsers that support `hidden="until-found"`
+  (Chromium and Firefox). Elsewhere the panels behave as before.
 
 ### Changed
 
