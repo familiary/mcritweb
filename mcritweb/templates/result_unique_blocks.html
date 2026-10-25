@@ -141,7 +141,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
        can yield a rule at all. Keying it on the current cover would disable the tab as
        soon as a parameter selected no blocks - locking the reader out of the very form
        that would undo it. What the current parameters produced is reported inside. #}
-    <button class="nav-link {% if active_tab=='yara' %}show active{%endif%} {% if not statistics['has_yara_rule'] %}disabled{%endif%}" id="pills-yara-tab" data-bs-toggle="pill" data-bs-target="#pills-yara" type="button" role="tab" aria-controls="pills-yara" aria-selected="false">YARA Rule</button>
+    <button class="nav-link {% if active_tab=='yara' %}show active{%endif%} {% if not statistics['has_yara_rule'] %}disabled{%endif%}" id="pills-yara-tab" data-bs-toggle="pill" data-bs-target="#pills-yara" type="button" role="tab" aria-controls="pills-yara" aria-selected="false"{% if not statistics['has_yara_rule'] %} aria-disabled="true"{% endif %}>YARA Rule</button>
   </li>
 </ul>
 

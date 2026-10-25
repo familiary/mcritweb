@@ -8,10 +8,13 @@ without an href doing a button's job, which is not in the tab order at all. What
 keys then do is a browser question, answered in testKeyboardAccessBrowser.py.
 """
 
+import copy
 import logging
+import re
 from html.parser import HTMLParser
 
 import pytest
+from fixtureData import job_id_of, load
 from testAccessibility import ADMIN_PAGES, CONTRIBUTOR_PAGES, VISITOR_PAGES
 
 LOG = logging.getLogger(__name__)
@@ -101,3 +104,71 @@ def test_a_pending_account_s_menus_are_disabled_for_assistive_technology_too(cli
         "navbarDropdownData": ("button", True),
         "navbarDropdownUser": ("button", False),
     }
+
+
+#: a pager entry Bootstrap greys out, with everything inside it
+DISABLED_PAGE_ITEM = re.compile(r'<li class="page-item\s+disabled">(.*?)</li>', re.S)
+
+
+@pytest.mark.parametrize("path", [
+    # the first page of a cursor pagination, whose Last page is never offered
+    "/explore/functions",
+    # the first page of an offset pagination, and on a result page
+    f"/data/result/{job_id_of('matches_for_sample')}",
+])
+def test_a_pager_entry_that_goes_nowhere_is_no_tab_stop_and_says_it_is_disabled(client, as_role, path):
+    """First and Previous on the first page were links with a live href, the second to
+    `page=0`: a tab stop that reloaded the page, with nothing to tell a screen reader
+    why. The cursor pager's Last page put its tab stop on a span without a role, whose
+    reason was in a title Bootstrap moves into a tooltip."""
+    html = render(client, as_role, path)
+    disabled = DISABLED_PAGE_ITEM.findall(html)
+    assert disabled, f"{path} no longer starts on a first page"
+
+    for item in disabled:
+        tags = start_tags(item)
+        assert [tag for tag, attrs, _ in tags if tag == "a" and "href" in attrs] == [], item
+        assert all(attrs.get("aria-disabled") == "true" for tag, attrs, _ in tags if tag == "a"), item
+        stops = [(tag, attrs) for tag, attrs, _ in tags if "tabindex" in attrs]
+        assert all(tag == "a" and attrs.get("aria-label", "").startswith("Last page,") for tag, attrs in stops), item
+
+
+@pytest.mark.parametrize("path", SIGNED_IN_PAGES)
+def test_no_anchor_relies_on_a_disabled_attribute(client, as_role, path):
+    """An anchor has no `disabled`; what reads as disabled is aria-disabled."""
+    tags = start_tags(render(client, as_role, path))
+
+    assert [line for tag, attrs, line in tags if tag == "a" and "disabled" in attrs] == []
+    greyed = [(attrs, line) for tag, attrs, line in tags if tag == "a" and "disabled" in (attrs.get("class") or "").split()]
+    assert [line for attrs, line in greyed if "href" in attrs or attrs.get("aria-disabled") != "true"] == []
+
+
+def test_a_jobs_menu_entry_greyed_out_is_disabled_for_a_screen_reader_too(client, as_role):
+    """The jobs page greys out a category with nothing in it; the entry was still a link
+    Tab stopped on, and nothing said it was unavailable."""
+    html = render(client, as_role, "/data/jobs?active=getMatchesForSample")
+    entries = [attrs for tag, attrs, _ in start_tags(html) if "dropdown-item" in (attrs.get("class") or "").split() and "disabled" in attrs.get("class").split()]
+
+    assert entries, "no category is greyed out any more - this case has stopped guarding anything"
+    assert all("href" not in attrs and attrs.get("aria-disabled") == "true" for attrs in entries)
+
+
+@pytest.fixture
+def serve_report(corpus_mcrit, monkeypatch):
+    """Answer every result with a changed copy of a captured report."""
+    def _serve(changed):
+        monkeypatch.setattr(corpus_mcrit, "getResultForJob", lambda *args, **kwargs: changed)
+    return _serve
+
+
+def test_the_yara_tab_of_a_report_without_a_rule_is_disabled_for_a_screen_reader_too(client, as_role, serve_report):
+    """Bootstrap's `disabled` class greys the tab out and keeps it from opening; nothing
+    told a screen reader."""
+    changed = copy.deepcopy(load("unique_blocks.result"))
+    changed["statistics"]["has_yara_rule"] = False
+    serve_report(changed)
+    tags = start_tags(render(client, as_role, f"/data/result/{job_id_of('unique_blocks')}"))
+
+    tab = next(attrs for tag, attrs, _ in tags if attrs.get("id") == "pills-yara-tab")
+    assert "disabled" in tab["class"].split()
+    assert tab.get("aria-disabled") == "true"

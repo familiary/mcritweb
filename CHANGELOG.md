@@ -123,6 +123,11 @@ rather than reconstructing it from the commit log at release time.
   happen. The navbar's and the jobs page's menus open with Space as well as Enter, now that their
   toggles are buttons rather than links to "#", and an account waiting for a role has its Explore,
   Analyze and Data menus switched off for a screen reader too, which read them as working buttons.
+- Controls that look disabled say so to a screen reader and are no tab stop where they lead
+  nowhere. A pager's First and Previous on the first page, and Next and Last on the last, were links
+  that reloaded the page; the search pager's Last page was a tab stop without a role whose reason
+  was only in its tooltip; a jobs category with nothing in it, and the YARA tab of a report without
+  a rule, were greyed out with nothing to say why.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files
