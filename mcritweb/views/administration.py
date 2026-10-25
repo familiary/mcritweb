@@ -5,7 +5,7 @@ from flask import Blueprint, current_app, flash, g, redirect, render_template, r
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.compression import uncompressed
+from mcritweb.compression import no_store, uncompressed
 from mcritweb.db import THEMES, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, is_legacy_apitoken
 from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
 from mcritweb.views.client import backend_version, get_client
@@ -288,6 +288,7 @@ def delete_user(user_id, tab = None):
 @bp.route('/server')
 @admin_required
 @uncompressed
+@no_store
 def server():
     server_info = db.get_server_info()
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
@@ -300,6 +301,7 @@ def server():
 @bp.route('/change_server' , methods=('POST',))
 @admin_required
 @uncompressed
+@no_store
 def change_server():
     server_info = db.get_server_info()
     new_url = request.form.get('mcrit_server_url', '')

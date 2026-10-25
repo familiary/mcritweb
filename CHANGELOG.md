@@ -133,6 +133,10 @@ rather than reconstructing it from the commit log at release time.
 
 ### Security
 
+- The settings page (API token) and the server page (registration token) are sent with
+  `Cache-Control: no-store`. Without it, Back after logout restored the page from the browser's
+  back/forward cache with the token on it, without asking the server. Every other page keeps its
+  caching.
 - jQuery UI goes from 1.13.1 to 1.13.3, which fixes CVE-2022-31160: a `checkboxradio` widget re-read
   its label's escaped text as HTML on refresh. MCRITweb creates no checkboxradio, so no page of its
   own reached the flaw, but the library is loaded on every page. The only jQuery UI widget MCRITweb
