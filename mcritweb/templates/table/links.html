@@ -74,3 +74,16 @@ function copy_to_clipboard(btn){
 {%- macro format_sha_short_clipboard(sha256) -%}
   {{ format_monospace(sha256[:8]) }} {{ clipboard_btn(sha256) }}
 {%- endmacro -%}
+
+{#- Where a sample's sha256 comes from (familiary/mcrit#270). `true`: MCRIT disassembled the
+  sample from an uploaded binary. `false`: it was indexed from a submitted report or an import,
+  so the sha256 is only what that report states. `none` - stored before mcrit recorded this, a
+  query, or an mcrit too old to send the field - says nothing, since "not verified" would claim
+  more than is known. -#}
+{%- macro sha256_provenance(sha256_verified) -%}
+  {%- if sha256_verified is true -%}
+    <div class="mt-1"><span class="badge bg-success" title="MCRIT disassembled this sample itself, from an uploaded binary with this sha256."><i class="fa-solid fa-square-check" aria-hidden="true"></i> verified against the uploaded binary</span></div>
+  {%- elif sha256_verified is false -%}
+    <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small" role="note"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> This sha256 was taken from a submitted report or an import. It was not checked against a binary.</div>
+  {%- endif -%}
+{%- endmacro -%}
