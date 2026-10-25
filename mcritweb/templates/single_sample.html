@@ -57,7 +57,7 @@ Sample: {{ entry.sample_id }}
         <h5 class="modal-title" id="editSampleModalLabel">Modify Sample</h5>
       </div>
       <div class="modal-body">
-          <form action='{{ url_for("explore.modifySample") }}'' method="POST" style="width: 80%">
+          <form action='{{ url_for("explore.modifySample") }}' method="POST" style="width: 80%">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" class="form-control" name="sample_id" id="sample_id" hidden value="">
           <div class="form-group mb-3">

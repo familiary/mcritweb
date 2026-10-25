@@ -130,6 +130,10 @@ rather than reconstructing it from the commit log at release time.
   its longest instruction and stays inside its pane and the window; it was sized from the drawn
   block, so most instructions ran out of the box, and the combined view's "B's code" tooltip was not
   held inside the pane at all.
+- Three markup slips in forms. The sample page's edit dialog had a stray quote after its form's
+  `action`, the settings page gave all seven column lists the same id, and the 1 vs 1 page printed
+  the sample edit dialog twice, so the second copy's labels named the first copy's fields. That
+  page has no edit control, so the dialog is now printed only where a row can open it.
 
 ### Security
 

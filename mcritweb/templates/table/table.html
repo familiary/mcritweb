@@ -153,6 +153,9 @@
 
 {% macro sample_table(samples, table_id="sample-table", empty_message=None, empty_link=None) %}
   {% if samples %}
+  {# only where a row's edit control can open it: the 1 vs 1 page prints two tables without
+     one, and two copies of the dialog put every id of it on the page twice #}
+  {% if kwargs.get("show_edit") %}
 <!-- Modal -->
 <div class="modal fade" id="editSampleModal" tabindex="-1" aria-labelledby="editSampleModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
@@ -210,6 +213,7 @@
       toggle_delete_sample(deleteBox);
     });
   </script>
+  {% endif %}
   {{ _table_base(samples, sample_header, sample_row, table_id=table_id, **kwargs) }}
   {% else %}
   {{ empty_state(empty_message or "No samples available. Click here to upload your first sample", empty_link if empty_message else url_for("data.submit")) }}
