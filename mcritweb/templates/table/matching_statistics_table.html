@@ -9,6 +9,7 @@
     'num_self_matches',
     'bytes_matched',
   ] %}
+  {% set self_matches_explained = "Matches of the sample against itself are not part of the report's function matches, so this row cannot be narrowed and still counts the whole job." %}
   
   <table class="table table-hover">
     <thead class="table-light">
@@ -22,7 +23,9 @@
       {% for field in fields %}
         <tr>
           {%- if field == 'num_self_matches' and statistics['is_filtered'] %}
-            <td valign="middle"><span class="hint--right" data-hint="Matches of the sample against itself are not part of the report's function matches, so this row cannot be narrowed and still counts the whole job.">{{ field }} (whole job)</span>: </td>
+            {# focusable, so that its tooltip shows for the keyboard as well, and described by
+               the same text, below the table, for a screen reader #}
+            <td valign="middle"><span class="hint--right" tabindex="0" aria-describedby="self-matches-explained" data-hint="{{ self_matches_explained }}">{{ field }} (whole job)</span>: </td>
           {%- else %}
           <td valign="middle">{{ field }}: </td>
           {%- endif %}
@@ -32,4 +35,7 @@
       {% endfor %}
     </tbody>
   </table>
+  {% if statistics['is_filtered'] %}
+    <span hidden id="self-matches-explained">{{ self_matches_explained }}</span>
+  {% endif %}
 {% endmacro %}

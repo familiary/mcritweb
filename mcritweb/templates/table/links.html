@@ -13,6 +13,14 @@
   {%- endfor -%}
 {%- endmacro -%}
 
+{#- hint.css draws a tooltip only under the pointer or the keyboard focus, and a table cell
+  could take the focus only as one more Tab stop per cell. So the text of a cell's tooltip
+  follows it again as visually hidden text, which a screen reader reads with the cell, and
+  nothing in it is left that only a mouse can reach. `hint` is the data-hint value. -#}
+{%- macro hint_copy(hint) -%}
+  <span class="visually-hidden"> ({{ hint }})</span>
+{%- endmacro -%}
+
 {%- macro format_monospace(content) -%}
   <span class="font-monospace">{{ content }}</span>
 {%- endmacro -%}

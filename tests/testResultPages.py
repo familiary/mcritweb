@@ -1850,5 +1850,71 @@ def test_a_hint_tooltip_takes_room_only_while_it_is_shown():
     assert "100vw" in shown.get("max-width", ""), "the tooltip is not held to the width of the window"
 
 
+#: An element with a hint.css tooltip, its content, and a visually hidden copy right after it
+#: if it has one. No element that carries a hint nests another of its own kind.
+HINTED = re.compile(
+    r"<(?P<tag>span|button)\b(?P<attrs>[^>]*\sdata-hint=\"(?P<hint>[^\"]*)\"[^>]*)>(?P<content>.*?)</(?P=tag)>"
+    r"(?:<span class=\"visually-hidden\">(?P<copy>.*?)</span>)?",
+    re.S,
+)
+
+
+def hint_words(text):
+    return " ".join(html.unescape(re.sub(r"<[^>]*>", "", text)).split())
+
+
+def hints_out_of_reach(page):
+    """Every tooltip on a rendered page that only a pointer can reach: its element takes no
+    focus, or takes it and is not described by the tooltip's text, and no visually hidden
+    copy of the text follows it. The cross compare matrix squares are left to their own
+    change, which turns them into links."""
+    unreachable = []
+    for match in HINTED.finditer(page):
+        attrs, hint = match.group("attrs"), hint_words(match.group("hint"))
+        if "score-swatch" in attrs:
+            continue
+        if match.group("copy") is not None and hint in hint_words(match.group("copy")):
+            continue
+        focusable = match.group("tag") == "button" or re.search(r'\stabindex="0"', attrs)
+        described = re.search(r'\saria-describedby="([^"]+)"', attrs)
+        if focusable and described:
+            target = re.search(r'<(\w+)\b[^>]*\sid="' + re.escape(described.group(1)) + r'"[^>]*>(.*?)</\1>', page, re.S)
+            if target and hint_words(target.group(2)) == hint:
+                continue
+        unreachable.append(hint[:60])
+    return unreachable
+
+
+#: A page for each template that writes a tooltip: the score cells and matched families of
+#: the result pages, the filtered statistics table, the job table, the cross compare order
+#: buttons and the sample picker's details.
+HINT_PAGES = [(report, query) for report, query, _ in RESULT_PAGES] + [("cross_compare", ""), ("job:cross_compare", ""), ("/analyze/compare", "")]
+
+
+@pytest.mark.parametrize("report,query", HINT_PAGES)
+def test_no_tooltip_is_reachable_only_with_a_mouse(client, as_role, report, query):
+    """hint.css draws a tooltip on hover or focus, and no element with one could take the
+    focus, so the score fractions, a sample's details, the matched families and what
+    "Total (since queued)" measures were there for a mouse and for nobody else. A tooltip
+    that stands alone (one per page) now takes the focus and describes its element; one
+    per table cell is followed by a visually hidden copy, which a screen reader reads with
+    the cell, rather than adding a Tab stop to every cell.
+
+    A lint, because `tests/testBrowserScoreTooltips.py`, which presses Tab in Chromium,
+    skips where playwright is not installed, CI included."""
+    as_role("visitor")
+    if report.startswith("/"):
+        path = report
+    elif report.startswith("job:"):
+        path = f"/data/jobs/{job_id_of(report[4:])}"
+    else:
+        path = f"/data/result/{job_id_of(report)}{query}"
+    response = client.get(path)
+    assert response.status_code == 200
+    page = response.data.decode()
+    assert HINTED.search(page), f"{path} has no tooltip to check"
+    assert hints_out_of_reach(page) == [], f"{path}: tooltips only a mouse can reach"
+
+
 if __name__ == "__main__":
     unittest.main()

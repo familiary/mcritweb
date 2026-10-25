@@ -247,5 +247,108 @@ def test_a_tooltip_shows_whole_inside_the_window(live_server, browser_page, repo
     assert not cut, f"{len(cut)} of {hints.count()} tooltips are not drawn whole: {cut[:5]}"
 
 
+#: Whether an element's tooltip is on screen.
+SHOWN = "(node) => { const after = getComputedStyle(node, '::after'); return after.display !== 'none' && after.visibility === 'visible'; }"
+
+#: The tooltip of the focused element, if it has one: its text and whether it is on screen.
+FOCUSED_HINT = """() => {
+    const node = document.activeElement;
+    if (!node || !node.matches('[data-hint]')) return null;
+    const after = getComputedStyle(node, '::after');
+    return [node.getAttribute('data-hint'), after.display !== 'none' && after.visibility === 'visible'];
+}"""
+
+
+def tab_to_a_hint(page, limit=150):
+    """Press Tab until the focus is on an element with a tooltip; its tooltip, as
+    FOCUSED_HINT has it, or None when the walk never lands on one."""
+    for _ in range(limit):
+        page.keyboard.press("Tab")
+        focused = page.evaluate(FOCUSED_HINT)
+        if focused is not None:
+            return focused
+    return None
+
+
+def focused_description(page):
+    """The accessible description the browser gives the focused element."""
+    cdp = page.context.new_cdp_session(page)
+    try:
+        handle = cdp.send("Runtime.evaluate", {"expression": "document.activeElement"})
+        nodes = cdp.send("Accessibility.getPartialAXTree", {"objectId": handle["result"]["objectId"], "fetchRelatives": False})["nodes"]
+    finally:
+        cdp.detach()
+    return " ".join(((nodes[0].get("description") or {}).get("value") or "").split())
+
+
+def test_a_hint_takes_the_keyboard_focus_and_shows_its_tooltip(live_server, browser_page):
+    """hint.css shows a tooltip on :focus as well as on :hover, but no element with one
+    could take the focus, so 200 presses of Tab never showed one: what "Total (since
+    queued)" measures was there for a mouse only. The label takes the focus now, its
+    tooltip shows, and a screen reader is given the same text as its description."""
+    page, console_errors = browser_page
+    page.goto(f"{live_server}/data/result/{job_id_of('cross_compare')}")
+    page.wait_for_load_state()
+
+    focused = tab_to_a_hint(page)
+    assert focused is not None, "Tab never reached an element with a tooltip"
+    hint, shown = focused
+    assert hint.startswith("Measured from when this job was queued"), f"the first tooltip Tab reaches is {hint!r}"
+    assert shown, "the focused label's tooltip is not on screen"
+    assert focused_description(page) == " ".join(hint.split())
+    assert not console_errors, console_errors
+
+
+def test_escape_puts_the_tooltip_away(live_server, browser_page):
+    """A tooltip covers what is beside it, and hint.css kept it up for as long as the
+    pointer or the focus stayed on its element, Escape or not (WCAG 1.4.13). Escape hides
+    it now, until the focus or the pointer moves on to another element."""
+    page, _ = browser_page
+    page.goto(f"{live_server}/data/result/{job_id_of('cross_compare')}")
+    page.wait_for_load_state()
+    page.evaluate("() => new Promise((resolve) => whenReady(() => resolve(true)))")
+
+    assert tab_to_a_hint(page) is not None, "Tab never reached an element with a tooltip"
+    page.keyboard.press("Escape")
+    assert page.evaluate(FOCUSED_HINT)[1] is False, "Escape left the focused label's tooltip on screen"
+    page.keyboard.press("Tab")
+    page.keyboard.press("Shift+Tab")
+    assert page.evaluate(FOCUSED_HINT)[1] is True, "the tooltip stayed away after the focus left and came back"
+
+    page.goto(f"{live_server}/data/result/{job_id_of('matches_for_sample')}")
+    page.wait_for_load_state()
+    page.evaluate("() => new Promise((resolve) => whenReady(() => resolve(true)))")
+    cells = page.locator("td span[data-hint]")
+    cells.nth(0).hover()
+    assert cells.nth(0).evaluate(SHOWN)
+    page.keyboard.press("Escape")
+    assert not cells.nth(0).evaluate(SHOWN), "Escape left the hovered cell's tooltip on screen"
+    box = cells.nth(0).bounding_box()
+    page.mouse.move(box["x"] + 1, box["y"] + 1)
+    assert not cells.nth(0).evaluate(SHOWN), "the tooltip came back while the pointer stayed on its cell"
+    cells.nth(1).hover()
+    assert cells.nth(1).evaluate(SHOWN), "the next cell's tooltip does not show once the pointer has moved on"
+
+
+def test_the_pointer_can_rest_on_a_tooltip(live_server, browser_page):
+    """WCAG 1.4.13 asks that the pointer can move onto a tooltip without it closing, so
+    that it can be read under a magnifier. hint.css's let the pointer through to whatever
+    was under it, and closed as soon as it left the element."""
+    page, _ = browser_page
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto(f"{live_server}/data/result/{job_id_of('matches_for_sample')}")
+    page.wait_for_load_state()
+    cell = page.locator("td span[data-hint]").first
+    cell.hover()
+    left, top, right, bottom = tooltip_box(page, cell)
+    # up out of the cell into the tooltip, which sits on top of it, and then across it
+    cell_box = cell.bounding_box()
+    page.mouse.move(cell_box["x"] + cell_box["width"] / 2, bottom - 4, steps=5)
+    page.mouse.move((left + right) / 2, (top + bottom) / 2, steps=5)
+    page.wait_for_timeout(400)
+    assert cell.evaluate("node => node.matches(':hover')"), "the pointer on the tooltip is not on its element"
+    assert cell.evaluate(SHOWN), "the tooltip closed when the pointer moved onto it"
+
+
 if __name__ == "__main__":
     unittest.main()

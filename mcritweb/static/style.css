@@ -405,6 +405,19 @@ form.form-inline input {
   display: none;
 }
 
+/* Escape puts the tooltip that is showing away (static/hints.js) */
+:root.hints-dismissed [data-hint]::before,
+:root.hints-dismissed [data-hint]::after {
+  display: none;
+}
+
+/* a hint is marked as one, as <abbr> is. Not the matrix squares, which lead to their pair */
+span[data-hint]:not(.score-swatch) {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+}
+
 /* the text wraps, at a width that fits a phone; pre-wrap keeps the line breaks and the
    padding the templates write into it */
 :root [data-hint]::after {
@@ -448,6 +461,9 @@ form.form-inline input {
     inset: auto;
     margin: 0.5rem 0.5rem 0 0;
     transform: none;
+    /* it touches its element, so the pointer can move onto it, to read it under a
+       magnifier for instance, without it closing (WCAG 1.4.13) */
+    pointer-events: auto;
   }
   :root .hint--left:is(:hover, :focus-visible)::after {
     position-area: top span-left;

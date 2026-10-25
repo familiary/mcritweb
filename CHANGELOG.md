@@ -138,6 +138,12 @@ rather than reconstructing it from the commit log at release time.
   made the cross compare pages 1120px wide in any narrower window, and the two hidden boxes behind
   every matrix square were most of the time a large matrix took to draw, so loading one and
   switching its tabs now take about half the layout work.
+- What the tooltips say no longer needs a mouse. The byte counts behind each score, a sample's
+  details in the sample pickers and the families an aggregated function matched follow their cell
+  as text a screen reader reads; "Total (since queued)", "(whole job)" and the cross compare
+  order buttons take the keyboard focus, show their tooltip there, and are described by it. A
+  tooltip's element is underlined with dots, Escape puts a tooltip away, and the pointer can move
+  onto one without it closing.
 
 ### Security
 
