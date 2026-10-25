@@ -10,6 +10,7 @@ from mcrit.storage.SampleEntry import SampleEntry
 
 import mcritweb.views.cfg_explorer_detector as cfg_explorer_detector
 from mcritweb.autocomplete import autocomplete_items
+from mcritweb.backend_errors import BACKEND_FAILURES, require_result, with_server_errors
 from mcritweb.statistics import statistics_page
 from mcritweb.views.authentication import contributor_required, visitor_required
 from mcritweb.views.client import backend_version, get_client, get_sample_entries, remember_samples
@@ -371,9 +372,12 @@ def modifyFamily():
         family_entry = None
         try:
             family_id = int(family_id)
-            family_entry = client.getFamily(family_id)
+            family_entry = with_server_errors(client).getFamily(family_id)
             if family_entry is None:
                 raise ValueError
+        except BACKEND_FAILURES:
+            # a backend that failed says nothing about the id; its own page says what happened
+            raise
         except Exception:
             flash("No valid family_id received.", category="error")
             return redirect(url_for('explore.families'))
@@ -382,7 +386,7 @@ def modifyFamily():
         is_family_delete = True if request.form.get("family_delete", None) is not None else False
         # delete family
         if is_family_delete:
-            job_id = client.deleteFamily(family_id, keep_samples=is_family_keeping_samples)
+            job_id = require_result(with_server_errors(client).deleteFamily(family_id, keep_samples=is_family_keeping_samples), "a job for the family deletion")
             flash("Job to delete family was scheduled.", category="info")
             return redirect(url_for('data.job_by_id', job_id=job_id, refresh=5))
         # check if sample_entry should be modified
@@ -490,16 +494,19 @@ def modifySample():
         sample_entry = None
         try:
             sample_id = int(sample_id)
-            sample_entry = client.getSampleById(sample_id)
+            sample_entry = with_server_errors(client).getSampleById(sample_id)
             if sample_entry is None:
                 raise ValueError
+        except BACKEND_FAILURES:
+            # a backend that failed says nothing about the id; its own page says what happened
+            raise
         except Exception:
             flash("No valid sample_id received.", category="error")
             return redirect(url_for('explore.samples'))
         is_sample_delete = True if request.form.get("sample_delete", None) is not None else False
         # delete sample
         if is_sample_delete:
-            job_id = client.deleteSample(sample_id)
+            job_id = require_result(with_server_errors(client).deleteSample(sample_id), "a job for the sample deletion")
             flash("Job to delete sample was scheduled.", category="info")
             return redirect(url_for('data.job_by_id', job_id=job_id, refresh=5))
         # check if sample_entry should be modified
@@ -601,7 +608,7 @@ def functions():
 @mcrit_server_required
 def family_by_id(family_id):
     client = get_client()
-    family_info = client.getFamily(family_id, with_samples=False)
+    family_info = with_server_errors(client).getFamily(family_id, with_samples=False)
     if family_info:
         original_query = request.args.get('query', "")
         query = f"family_id:{family_id} {original_query}"
@@ -641,7 +648,7 @@ def sample_function_query(sample_id, typed):
 @mcrit_server_required
 def sample_by_id(sample_id):
     client = get_client()
-    sample_entry = client.getSampleById(sample_id)
+    sample_entry = with_server_errors(client).getSampleById(sample_id)
     if sample_entry:
         if sample_id < 0:
             return render_template("single_query_sample.html", entry=sample_entry)
@@ -765,9 +772,10 @@ def modifyFunction():
 @mcrit_server_required
 def function_by_id(function_id):
     client = get_client()
-    function_entry = client.getFunctionById(function_id)
+    function_entry = with_server_errors(client).getFunctionById(function_id)
     if function_entry:
-        sample_entry = client.getSampleById(function_entry.sample_id)
+        # the page links and describes the function through its sample throughout
+        sample_entry = require_result(with_server_errors(client).getSampleById(function_entry.sample_id), "the sample of this function")
         pichash_match_summary = client.getMatchesForPicHash(function_entry.pichash, summary=True)
         return render_template(
             "single_function.html",
@@ -914,7 +922,7 @@ def read_at_most(stream, limit):
 @mcrit_server_required
 def getPicBlockMatches(picblockhash):
     client = get_client()
-    return client.getMatchesForPicBlockHash(int(picblockhash, 16), summary=True)
+    return require_result(with_server_errors(client).getMatchesForPicBlockHash(int(picblockhash, 16), summary=True), "the matches of this block")
 
 ##############################################################
 ### Statistics + Search

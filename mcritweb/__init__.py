@@ -89,7 +89,7 @@ def create_app(test_config=None, instance_path=None):
     # import - including a test that only wants a pure-python helper. See issue #88.
     from flask_dropzone import Dropzone
 
-    from . import compression, db, manual
+    from . import backend_errors, compression, db, manual
     from .csrf import CsrfProtect
     from .jobnames import folded_sample_ids, job_method_name, job_task, unique_blocks_samples
     from .search_highlighting import get_highlight_terms, split_search_matches
@@ -284,6 +284,8 @@ def create_app(test_config=None, instance_path=None):
     app.register_blueprint(administration.bp)
     app.register_blueprint(data.bp)
     app.register_blueprint(api.bp)
+    # a failed backend call answers with a page saying so, not a stack trace (#43)
+    backend_errors.register(app)
     app.config['MCRITWEB_VERSION'] = get_mcritweb_version_from_setup()
     # gzip the text responses for deployments without a compressing proxy (issue #63)
     compression.register(app)

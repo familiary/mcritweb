@@ -18,6 +18,7 @@ from mcrit.storage.UniqueBlocksResult import UniqueBlocksResult, wrap_string
 from smda.common.SmdaReport import SmdaReport
 from werkzeug.exceptions import NotFound
 
+from mcritweb.backend_errors import require_result, with_server_errors
 from mcritweb.db import UserColumnSettings, UserFilters, get_query_filename, utc_now
 from mcritweb.views.analyze import query as analyze_query
 from mcritweb.views.authentication import contributor_required, visitor_required
@@ -700,8 +701,8 @@ def specific_export(type, item_id):
 @mcrit_server_required
 def match_functions(function_id_a, function_id_b):
     client = get_client()
-    # the backend checks both ids itself; None is an unknown id (or a failed request)
-    match_info = client.getMatchFunctionVs(function_id_a, function_id_b)
+    # the backend checks both ids itself; None is an unknown id, a failure raises
+    match_info = with_server_errors(client).getMatchFunctionVs(function_id_a, function_id_b)
     if match_info is not None:
         function_entry = FunctionEntry.fromDict(match_info["function_entry_a"])
         pichash_matches_a = client.getMatchesForPicHash(function_entry.pichash, summary=True)
@@ -778,7 +779,7 @@ def download_result(job_id):
     job_info = None
     if JOB_ID_PATTERN.fullmatch(job_id):
         job_id = job_id.lower()
-        job_info = client.getJobData(job_id)
+        job_info = with_server_errors(client).getJobData(job_id)
     if job_info is None:
         return render_template("result_invalid.html", job_id=job_id)
     cached_filename = find_cached_result_filename(current_app, job_id)
@@ -834,7 +835,7 @@ def result(job_id):
     client = get_client()
     # check if we have the respective report already locally cached
     result_json = load_cached_result(current_app, job_id)
-    job_info = client.getJobData(job_id)
+    job_info = with_server_errors(client).getJobData(job_id)
     # kept separate from result_json because the tail of this view needs to tell an
     # empty report ({}) from one that could not be fetched (None), and truthiness
     # cannot. load_cached_result answers {} on a miss, and cache_result only ever
@@ -843,7 +844,7 @@ def result(job_id):
     if not result_json:
         # otherwise obtain result report from remote
         result_json = fetched = client.getResultForJob(job_id)
-        if result_json:
+        if result_json and job_info is not None:
             cache_result(current_app, job_info, result_json)
     if result_json:
         # TODO validation - only parse to matching_result if this data type is appropriate 
@@ -1544,11 +1545,11 @@ def linkhunt(job_id):
     client = get_client()
     # check if we have the respective report already locally cached
     result_json = load_cached_result(current_app, job_id)
-    job_info = client.getJobData(job_id)
+    job_info = with_server_errors(client).getJobData(job_id)
     if not result_json:
         # otherwise obtain result report from remote
             result_json = client.getResultForJob(job_id)
-            if result_json:
+            if result_json and job_info is not None:
                 cache_result(current_app, job_info, result_json)
     if job_info is None:
         # nothing in the queue under this id. A result without a job would be the same
@@ -1660,7 +1661,9 @@ def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
     cluster_key = (job_info.job_id,) + tuple((tuple(sorted(set(arg))) or None) if isinstance(arg, list) else arg for arg in link_hunt_args)
 
     def cluster_link_hunt_result():
-        function_entries = client.getFunctionsBySampleId(matching_result.reference_sample_entry.sample_id)
+        function_entries = require_result(
+            with_server_errors(client).getFunctionsBySampleId(matching_result.reference_sample_entry.sample_id),
+            "the functions of the reference sample")
         # TODO: probably need to paginate them as well
         link_clusters = matching_result.clusterLinkHuntResult(function_entries, link_hunt_result)
         return sorted([cluster for cluster in link_clusters if len(cluster["links"]) > 1], key=lambda x: x["score"], reverse=True)
@@ -1901,7 +1904,7 @@ def job_by_id(job_id):
     job_info = None
     if JOB_ID_PATTERN.fullmatch(job_id):
         job_id = job_id.lower()
-        job_info = client.getJobData(job_id)
+        job_info = with_server_errors(client).getJobData(job_id)
     if auto_refresh and job_info and job_info.is_failed:
         auto_refresh = 0
         suppress_processing_message = True
@@ -2170,7 +2173,7 @@ def submit():
         sample_entry = client.getSampleBySha256(upload_sha256)
         if sample_entry is None:
             if form_options == "smda" and smda_report:
-                new_sample_entry, job_id = client.addReport(smda_report)
+                new_sample_entry, job_id = require_result(with_server_errors(client).addReport(smda_report), "the sample for the submitted report")
                 return url_for('explore.sample_by_id', sample_id=new_sample_entry.sample_id), 202 # Accepted
             else:
                 # These three ride in the query string McritClient builds by hand, so
@@ -2179,11 +2182,11 @@ def submit():
                 # have raised a 400 before here. The cost is length: a 255-character
                 # non-ASCII filename encodes to ~2.3 kB of request line, against
                 # gunicorn's 4094-byte default for the whole line.
-                job_id = client.addBinarySample(binary_content,
+                job_id = require_result(with_server_errors(client).addBinarySample(binary_content,
                     filename=quote_backend_query_value(f.filename),
                     family=quote_backend_query_value(family),
                     version=quote_backend_query_value(version),
-                    is_dump=is_dump, base_addr=base_address, bitness=bitness)
+                    is_dump=is_dump, base_addr=base_address, bitness=bitness), "a job for the submitted sample")
                 return url_for('data.job_by_id', job_id=job_id, refresh=3, forward=1), 202 # Accepted
         else:
             flash('Sample was already in database', category='warning')
