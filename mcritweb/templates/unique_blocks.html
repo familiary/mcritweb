@@ -22,10 +22,10 @@ Unique Blocks
       }
       var position = selected.indexOf(id);
       if (position == -1) {
-        this.style.backgroundColor = "rgb(240, 240, 240)";
+        this.classList.add("row-pending");
         selected.push(id);
       } else {
-        this.style.backgroundColor = "white";
+        this.classList.remove("row-pending");
         selected.splice(position, 1);
       }
     });
@@ -161,7 +161,7 @@ Unique Blocks
       </thead>
       <tbody>
         {% for sample in samples %}
-        <tr {% if sample.sample_id in selected_ids %} style="background-color: yellowgreen;"{% endif %}class="parent">
+        <tr class="parent{% if sample.sample_id in selected_ids %} row-selected{% endif %}">
           <th align="right" valign="middle" scope="row" class="id">{{ "%d"|format(sample.sample_id) }}</th>
           <td align="right" valign="middle" class="font-monospace">{{ sample.getShortSha256() }}</td>
           <td valign="middle">{{ sample.family }}</td>

@@ -146,5 +146,32 @@ class ScoreColorProvider:
             return self.getMatchHexColorByScore100(60, opacity=opacity)
         return "FFFFFF"
 
+    # The result pages tint rows and cells with these rather than with the hex above. A
+    # hex baked the 40% blend toward white into the page, which only works on a white
+    # page: on the dark theme (#70) it was a field of near-white blocks, the empty cells
+    # brightest of all. These hand the browser the hue instead and let the theme say how
+    # strongly it shows and what it is mixed into (--tint-strength, --tint-ground in
+    # static/style.css and theme-dark.css). On the light theme that is the same 40% into
+    # white as before, give or take a rounding step of one in 255 per channel.
+
+    def tint(self, hex_color):
+        """A score colour as a CSS background. White is the maps' "no score", which paints
+        the ground: a cell without a score sits in a tinted row and must not take its tint."""
+        if hex_color.lower() == "ffffff":
+            return "var(--tint-ground)"
+        return f"color-mix(in srgb, #{hex_color} var(--tint-strength), var(--tint-ground))"
+
+    def getMatchTintFromResult(self, match_result, score_type, scale=100):
+        return self.tint(self.getMatchHexColorFromResult(match_result, score_type, scale=scale, opacity=1))
+
+    def getMatchTintByScore100(self, score):
+        return self.tint(self.getMatchHexColorByScore100(score))
+
+    def getMatchTintByScore50(self, score):
+        return self.tint(self.getMatchHexColorByScore50(score))
+
+    def getUniqueTint(self, score):
+        return self.tint(self.getUniqueColorScore(score, opacity=1))
+
     def __init__(self) -> None:
         pass

@@ -10,5 +10,6 @@ CREATE TABLE user (
   apitoken VARCHAR,
   -- moved on by every logout, which ends every session issued before it; see
   -- authentication.password_mark
-  session_generation INTEGER NOT NULL DEFAULT 0
+  session_generation INTEGER NOT NULL DEFAULT 0,
+  theme VARCHAR
 );

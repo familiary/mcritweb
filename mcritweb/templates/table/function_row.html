@@ -68,7 +68,7 @@
   {% if column_setup is none %}
     {% set column_setup = ["function_id", "family_id", "sample_id", "pic_hash", "has_minhash", "offset", "function_name", "num_instructions", "num_blocks"] %}
   {% endif %}
-  <tr class="function-row parent_{{ kwargs['parent'] }}"{{ row_tint(row_decorations, function.function_id) }} >
+  <tr class="function-row parent_{{ kwargs['parent'] }}{{ row_tint(row_decorations, function.function_id) }}" >
     {{ badge_column_cell(row_decorations, function.function_id) }}
     {% for column_type in column_setup %}
       {% if column_type == "function_id" %}
@@ -80,7 +80,7 @@
       {% elif column_type == "pic_hash" %}
         <td align="right" valign="middle" class="font-monospace">{{ format_pichash(function.pichash) }}</td>
       {% elif column_type == "has_minhash" %}
-        <td align="center" valign="middle"><i {% if function.minhash|length > 0 %}style="color:green;" class="fa-solid fa-square-check" title="MinHash present"{% else %}style="color:darkred;" class="fa-solid fa-times-circle" title="No MinHash"{% endif %}></i></td>
+        <td align="center" valign="middle"><i {% if function.minhash|length > 0 %}style="color: var(--status-yes);" class="fa-solid fa-square-check" title="MinHash present"{% else %}style="color: var(--status-no);" class="fa-solid fa-times-circle" title="No MinHash"{% endif %}></i></td>
       {% elif column_type == "offset" %}
         <td align="right" valign="middle" class="font-monospace">{{ format_offset(function.offset) }}</td>
       {% elif column_type == "function_name" %}

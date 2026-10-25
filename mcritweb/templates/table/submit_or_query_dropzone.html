@@ -9,7 +9,7 @@
 {% if not lazy %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
 {% endif %}
-{{ dropzone.style('border: 2px dashed black; margin: 20px auto; max-width: 600px; min-height: 200px; border-radius: 25px; background: rgb(240, 240, 240);') }}
+{{ dropzone.style('border: 2px dashed var(--dropzone-border); margin: 20px auto; max-width: 600px; min-height: 200px; border-radius: 25px; background: var(--surface-chrome);') }}
 {# the form's behaviour, and the drop overlay's: static/upload_form.js, queued (ADR-0021).
    The slider's label stays here, so that it follows the slider before the file has run. #}
 <script>later({{ url_for('static', filename='upload_form.js')|tojson }})</script>
