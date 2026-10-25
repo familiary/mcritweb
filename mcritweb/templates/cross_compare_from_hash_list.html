@@ -22,7 +22,7 @@ Set up Cross Compare from Hash List
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <p>Enter a list of hashes to compare:</p>
         <div class="mb-3">
-            <label for="hashlistInput" class="form-label">Hash List (one SHA256 per line)</label>
+            <label for="hashlistInput" class="form-label">Hash List (one SHA256 per line, at most {{ max_hashes }})</label>
             <textarea class="form-control" id="hashlistInput" name="hashlist" rows="10" style="width:100%"></textarea>
         </div>
         <br>
