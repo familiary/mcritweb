@@ -117,6 +117,9 @@ rather than reconstructing it from the commit log at release time.
 - A table or cross compare matrix that scrolls sideways fades out at its right edge while there is
   more of it to the right, in Chrome and Edge; a touch scrollbar stays hidden until the table is
   touched, so nothing used to say there was more. Other browsers show no fade, as before.
+  The matrix's fade follows its scroll position by a scroll-driven animation rather than a
+  scroll-state container, which made every tab switch of a 100 x 100 matrix spend about 190ms more
+  restyling the page.
 - The help page's paragraphs and list items are at most 80 characters wide, instead of running the
   width of the window, up to about 200 characters a line on a wide screen; its screenshots, tables
   and code still use the whole width.

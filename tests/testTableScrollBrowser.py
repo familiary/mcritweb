@@ -387,9 +387,21 @@ def test_a_box_that_does_not_scroll_shows_no_fade(open_page, live_server):
 
 def test_the_cross_compare_matrix_fades_where_it_goes_on(open_page, live_server):
     page = open_page(live_server + f"/data/result/{job_id_of('cross_compare')}", 390)
-    if page.evaluate("() => !CSS.supports('container-type', 'scroll-state')"):
-        pytest.skip("this Chromium has no scroll-state container queries")
-    assert page.evaluate(FADE_SHOWN, page.evaluate_handle("() => document.querySelector('.tab-pane.active .cross-pane-body')"))
+    if page.evaluate("() => !CSS.supports('animation-timeline', 'scroll()')"):
+        pytest.skip("this Chromium has no scroll-driven animations")
+    pane = page.evaluate_handle("() => document.querySelector('.tab-pane.active .cross-pane-body')")
+    assert page.evaluate(FADE_SHOWN, pane)
+    # a scroll-state container makes every tab switch of a large matrix cost more style time
+    assert page.evaluate("(pane) => getComputedStyle(pane).containerType", pane) == "normal"
+
+    page.evaluate("(pane) => { pane.scrollLeft = pane.scrollWidth; }", pane)
+    page.evaluate(TWO_FRAMES)
+    assert not page.evaluate(FADE_SHOWN, pane)
+
+
+def test_a_matrix_that_fits_its_pane_shows_no_fade(open_page, live_server):
+    page = open_page(live_server + f"/data/result/{job_id_of('cross_compare')}", 1280)
+    assert not page.evaluate(FADE_SHOWN, page.evaluate_handle("() => document.querySelector('.tab-pane.active .cross-pane-body')"))
 
 
 #: the function matches of a sample's 1:N result, the last of its three tables

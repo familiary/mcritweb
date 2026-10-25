@@ -183,10 +183,25 @@ def test_a_box_that_scrolls_fades_at_the_edge_with_more_to_come():
     laid out, so that showing it moves nothing."""
     css = STYLESHEET.read_text()
 
-    cue = css.split("@supports (container-type: scroll-state) {", 1)[1]
-    assert re.search(r"@container scroll-state\(scrollable: inline-end\)\s*\{\s*:is\(\.table-scroll, \.cross-pane-body\)::after\s*\{\s*opacity:\s*1;", cue)
-    fade = re.search(r":is\(\.table-scroll, \.cross-pane-body\)::after\s*\{([^}]*)\}", cue).group(1)
+    cue = css.split("@supports (container-type: scroll-state) {", 1)[1].split("@supports (animation-timeline", 1)[0]
+    assert re.search(r"@container scroll-state\(scrollable: inline-end\)\s*\{\s*\.table-scroll::after\s*\{\s*opacity:\s*1;", cue)
+    fade = re.search(r"\.table-scroll::after\s*\{([^}]*)\}", cue).group(1)
     assert "pointer-events: none" in fade and "position: sticky" in fade and "opacity: 0" in fade
+
+
+def test_the_matrix_pane_fades_by_a_scroll_timeline_not_a_scroll_state_container():
+    """On a 100 x 100 matrix a scroll-state container on the pane added about 190ms of style
+    time to every tab switch (602ms against 418ms). The pane's fade follows its scroll
+    position by an animation instead, and the pane is no container."""
+    css = re.sub(r"/\*.*?\*/", "", STYLESHEET.read_text(), flags=re.S)
+
+    assert not re.search(r"\.cross-pane-body[^{}]*\{[^}]*container-type", css)
+    assert not re.search(r"@container[^{]*\{\s*[^{}]*cross-pane-body", css)
+    cue = css.split("@supports (animation-timeline: scroll()) {", 1)[1]
+    fade = re.search(r"\.cross-pane-body::after\s*\{([^}]*)\}", cue).group(1)
+    assert "pointer-events: none" in fade and "position: sticky" in fade and "opacity: 0" in fade
+    assert re.search(r"animation-timeline:\s*scroll\(nearest inline\)", fade)
+    assert re.search(r"@keyframes cross-pane-fade\s*\{\s*from\s*\{\s*opacity:\s*1;\s*\}\s*to\s*\{\s*opacity:\s*0;", cue)
 
 
 #: result template -> the rows its function matches are counted from; that table is laid

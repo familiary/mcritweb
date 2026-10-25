@@ -483,20 +483,16 @@ table.table:not(.table-scroll > table) :is(td, th) {
    scrolled; it takes no room and catches no click, so nothing moves when it shows. Where
    scroll-state queries are not supported there is no fade, as before. */
 @supports (container-type: scroll-state) {
-  .cross-pane-body {
-    container-type: scroll-state;
-    display: grid;
-  }
   @media (max-width: 1199.98px) {
     .table-scroll {
       container-type: scroll-state;
       display: grid;
     }
   }
-  :is(.table-scroll, .cross-pane-body) > table {
+  .table-scroll > table {
     grid-area: 1 / 1;
   }
-  :is(.table-scroll, .cross-pane-body)::after {
+  .table-scroll::after {
     content: "";
     grid-area: 1 / 1;
     justify-self: end;
@@ -508,8 +504,42 @@ table.table:not(.table-scroll > table) :is(td, th) {
     background: linear-gradient(to left, var(--surface-page), transparent);
   }
   @container scroll-state(scrollable: inline-end) {
-    :is(.table-scroll, .cross-pane-body)::after {
+    .table-scroll::after {
       opacity: 1;
+    }
+  }
+}
+/* The cross compare matrix's pane has the same fade, but is not a scroll-state container: on
+   a 100 x 100 matrix the container added about 190ms of style time to every tab switch. A
+   scroll-driven animation of the fade's own opacity does not: it runs while the pane is
+   scrollable, one step from shown to gone at the end of the scroll range, and a pane that
+   does not scroll has no timeline, so the fade keeps its opacity of 0. */
+@supports (animation-timeline: scroll()) {
+  .cross-pane-body {
+    display: grid;
+  }
+  .cross-pane-body > table {
+    grid-area: 1 / 1;
+  }
+  .cross-pane-body::after {
+    content: "";
+    grid-area: 1 / 1;
+    justify-self: end;
+    position: sticky;
+    inset-inline-end: 0;
+    inline-size: 1.5rem;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(to left, var(--surface-page), transparent);
+    animation: cross-pane-fade steps(1, end) both;
+    animation-timeline: scroll(nearest inline);
+  }
+  @keyframes cross-pane-fade {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
     }
   }
 }
