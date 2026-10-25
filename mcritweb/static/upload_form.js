@@ -227,12 +227,31 @@ function mcritLoadDropzone(done) {
             clearDropzone();
         });
 
+        // A file let go anywhere but on the zone is the browser's to handle, and it opens
+        // the file in place of the page, or downloads it - and the overlay opens under the
+        // pointer, so a drop a little off the zone is easy to make. A drag that carries a
+        // file is refused there; the zone's own handlers take it, and stop it on the zone.
+        function aFileBesideTheZone(e) {
+            var types = (e.dataTransfer && e.dataTransfer.types) || [];
+            var target = e.target.closest ? e.target.closest("#myDropzone") : null;
+            return Array.prototype.indexOf.call(types, "Files") >= 0 && target === null;
+        }
+
         // the drop overlay is on every page, but Dropzone itself (its script and
         // stylesheet) is only fetched once a file is actually dragged in - issue #63
         window.addEventListener('dragover', function (e) {
             var dt = e.dataTransfer;
             if (dt.effectAllowed == "copy" || dt.dropEffect == "copy") {
                 mcritLoadDropzone(showDropModal);
+            }
+            if (aFileBesideTheZone(e)) {
+                e.preventDefault();
+                dt.dropEffect = "none";
+            }
+        });
+        window.addEventListener('drop', function (e) {
+            if (aFileBesideTheZone(e)) {
+                e.preventDefault();
             }
         });
     });

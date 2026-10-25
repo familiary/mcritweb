@@ -144,6 +144,10 @@ rather than reconstructing it from the commit log at release time.
   order buttons take the keyboard focus, show their tooltip there, and are described by it. A
   tooltip's element is underlined with dots, Escape puts a tooltip away, and the pointer can move
   onto one without it closing.
+- A file let go beside the drop zone no longer replaces the page. The overlay opens under the
+  pointer on the first drag, and a file dropped a little off the zone, on the overlay or the page,
+  was opened by the browser in place of the page (a `.smda` report as JSON) or downloaded. Only the
+  zone takes a dragged file now; elsewhere the pointer shows that it cannot be dropped.
 
 ### Security
 

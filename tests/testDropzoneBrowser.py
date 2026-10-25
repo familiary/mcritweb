@@ -219,5 +219,61 @@ def test_an_upload_page_fetches_dropzone_after_its_first_paint_and_attaches_it_o
     assert errors == []
 
 
+#: Hands `target` a drag event carrying `what` ("file" or "text"), the way the browser hands
+#: the page an OS drag, and answers whether the page cancelled it and the drop effect it left.
+#: A real drag from the desktop cannot be made from playwright; this is the event the page sees.
+DRAG = """([target, type, what]) => {
+    const transfer = new DataTransfer();
+    if (what === "file") {
+        transfer.items.add(new File(["MZ"], "sample.exe"));
+    } else {
+        transfer.setData("text/plain", "some text");
+    }
+    // a DataTransfer made in a script keeps both of these at "none"; the browser's own has
+    // the drag source's effectAllowed, and starts each dragover at the dropEffect it implies
+    Object.defineProperty(transfer, "effectAllowed", {value: "copy"});
+    Object.defineProperty(transfer, "dropEffect", {value: "copy", writable: true});
+    const event = new DragEvent(type, {bubbles: true, cancelable: true, dataTransfer: transfer});
+    (target === "window" ? window : document.querySelector(target)).dispatchEvent(event);
+    return [event.defaultPrevented, transfer.dropEffect];
+}"""
+
+
+def test_a_file_let_go_beside_the_drop_zone_does_not_replace_the_page(app, live_url, make_user):
+    """The overlay opens on the first drag over the page, under the pointer, and nothing
+    but the zone took the file: let go a little off it, on the overlay or the page, and the
+    browser did what it does with a file nobody takes, which is to open it in the tab in
+    place of the page (a `.smda` report as JSON) or download it. A drag that carries a file
+    is refused everywhere but on the zone now, which still takes it, and still opens the
+    overlay; a drag of text is left alone."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+    user_id = make_user("contributor")
+
+    with sync_api.sync_playwright() as playwright:
+        browser, page = open_samples_page(playwright, app, live_url, user_id)
+        try:
+            page.route("**/data/request_filename_info", lambda route: route.fulfill(status=200, content_type="application/json", body="{}"))
+            page.goto(live_url + "/explore/samples")
+            page.evaluate(WAIT_FOR_THE_QUEUE)
+            page.evaluate(DRAG, ["body", "dragover", "file"])
+            page.wait_for_selector("#submitFileModal.show")
+
+            beside = {target: [page.evaluate(DRAG, [target, kind, "file"]) for kind in ("dragover", "drop")]
+                      for target in ("#submitFileModal", ".modal-dialog", ".modal-header", "main", "body", "window")}
+            text = [page.evaluate(DRAG, ["#submitFileModal", kind, "text"])[0] for kind in ("dragover", "drop")]
+            on_the_zone = page.evaluate(DRAG, ["#myDropzone", "drop", "file"])
+            page.wait_for_function("() => Dropzone.forElement('#myDropzone').files.length === 1")
+            taken = page.evaluate("() => Dropzone.forElement('#myDropzone').files.map((file) => file.name)")
+        finally:
+            browser.close()
+
+    for target, (over, drop) in beside.items():
+        assert over == [True, "none"], f"a file dragged over {target} is offered a drop: {over}"
+        assert drop[0] is True, f"a file let go on {target} is left to the browser"
+    assert text == [False, False], "a drag of text is cancelled too"
+    assert on_the_zone[0] is True
+    assert taken == ["sample.exe"], taken
+
+
 if __name__ == "__main__":
     unittest.main()
