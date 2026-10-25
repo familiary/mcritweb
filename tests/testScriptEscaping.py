@@ -264,8 +264,8 @@ def test_a_matrix_cell_carries_its_link_as_data_not_as_script(client, as_role, f
     """A cell of the cross compare matrix wrote its sample's job id into a JS string in
     an onclick attribute - the construct `clipboard_btn` in table/links.html moved off,
     because the HTML parser decodes `&#39;` back to a quote before the handler is
-    compiled. Job ids are the backend's ObjectIds, so it was inert; the link is a data-href
-    now, which a document listener follows, and nothing of the backend reaches a script."""
+    compiled. Job ids are the backend's ObjectIds, so it was inert; a cell with matches is
+    a link now, and nothing of the backend reaches a script."""
     as_role("visitor")
     page = client.get(f"/data/result/{job_id_of('cross_compare')}").get_data(as_text=True)
 
@@ -273,10 +273,10 @@ def test_a_matrix_cell_carries_its_link_as_data_not_as_script(client, as_role, f
     assert rows, "the matrix has no rows - not the page this test means"
     links = 0
     for row in rows:
-        job_id = re.search(r'<td class="result clickable"[^>]*>([^<]*)</td>', row).group(1)
-        for swatch in re.findall(r'<span[^>]*score-swatch[^>]*>', row):
+        job_id = re.search(r'<th scope="row"[^>]*><a href="/data/result/([^"]*)"', row).group(1)
+        for swatch in re.findall(r'<(?:span|a)\b[^>]*score-swatch[^>]*>', row):
             assert "onclick" not in swatch, swatch
-            href = re.search(r'data-href="([^"]*)"', swatch)
+            href = re.search(r' href="([^"]*)"', swatch)
             if href:
                 links += 1
                 # relative to the page, /data/result/<the cross compare>, as the handler's was
