@@ -18,7 +18,7 @@ import time
 import tomllib
 
 import requests
-from flask import current_app, flash, g, has_app_context, redirect, session, url_for
+from flask import current_app, flash, g, has_app_context, redirect, request, session, url_for
 from smda.common.SmdaReport import SmdaReport
 
 from mcritweb import db
@@ -425,6 +425,21 @@ def query_upload_path(app, job_id):
     if not isinstance(job_id, str) or not QUERY_UPLOAD_JOB_ID.match(job_id):
         return None
     return os.sep.join([app.instance_path, "temp", "uploads", job_id])
+
+
+def refuse_upload(message, status=400):
+    """The answer to a refused upload from the submit or query form.
+
+    The drop zone sends the file with `X-Requested-With: XMLHttpRequest`, and gets the
+    reason as the plain text of the answer, which static/upload_form.js shows beside the
+    form; the file and the fields stay as they were, ready to be sent again. It used to
+    get an empty answer and reload the page to show a flash, which dropped the file and
+    everything typed. Anything else posting to these routes gets that flash still.
+    """
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return message, status, {"Content-Type": "text/plain; charset=utf-8"}
+    flash(message, category='error')
+    return "", status
 
 
 def ensure_local_data_paths(app, clear_data=False):

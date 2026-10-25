@@ -99,3 +99,94 @@ def test_a_report_still_fills_the_fields_and_the_next_file_takes_that_back(open_
     add_file(page, "plain_sample.bin")
     assert [page.input_value("#family"), page.input_value("#version")] == ["", "2.0"]
     assert page.errors == []
+
+
+def submit_requests(page):
+    """Hold every upload to /data/submit, and return the list it is recorded in."""
+    held = []
+    page.route("**/data/submit", lambda route: held.append(route) if route.request.method == "POST" else route.continue_())
+    return held
+
+
+def test_a_dump_without_its_bitness_and_address_is_held_back_in_the_browser(open_page):
+    """The click handler sent the queue without the browser's own check of the fields, so a
+    dump went up without the two fields it needs, and the server's refusal came back after
+    the whole file had been sent."""
+    page = open_page("/data/submit")
+    held = submit_requests(page)
+    page.fill("#family", "win.testfam")
+    add_file(page, "plain_sample.bin")
+    page.check("#dumped")
+    page.click("#submit-dropzone")
+    page.wait_for_timeout(300)
+
+    assert held == [], "the upload was sent"
+    assert page.evaluate("() => document.activeElement.id") in ("base_addr", "bitness32")
+    assert page.evaluate("() => document.getElementById('base_addr').validity.valueMissing")
+    assert page.evaluate("() => document.getElementById('bitness32').validity.valueMissing")
+    page.fill("#base_addr", "not an address")
+    assert page.evaluate("() => document.getElementById('base_addr').validity.patternMismatch")
+    page.fill("#base_addr", "0x400000")
+    assert page.evaluate("() => document.getElementById('base_addr').checkValidity()")
+    assert page.input_value("#family") == "win.testfam"
+    assert page.errors == []
+
+
+def test_an_unmapped_file_does_not_need_the_dump_fields(open_page):
+    page = open_page("/data/submit")
+    page.check("#dumped")
+    page.check("#unmapped")
+    assert page.evaluate("() => document.getElementById('dropzone-additional-fields-form').checkValidity()")
+
+
+def test_without_a_file_the_button_says_so(open_page):
+    """It used to be disabled until a file was added, with nothing to say why."""
+    page = open_page("/data/submit")
+    held = submit_requests(page)
+    assert page.is_enabled("#submit-dropzone")
+    page.click("#submit-dropzone")
+
+    assert page.inner_text("#upload-feedback") == "Choose a file first."
+    assert page.evaluate("() => document.activeElement.classList.contains('dz-button')")
+    assert held == []
+
+
+def test_a_refused_upload_keeps_the_file_and_the_fields_and_can_go_again(open_page):
+    """The page reloaded on any refusal to show the server's flash: the file was gone, the
+    family and version empty, "Dumped" unchecked. The reason now appears beside the button,
+    and the same file goes again with the next press."""
+    page = open_page("/data/submit")
+    held = submit_requests(page)
+    page.fill("#family", "win.testfam")
+    page.fill("#version", "1.0")
+    add_file(page, "plain_sample.bin")
+    page.check("#dumped")
+    page.check("#bitness32")
+    page.fill("#base_addr", "0x400000")
+
+    page.click("#submit-dropzone")
+    for _ in range(100):
+        if held:
+            break
+        page.wait_for_timeout(50)
+    assert len(held) == 1
+    assert held[0].request.headers.get("x-requested-with") == "XMLHttpRequest"
+    held[0].fulfill(status=400, content_type="text/plain; charset=utf-8", body="Refused for the test.")
+    page.wait_for_function("() => document.getElementById('upload-feedback').textContent !== ''")
+
+    assert page.inner_text("#upload-feedback") == "Refused for the test."
+    assert [page.input_value("#family"), page.input_value("#version"), page.input_value("#base_addr")] == ["win.testfam", "1.0", "0x400000"]
+    assert page.is_checked("#dumped") and page.is_checked("#bitness32")
+    assert page.evaluate("() => Dropzone.forElement('#myDropzone').getQueuedFiles().length") == 1
+
+    page.click("#submit-dropzone")
+    for _ in range(100):
+        if len(held) == 2:
+            break
+        page.wait_for_timeout(50)
+    assert len(held) == 2, "the file was not sent again"
+    assert b"plain_sample.bin" in (held[1].request.post_data_buffer or b"")
+    held[1].fulfill(status=400, content_type="text/html", body="<html>gateway</html>")
+    page.wait_for_function("() => document.getElementById('upload-feedback').textContent.indexOf('400') >= 0")
+    assert "gateway" not in page.inner_text("#upload-feedback")
+    assert page.errors == []

@@ -173,6 +173,13 @@ rather than reconstructing it from the commit log at release time.
   form is sent. Such a field used to take anything, and what it could not parse was dropped without
   a word; a default filter of "abc" was even stored as 0 and reported as changed. The settings page
   now refuses it, stores nothing and says why beside the field.
+- The upload form checks a memory dump's base address and bitness before the file is sent, and a
+  refusal from the server leaves the file and every field as they were, with the reason beside the
+  Submit button, ready to send again. The page used to send the whole file, then reload to show the
+  server's refusal, which dropped the file, the family and version and the chosen options. The
+  Submit button is enabled as soon as the page's script is in and says "Choose a file first" when
+  there is none, instead of staying disabled without a reason. Family and version are marked
+  optional.
 
 ### Security
 

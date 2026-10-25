@@ -423,3 +423,10 @@ form.form-inline input {
 .password-field .form-control {
   flex: 1 1 auto;
 }
+
+/* The upload form's word on the upload (static/upload_form.js, sayAboutUpload): a file still to
+   be chosen, or why the server refused one */
+.upload-feedback {
+  margin-top: 0.5rem;
+  color: var(--text-danger);
+}
