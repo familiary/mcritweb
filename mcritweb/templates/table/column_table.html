@@ -203,7 +203,7 @@
 
 
 
-{% macro job_column_table(job_info, show_created=True, show_started=True, show_finished=True, show_progress=False, show_duration=True, progress_id=None) %}
+{% macro job_column_table(job_info, show_created=True, show_started=True, show_finished=True, show_progress=False, show_duration=True, child_progress=None, child_jobs=None, progress_id=None) %}
   <table class="table table-hover">
     <tbody>
       <tr>
@@ -297,14 +297,59 @@
           </td>
         </tr>
       {% endif %}
+      {# a job waiting on dependencies only starts once they are done, so its own
+         duration says nothing about them - see data.total_duration. Deliberately
+         outside show_duration: the pages that switch the duration row off do so
+         because an unfinished job has none, which is exactly when this row is the
+         only elapsed time there is. #}
+      {% set job_total_duration = job_info|total_duration(child_jobs) %}
+      {% if job_total_duration is not none %}
+        <tr>
+          {% if job_info.finished_at %}
+            <td valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued. A job that fans out is queued just after the children it waits on, so this is a lower bound by that enqueue interval - 10ms for five children.">Total (since queued): </span></td>
+            <td valign="middle">{{ job_total_duration }}</td>
+          {% else %}
+            <td valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued to the latest time the backend recorded on it or its sub-jobs, since the backend's clock need not be this server's. From there it counts on in the browser, so it is a lower bound.">Total (since queued): </span></td>
+            <td valign="middle"><span data-elapsed-seconds="{{ job_total_duration.total_seconds()|int }}">{{ job_total_duration }}</span> and counting</td>
+          {% endif %}
+        </tr>
+        {% if not job_info.finished_at %}
+          <script>
+            (function () {
+              // counts on from what the page was rendered with, in the format Python
+              // gives a timedelta: "0:01:30", "1 day, 2:03:04"
+              const cell = document.querySelector("[data-elapsed-seconds]");
+              const rendered = Number(cell.dataset.elapsedSeconds);
+              const loaded = Date.now();
+              function two(n) { return String(n).padStart(2, "0"); }
+              window.setInterval(function () {
+                const total = rendered + Math.floor((Date.now() - loaded) / 1000);
+                const days = Math.floor(total / 86400);
+                const rest = total % 86400;
+                const clock = Math.floor(rest / 3600) + ":" + two(Math.floor(rest % 3600 / 60)) + ":" + two(rest % 60);
+                cell.textContent = days ? days + (days === 1 ? " day, " : " days, ") + clock : clock;
+              }, 1000);
+            })();
+          </script>
+        {% endif %}
+      {% endif %}
       {% if show_progress %}
         <tr>
           <td valign="middle">Progress: </td>
-          <td valign="middle"{% if progress_id %} id="{{ progress_id }}"{% endif %}>
+          {# the flag tells the overview's polling script that the number here is the
+             dependencies' average, which it takes from data.job_status's
+             dependency_progress rather than from the job's own progress #}
+          <td valign="middle"{% if progress_id %} id="{{ progress_id }}"{% endif %}{% if child_progress is not none and not job_info.finished_at %} data-progress-of="dependencies"{% endif %}>
             {% if job_info.finished_at %}
               <a href="{{ url_for('data.result', job_id=job_info.job_id ) }}">Results available</a>
             {% else %}
-              {% if job_info.started_at %}
+              {%- if child_progress is not none %}
+                {# a job waiting on dependencies has not started, so its own counter reads
+                   0 for the entire time the work is running - which is the half of issue
+                   #46 about progress. The children carry the real number and this page
+                   has already fetched them. #}
+                {{ "%5.2f"|format(100 * child_progress) }}% <span class="text-muted">(across {{ child_jobs|length }} dependencies)</span>
+              {% elif job_info.started_at %}
                 {{ "%5.2f"|format(100 * job_info.progress) }}% 
               {% else %}
                 {{ "%5.2f"|format(0) }}% 
