@@ -141,6 +141,9 @@ rather than reconstructing it from the commit log at release time.
   box's 1.8:1) and its focus ring 1.4:1, where WCAG asks 3:1. They are 3.2:1 or more now, on the
   page and on the grey chrome. The search boxes and check boxes that turn the ring off (five pages
   open with the focus in one) show an outline in the accent colour instead, in both themes.
+- In the light theme the current page of a pager is underlined in the accent colour, as in the dark
+  theme. Its grey fill alone was 1.14:1 against the white page, so the page you were on could hardly
+  be told from the others.
 
 ### Security
 

@@ -1363,3 +1363,33 @@ def test_in_the_light_theme_the_keyboards_focus_holds_3_to_1_against_what_is_beh
     best = max([value for value in (found["ring"], found["outline"]) if value is not None], default=0)
     assert best >= 3, f"{what} in focus: ring {found['ring']}:1, outline {found['outline']}:1 against rgb{tuple(found['behind'])}"
 
+
+def test_in_the_light_theme_the_current_page_of_the_pager_is_marked_at_3_to_1(open_in):
+    """The current page was told from the others by a grey fill alone, #f0f0f0 on the white page:
+    1.14:1, a state no one with low vision could see. It is underlined in the accent, as in dark."""
+    page = open_in("light", "/explore/functions")
+    current = page.locator(".page-item.active .page-link:visible").first
+    assert current.count() == 1, "the functions page has no current page in its pager"
+
+    found = current.evaluate("(element) => {" + HELPERS + """
+      const mark = getComputedStyle(element).boxShadow.match(/(rgba?\\([^)]*\\))\\s+0px\\s+-?[\\d.]+px\\s+0px(?:\\s+0px)?\\s+inset/);
+      if (!mark) return null;
+      const own = background(element).rgb, page = background(element.parentElement).rgb;
+      return [ratio(over(parse(mark[1]), own), own), ratio(over(parse(mark[1]), own), page)];
+    }""")
+
+    assert found is not None, "the current page has no underline"
+    assert min(found) >= 3, f"its underline is {found[0]:.2f}:1 against its own fill and {found[1]:.2f}:1 against the page"
+
+
+def test_in_the_light_theme_the_current_page_of_the_pager_shows_its_focus(open_in):
+    """The underline is a box shadow, the property the focus ring is drawn with: one rule must not
+    replace the other (test_the_current_page_of_the_pager_shows_its_focus, for dark)."""
+    page = open_in("light", "/explore/functions")
+    current = page.locator(".page-item.active .page-link:visible").first
+    current.scroll_into_view_if_needed()
+
+    keyboard_focus(page, current)
+    found = current.evaluate(FOCUS_RING_OF)
+
+    assert found["ring"] is not None and found["ring"] >= 3, f"the current page in focus: {found}"

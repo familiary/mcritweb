@@ -515,3 +515,15 @@ form.form-inline input {
 :root .shadow-none:focus-visible {
   outline: 2px solid var(--accent);
 }
+
+/* The current page of a pager was told from the others by a grey fill alone, #f0f0f0 on the
+   white page: 1.14:1. It is underlined in the accent, as theme-dark.css underlines it, and
+   keeps the focus ring above while it has the focus: both are box shadows, so the one rule
+   would replace the other */
+:root .page-item.active .page-link {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+:root .page-item.active .page-link:focus {
+  box-shadow: inset 0 -2px 0 var(--accent), 0 0 0 0.25rem var(--focus-ring);
+}
