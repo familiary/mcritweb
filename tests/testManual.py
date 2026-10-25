@@ -12,6 +12,7 @@ several of these tests read the repository rather than a response.
 """
 
 import logging
+import mimetypes
 import pathlib
 import re
 import unittest
@@ -225,6 +226,27 @@ def test_a_webp_screenshot_is_served_as_one(client):
     response = client.get("/help/images/first_login.webp")
     assert response.status_code == 200
     assert response.mimetype == "image/webp"
+
+
+@pytest.fixture
+def no_system_mime_types(monkeypatch):
+    """What mimetypes knows on an image without /etc/mime.types under a Python whose own
+    table lacks the type, such as python:3.12-slim: nothing about either file here."""
+    empty = mimetypes.MimeTypes()
+    empty.types_map = ({}, {})
+    empty.types_map_inv = ({}, {})
+    monkeypatch.setattr(mimetypes, "_db", empty)
+
+
+def test_webp_and_woff2_are_served_as_such_without_system_mime_types(no_system_mime_types, request):
+    """Served as application/octet-stream, nosniff makes the browser refuse both."""
+    assert mimetypes.guess_type("first_login.webp")[0] is None
+    assert mimetypes.guess_type("fa-solid-900.woff2")[0] is None
+    # the app, created only now, registers the two types itself
+    client = request.getfixturevalue("client")
+
+    assert client.get("/help/images/first_login.webp").mimetype == "image/webp"
+    assert client.get("/static/webfonts/fa-solid-900.woff2").mimetype == "font/woff2"
 
 
 def test_the_size_is_read_from_a_lossless_webp_header(tmp_path):
