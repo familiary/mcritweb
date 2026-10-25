@@ -95,9 +95,10 @@ def render(image_url_prefix):
         _cache.clear()
         html = SCREENSHOT_SOURCE.sub(_with_size, html)
         html = html.replace(MARKDOWN_IMAGE_PREFIX, f'src="{image_url_prefix}')
-        # the first screenshot is the page's largest paint; the rest download as they are scrolled to
+        # the first screenshot is the page's largest paint, so it is asked for at high priority,
+        # which the browser otherwise gives only the logo; the rest download as they are scrolled to
         first, _, rest = html.partition("<img ")
         if rest:
-            html = first + "<img " + rest.replace("<img ", '<img loading="lazy" ')
+            html = first + '<img fetchpriority="high" ' + rest.replace("<img ", '<img loading="lazy" ')
         _cache[key] = Markup(html)
     return _cache[key]

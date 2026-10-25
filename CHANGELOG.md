@@ -119,6 +119,7 @@ rather than reconstructing it from the commit log at release time.
   and the manual's screenshots are still revalidated on every view. A compressible file sent
   without gzip now says `Vary: Accept-Encoding` as well, so that a shared cache keeping it does not
   hand that copy to clients that take gzip.
+- The help page asks for its first screenshot, its largest paint, at high priority.
 
 ### Fixed
 
