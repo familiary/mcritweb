@@ -68,7 +68,9 @@
     if (!region || !input) {
       return;
     }
-    var shownTerm = input.value;
+    // the term the page was rendered for: base.html's queue runs this after the first
+    // paint (ADR-0021), and the box has focus from the start, so it may hold more by now
+    var shownTerm = input.defaultValue;
     var timer = null;
     var inFlight = null;
 
@@ -144,6 +146,10 @@
         inFlight.abort();
       }
     });
+    // what was typed before this ran is searched as if typed now
+    if (input.value !== shownTerm) {
+      timer = window.setTimeout(search, TYPING_PAUSE_MS);
+    }
   }
 
   document.querySelectorAll("form[data-live-search]").forEach(liveSearch);
