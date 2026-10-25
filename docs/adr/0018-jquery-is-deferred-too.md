@@ -2,7 +2,9 @@
 
 ---
 status: accepted — measured 2026-10-20; finishes the `defer` section of 0017, which kept
-jQuery a plain script
+jQuery a plain script. Its loading is changed by 0021: the scripts are queued and loaded
+after the first paint, not deferred, and a press on Bootstrap's controls before they are
+in is replayed; the whenReady rule stands
 ---
 
 [ADR-0017](0017-the-rest-of-63-done-in-the-application.md) deferred Bootstrap,

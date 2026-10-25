@@ -1,12 +1,13 @@
 #!/usr/bin/python
-"""What deferring jQuery does to the pages, in a browser (issue #63, ADR-0018).
+"""What loading jQuery after the first paint does to the pages, in a browser (issue #63,
+ADR-0018, ADR-0021).
 
-testParseTimeScripts.py reads the scripts and finds no `$` that runs while the page
-parses. This loads the pages and looks: every page the accessibility checks render,
-in Chromium, against the captured corpus. A `$` reached before the deferred jQuery has
-run is a "$ is not defined" page error, so the first test is that no page logs an
-error at all. The others check what the ready handlers set up, once they have run:
-Bootstrap owns `$.fn.tooltip` (jQuery UI is deferred now too, and runs before it), the
+testParseTimeScripts.py reads the scripts and finds no `$` that runs before the queue
+base.html loads after the first paint has run. This loads the pages and looks: every
+page the accessibility checks render, in Chromium, against the captured corpus. A `$`
+reached before jQuery has run is a "$ is not defined" page error, so the first test is
+that no page logs an error at all. The others check what the ready handlers set up, once they have run:
+Bootstrap owns `$.fn.tooltip` (jQuery UI is queued now too, and runs before it), the
 clipboard buttons have Bootstrap tooltips, the cross compare's sample list is a jQuery
 UI sortable, the settings lists are SortableJS lists, a row click navigates, a file
 dragged over a page opens the drop overlay, the upload page's form reacts, and the
@@ -35,9 +36,20 @@ logging.disable(logging.CRITICAL)
 
 SCRIPT_TIMEOUT_MS = 10000
 
-#: resolves once every ready handler queued before it has run: jQuery runs handlers in
-#: the order they were queued, and whenReady queues them by DOMContentLoaded at the latest
-AFTER_THE_READY_HANDLERS = "() => new Promise(resolve => jQuery(() => resolve(true)))"
+#: resolves once every ready handler queued before it has run: whenReady keeps them in
+#: the order they were queued until the queued scripts have run, and jQuery runs them in
+#: that order
+AFTER_THE_READY_HANDLERS = """() => new Promise((resolve, reject) => {
+    whenReady(() => resolve(true));
+    setTimeout(() => reject(new Error("the queued scripts did not run within 10 s")), 10000);
+})"""
+
+#: how long after DOMContentLoaded the queue started: the start of jquery.js's request
+QUEUE_DELAY = """() => {
+    const loaded = performance.getEntriesByType("navigation")[0].domContentLoadedEventStart;
+    const jquery = performance.getEntriesByType("resource").find(entry => entry.name.endsWith("/static/jquery.js"));
+    return jquery ? jquery.startTime - loaded : null;
+}"""
 
 #: the lists settings.html makes sortable, both halves of each table's pair
 SETTINGS_LISTS = [f"{table}_{half}" for table in (
@@ -193,7 +205,7 @@ def test_the_upload_page_wires_its_form(open_as, live_server):
     page = ready(open_as("contributor"), f"{live_server}/analyze/query")
 
     assert page.evaluate("() => !!jQuery._data(document.getElementById('submit-dropzone'), 'events').click")
-    # a plain script here, Dropzone ran before the deferred jQuery and attached no plugin
+    # a plain script here, Dropzone ran before the queued jQuery and attached no plugin
     assert page.evaluate("() => typeof jQuery.fn.dropzone") == "undefined"
     page.check("#dumped")
     page.wait_for_selector("#extendedFields", state="visible")
@@ -213,9 +225,9 @@ def test_the_job_delete_confirmation_opens(open_as, live_server):
 
 # --- the time before jQuery has run ----------------------------------------------------------
 #
-# A deferred script runs once the document is parsed, and the page is on screen before
-# that. These hold jquery.js back, so that every deferred script behind it waits too,
-# click something in that window, and then let it through.
+# The queue loads once the page has been painted, and the page is on screen before it has
+# run. These hold jquery.js back, so that every queued script behind it waits too, click
+# something in that window, and then let it through.
 
 @pytest.fixture
 def held_back(open_as):
@@ -226,12 +238,13 @@ def held_back(open_as):
         waiting = []
         page.route("**/static/jquery.js", lambda route: waiting.append(route))
 
-        def release():
+        def release(settle=True):
             while waiting:
                 waiting.pop().continue_()
             page.unroute("**/static/jquery.js")
-            page.wait_for_function("() => window.jQuery !== undefined")
-            assert page.evaluate(AFTER_THE_READY_HANDLERS)
+            if settle:
+                page.wait_for_function("() => window.jQuery !== undefined")
+                assert page.evaluate(AFTER_THE_READY_HANDLERS)
         return page, release
     return _held_back
 
@@ -386,4 +399,198 @@ def test_a_search_keeps_the_pickers_state(held_back, live_server, picker, when):
     for name, value in carried.items():
         assert parameters.get(name) == [value], f"{name} in {page.url}"
     assert dropped is None or dropped not in parameters, page.url
+    assert page.errors == []
+
+
+# --- the queue -------------------------------------------------------------------------------
+
+QUEUED_IN_BASE = ["jquery.js", "post_action.js", "page_loading.js", "autocomplete.js",
+                  "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js"]
+
+
+#: the scripts in the order they run: a script's load event fires once it has run
+RUN_ORDER = """
+window.mcritRunOrder = [];
+document.addEventListener("load", event => {
+    if (event.target.tagName === "SCRIPT") {
+        window.mcritRunOrder.push(event.target.src.split("/static/")[1]);
+    }
+}, true);
+"""
+
+
+def test_the_queue_is_fetched_once_the_page_has_been_painted(open_as, live_server):
+    """What the queue is for: its scripts are not fetched alongside the stylesheets the
+    page is painted with, but once it has been painted, and they run in the order they were
+    queued. Not the order their requests start in: the browser need not start them in the
+    order they were added, and a test run under load saw it start one ahead of another."""
+    page = open_as("visitor")
+    page.add_init_script(RUN_ORDER)
+    ready(page, f"{live_server}/explore/samples")
+    timings = page.evaluate("""() => ({
+        paint: performance.getEntriesByName("first-contentful-paint")[0].startTime,
+        scripts: performance.getEntriesByType("resource")
+            .filter(entry => entry.initiatorType === "script")
+            .map(entry => [entry.name.split("/static/")[1], entry.startTime]),
+        ran: window.mcritRunOrder,
+    })""")
+    assert sorted(name for name, _ in timings["scripts"]) == sorted(QUEUED_IN_BASE)
+    assert timings["ran"] == QUEUED_IN_BASE
+    assert all(start > timings["paint"] for _, start in timings["scripts"]), timings
+    assert page.errors == []
+
+
+def test_the_csrf_token_is_there_before_the_queue_has_run(held_back, live_server):
+    """The CFG viewers ask for csrfToken() from window.onload, which can come before the
+    queue has run when nothing else was left to load. It used to come from post_action.js."""
+    page, release = held_back("visitor")
+    page.goto(f"{live_server}/explore/samples", wait_until="domcontentloaded")
+    assert page.evaluate("() => window.jQuery") is None, "the queue ran before the check"
+    token = page.get_attribute('meta[name="csrf-token"]', "content")
+    assert token and page.evaluate("() => csrfToken()") == token
+    release()
+    assert page.errors == []
+
+
+def test_a_press_on_a_navbar_menu_before_bootstrap_is_in_opens_it_once_it_is(held_back, live_server):
+    page, release = held_back("visitor")
+    page.goto(f"{live_server}/", wait_until="commit")
+    page.wait_for_selector("#navbarDropdownExplore")
+    assert page.evaluate("() => window.jQuery") is None, "jQuery ran before the click"
+    page.click("#navbarDropdownExplore")
+    release()
+
+    page.wait_for_selector('[aria-labelledby="navbarDropdownExplore"].show')
+    assert page.get_attribute("#navbarDropdownExplore", "aria-expanded") == "true"
+    assert page.errors == []
+
+
+def test_a_press_on_a_post_button_before_post_action_is_in_posts_once_it_is(held_back, live_server):
+    """The settings page's new-token button POSTs through post_action.js, which is queued
+    behind jQuery. Pressed before it was in, the press did nothing."""
+    page, release = held_back("visitor")
+    page.goto(f"{live_server}/settings", wait_until="commit")
+    button = "button[data-post$='/regenerate_apitoken']"
+    page.wait_for_selector(button)
+    assert page.evaluate("() => window.postTo") is None, "post_action.js ran before the click"
+    page.click(button)
+
+    # not waited for here: the replayed press navigates away while the page would be asked
+    with page.expect_request(lambda request: request.method == "POST" and request.url.endswith("/regenerate_apitoken")) as posted:
+        release(settle=False)
+    assert "csrf_token=" in (posted.value.post_data or "")
+    page.wait_for_load_state()
+    assert page.errors == []
+
+
+def test_a_page_that_is_not_visible_loads_the_queue_without_painting(open_as, live_server):
+    """A tab opened in the background paints no frame, so the queue does not wait for one.
+    The page here reports no paint and runs no animation frame either, so only the hidden
+    page's own branch starts the queue before the three-second backstop."""
+    page = open_as("visitor")
+    page.add_init_script("""
+        Object.defineProperty(document, "visibilityState", {get: () => "hidden"});
+        delete window.PerformanceObserver;
+        window.requestAnimationFrame = () => 0;
+    """)
+    page.goto(f"{live_server}/explore/samples")
+    # polled on a timer: the page's requestAnimationFrame never calls back here
+    page.wait_for_function("() => window.bootstrap !== undefined && typeof Autocomplete !== 'undefined'", polling=100)
+    assert page.evaluate(QUEUE_DELAY) < 1500
+    assert page.evaluate(AFTER_THE_READY_HANDLERS)
+    assert page.errors == []
+
+
+def test_without_paint_timing_an_animation_frame_starts_the_queue(open_as, live_server):
+    page = open_as("visitor")
+    page.add_init_script("delete window.PerformanceObserver;")
+    page = ready(page, f"{live_server}/explore/samples")
+    assert page.evaluate(QUEUE_DELAY) < 1500
+    assert page.errors == []
+
+
+def test_a_page_that_reports_no_paint_loads_the_queue_after_three_seconds(open_as, live_server):
+    page = open_as("visitor")
+    page.add_init_script("""
+        window.PerformanceObserver = class {
+            static get supportedEntryTypes() { return ["paint"]; }
+            observe() {}
+            disconnect() {}
+        };
+    """)
+    page = ready(page, f"{live_server}/explore/samples")
+    assert 2500 < page.evaluate(QUEUE_DELAY) < 6000
+    assert page.errors == []
+
+
+def test_the_queue_is_loaded_once(open_as, live_server):
+    """The paint, the animation frame and the three-second backstop can all try to start it."""
+    page = ready(open_as("visitor"), f"{live_server}/explore/samples")
+    page.wait_for_timeout(3500)
+    assert page.evaluate("() => performance.getEntriesByType('resource').filter(entry => entry.name.endsWith('/static/jquery.js')).length") == 1
+    assert page.errors == []
+
+
+def test_when_ready_after_the_queue_has_run_runs_at_once(open_as, live_server):
+    page = ready(open_as("visitor"), f"{live_server}/explore/samples")
+    assert page.evaluate("() => new Promise(resolve => { whenReady(() => resolve(typeof jQuery.fn.modal)); setTimeout(() => resolve('never'), 2000); })") == "function"
+    assert page.errors == []
+
+
+@pytest.mark.parametrize(("role", "path"), [("contributor", "/analyze/query"), ("visitor", "/explore/samples")])
+def test_the_upload_form_is_set_without_a_slide_at_load(open_as, live_server, role, path):
+    """The form's ready handler runs after the first paint now: a slide there would move
+    the upload page's fields under the reader, and on every other page animate the closed
+    drop overlay's form for nobody. The fields end where the checked radios ask."""
+    page = open_as(role)
+    # counts every jQuery animation from the moment jQuery arrives: slideDown and slideUp
+    # go through .animate()
+    page.add_init_script("""
+        window.animations = 0;
+        Object.defineProperty(window, "jQuery", {configurable: true, set(value) {
+            Object.defineProperty(window, "jQuery", {configurable: true, writable: true, value: value});
+            const animate = value.fn.animate;
+            value.fn.animate = function () { window.animations += this.length; return animate.apply(this, arguments); };
+        }});
+    """)
+    ready(page, live_server + path)
+    assert page.evaluate("() => window.animations") == 0
+    extended = page.evaluate("() => getComputedStyle(document.getElementById('extendedFields')).display")
+    asked = page.evaluate("() => document.getElementById('dumped').checked || document.getElementById('smda').checked")
+    assert (extended != "none") == asked
+    assert page.errors == []
+
+
+def test_a_copy_pressed_before_jquery_is_in_copies_and_confirms_once_it_is(held_back, live_server):
+    """copy_to_clipboard is an onclick= handler. It copied, and then threw "$ is not defined"
+    before showing its "Copied!" tooltip, when pressed before the scripts were in."""
+    page, release = held_back("visitor")
+    page.context.grant_permissions(["clipboard-read", "clipboard-write"], origin=live_server)
+    page.goto(f"{live_server}/explore/samples/0", wait_until="commit")
+    button = page.locator("button[data-clipboard-value]").first
+    button.wait_for()
+    assert page.evaluate("() => window.jQuery") is None, "jQuery ran before the press"
+    button.click()
+    assert page.evaluate("() => navigator.clipboard.readText()") == button.get_attribute("data-clipboard-value")
+    release()
+
+    page.wait_for_selector(".tooltip.show")
+    assert "Copied!" in page.inner_text(".tooltip.show")
+    assert page.errors == []
+
+
+def test_a_press_on_an_element_with_a_tooltip_is_not_held(held_back, live_server):
+    """A tooltip acts on hover and focus. The copy button marked up as Bootstrap 5 marks a
+    tooltip, data-bs-toggle="tooltip", still copies on the press itself."""
+    page, release = held_back("visitor")
+    page.context.grant_permissions(["clipboard-read", "clipboard-write"], origin=live_server)
+    page.goto(f"{live_server}/explore/samples/0", wait_until="commit")
+    button = page.locator("button[data-clipboard-value]").first
+    button.wait_for()
+    button.evaluate("button => button.setAttribute('data-bs-toggle', 'tooltip')")
+    assert page.evaluate("() => window.jQuery") is None, "jQuery ran before the press"
+    button.click()
+    assert page.evaluate("() => navigator.clipboard.readText()") == button.get_attribute("data-clipboard-value")
+    assert page.evaluate("() => mcritScripts.pressed.length") == 0
+    release()
     assert page.errors == []

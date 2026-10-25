@@ -38,20 +38,22 @@
 
   whenReady(function(){
     // the state the checked radios ask for, whichever way they got checked: a toggle
-    // before the deferred jQuery had run is left to this (the handlers above slide the
-    // fields with jQuery), and a page the browser restores comes back with its radios as
-    // they were. SMDA shows the fields as Dumped does.
+    // before jQuery had run is left to this (the handlers above slide the fields with
+    // jQuery), and a page the browser restores comes back with its radios as they were.
+    // SMDA shows the fields as Dumped does. Set, not slid: this runs after the page has
+    // been painted, where a slide is a layout shift on the upload pages, and on every
+    // other page, whose form is in the closed drop overlay, 400 ms of animation no one sees.
     if ($("#dumped").prop("checked") || $("#smda").prop("checked")){
-      $(document.getElementById("extendedFields")).slideDown(); 
+      $(document.getElementById("extendedFields")).show();
     }
     {% if select_form_type %}
     if ($("#submit_form").prop("checked")){
-      $(document.getElementsByClassName("submit-form-exclusive")).slideDown();   
-      $(document.getElementsByClassName("query-form-exclusive")).slideUp();   
+      $(document.getElementsByClassName("submit-form-exclusive")).show();
+      $(document.getElementsByClassName("query-form-exclusive")).hide();
     }
     if ($("#query_form").prop("checked")){
-      $(document.getElementsByClassName("submit-form-exclusive")).slideUp();   
-      $(document.getElementsByClassName("query-form-exclusive")).slideDown();   
+      $(document.getElementsByClassName("submit-form-exclusive")).hide();
+      $(document.getElementsByClassName("query-form-exclusive")).show();
     }
     {% endif %}
   });
