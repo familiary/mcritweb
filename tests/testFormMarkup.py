@@ -247,6 +247,55 @@ def test_the_upload_button_says_what_the_chosen_mode_does(client, as_role, path,
     assert ButtonText(page_of(client, path)).text.strip() == label
 
 
+class FormFields(HTMLParser):
+    """{form action or "": [attributes of each field a keyboard types into, in order]}."""
+
+    TYPED = {None, "text", "password", "search", "url", "email", "number"}
+
+    def __init__(self, html):
+        super().__init__(convert_charrefs=True)
+        self.forms, self.current = {}, None
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "form":
+            self.current = self.forms.setdefault(attrs.get("action") or "", [])
+        elif tag == "input" and self.current is not None and attrs.get("type") in self.TYPED:
+            self.current.append(attrs)
+
+    def handle_endtag(self, tag):
+        if tag == "form":
+            self.current = None
+
+
+def test_the_last_field_of_a_credential_form_has_a_done_key(app, client, as_role, make_user):
+    """The sign-in guide's enterkeyhint="done" on the final input, so a phone keyboard's Enter
+    key says the form is finished there; the fields before it keep the default."""
+    forms = [FormFields(page_of(client, "/register")).forms]
+    make_user("admin")
+    forms.append(FormFields(page_of(client, "/login")).forms)
+    forms.append(FormFields(page_of(client, "/register")).forms)
+    with app.app_context():
+        server_info = ServerInfo.fromDb()
+        server_info.registration_token = "token"
+        server_info.saveToDb()
+    forms.append(FormFields(page_of(client, "/register")).forms)
+    as_role("contributor")
+    settings = FormFields(page_of(client, "/settings")).forms
+    forms.append({action: fields for action, fields in settings.items() if "change_username" in action or "change_password" in action})
+
+    checked = 0
+    for page in forms:
+        for action, fields in page.items():
+            if not fields or not any(field.get("type") == "password" for field in fields):
+                continue
+            hints = [field.get("enterkeyhint") for field in fields]
+            assert hints[-1] == "done" and "done" not in hints[:-1], (action, [field.get("name") for field in fields], hints)
+            checked += 1
+    assert checked == 6, checked
+
+
 def test_a_page_that_edits_samples_still_has_its_dialog(client, as_role):
     """The dialog is printed where an edit control can open it, and once."""
     as_role("contributor")

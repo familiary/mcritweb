@@ -17,7 +17,7 @@ Login
         <div class="mb-3">
             <label for="current-password" class="form-label">Password</label>
             <div class="password-field">
-              <input type="password" name='inputPassword' id="current-password" class="form-control" autocomplete="current-password" required{{ error_attrs(field_error, "current-password") }}{% if field_error %} autofocus{% endif %}>
+              <input type="password" name='inputPassword' id="current-password" class="form-control" autocomplete="current-password" enterkeyhint="done" required{{ error_attrs(field_error, "current-password") }}{% if field_error %} autofocus{% endif %}>
               {{ password_toggle("current-password") }}
             </div>
             {{ error_message(field_error, "current-password") }}

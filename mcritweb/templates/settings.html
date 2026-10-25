@@ -106,7 +106,7 @@ Settings
           <div class="form-group mb-2">
             <label for="inputPassword1" class="form-label">Password</label>
             <div class="password-field">
-              <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" autocomplete="current-password" required{{ error_attrs(form_error, "inputPassword1") }}{% if form_error and "inputPassword1" in form_error.fields %} autofocus{% endif %}>
+              <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" autocomplete="current-password" enterkeyhint="done" required{{ error_attrs(form_error, "inputPassword1") }}{% if form_error and "inputPassword1" in form_error.fields %} autofocus{% endif %}>
               {{ password_toggle("inputPassword1") }}
             </div>
             {{ error_message(form_error, "inputPassword1") }}
@@ -136,7 +136,7 @@ Settings
           <div class="form-group mb-2">
               <label for="inputPassword4" class="form-label">Confirm new password</label>
               <div class="password-field">
-                <input type="password" class="form-control" name="inputPassword4" id="inputPassword4" autocomplete="new-password" required{{ error_attrs(form_error, "inputPassword4") }}{% if form_error and "inputPassword4" in form_error.fields %} autofocus{% endif %}>
+                <input type="password" class="form-control" name="inputPassword4" id="inputPassword4" autocomplete="new-password" enterkeyhint="done" required{{ error_attrs(form_error, "inputPassword4") }}{% if form_error and "inputPassword4" in form_error.fields %} autofocus{% endif %}>
                 {{ password_toggle("inputPassword4") }}
               </div>
               {{ error_message(form_error, "inputPassword4") }}

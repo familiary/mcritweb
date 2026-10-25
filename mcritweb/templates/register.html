@@ -27,7 +27,7 @@ Register
     <div class="mb-3">
         <label for="inputPassword2" class="form-label">Confirm password</label>
         <div class="password-field">
-          <input type="password" class="form-control" name="inputPassword2" id="inputPassword2" autocomplete="new-password" required{{ error_attrs(field_error, "inputPassword2") }}{% if field_error and "inputPassword2" in field_error.fields %} autofocus{% endif %}>
+          <input type="password" class="form-control" name="inputPassword2" id="inputPassword2" autocomplete="new-password"{% if not is_registration_token_required and not g.first_user %} enterkeyhint="done"{% endif %} required{{ error_attrs(field_error, "inputPassword2") }}{% if field_error and "inputPassword2" in field_error.fields %} autofocus{% endif %}>
           {{ password_toggle("inputPassword2") }}
         </div>
         {{ error_message(field_error, "inputPassword2") }}
@@ -35,7 +35,7 @@ Register
     {% if is_registration_token_required %}
       <div class="mb-3">
         <label for="registrationToken" class="form-label">Registration token</label>
-        <input class="form-control" name="registrationToken" id="registrationToken" value="{{ query_token }}" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" required{{ error_attrs(field_error, "registrationToken") }}{% if field_error and "registrationToken" in field_error.fields %} autofocus{% endif %}>
+        <input class="form-control" name="registrationToken" id="registrationToken" value="{{ query_token }}" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off"{% if not g.first_user %} enterkeyhint="done"{% endif %} required{{ error_attrs(field_error, "registrationToken") }}{% if field_error and "registrationToken" in field_error.fields %} autofocus{% endif %}>
         {{ error_message(field_error, "registrationToken") }}
       </div>
     {% endif %}
@@ -51,7 +51,7 @@ Register
       </div>
       <div class="mb-3">
         <label for="set-registration-token" class="form-label">Optional registration token (replace or clear if other or no token desired):</label>
-        <input name='setRegistrationToken' class="form-control" id="set-registration-token" value="{{ proposed_registration_token }}" pattern="^[a-zA-Z0-9._\-]{3,36}$" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">
+        <input name='setRegistrationToken' class="form-control" id="set-registration-token" value="{{ proposed_registration_token }}" pattern="^[a-zA-Z0-9._\-]{3,36}$" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" enterkeyhint="done">
       </div>
     <h3 class="mt-4 mb-3">Define Operation Mode:</h3>
     <fieldset>
