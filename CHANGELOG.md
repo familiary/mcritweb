@@ -114,6 +114,9 @@ rather than reconstructing it from the commit log at release time.
 - On a screen 1200px wide or more, the column headings of a list or result table stay at the top of
   the window while its rows scroll by, so the 100 or 250 rows of a page can be read without
   scrolling back up to tell the score columns apart.
+- A table or cross compare matrix that scrolls sideways fades out at its right edge while there is
+  more of it to the right, in Chrome and Edge; a touch scrollbar stays hidden until the table is
+  touched, so nothing used to say there was more. Other browsers show no fade, as before.
 
 ### Fixed
 

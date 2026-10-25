@@ -460,3 +460,48 @@ table.table:not(.table-scroll > table) :is(td, th) {
 .cross-pane-body > table {
   margin-inline: auto;
 }
+
+/* A box that scrolls a table sideways says so with a fade at its right edge, shown while
+   more of the table lies to the right. Nothing else did: on a phone or a Mac the scrollbar
+   stays hidden until the table is touched, and a table cut at the edge of the screen looks
+   like a whole one. The box becomes a grid of one cell holding the table and the fade, so
+   that the fade is as tall as the table and sticks to the box's edge however far it is
+   scrolled; it takes no room and catches no click, so nothing moves when it shows. Where
+   scroll-state queries are not supported there is no fade, as before. */
+@supports (container-type: scroll-state) {
+  .cross-pane-body {
+    container-type: scroll-state;
+    display: grid;
+  }
+  @media (max-width: 1199.98px) {
+    .table-scroll {
+      container-type: scroll-state;
+      display: grid;
+    }
+  }
+  :is(.table-scroll, .cross-pane-body) > table {
+    grid-area: 1 / 1;
+  }
+  :is(.table-scroll, .cross-pane-body)::after {
+    content: "";
+    grid-area: 1 / 1;
+    justify-self: end;
+    position: sticky;
+    inset-inline-end: 0;
+    inline-size: 1.5rem;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(to left, var(--surface-page), transparent);
+  }
+  @container scroll-state(scrollable: inline-end) {
+    :is(.table-scroll, .cross-pane-body)::after {
+      opacity: 1;
+    }
+  }
+}
+/* the fade is the page's colour, which forced colours replace around it */
+@media (forced-colors: active) {
+  :is(.table-scroll, .cross-pane-body)::after {
+    display: none;
+  }
+}

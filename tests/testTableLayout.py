@@ -178,5 +178,16 @@ def test_the_cross_compare_matrix_is_centred_by_its_margins():
     assert re.search(r"\.cross-pane-body > table\s*\{\s*margin-inline:\s*auto;", css)
 
 
+def test_a_box_that_scrolls_fades_at_the_edge_with_more_to_come():
+    """The scroll cue: only where scroll-state queries are supported, and only shown, never
+    laid out, so that showing it moves nothing."""
+    css = STYLESHEET.read_text()
+
+    cue = css.split("@supports (container-type: scroll-state) {", 1)[1]
+    assert re.search(r"@container scroll-state\(scrollable: inline-end\)\s*\{\s*:is\(\.table-scroll, \.cross-pane-body\)::after\s*\{\s*opacity:\s*1;", cue)
+    fade = re.search(r":is\(\.table-scroll, \.cross-pane-body\)::after\s*\{([^}]*)\}", cue).group(1)
+    assert "pointer-events: none" in fade and "position: sticky" in fade and "opacity: 0" in fade
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -313,3 +313,44 @@ def test_a_matrix_that_fits_its_pane_is_centred_in_it(open_page, live_server):
     pane_left, pane_right, matrix_left, matrix_right = page.evaluate(MATRIX_IN_PANE)[0]
     assert abs((matrix_left - pane_left) - (pane_right - matrix_right)) <= 1
     assert matrix_left - pane_left > 100
+
+
+#: whether the box shows its fade: there is one, and it is not transparent
+FADE_SHOWN = "(box) => { const fade = getComputedStyle(box, '::after'); return fade.content !== 'none' && fade.opacity === '1'; }"
+
+TWO_FRAMES = "() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))"
+
+
+def test_a_box_with_more_table_to_its_right_fades_at_that_edge(open_page, live_server):
+    """A touch scrollbar is hidden until the table is touched, and a table cut off at the
+    edge of a phone looks like a whole one. The fade shows while there is more to the right,
+    goes once the box is scrolled to the end, and lets a press through to the cell under it.
+    Chromium only: elsewhere there are no scroll-state queries and no fade, as before."""
+    page = open_page(live_server + "/explore/samples", 390)
+    box = page.evaluate_handle("() => document.querySelector('.table-scroll')")
+    if page.evaluate("() => !CSS.supports('container-type', 'scroll-state')"):
+        pytest.skip("this Chromium has no scroll-state container queries")
+
+    assert page.evaluate(FADE_SHOWN, box)
+    under = page.evaluate(
+        "(box) => { const edge = box.getBoundingClientRect(); const cell = box.querySelector('tbody td');"
+        " const row = cell.getBoundingClientRect(); return document.elementFromPoint(edge.right - 4, row.top + row.height / 2).closest('td, th') !== null; }",
+        box,
+    )
+    assert under, "the fade catches presses meant for the table"
+
+    page.evaluate("(box) => { box.scrollLeft = box.scrollWidth; }", box)
+    page.evaluate(TWO_FRAMES)
+    assert not page.evaluate(FADE_SHOWN, box)
+
+
+def test_a_box_that_does_not_scroll_shows_no_fade(open_page, live_server):
+    page = open_page(live_server + "/explore/samples", 1280)
+    assert not page.evaluate(FADE_SHOWN, page.evaluate_handle("() => document.querySelector('.table-scroll')"))
+
+
+def test_the_cross_compare_matrix_fades_where_it_goes_on(open_page, live_server):
+    page = open_page(live_server + f"/data/result/{job_id_of('cross_compare')}", 390)
+    if page.evaluate("() => !CSS.supports('container-type', 'scroll-state')"):
+        pytest.skip("this Chromium has no scroll-state container queries")
+    assert page.evaluate(FADE_SHOWN, page.evaluate_handle("() => document.querySelector('.tab-pane.active .cross-pane-body')"))
