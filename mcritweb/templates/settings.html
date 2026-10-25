@@ -5,7 +5,9 @@ Settings
 {% endblock %}
 
 {% block style %}
-<script src="{{ url_for('static', filename='sortablejs/Sortable.min.js') }}"></script>
+{# deferred: in <head> it held back the first paint, and the lists below are only made
+   sortable from whenReady, once it has run (issue #63) #}
+<script defer src="{{ url_for('static', filename='sortablejs/Sortable.min.js') }}"></script>
 <style>
     .list-group.col {
         min-height: 50px;
@@ -278,6 +280,7 @@ Settings
 
 
     <script type="text/javascript">
+      whenReady(function () {
         // Family Table
         var familyTableActive = document.getElementById('family_table_active');
         var familyTableAvailable = document.getElementById('family_table_available');
@@ -319,6 +322,7 @@ Settings
         var resultFunctionFunctionFilteredTableAvailable = document.getElementById('result_function_function_filtered_table_available');
         new Sortable(resultFunctionFunctionFilteredTableActive, {group: 'result_function_function_filtered_table_group', animation: 100});
         new Sortable(resultFunctionFunctionFilteredTableAvailable, {group: 'result_function_function_filtered_table_group', animation: 100});
+      });
 
         function getElementsFromContainer(containerId) {
             const container = document.getElementById(containerId);

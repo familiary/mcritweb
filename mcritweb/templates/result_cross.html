@@ -60,15 +60,20 @@ Results for Job: {{ job_info.job_id }}
 {% endblock %}
 {% block style %}
 
+{# this page is the only one that calls .sortable(); see issue #63. Deferred, like the
+   jQuery it extends, and so it runs after it and before Bootstrap - see base.html #}
+<link rel="stylesheet" href="{{ url_for('static', filename='jquery-ui.css') }}">
+<script defer src="{{ url_for('static', filename='jquery-ui.js') }}"></script>
+
 <script>
-  $(document).ready(function(){
+  whenReady(function(){
     // delegated, so that it also reaches the rows of a pane filled after load
     $(document).on("click", "td.clickable", function(){
       var result = $(this).parent().children("td.result").text();
       window.location.href="/data/result/"+result;
     });
   });
-  $( function() {
+  whenReady( function() {
     $( "#sortable" ).sortable();
   } );
   function changeorder() {
@@ -89,16 +94,18 @@ Results for Job: {{ job_info.job_id }}
   // the first sample and the row at the cell's column the second - rows and columns come in
   // the same order. hint.css shows the text as it is (white-space: pre), so the line breaks
   // and indentation are the ones the template used to write into the attribute.
-  $(document).on("mouseover", "#pills-tabContent tr.sample-row span[data-hint]", function(){
-    var hint = this.getAttribute("data-hint");
-    if (hint.indexOf("\n") >= 0) {
-      return;
-    }
-    var row = this.closest("tr");
-    var sampleRows = this.closest("table").querySelectorAll("tr.sample-row");
-    var column = sampleRows[this.parentNode.cellIndex - (row.cells.length - sampleRows.length)];
-    var indent = "\n            ";
-    this.setAttribute("data-hint", hint + "\n" + indent + row.getAttribute("data-hint-sample") + indent + "\nvs.\n" + indent + column.getAttribute("data-hint-sample"));
+  whenReady(function(){
+    $(document).on("mouseover", "#pills-tabContent tr.sample-row span[data-hint]", function(){
+      var hint = this.getAttribute("data-hint");
+      if (hint.indexOf("\n") >= 0) {
+        return;
+      }
+      var row = this.closest("tr");
+      var sampleRows = this.closest("table").querySelectorAll("tr.sample-row");
+      var column = sampleRows[this.parentNode.cellIndex - (row.cells.length - sampleRows.length)];
+      var indent = "\n            ";
+      this.setAttribute("data-hint", hint + "\n" + indent + row.getAttribute("data-hint-sample") + indent + "\nvs.\n" + indent + column.getAttribute("data-hint-sample"));
+    });
   });
 </script>
 {% endblock %} 
@@ -107,7 +114,7 @@ Results for Job: {{ job_info.job_id }}
 
 <script>
   var button_clicked = false;
-  $(document).ready(function(){
+  whenReady(function(){
     var editSampleModal = document.getElementById('editSampleModal');
     editSampleModal.addEventListener('show.bs.modal', function (event) {
     // Button that triggered the modal
@@ -256,7 +263,7 @@ Results for Job: {{ job_info.job_id }}
   // everything a pair of samples has in common across the methods: links, edit buttons and
   // the samples' part of each tooltip - and patching in what differs per method: the order,
   // each cell's colour and the score line of its tooltip.
-  $(document).ready(function(){
+  whenReady(function(){
     var lazy = null;
     var renderedPane = document.getElementById("pills-" + {{ rendered_method|tojson }});
     var rendered = renderedPane ? renderedPane.querySelector("table") : null;
