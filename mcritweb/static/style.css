@@ -426,6 +426,9 @@ form.form-inline input {
 .table-scroll {
   position: relative;
   margin-bottom: 1rem;
+  /* beside a float, as the table it holds is, not under it: a positioned box that ran under
+     the floated API usage button of the function pages painted over it and took its clicks */
+  display: flow-root;
 }
 .table-scroll > .table {
   margin-bottom: 0;

@@ -499,3 +499,20 @@ def test_a_searched_hash_breaks_in_the_heading_and_the_empty_message(open_page, 
         page = open_page(live_server + path, width)
         scroll_width, client_width = page.evaluate(PAGE_WIDTH)
         assert scroll_width <= client_width, f"{path} is {scroll_width}px wide in a {client_width}px window"
+
+
+@pytest.mark.parametrize("path", ["/explore/functions/84", "/data/matches/function/84/943"])
+@pytest.mark.parametrize("width", [390, 1024, 1280])
+def test_the_api_usage_button_of_a_function_page_opens_its_dialog(open_page, live_server, path, width):
+    """The function pages hold their details in a .table-scroll, which is positioned. On the
+    comparison page the API usage button floats before that box, and the box ran under it,
+    painted over it and took its click: the dialog never opened."""
+    page = open_page(live_server + path, width)
+    button = page.locator("[data-bs-target='#apiUsageModal']").first
+    assert page.evaluate("() => !!document.querySelector('.table-scroll')")
+    box = button.bounding_box()
+    hit = page.evaluate("([x, y]) => { const el = document.elementFromPoint(x, y); return !!el && !!el.closest(\"[data-bs-target='#apiUsageModal']\"); }",
+                        [box["x"] + box["width"] / 2, box["y"] + box["height"] / 2])
+    assert hit, "something else is drawn over the API usage button"
+    button.click(timeout=5000)
+    page.wait_for_selector("#apiUsageModal.show", timeout=5000)

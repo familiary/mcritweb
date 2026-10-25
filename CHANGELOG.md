@@ -154,7 +154,9 @@ rather than reconstructing it from the commit log at release time.
   keeps on one line, 1,064px on the samples list, and below about 1,100px the page scrolled sideways
   with it, taking the heading, the filters and the pagination along. Below 1200px each data table
   now scrolls on its own, and the menus in its rows, a sample's Analyze menu and a user's actions,
-  open over the edge of the box rather than being cut off by it.
+  open over the edge of the box rather than being cut off by it. On the function pages the box no
+  longer covers the API usage button that floats before it, which stopped the button opening its
+  dialog.
 - The tables that list the fields of one thing - a sample, a function, a job, the settings - break a
   long value onto the next line instead of pushing the page wider than a phone: the 64-character API
   token on the settings page, a long filename, a 37-character statistics field. The labels of those
