@@ -233,6 +233,11 @@ class UserInfo:
     @property
     def registration_date(self):
         return self.registered.strftime("%Y-%m-%d")
+
+    @property
+    def is_root(self):
+        """Whether this is the account the instance keeps as its admin, see ROOT_USER_ID."""
+        return self.user_id == ROOT_USER_ID
     
 
 #: 3 to 20 letters, digits, dots and underscores, not starting or ending with a dot or an
@@ -305,6 +310,30 @@ def get_all_user_info():
         all_user_infos.append(UserInfo.fromDb(user_id=user["id"]))
     return all_user_infos
     
+
+#: The account the first registration creates, as an admin. change_user_role will not
+#: demote it and delete_user will not delete it, so the instance always has an admin,
+#: whichever of the others are demoted or deleted.
+ROOT_USER_ID = 1
+
+
+def delete_user(user_id):
+    """Delete an account and everything keyed to it, unless it is the root account.
+
+    Returns whether it was deleted. The password, the API token and the theme are columns
+    of the row, and with the row gone every session of the account finds nobody to sign
+    in. Jobs carry no owner (ADR-0007), so there are none to delete or hand over. Both the
+    admin's delete on the users page and a user's delete of their own account come here.
+    """
+    if user_id == ROOT_USER_ID:
+        return False
+    database = get_db()
+    database.execute("DELETE FROM user_filters WHERE user_id = ?;", (user_id,))
+    database.execute("DELETE FROM user_column_settings WHERE user_id = ?;", (user_id,))
+    database.execute("DELETE FROM user WHERE id = ?;", (user_id,))
+    database.commit()
+    return True
+
 
 class ServerInfo:
 

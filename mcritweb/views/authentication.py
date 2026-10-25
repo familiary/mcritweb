@@ -513,3 +513,44 @@ def logout():
     else:
         flash('You\'re logged out now', category='success')
     return redirect(url_for('index'))
+
+
+#: What the root account is told if it asks to be deleted. Its settings page offers no
+#: form, so only a request made by hand gets here.
+ROOT_ACCOUNT_KEPT = ('This account cannot be deleted: it is the first one registered here, '
+                     'which stays an administrator so that the instance always has one.')
+
+
+@bp.route('/delete_account', methods=('POST',))
+@login_required
+def delete_account():
+    """Delete the caller's own account, as an admin deleting it from the users page would.
+
+    The password is asked for again, so that a session left open on a shared machine, or
+    a copy of its cookie, cannot end the account on its own. That makes the check a
+    password guess like one at /login, and it is metered by the same throttle: otherwise
+    whoever holds a stolen session could guess at the password here without limit.
+    """
+    user_info = g.user
+    # the last admin: every other admin can go and leave the root account in place, so
+    # it is the only one whose deletion could leave the server without an admin. Refused
+    # before the password check, so that asking costs no guess
+    if user_info.is_root:
+        flash(ROOT_ACCOUNT_KEPT, category='error')
+        return redirect(url_for('authentication.settings'))
+    if _throttled(user_info.username):
+        flash(TOO_MANY_ATTEMPTS, category='error')
+        return redirect(url_for('authentication.settings'))
+    password = request.form.get('password', '')
+    if not password or not check_password_hash(user_info.password, password):
+        db.record_failed_login(request.remote_addr, user_info.username)
+        flash('Incorrect password. Your account was not deleted.', category='error')
+        return redirect(url_for('authentication.settings'))
+    db.delete_user(user_info.user_id)
+    db.clear_login_failures(request.remote_addr, user_info.username)
+    # with the row gone, every other session of the account, a copied cookie included,
+    # finds nobody to sign in on its next request. This one ends now, as a logout's does
+    g.user = None
+    session.clear()
+    flash('Your account was deleted, together with its settings and its API token.', category='success')
+    return redirect(url_for('authentication.login'))
