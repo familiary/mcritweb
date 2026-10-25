@@ -42,3 +42,12 @@
 {% macro password_toggle(field) -%}
   <button type="button" class="btn btn-outline-secondary password-toggle" aria-pressed="false" aria-controls="{{ field }}">Show<span class="visually-hidden"> password</span></button>
 {%- endmacro %}
+
+{#
+  Which fields a form needs, said once at its top, where its fields used to say nothing. A
+  form whose every field is required says so rather than marking each one; the form names it
+  with aria-describedby="{{ id }}".
+#}
+{% macro required_note(id, text="All fields are required.") -%}
+  <p class="form-text" id="{{ id }}">{{ text }}</p>
+{%- endmacro %}

@@ -1,6 +1,6 @@
 {% from 'table/links.html' import clipboard_btn %}
 {% from 'table/filter_fields.html' import filter_field %}
-{% from 'table/field_feedback.html' import USERNAME_RULE, username_hint, error_attrs, error_message, password_toggle %}
+{% from 'table/field_feedback.html' import USERNAME_RULE, username_hint, error_attrs, error_message, password_toggle, required_note %}
 {% extends 'base.html' %}
 {% block title%}
 Settings
@@ -95,8 +95,9 @@ Settings
 </div>
 {% if g.user.role == 'admin' or g.user.role == 'contributor' %}
   <div class="tab-pane fade{% if open_tab == 'username' %} show active{% endif %}" id="pills-username" role="tabpanel" aria-labelledby="pills-username-tab">
-      <form action = "{{ url_for('admin.change_username') }}" method='post'>
+      <form action = "{{ url_for('admin.change_username') }}" method='post' aria-describedby="rename-required">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {{ required_note("rename-required") }}
           <div class="form-group mb-2">
             <label for="username" class="form-label">New username</label>
             {{ username_hint("username-hint") }}
@@ -115,8 +116,9 @@ Settings
       </form>
   </div>
   <div class="tab-pane fade{% if open_tab == 'password' %} show active{% endif %}" id="pills-password" role="tabpanel" aria-labelledby="pills-password-tab">
-      <form action = "{{ url_for('admin.change_password') }}" method='post'>
+      <form action = "{{ url_for('admin.change_password') }}" method='post' aria-describedby="password-required">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {{ required_note("password-required") }}
           <div class="form-group mb-2">
             <label for="inputPassword2" class="form-label">Current password</label>
             <div class="password-field">

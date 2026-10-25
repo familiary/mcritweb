@@ -1,4 +1,4 @@
-{% from 'table/field_feedback.html' import USERNAME_RULE, username_hint, error_attrs, error_message, password_toggle %}
+{% from 'table/field_feedback.html' import USERNAME_RULE, username_hint, error_attrs, error_message, password_toggle, required_note %}
 {% extends 'base.html' %}
 {% block title%}
 Register
@@ -7,9 +7,11 @@ Register
 {% block content %}
 <div class="d-flex justify-content-center my-4">
   <div style="max-width: 500px; width: 100%;">
-  <form method='post'>
+  <form method='post' aria-describedby="register-required">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <h3 class="mb-3">Define User Details:</h3>
+    {# the first user's form mixes in server settings that are optional, and their labels say so #}
+    {{ required_note("register-required", "Fields are required unless they say optional." if g.first_user else "All fields are required.") }}
     <div class="mb-2">
       <label for="username" class="form-label">Username</label>
       {{ username_hint("username-hint") }}

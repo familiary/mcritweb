@@ -168,6 +168,8 @@ rather than reconstructing it from the commit log at release time.
   too. A field the browser itself refuses is announced invalid when it is shown so. The username
   rule is written out beside the registration and rename fields instead of as a regular expression
   in a tooltip; it stays ASCII, since usernames are identifiers compared without regard to case.
+  The sign-in, registration, rename and password forms say at their top that all their fields are
+  required, and the first user's form that its fields are required unless they say optional.
 - The filter forms' number fields take numbers: a score is a whole number from 0 to 100 and a count
   one from 0, with a digit keypad on a phone, offsets are decimal or 0x hexadecimal, and the
   excluded family and sample IDs are numbers separated by commas; the browser says so before the

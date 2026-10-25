@@ -296,6 +296,60 @@ def test_the_last_field_of_a_credential_form_has_a_done_key(app, client, as_role
     assert checked == 6, checked
 
 
+class FormNotes(HTMLParser):
+    """[(form attributes, [its typed fields' attributes])] and the text of every element with an id."""
+
+    def __init__(self, html):
+        super().__init__(convert_charrefs=True)
+        self.forms, self.texts, self.open = [], {}, []
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "form":
+            self.forms.append((attrs, []))
+        elif tag == "input" and self.forms and attrs.get("type") in FormFields.TYPED:
+            self.forms[-1][1].append(attrs)
+        if tag not in ("input", "br", "img", "link", "meta"):
+            self.open.append(attrs.get("id"))
+            if attrs.get("id"):
+                self.texts[attrs["id"]] = ""
+
+    def handle_endtag(self, tag):
+        if self.open and tag not in ("input", "br", "img", "link", "meta"):
+            self.open.pop()
+
+    def handle_data(self, data):
+        for element in self.open:
+            if element:
+                self.texts[element] += data
+
+
+def required_notes(html):
+    """{action: (the text the form is described by, whether all its typed fields are required)}."""
+    page = FormNotes(html)
+    notes = {}
+    for attrs, fields in page.forms:
+        if any(field.get("type") == "password" for field in fields):
+            text = " ".join(page.texts.get(id_, "").strip() for id_ in (attrs.get("aria-describedby") or "").split())
+            notes[attrs.get("action") or ""] = (text, all("required" in field for field in fields))
+    return notes
+
+
+def test_a_form_whose_fields_are_all_required_says_so_once(app, client, as_role, make_user):
+    """No field said it was required. Where every field is, the form says so once at its top,
+    and is described by it, rather than marking each field; the first user's form, which
+    mixes in optional fields, says that the ones that are optional say so."""
+    first = required_notes(page_of(client, "/register"))
+    assert first == {"": ("Fields are required unless they say optional.", False)}
+    make_user("admin")
+    pages = [required_notes(page_of(client, "/login")), required_notes(page_of(client, "/register"))]
+    as_role("contributor")
+    pages.append(required_notes(page_of(client, "/settings")))
+    found = [note for page in pages for note in page.values()]
+    assert found == [("All fields are required.", True)] * 4, found
+
+
 def test_a_page_that_edits_samples_still_has_its_dialog(client, as_role):
     """The dialog is printed where an edit control can open it, and once."""
     as_role("contributor")

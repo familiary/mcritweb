@@ -1,4 +1,4 @@
-{% from 'table/field_feedback.html' import error_attrs, error_message, password_toggle %}
+{% from 'table/field_feedback.html' import error_attrs, error_message, password_toggle, required_note %}
 {% extends 'base.html' %}
 {% block title%}
 Login
@@ -7,9 +7,10 @@ Login
 <script>later({{ url_for('static', filename='form_fields.js')|tojson }})</script>{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-center">
-    <form class="form-signin" method='POST'>
+    <form class="form-signin" method='POST' aria-describedby="login-required">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <h1 class="h3 mb-3 text-center mono-font">Please sign in</h1>
+        {{ required_note("login-required") }}
         <div class="mb-2">
             <label for="username" class="form-label">Username</label>
             <input type='text' name='username' id="username" class="form-control" autocomplete="username" spellcheck="false" autocapitalize="off" autocorrect="off" required{% if username %} value="{{ username }}"{% endif %}{{ error_attrs(field_error, "username") }}{% if not field_error %} autofocus{% endif %}>
