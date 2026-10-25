@@ -162,6 +162,8 @@ rather than reconstructing it from the commit log at release time.
   get the same answer as before.
 - With reduced motion asked for, a file waiting in the drop zone no longer pulses for as long as it
   waits, and the score tooltips appear at once instead of sliding into place.
+- In the dark theme, the progress bar of a file waiting in the drop zone is dark too; Dropzone drew
+  it as a bright white bar in the dark preview card.
 
 ### Security
 

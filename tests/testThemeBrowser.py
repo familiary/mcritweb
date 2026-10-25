@@ -1459,3 +1459,20 @@ def test_the_blocks_show_cycles_colours_keep_their_text_readable(open_in, theme,
     assert len(found) >= 3, f"hardly any block was coloured: {found}"
     worst = min(found, key=lambda block: block["ratio"])
     assert worst["ratio"] >= 4.5, f"block text at {worst['ratio']}:1 on rgb{tuple(worst['fill'])}"
+
+
+def test_a_file_waiting_to_be_uploaded_is_drawn_on_the_dark_palette(open_in):
+    """The walk sees an empty drop zone. Once a file is in it, Dropzone shows its progress in a
+    capsule it paints 90% white (dropzone.min.css), which theme-dark.css's Dropzone rules did not
+    reach: a bright bar in the dark preview card of every upload that waits for "Submit"."""
+    page = open_in("dark", "/data/submit", ".dropzone")
+    page.wait_for_function("window.Dropzone !== undefined && document.getElementById('myDropzone').dropzone !== undefined")
+
+    page.evaluate("Dropzone.forElement('#myDropzone').addFile(new File(['MZ'], 'waiting.exe'))")
+    page.wait_for_selector(".dropzone .dz-preview .dz-progress")
+    calm(page)
+    report = run_probe(page)
+
+    assert page.locator(".dropzone .dz-preview .dz-progress").is_visible()
+    assert report["light"] == [], "elements whose background is lighter than 0.4:\n" + listed(report["light"])
+    assert report["text"] == [], "text below 4.5:1:\n" + listed(report["text"])

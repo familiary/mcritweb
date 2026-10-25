@@ -903,3 +903,17 @@
   background-color: var(--cfg-tooltip-bg) !important;
   box-shadow: var(--cfg-tooltip-shadow) !important;
 }
+
+/* --- Dropzone's progress bar ------------------------------------------------------------ */
+
+/* the capsule a file waiting to be uploaded shows its progress in: Dropzone paints it 90% white,
+   a bright bar in the dark preview card. It is a field's fill inside the control border here
+   (3.1:1 on the card), and the bar fills it in the primary colour (3.5:1 on it) */
+:root .dropzone .dz-preview .dz-progress {
+  background-color: var(--surface-input);
+  border: 1px solid var(--border-control);
+}
+
+:root .dropzone .dz-preview .dz-progress .dz-upload {
+  background: var(--primary);
+}
