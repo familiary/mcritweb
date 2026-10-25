@@ -160,6 +160,8 @@ rather than reconstructing it from the commit log at release time.
   layout and in the account's theme. They were Werkzeug's bare documents, white even on the dark
   theme. The page needs nothing from the MCRIT backend. The API, and scripts that ask for JSON,
   get the same answer as before.
+- With reduced motion asked for, a file waiting in the drop zone no longer pulses for as long as it
+  waits, and the score tooltips appear at once instead of sliding into place.
 
 ### Security
 

@@ -551,3 +551,19 @@ form.form-inline input {
 .node[fill="white"] rect {
   fill-opacity: var(--cfg-cycle-opacity);
 }
+
+/* Motion a reader has asked to be spared. Bootstrap's own fades, collapses and dialogs stop
+   under prefers-reduced-motion already; two did not: the pulse Dropzone gives a file that waits
+   for "Submit", a 6 s scale repeated for as long as it waits, and the slide of every hint.css
+   tooltip, which now appears at once where it would have ended up. Both start at :root to
+   outrank the vendored rules, which are as specific and can be linked after this file */
+@media (prefers-reduced-motion: reduce) {
+  :root .dropzone .dz-preview:not(.dz-processing) .dz-progress {
+    animation: none;
+  }
+
+  :root [data-hint]::before,
+  :root [data-hint]::after {
+    transition: none;
+  }
+}

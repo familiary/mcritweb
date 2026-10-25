@@ -2,8 +2,9 @@
 """What moves on a page when the reader has asked for less motion, in a browser.
 
 Bootstrap's own transitions (its fades, collapses and dialogs) are off under
-`prefers-reduced-motion: reduce` already, in the vendored stylesheet. The upload form's fields
-were not: jQuery slides them open and shut.
+`prefers-reduced-motion: reduce` already, in the vendored stylesheet. Three things were not:
+the upload form's fields, which jQuery slides open and shut, the pulse Dropzone runs on a file
+waiting to be uploaded, for as long as it waits, and the slide of every hint.css tooltip.
 
 `playwright` is not a dependency of this project and CI does not install it, so this module
 skips there rather than failing.
@@ -14,6 +15,7 @@ import threading
 
 import pytest
 from conftest import session_cookie_for
+from fixtureData import job_id_of
 from werkzeug.serving import make_server
 
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
@@ -99,3 +101,30 @@ def test_the_upload_form_follows_a_change_of_the_preference_while_the_page_is_op
     page.click("#unmapped")
     assert page.evaluate(SLIDING, "#extendedFields")[0], "after the switch back, the fields no longer slide"
 
+
+def test_with_reduced_motion_a_file_waiting_to_be_uploaded_does_not_pulse(open_page):
+    """Dropzone pulses the progress bar of a file that waits for "Submit", a 6 s scale animation
+    that repeats for as long as the file waits."""
+    page = open_page("/data/submit", "reduce")
+    page.wait_for_function("window.Dropzone !== undefined && document.getElementById('myDropzone').dropzone !== undefined")
+
+    page.evaluate("Dropzone.forElement('#myDropzone').addFile(new File(['MZ'], 'waiting.exe'))")
+    page.wait_for_selector(".dropzone .dz-preview .dz-progress", state="attached")
+    running = page.evaluate("document.getAnimations().filter((animation) => animation instanceof CSSAnimation && animation.playState === 'running').map((animation) => animation.animationName)")
+
+    assert running == [], f"animations running: {running}"
+
+
+def test_with_reduced_motion_a_hint_tooltip_does_not_slide_in(open_page):
+    """hint.css fades a tooltip in and moves it 8 px towards its place, on every score cell the
+    pointer crosses."""
+    page = open_page(f"/data/result/{job_id_of('matches_for_sample')}", "reduce")
+    cell = page.locator("td span[data-hint]:visible").first
+    assert cell.count() == 1, "the result page has no score cell with a tooltip"
+
+    cell.hover()
+    moving = page.evaluate("document.getAnimations().filter((animation) => animation instanceof CSSTransition).map((animation) => animation.transitionProperty)")
+    shown = cell.evaluate("(cell) => getComputedStyle(cell, '::after').opacity")
+
+    assert moving == [], f"transitions running: {moving}"
+    assert shown == "1", "the tooltip did not show"
