@@ -88,13 +88,13 @@
           Filename
         {% endcall %}
       {% elif column_type == "bitness" and not compact_view %}
-        <th style="text-align: right;" scope="col">Bitness</th>
+        <th class="text-end" scope="col">Bitness</th>
       {% elif column_type == "num_functions" %}
         {% call sortable_header_col(sort_pagination, "statistics.num_functions", align="right") %}
           Functions
         {% endcall %}
       {% elif column_type == "is_library" %}
-        <th style="text-align: right;" scope="col">Library</th>
+        <th class="text-end" scope="col">Library</th>
       {% endif %}
     {% endfor %}
     {% if show_hint %}

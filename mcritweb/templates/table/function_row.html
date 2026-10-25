@@ -38,9 +38,9 @@
           <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample ID</span>
         {% endcall %}
       {% elif column_type == "pic_hash" %}
-        <th style="text-align: right;" scope="col">Pichash</th>
+        <th class="text-end" scope="col">Pichash</th>
       {% elif column_type == "has_minhash" %}
-        <th style="text-align: center;" scope="col">Minhash</th>
+        <th class="text-center" scope="col">Minhash</th>
       {% elif column_type == "offset" %}
         {% call sortable_header_col(sort_pagination, "offset", align="right") %}
           Offset
