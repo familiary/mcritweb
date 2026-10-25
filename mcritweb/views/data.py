@@ -62,7 +62,7 @@ bp = Blueprint('data', __name__, url_prefix='/data')
 ################################################################
 
 #: A job id as the backend hands it out: a mongo ObjectId (24 hex), which a local
-#: queue mints too since mcrit 1.14 - before that it was a uuid4, and setup.py still
+#: queue mints too since mcrit 1.14 - before that it was a uuid4, and pyproject.toml still
 #: allows those releases. A cached report is named after its job id, and the id
 #: arrives straight from the URL - so keep it to characters that cannot leave the
 #: cache directory (no os.sep, no ".."), and to a length a filename can hold. `\Z`,

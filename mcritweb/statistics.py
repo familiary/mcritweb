@@ -137,7 +137,7 @@ def statistics_page(status_answer, mcritweb_version, mcrit_version):
     """Everything statistics.html renders, from getStatus()'s answer and the versions.
 
     `mcrit_version` is backend_version()'s answer, which is "unknown" already when the
-    backend does not give one; `mcritweb_version` is None when setup.py had no version.
+    backend does not give one; `mcritweb_version` is the app's MCRITWEB_VERSION, None when unset.
 
     `status_answer` is what McritClient.getStatus() returns: `{"status": {...}}`, or
     None when the backend could not answer.
