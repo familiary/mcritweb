@@ -28,15 +28,15 @@ Results for Job: {{ job_info.job_id }}
     <div class="form-group row">
       {% set min_offset = matching_result.getFilterValue("filter_min_offset") %}
       {% set max_offset = matching_result.getFilterValue("filter_max_offset") %}
-      {{ filter_field("filter_min_score", "Min. score", matching_result.getFilterValue("filter_min_score"), placeholder="0-100") }}
-      {{ filter_field("filter_lib_min_score", "Min. library score", matching_result.getFilterValue("filter_lib_min_score"), placeholder="0-100") }}
-      {{ filter_field("filter_link_score", "Min. link score", matching_result.getFilterValue("filter_link_score"), placeholder="0-100") }}
-      {{ filter_field("filter_min_size", "Min. size (bytes)", matching_result.getFilterValue("filter_min_size")) }}
-      {{ filter_field("filter_min_offset", "Min. offset", "0x%x" % min_offset if min_offset is not none else none, placeholder="0x0") }}
-      {{ filter_field("filter_max_offset", "Max. offset", "0x%x" % max_offset if max_offset is not none else none, placeholder="0x0") }}
-      {{ filter_field("filter_unpenalized_family_count", "Unpenalized family count", matching_result.getFilterValue("filter_unpenalized_family_count"), cols="col-12 col-sm-6", placeholder="3") }}
-      {{ filter_field("filter_exclude_families", "Exclude family IDs", matching_result.getFilterValue("filter_exclude_families"), cols="col-6", placeholder="1, 2, 3") }}
-      {{ filter_field("filter_exclude_samples", "Exclude sample IDs", matching_result.getFilterValue("filter_exclude_samples"), cols="col-6", placeholder="1, 2, 3") }}
+      {{ filter_field("filter_min_score", "Min. score", matching_result.getFilterValue("filter_min_score"), placeholder="0-100", kind="score") }}
+      {{ filter_field("filter_lib_min_score", "Min. library score", matching_result.getFilterValue("filter_lib_min_score"), placeholder="0-100", kind="score") }}
+      {{ filter_field("filter_link_score", "Min. link score", matching_result.getFilterValue("filter_link_score"), placeholder="0-100", kind="score") }}
+      {{ filter_field("filter_min_size", "Min. size (bytes)", matching_result.getFilterValue("filter_min_size"), kind="count") }}
+      {{ filter_field("filter_min_offset", "Min. offset", "0x%x" % min_offset if min_offset is not none else none, placeholder="0x0", kind="offset") }}
+      {{ filter_field("filter_max_offset", "Max. offset", "0x%x" % max_offset if max_offset is not none else none, placeholder="0x0", kind="offset") }}
+      {{ filter_field("filter_unpenalized_family_count", "Unpenalized family count", matching_result.getFilterValue("filter_unpenalized_family_count"), cols="col-12 col-sm-6", placeholder="3", kind="count") }}
+      {{ filter_field("filter_exclude_families", "Exclude family IDs", matching_result.getFilterValue("filter_exclude_families"), cols="col-6", placeholder="1, 2, 3", kind="ids") }}
+      {{ filter_field("filter_exclude_samples", "Exclude sample IDs", matching_result.getFilterValue("filter_exclude_samples"), cols="col-6", placeholder="1, 2, 3", kind="ids") }}
       <label class="col-4" for="filter_strongest_per_family">strongest per family only</label>
       <input class="col-1" type="checkbox" name='filter_strongest_per_family' id="filter_strongest_per_family" {% if matching_result.getFilterValue("filter_strongest_per_family") %}checked{% endif %}>
       <div class="d-grid gap-4 d-md-block">

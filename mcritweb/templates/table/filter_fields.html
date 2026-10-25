@@ -1,3 +1,4 @@
+{% from 'table/field_feedback.html' import error_attrs, error_message %}
 {#
   A field of the filter forms - the result pages', the link hunt's, the unique blocks
   page's and the default result filter on the settings page - with a visible label of its
@@ -12,12 +13,28 @@
 
   `value` is printed as it is given, so an offset comes formatted; none leaves the field
   empty. `cols` are the grid classes of the field's cell in the form's row.
+
+  `kind` says what the field takes, which the browser checks before the form is sent: it
+  used to take anything, and the server read what it could not parse as no filter at all
+  (or, for the default filter, as 0) and said nothing. What each kind lets through is what
+  views/params.py parses: a score is a whole percentage, a count a whole number from 0, an
+  offset a decimal number or a hexadecimal one after 0x, and ids are whole numbers separated
+  by commas. Text is left alone. A score is never a fraction there, and hex only reaches an
+  offset, so the numbers are number fields, with a digit keypad on a phone.
+
+  `error` is a refused submit's, for templates/table/field_feedback.html.
 #}
-{% macro filter_field(name, label, value=none, cols="col-6 col-sm-3", placeholder="") -%}
+{% macro filter_field(name, label, value=none, cols="col-6 col-sm-3", placeholder="", kind="text", error=none) -%}
   <div class="{{ cols }} filter-field">
     <label class="form-label" for="{{ name }}">{{ label }}</label>
-    <input class="form-control" type="text" name="{{ name }}" id="{{ name }}"
+    <input class="form-control" name="{{ name }}" id="{{ name }}"
+      {%- if kind == "score" %} type="number" inputmode="numeric" min="0" max="100" step="1"
+      {%- elif kind == "count" %} type="number" inputmode="numeric" min="0" step="1"
+      {%- elif kind == "offset" %} type="text" pattern="0x[0-9a-fA-F]+|[0-9]+" title="A decimal number, or a hexadecimal one starting with 0x" spellcheck="false" autocapitalize="off" autocorrect="off"
+      {%- elif kind == "ids" %} type="text" pattern="[0-9]+(\s*,\s*[0-9]+)*" title="Numbers separated by commas"
+      {%- else %} type="text"{% endif %}
       {%- if placeholder %} placeholder="{{ placeholder }}"{% endif %}
-      {%- if value is not none %} value="{{ value }}"{% endif %}>
+      {%- if value is not none %} value="{{ value }}"{% endif %}{{ error_attrs(error, name) }}>
+    {{- error_message(error, name) }}
   </div>
 {%- endmacro %}

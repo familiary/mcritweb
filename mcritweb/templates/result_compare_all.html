@@ -58,10 +58,10 @@ Results for Job: {{ job_info.job_id }}
 <p>total: {{ famp.max_value }}{% if famp.max_value > 0 %}, showing: {{ 1 + famp.start_index }} - {{ famp.end_index }}{% endif %} (filtered: {{ matching_result.num_original_family_matches - famp.max_value}})</p>
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#family-matches" method='GET'>
   <div class="form-group row">
-    {{ filter_field("filter_direct_min_score", "Min. direct score", matching_result.getFilterValue("filter_direct_min_score"), placeholder="0-100") }}
-    {{ filter_field("filter_direct_nonlib_min_score", "Min. nonlib direct score", matching_result.getFilterValue("filter_direct_nonlib_min_score"), placeholder="0-100") }}
-    {{ filter_field("filter_frequency_min_score", "Min. frequency score", matching_result.getFilterValue("filter_frequency_min_score"), placeholder="0-100") }}
-    {{ filter_field("filter_frequency_nonlib_min_score", "Min. nonlib frequency score", matching_result.getFilterValue("filter_frequency_nonlib_min_score"), placeholder="0-100") }}
+    {{ filter_field("filter_direct_min_score", "Min. direct score", matching_result.getFilterValue("filter_direct_min_score"), placeholder="0-100", kind="score") }}
+    {{ filter_field("filter_direct_nonlib_min_score", "Min. nonlib direct score", matching_result.getFilterValue("filter_direct_nonlib_min_score"), placeholder="0-100", kind="score") }}
+    {{ filter_field("filter_frequency_min_score", "Min. frequency score", matching_result.getFilterValue("filter_frequency_min_score"), placeholder="0-100", kind="score") }}
+    {{ filter_field("filter_frequency_nonlib_min_score", "Min. nonlib frequency score", matching_result.getFilterValue("filter_frequency_nonlib_min_score"), placeholder="0-100", kind="score") }}
     {{ filter_field("filter_family_name", "Family name", matching_result.getFilterValue("filter_family_name"), cols="col-12") }}
     <input class="col-1" type="checkbox" name='filter_unique_only' id="filter_unique_only" {% if matching_result.getFilterValue("filter_unique_only") %}checked{% endif %}>
     <label class="col-5" for="filter_unique_only">only show families with unique matches</label>
@@ -120,10 +120,10 @@ Results for Job: {{ job_info.job_id }}
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#function-matches" method='GET'>
     <div class="form-group row">
       {% set offset = matching_result.getFilterValue("filter_function_offset") %}
-      {{ filter_field("filter_function_min_score", "Min. score", matching_result.getFilterValue("filter_function_min_score"), placeholder="0-100") }}
-      {{ filter_field("filter_function_max_score", "Max. score", matching_result.getFilterValue("filter_function_max_score"), placeholder="0-100") }}
-      {{ filter_field("filter_max_num_families", "Max. families", matching_result.getFilterValue("filter_max_num_families")) }}
-      {{ filter_field("filter_function_offset", "Offset", "0x%x" % offset if offset is not none else none, placeholder="0x0") }}
+      {{ filter_field("filter_function_min_score", "Min. score", matching_result.getFilterValue("filter_function_min_score"), placeholder="0-100", kind="score") }}
+      {{ filter_field("filter_function_max_score", "Max. score", matching_result.getFilterValue("filter_function_max_score"), placeholder="0-100", kind="score") }}
+      {{ filter_field("filter_max_num_families", "Max. families", matching_result.getFilterValue("filter_max_num_families"), kind="count") }}
+      {{ filter_field("filter_function_offset", "Offset", "0x%x" % offset if offset is not none else none, placeholder="0x0", kind="offset") }}
       <input class="col-1" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" {% if matching_result.getFilterValue("filter_exclude_library") %}checked{% endif %}>
       <label class="col-3" for="filter_exclude_library">exclude functions with library hits</label>
       <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>

@@ -459,6 +459,9 @@ def settings():
     if user_column_settings is None:
         user_column_settings = UserColumnSettings.fromDict(user_id, {})
         user_column_settings.saveToDb()
+    if form_error and form_error["tab"] == "default-filter":
+        # a refused default filter shows what was typed, not what is stored
+        user_filters = UserFilters.fromDict(user_id, form_error["typed"])
     return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken),
                            form_error=form_error, open_tab=form_error["tab"] if form_error else "info")
 

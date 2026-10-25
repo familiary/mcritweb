@@ -138,18 +138,18 @@ Settings
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group row text-start">
           <h3>Family / Sample result filter</h3> 
-          {{ filter_field("filter_direct_min_score", "Min. direct score", user_filters.filter_direct_min_score, placeholder="0-100") }}
-          {{ filter_field("filter_direct_nonlib_min_score", "Min. nonlib direct score", user_filters.filter_direct_nonlib_min_score, placeholder="0-100") }}
-          {{ filter_field("filter_frequency_min_score", "Min. frequency score", user_filters.filter_frequency_min_score, placeholder="0-100") }}
-          {{ filter_field("filter_frequency_nonlib_min_score", "Min. nonlib frequency score", user_filters.filter_frequency_nonlib_min_score, placeholder="0-100") }}
+          {{ filter_field("filter_direct_min_score", "Min. direct score", user_filters.filter_direct_min_score, placeholder="0-100", kind="score", error=form_error) }}
+          {{ filter_field("filter_direct_nonlib_min_score", "Min. nonlib direct score", user_filters.filter_direct_nonlib_min_score, placeholder="0-100", kind="score", error=form_error) }}
+          {{ filter_field("filter_frequency_min_score", "Min. frequency score", user_filters.filter_frequency_min_score, placeholder="0-100", kind="score", error=form_error) }}
+          {{ filter_field("filter_frequency_nonlib_min_score", "Min. nonlib frequency score", user_filters.filter_frequency_nonlib_min_score, placeholder="0-100", kind="score", error=form_error) }}
           <label class="col-8" for="filter_unique_only">only show families/samples with unique matches</label>
           <input class="col-4" type="checkbox" name='filter_unique_only' id="filter_unique_only" {% if user_filters.filter_unique_only %}checked{% endif %}>
           <label class="col-8" for="filter_exclude_own_family">exclude own family</label>
           <input class="col-4" type="checkbox" name='filter_exclude_own_family' id="filter_exclude_own_family" {% if user_filters.filter_exclude_own_family %}checked{% endif %}>
           <h3>Function result filter</h3> 
-          {{ filter_field("filter_function_min_score", "Min. score", user_filters.filter_function_min_score, placeholder="0-100") }}
-          {{ filter_field("filter_function_max_score", "Max. score", user_filters.filter_function_max_score, placeholder="0-100") }}
-          {{ filter_field("filter_max_num_families", "Max. families/samples", user_filters.filter_max_num_families) }}
+          {{ filter_field("filter_function_min_score", "Min. score", user_filters.filter_function_min_score, placeholder="0-100", kind="score", error=form_error) }}
+          {{ filter_field("filter_function_max_score", "Max. score", user_filters.filter_function_max_score, placeholder="0-100", kind="score", error=form_error) }}
+          {{ filter_field("filter_max_num_families", "Max. families/samples", user_filters.filter_max_num_families, kind="count", error=form_error) }}
           <label class="col-8" for="filter_exclude_library">exclude functions with library hits</label>
           <input class="col-4" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" {% if user_filters.filter_exclude_library %}checked{% endif %}>
           <label class="col-8" for="filter_exclude_pic">exclude PIC hits</label>

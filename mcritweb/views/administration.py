@@ -75,6 +75,36 @@ def change_password():
     return refuse_settings_form('password', [error_field], error_msg)
 
 
+#: The default filter's number fields, with the largest value each takes: the scores are
+#: percentages, the last a number of families. All are whole numbers from 0, as the
+#: settings form asks; an empty one is stored as the default it always was.
+DEFAULT_FILTER_NUMBERS = {
+    "filter_direct_min_score": 100,
+    "filter_direct_nonlib_min_score": 100,
+    "filter_frequency_min_score": 100,
+    "filter_frequency_nonlib_min_score": 100,
+    "filter_function_min_score": 100,
+    "filter_function_max_score": 100,
+    "filter_max_num_families": None,
+}
+DEFAULT_FILTER_CHECKBOXES = ("filter_unique_only", "filter_exclude_own_family", "filter_exclude_library", "filter_exclude_pic")
+
+
+def refused_default_filter_number(request):
+    """(field, message) for the first number field holding something that is not a whole
+    number in its range, or None. Such a value used to be stored as 0 - or 100 for the
+    maximum score - and the change reported as a success."""
+    for name, maximum in DEFAULT_FILTER_NUMBERS.items():
+        if not request.form.get(name, "").strip():
+            continue
+        value = parse_integer_post_param(request, name)
+        if value is None or value < 0 or (maximum is not None and value > maximum):
+            if maximum is None:
+                return name, "Default filters not changed: the number of families has to be a whole number from 0."
+            return name, f"Default filters not changed: a score has to be a whole number from 0 to {maximum}."
+    return None
+
+
 @bp.route('/change_default_filter' , methods=('POST',))
 @login_required
 def change_default_filter():
@@ -82,6 +112,11 @@ def change_default_filter():
     if user_id is None:
         flash('User ID was not recognized', category='error')
         return redirect(url_for('index'))
+    refused = refused_default_filter_number(request)
+    if refused is not None:
+        typed = {name: request.form.get(name, "") for name in DEFAULT_FILTER_NUMBERS}
+        typed.update({name: "on" if parse_checkbox_post_param(request, name) else "" for name in DEFAULT_FILTER_CHECKBOXES})
+        return refuse_settings_form("default-filter", [refused[0]], refused[1], typed)
     # generic filtering on family/sample results
     filter_direct_min_score = parse_integer_post_param(request, "filter_direct_min_score")
     filter_direct_nonlib_min_score = parse_integer_post_param(request, "filter_direct_nonlib_min_score")

@@ -181,9 +181,9 @@ Unique Blocks for {{ sample_ids|length }} Samples
         <div class="form-group row">
           {# prefilled, so that the filter is not silently reset by using it twice - the
              rule form below carries these across for the same reason #}
-          {{ filter_field("min_score", "Min. score", request.args.get('min_score', ''), cols="col-6 col-sm-4", placeholder="0-100") }}
-          {{ filter_field("min_block_length", "Min. block length", request.args.get('min_block_length', ''), cols="col-6 col-sm-4") }}
-          {{ filter_field("max_block_length", "Max. block length", request.args.get('max_block_length', ''), cols="col-6 col-sm-4") }}
+          {{ filter_field("min_score", "Min. score", request.args.get('min_score', ''), cols="col-6 col-sm-4", placeholder="0-100", kind="score") }}
+          {{ filter_field("min_block_length", "Min. block length", request.args.get('min_block_length', ''), cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("max_block_length", "Max. block length", request.args.get('max_block_length', ''), cols="col-6 col-sm-4", kind="count") }}
           <input type="hidden" name="tab" value="blocks">{{ carry_yara_rule_params() }}
           <button type="submit" class="btn btn-primary">Filter</button>
         </div>
@@ -229,12 +229,12 @@ Unique Blocks for {{ sample_ids|length }} Samples
     </p>
     <form class="form-inline" action="{{ url_for('data.result', job_id=job_info.job_id) }}" method='GET'>
         <div class="form-group row">
-          {{ filter_field("min_ins", "Min. instructions", yara_params['min_ins'], cols="col-6 col-sm-4") }}
-          {{ filter_field("max_ins", "Max. instructions", yara_params['max_ins'], cols="col-6 col-sm-4") }}
-          {{ filter_field("min_bytes", "Min. bytes", yara_params['min_bytes'], cols="col-6 col-sm-4") }}
-          {{ filter_field("max_bytes", "Max. bytes", yara_params['max_bytes'], cols="col-6 col-sm-4") }}
-          {{ filter_field("required_per_sample", "Blocks per sample", yara_params['required_per_sample'], cols="col-6 col-sm-4") }}
-          {{ filter_field("condition_required", "Strings required", yara_params['condition_required'], cols="col-6 col-sm-4") }}
+          {{ filter_field("min_ins", "Min. instructions", yara_params['min_ins'], cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("max_ins", "Max. instructions", yara_params['max_ins'], cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("min_bytes", "Min. bytes", yara_params['min_bytes'], cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("max_bytes", "Max. bytes", yara_params['max_bytes'], cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("required_per_sample", "Blocks per sample", yara_params['required_per_sample'], cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("condition_required", "Strings required", yara_params['condition_required'], cols="col-6 col-sm-4", kind="count") }}
           <input type="hidden" name="tab" value="yara">{{ carry_block_filter_params() }}
           <button type="submit" class="btn btn-primary">Regenerate Rule</button>
         </div>

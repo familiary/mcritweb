@@ -164,6 +164,12 @@ rather than reconstructing it from the commit log at release time.
   too. A field the browser itself refuses is announced invalid when it is shown so. The username
   rule is written out beside the registration and rename fields instead of as a regular expression
   in a tooltip; it stays ASCII, since usernames are identifiers compared without regard to case.
+- The filter forms' number fields take numbers: a score is a whole number from 0 to 100 and a count
+  one from 0, with a digit keypad on a phone, offsets are decimal or 0x hexadecimal, and the
+  excluded family and sample IDs are numbers separated by commas; the browser says so before the
+  form is sent. Such a field used to take anything, and what it could not parse was dropped without
+  a word; a default filter of "abc" was even stored as 0 and reported as changed. The settings page
+  now refuses it, stores nothing and says why beside the field.
 
 ### Security
 
