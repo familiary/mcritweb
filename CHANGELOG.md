@@ -70,7 +70,8 @@ rather than reconstructing it from the commit log at release time.
   removes - the account with its password, API token and preferences - signs it out in every
   browser and lands on the login page. A wrong password counts against the same limit as a failed
   login. The first account registered cannot delete itself, as an admin cannot delete it either: it
-  is the administrator the instance always keeps. Samples, families and jobs stay on the backend.
+  is the administrator the instance always keeps, and so is an admin when no other account holds the
+  role, in case that account was demoted or removed in the database. Samples, families and jobs stay on the backend.
 
 ### Changed
 

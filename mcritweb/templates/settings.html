@@ -308,10 +308,12 @@ Settings
   </div>
   {# offered to every role, pending included: what the account holds is its owner's, and
      deleting it should not need an admin. The root account is the one the instance keeps
-     as its admin, so it is told why instead #}
+     as its admin, so it is told why instead, as is an admin with no other admin beside it #}
   <div class="tab-pane fade" id="pills-delete-account" role="tabpanel" aria-labelledby="pills-delete-account-tab">
     {% if user_info.is_root %}
     <p>This account cannot be deleted. It is the first account registered here, which stays an administrator so that the instance always has one: the users page cannot demote or delete it either.</p>
+    {% elif only_admin %}
+    <p>This account cannot be deleted. It is the only administrator, and the instance needs one. Make another account an administrator on the users page first.</p>
     {% else %}
     <form action="{{ url_for('authentication.delete_account') }}" method="post" class="text-start d-inline-block">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

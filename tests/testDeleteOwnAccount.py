@@ -297,6 +297,80 @@ def test_the_first_account_cannot_delete_itself(app, boss, carol):
     assert failures(app, "boss") == 0
 
 
+def _demote_root(app, boss):
+    """What editing the database by hand can do: id 1 is no longer an admin."""
+    connection = sqlite3.connect(app.config["DATABASE"])
+    try:
+        connection.execute("UPDATE user SET role = 'contributor' WHERE id = ?", (boss,))
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def test_the_only_admin_cannot_delete_itself(app, boss):
+    """The root refusal rests on id 1 being an admin. If that row was demoted by hand,
+    the one admin left could delete itself and leave the instance without any, so the
+    count of admins is what decides, and the password is not asked for."""
+    _demote_root(app, boss)
+    user_id = _make_carol(app, "admin")
+    owner = logged_in(app)
+
+    response = delete_account(owner)
+
+    assert response.headers["Location"].endswith("/settings")
+    assert flashes(owner) == ["This account cannot be deleted: it is the only administrator, and the "
+                              "instance needs one. Make another account an administrator first."]
+    assert account_rows(app, user_id) == {"user": [(user_id,)], "user_filters": [(user_id,)],
+                                          "user_column_settings": [(user_id,)]}
+    assert is_logged_in(owner)
+    # refused before the password is checked, so it costs no guess
+    delete_account(owner, password="not the password")
+    assert failures(app) == 0
+
+
+def test_an_admin_can_delete_itself_while_another_admin_remains(app, boss):
+    _demote_root(app, boss)
+    other = _make_other_admin(app)
+    user_id = _make_carol(app, "admin")
+
+    delete_account(logged_in(app))
+
+    assert account_rows(app, user_id)["user"] == []
+    assert _rows(app, "SELECT role FROM user WHERE id = ?", (other,)) == [("admin",)]
+
+
+def test_the_settings_page_explains_why_the_only_admin_cannot_delete_itself(app, boss):
+    _demote_root(app, boss)
+    _make_carol(app, "admin")
+
+    page = logged_in(app).get("/settings").get_data(as_text=True)
+
+    assert f'action="{TARGET}"' not in page
+    assert "This account cannot be deleted" in page
+    assert "only administrator" in page
+
+
+def test_a_contributor_can_delete_itself_when_no_admin_is_left(app, boss):
+    """Only an admin's deletion can take the last admin away."""
+    _demote_root(app, boss)
+    user_id = _make_carol(app, "contributor")
+
+    delete_account(logged_in(app))
+
+    assert account_rows(app, user_id)["user"] == []
+
+
+def _make_other_admin(app):
+    with app.app_context():
+        user_info = UserInfo()
+        user_info.username = "dave"
+        user_info.password = generate_password_hash(PASSWORD)
+        user_info.role = "admin"
+        user_info.apitoken = "apitoken-dave"
+        user_info.saveToDb()
+        return UserInfo.fromDb(username="dave").user_id
+
+
 # --- the account's other sessions -------------------------------------------------
 
 def test_a_copied_session_ends_with_the_account(app, carol):

@@ -422,7 +422,7 @@ def settings():
     if user_column_settings is None:
         user_column_settings = UserColumnSettings.fromDict(user_id, {})
         user_column_settings.saveToDb()
-    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken))
+    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken), only_admin=db.is_only_admin(user_info))
 
 def admin_required(view):
     @functools.wraps(view)
@@ -520,6 +520,10 @@ def logout():
 ROOT_ACCOUNT_KEPT = ('This account cannot be deleted: it is the first one registered here, '
                      'which stays an administrator so that the instance always has one.')
 
+#: And if the root account is gone or demoted and this is the one admin left.
+LAST_ADMIN_KEPT = ('This account cannot be deleted: it is the only administrator, and the '
+                   'instance needs one. Make another account an administrator first.')
+
 
 @bp.route('/delete_account', methods=('POST',))
 @login_required
@@ -537,6 +541,11 @@ def delete_account():
     # before the password check, so that asking costs no guess
     if user_info.is_root:
         flash(ROOT_ACCOUNT_KEPT, category='error')
+        return redirect(url_for('authentication.settings'))
+    # the root account is only a convention about one row: if it was demoted or removed
+    # by hand, the admin left must stay too
+    if db.is_only_admin(user_info):
+        flash(LAST_ADMIN_KEPT, category='error')
         return redirect(url_for('authentication.settings'))
     if _throttled(user_info.username):
         flash(TOO_MANY_ATTEMPTS, category='error')

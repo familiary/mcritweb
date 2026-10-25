@@ -317,6 +317,20 @@ def get_all_user_info():
 ROOT_USER_ID = 1
 
 
+def is_only_admin(user_info):
+    """Whether this account is an admin and no other account is.
+
+    The root account is meant to keep that from happening, but it is a convention about
+    one row's id: editing the database by hand can demote or remove it, and then the
+    last admin left must not be deleted either.
+    """
+    if user_info.role != "admin":
+        return False
+    others = get_db().execute("SELECT COUNT(*) FROM user WHERE role = 'admin' AND id != ?;",
+                              (user_info.user_id,)).fetchone()[0]
+    return others == 0
+
+
 def delete_user(user_id):
     """Delete an account and everything keyed to it, unless it is the root account.
 
