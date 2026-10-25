@@ -95,7 +95,7 @@ Function: {{ function_id }}
     </div>
     <div align="right" class="col">
       <div class="btn-group dropdown">
-        <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="button_function_analyze" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Analyze">
+        <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="button_function_analyze" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Analyze" aria-label="Analyze function {{ function_id }}">
           <i class="fa-solid fa-flask" aria-hidden="true"></i>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
@@ -121,9 +121,9 @@ Function: {{ function_id }}
       {% endif %}
       {% if g.user.role in ('admin', 'contributor') %}
         {% if can_modify_function %}
-        <a class="btn btn-outline-dark btn-sm" id="button_function_rename" role="button" data-bs-toggle="modal" data-bs-target="#renameFunctionModal" title="Rename function"><i class="fa-solid fa-pen" aria-hidden="true"></i></a>
+        <a class="btn btn-outline-dark btn-sm" id="button_function_rename" role="button" data-bs-toggle="modal" data-bs-target="#renameFunctionModal" title="Rename function" aria-label="Rename function {{ function_id }}"><i class="fa-solid fa-pen" aria-hidden="true"></i></a>
         {% else %}
-        <a class="btn btn-outline-dark btn-sm disabled" id="button_function_rename" role="button" aria-disabled="true" title="Renaming functions needs an MCRIT backend of version 1.10.0 or newer"><i class="fa-solid fa-pen" aria-hidden="true"></i></a>
+        <a class="btn btn-outline-dark btn-sm disabled" id="button_function_rename" role="button" aria-disabled="true" title="Renaming functions needs an MCRIT backend of version 1.10.0 or newer" aria-label="Rename function {{ function_id }}"><i class="fa-solid fa-pen" aria-hidden="true"></i></a>
         {% endif %}
       {% endif %}
       {{ api_usage_button("apiUsageModal") }}

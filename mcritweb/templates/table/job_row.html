@@ -30,10 +30,10 @@
   {% set sample_entry = samples_by_id.get(job.sample_id) %}
   {{ job.method|job_name }} | 
   {% if sample_entry %}
-    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i> {{ format_sample_id(job.sample_id) }}<br />
+    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i><span class="visually-hidden">Family</span> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample</span> {{ format_sample_id(job.sample_id) }}<br />
     {{ format_monospace(samples_by_id[job.sample_id].sha256[:8]) }} | {{ samples_by_id[job.sample_id].getShortFilename() or "-" }}
   {% else %}
-    <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i> {{ job.sample_id }} (deleted)<br />
+    <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample</span> {{ job.sample_id }} (deleted)<br />
     - | - 
   {% endif %}
 
@@ -42,14 +42,14 @@
   {% set sample_entry_b = samples_by_id.get(job.other_sample_id) %}
   {{ job.method|job_name }} | 
   {% if sample_entry_a %}
-    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i> {{ format_family_name(sample_entry_a.family, sample_entry_a.family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i> {{ format_sample_id(job.sample_id) }} vs. 
+    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i><span class="visually-hidden">Family</span> {{ format_family_name(sample_entry_a.family, sample_entry_a.family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample</span> {{ format_sample_id(job.sample_id) }} vs. 
   {% else %}
-  <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i> {{ job.sample_id }} (deleted) vs.
+  <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample</span> {{ job.sample_id }} (deleted) vs.
   {% endif %}
   {% if sample_entry_b %}
-  {{ format_family_name(sample_entry_b.family, sample_entry_b.family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i> {{ format_sample_id(job.other_sample_id) }}
+  {{ format_family_name(sample_entry_b.family, sample_entry_b.family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample</span> {{ format_sample_id(job.other_sample_id) }}
   {% else %}
-  <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i> {{ job.other_sample_id }} (deleted)
+  <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample</span> {{ job.other_sample_id }} (deleted)
   {% endif %}
   <br />
   {% if sample_entry_a %}
@@ -80,7 +80,7 @@
   {% endfor %}
   {# Print the grouped samples #}
   {% for family_id, sample_ids in grouped_samples.items() %}
-    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i> {{ format_family_name(samples_by_id[sample_ids[0]].family, family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i> 
+    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i><span class="visually-hidden">Family</span> {{ format_family_name(samples_by_id[sample_ids[0]].family, family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample</span> 
     {{ sample_ids|join(', ') }}<br />
   {% endfor %}
 
@@ -108,16 +108,16 @@
   {{ job.method|job_name }} | <span title="{{ job.arguments[0]|join(', ') }}">{{ job.arguments[0]|unique_blocks_samples }}</span><br />
 
   {% if reference_sample %}
-  <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i> {{ format_family_name(reference_sample.family, reference_sample.family_id) }}
+  <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i><span class="visually-hidden">Family</span> {{ format_family_name(reference_sample.family, reference_sample.family_id) }}
   {% else %}
-  <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i> -
+  <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i><span class="visually-hidden">Family</span> -
   {% endif %}
 
 {% elif job.method == "updateMinHashesForSample" %}
   {% set sample_entry = samples_by_id.get(job.sample_id) %}
   {{ job.method|job_name }} | 
   {% if sample_entry %}
-    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i> {{ format_sample_id(job.sample_id) }}
+    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i><span class="visually-hidden">Family</span> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample</span> {{ format_sample_id(job.sample_id) }}
   {% else %}
     {{ job.sample_id }} (deleted)
   {% endif %}
@@ -144,17 +144,17 @@
   {{ job.method|job_name }}
 
 {% elif job.method == "addBinarySample" %}
-  {{ job.method|job_name }} | <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i> {{ job.family }}<br />
+  {{ job.method|job_name }} | <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i><span class="visually-hidden">Family</span> {{ job.family }}<br />
   {{ format_monospace(job.sha256[:8]) }} | {{ job.filename }}
 
 {% elif job.method == "deleteSample" %}
-  {{ job.method|job_name }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i>  {{ job.arguments[0] }}
+  {{ job.method|job_name }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample</span>  {{ job.arguments[0] }}
 
 {% elif job.method == "modifySample" %}
   {% set sample_entry = samples_by_id.get(job.sample_id) %}
   {{ job.method|job_name }} | 
   {% if sample_entry %}
-    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i> {{ format_sample_id(job.sample_id) }}
+    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i><span class="visually-hidden">Family</span> {{ format_family_name(samples_by_id[job.sample_id].family, samples_by_id[job.sample_id].family_id) }} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample</span> {{ format_sample_id(job.sample_id) }}
   {% else %}
   {{ job.sample_id }} (deleted)
   {% endif %}<br />
@@ -163,13 +163,13 @@
   {% endfor %}
 
   {% elif job.method == "deleteFamily" %}
-  {{ job.method|job_name }} | <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i>  {{ job.arguments[0] }}
+  {{ job.method|job_name }} | <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i><span class="visually-hidden">Family</span>  {{ job.arguments[0] }}
 
 {% elif job.method == "modifyFamily" %}
   {% set family_entry = families_by_id.get(job.family_id) %}
   {{ job.method|job_name }} | 
   {% if family_entry %}
-    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i> {{ format_family_name(family_entry.family_name, family_entry.family_id) }} 
+    <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i><span class="visually-hidden">Family</span> {{ format_family_name(family_entry.family_name, family_entry.family_id) }} 
   {% else %}
   {{ job.family_id }} (deleted)
   {% endif %}<br />

@@ -172,6 +172,10 @@ rather than reconstructing it from the commit log at release time.
 - The navbar, the jobs page's menu and the family table's header row close the elements they open,
   and the jobs page no longer closes a paragraph it never opened; browsers had repaired each, by
   rules nobody reading the templates could see.
+- Screen readers no longer read the icons as "unknown character": every Font Awesome icon is hidden
+  from them, the icon-only buttons that were named only by a tooltip (analyze and rename a function,
+  regenerate the API token) have names of their own, and the icons that say what a value is, the
+  family and sample of a job's description and the kinds of match of a PicHash, are spelled out.
 
 ### Security
 
