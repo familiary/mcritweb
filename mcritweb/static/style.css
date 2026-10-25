@@ -391,3 +391,90 @@ form.form-inline input {
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }
+
+/* hint.css tooltips: the data-hint attribute, drawn by the element's ::after with a ::before
+   arrow. hint.css is vendored and linked after this file, so the rules that change one of
+   its declarations start at :root to out-rank it.
+
+   A tooltip is laid out only while it is shown. hint.css merely hides the others, and a hidden
+   box still takes its room: one long hint on one line made the cross compare pages 1120px
+   wide in any window narrower than that, and the two boxes behind each square of a cross
+   compare matrix were most of the time a large one took to draw. */
+[data-hint]:not(:hover):not(:focus-visible)::before,
+[data-hint]:not(:hover):not(:focus-visible)::after {
+  display: none;
+}
+
+/* the text wraps, at a width that fits a phone; pre-wrap keeps the line breaks and the
+   padding the templates write into it */
+:root [data-hint]::after {
+  white-space: pre-wrap;
+  width: max-content;
+  max-width: min(32rem, calc(100vw - 2rem));
+  overflow-wrap: anywhere;
+}
+
+/* a shown tooltip is not filtered with its element: the dark theme dims the matrix squares
+   with a filter, which dimmed their tooltips too, and which would make the square the box
+   a fixed tooltip is placed in */
+:root [data-hint]:is(:hover, :focus-visible) {
+  filter: none;
+}
+
+/* Where the browser can anchor one box to another, the tooltip is placed against the
+   window instead of inside its element: above the element, or below it, or to its other
+   side, wherever it fits, and never cut off by a pane that scrolls, as the cross compare
+   matrix is. Above or below rather than beside it, so that it does not cover the cells
+   next to it in the same row. Elsewhere it opens where hint.css puts it. The arrow is left
+   out here, since it cannot follow the tooltip to another side. */
+@supports (anchor-scope: all) {
+  @position-try --hint-above {
+    position-area: top;
+    margin: 0.5rem 0.5rem 0;
+  }
+  @position-try --hint-below {
+    position-area: bottom;
+    margin: 0 0.5rem 0.5rem;
+  }
+  :root [data-hint]:is(:hover, :focus-visible) {
+    anchor-name: --hint;
+    anchor-scope: --hint;
+  }
+  :root [data-hint]:is(:hover, :focus-visible)::after {
+    position: fixed;
+    position-anchor: --hint;
+    position-area: top span-right;
+    position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline, --hint-above, --hint-below;
+    inset: auto;
+    margin: 0.5rem 0.5rem 0 0;
+    transform: none;
+  }
+  :root .hint--left:is(:hover, :focus-visible)::after {
+    position-area: top span-left;
+    margin: 0.5rem 0 0 0.5rem;
+  }
+  :root .hint--bottom:is(:hover, :focus-visible)::after {
+    position-area: bottom span-right;
+    margin: 0 0.5rem 0.5rem 0;
+  }
+  :root [data-hint]::before {
+    display: none;
+  }
+}
+
+/* a phone without anchor positioning shows the tooltip across the foot of the window, where
+   it fits wherever its element is (the modern-web-guidance tooltip guides' fallback) */
+@supports not (anchor-scope: all) {
+  @media (max-width: 575.98px) {
+    :root [data-hint]:is(:hover, :focus-visible)::after {
+      position: fixed;
+      inset: auto 0.5rem 0.5rem;
+      width: auto;
+      margin: 0;
+      transform: none;
+    }
+    :root [data-hint]::before {
+      display: none;
+    }
+  }
+}

@@ -130,6 +130,14 @@ rather than reconstructing it from the commit log at release time.
   its longest instruction and stays inside its pane and the window; it was sized from the drawn
   block, so most instructions ran out of the box, and the combined view's "B's code" tooltip was not
   held inside the pane at all.
+- The tooltips of scores, matrix squares and "Total (since queued)" wrap and stay inside the
+  window. They were one line long, so on a phone or tablet they ran off the screen, and the matrix
+  pane cut off the top of those on its first rows at any width. Where the browser can anchor a box
+  to another, a tooltip opens above or below its element, whichever side has room; a phone without
+  that shows it across the foot of the window. A hidden tooltip is no longer laid out at all: it
+  made the cross compare pages 1120px wide in any narrower window, and the two hidden boxes behind
+  every matrix square were most of the time a large matrix took to draw, so loading one and
+  switching its tabs now take about half the layout work.
 
 ### Security
 

@@ -1815,5 +1815,40 @@ def test_a_custom_order_naming_a_sample_outside_the_job_says_which_job(client, a
     assert job_id_of("cross_compare").encode() in response.data
 
 
+STYLESHEET = pathlib.Path(__file__).resolve().parents[1] / "mcritweb" / "static" / "style.css"
+
+
+def stylesheet_rules(path=STYLESHEET):
+    """{selector: declarations} for every innermost rule of a stylesheet, those inside an
+    at-rule included, each selector of a list on its own and its whitespace collapsed."""
+    text = re.sub(r"/\*.*?\*/", "", path.read_text(), flags=re.S)
+    rules = collections.defaultdict(dict)
+    for selectors, body in re.findall(r"([^{}]+)\{([^{}]*)\}", text):
+        declarations = dict(
+            (name.strip(), value.strip()) for name, _, value in (part.partition(":") for part in body.split(";")) if value.strip()
+        )
+        for selector in selectors.split(","):
+            rules[" ".join(selector.split())].update(declarations)
+    return rules
+
+
+def test_a_hint_tooltip_takes_room_only_while_it_is_shown():
+    """hint.css keeps every tooltip laid out while it hides it, so a hint nobody pointed at
+    widened the cross compare pages to 1120px, and the two boxes behind each square of a
+    large matrix were most of the time it took to draw one. Its one line of text (`white-
+    space: pre`) also ran off a phone's screen. hint.css is vendored, so style.css answers
+    it, with selectors that win over hint.css's, which is linked after it.
+
+    A lint, because `tests/testBrowserScoreTooltips.py`, which measures both in Chromium,
+    skips where playwright is not installed, CI included."""
+    rules = stylesheet_rules()
+    for pseudo in ("::before", "::after"):
+        idle = rules.get(f"[data-hint]:not(:hover):not(:focus-visible){pseudo}", {})
+        assert idle.get("display") == "none", f"an idle hint's {pseudo} is still laid out"
+    shown = rules.get(":root [data-hint]::after", {})
+    assert shown.get("white-space") == "pre-wrap", "the tooltip text does not wrap"
+    assert "100vw" in shown.get("max-width", ""), "the tooltip is not held to the width of the window"
+
+
 if __name__ == "__main__":
     unittest.main()
