@@ -42,8 +42,8 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
 
     <script nonce="{{ csp_nonce() }}" type="text/javascript">
     window.onload = function() {
-        var js_function_id_a = {{ function_id_a }};
-        var js_function_id_b = {{ function_id_b }};
+        var js_function_id_a = {{ function_id_a|tojson }};
+        var js_function_id_b = {{ function_id_b|tojson }};
         // the blocks' colours and which blocks match, which only the viewer reads: fetched
         // with it (drawGraphs) rather than carried in the page, where they grow with the two
         // functions. Without them the graphs are drawn uncoloured, and the page says so.

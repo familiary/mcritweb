@@ -21,8 +21,11 @@ import os
 import re
 
 import pytest
+from fixtureData import job_id_of
 from markupsafe import escape
 from mcrit.storage.FamilyEntry import FamilyEntry
+
+from mcritweb.db import ServerInfo
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -175,6 +178,105 @@ def test_a_family_name_stays_a_string_in_the_type_ahead_response(client, as_role
                     f"the {field} {item[field]!r} still carries {character!r} - the widget "
                     f"writes it into innerHTML and into a double-quoted attribute"
                 )
+
+
+# --- every value a script interpolates -----------------------------------------------
+
+#: `{{ ... }}`, the way a template interpolates a value
+INTERPOLATION = re.compile(r"\{\{(.*?)\}\}", re.DOTALL)
+#: `|tojson` as the last filter, which writes a JS literal any value survives
+TOJSON_LAST = re.compile(r"\|\s*tojson\s*$")
+
+
+def script_block_interpolations():
+    """Every `{{ ... }}` in the body of a `<script>` block that is not written through
+    `|tojson`, as `path:line expression`. A `url_for(...)` is let through: it
+    percent-encodes what it is given, so a quote or a backslash cannot come out of it.
+    The opening tag is left out, since its nonce is an attribute, not script."""
+    for path in sorted(template_files()):
+        with open(path, encoding="utf-8") as template:
+            source = template.read()
+        relative = os.path.relpath(path, TEMPLATE_ROOT)
+        for block in SCRIPT_BLOCK.finditer(source):
+            body = block.group().index(">") + 1
+            for hit in INTERPOLATION.finditer(block.group(), body):
+                expression = hit.group(1).strip()
+                if TOJSON_LAST.search(expression) or expression.startswith("url_for("):
+                    continue
+                line = source.count("\n", 0, block.start() + hit.start()) + 1
+                yield f"{relative}:{line} {expression}"
+
+
+def test_every_value_a_script_block_interpolates_goes_through_tojson():
+    """The ratchet beyond `|safe`: a value written into a script with nothing but
+    autoescaping is HTML-escaped, which a script does not decode, and a backslash at its
+    end escapes the closing quote of the string it was put in. The registration token on
+    the admin server page was one: the admin chooses it, and the pattern that limits it is
+    the registration form's, in HTML only."""
+    offenders = sorted(script_block_interpolations())
+    assert not offenders, (
+        "values written into a <script> block without |tojson at: " + "; ".join(offenders)
+        + ". Write {{ value|tojson }}, with no quotes around it."
+    )
+
+
+def test_a_registration_token_stays_a_string_in_the_admin_page_script(app, client, as_role):
+    value = 'a"b\\c\\'
+    with app.app_context():
+        server_info = ServerInfo.fromDb()
+        server_info.registration_token = value
+        server_info.saveToDb()
+    as_role("admin")
+
+    page = client.get("/admin/server").get_data(as_text=True)
+
+    literal = re.search(r"^\s*var js_token = (.*?);$", page, re.MULTILINE)
+    assert literal, "var js_token is gone from the admin server page"
+    assert json.loads(literal.group(1)) == value, literal.group(0)
+
+
+# --- a value in a URL ------------------------------------------------------------------
+
+def test_a_family_name_stays_a_path_segment_in_the_malpedia_link(client, as_role, fake_mcrit):
+    """The link puts the family name, which a contributor chooses, after Malpedia's
+    /details/. Autoescaping keeps it inside the attribute, but not inside the path: a `?`
+    or `#` in it started a query or a fragment of its own."""
+    family_id, family_entry = next(iter(fake_mcrit._families.items()))
+    fake_mcrit._families[family_id] = FamilyEntry.fromDict(
+        dict(family_entry.toDict(), family_name="win.evil?x=1#y z")
+    )
+    as_role("contributor")
+
+    page = client.get("/explore/families").get_data(as_text=True)
+
+    links = re.findall(r'href="https://malpedia\.caad\.fkie\.fraunhofer\.de/details/([^"]*)"', page)
+    assert "win.evil%3Fx%3D1%23y%20z" in links, links
+
+
+# --- a value in a handler --------------------------------------------------------------
+
+def test_a_matrix_cell_carries_its_link_as_data_not_as_script(client, as_role, fake_mcrit):
+    """A cell of the cross compare matrix wrote its sample's job id into a JS string in
+    an onclick attribute - the construct `clipboard_btn` in table/links.html moved off,
+    because the HTML parser decodes `&#39;` back to a quote before the handler is
+    compiled. Job ids are the backend's ObjectIds, so it was inert; the link is a data-href
+    now, which a document listener follows, and nothing of the backend reaches a script."""
+    as_role("visitor")
+    page = client.get(f"/data/result/{job_id_of('cross_compare')}").get_data(as_text=True)
+
+    rows = re.findall(r'<tr class="sample-row".*?</tr>', page, re.DOTALL)
+    assert rows, "the matrix has no rows - not the page this test means"
+    links = 0
+    for row in rows:
+        job_id = re.search(r'<td class="result clickable"[^>]*>([^<]*)</td>', row).group(1)
+        for swatch in re.findall(r'<span[^>]*score-swatch[^>]*>', row):
+            assert "onclick" not in swatch, swatch
+            href = re.search(r'data-href="([^"]*)"', swatch)
+            if href:
+                links += 1
+                # relative to the page, /data/result/<the cross compare>, as the handler's was
+                assert re.fullmatch(rf"{job_id}\?samid=\d+", href.group(1)), href.group(1)
+    assert links, "no cell links anywhere - not the page this test means"
 
 
 # --- the CFG page's own script ---------------------------------------------------

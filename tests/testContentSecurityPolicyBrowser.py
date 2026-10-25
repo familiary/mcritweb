@@ -19,6 +19,7 @@ project and CI does not install it, so this module skips there rather than faili
 """
 
 import os
+import re
 import threading
 
 import pytest
@@ -237,13 +238,27 @@ def test_the_cross_compare_tabs_fill_and_its_controls_navigate(admin, live_serve
     for tab in page.locator("#pills-tab button").all():
         tab.click()
         page.wait_for_selector(".tab-pane.active.show span.score-swatch")
+    # the last tab's pane was filled by cloning the first one's cells
     with page.expect_navigation():
-        page.locator(".tab-pane.active span.score-swatch[onclick], .tab-pane.active span.score-swatch[data-href]").first.click()
+        page.locator(".tab-pane.active span.score-swatch[data-href]").first.click()
+    assert re.search(r"/data/result/[0-9a-f]{24}\?samid=\d+$", page.url), page.url
     admin.assert_clean()
     admin.open(url)
     with page.expect_navigation():
         page.click("text=Change order")
     admin.assert_clean()
+
+
+def test_a_matrix_cell_leads_to_its_matches_before_the_queued_scripts_are_in(admin, live_server):
+    """The cell's link is followed by a listener the page binds while it parses, as its
+    onclick used to be, so a click does not wait for jQuery."""
+    page = admin.page
+    page.route("**/static/jquery.js", lambda route: None)
+    page.goto(live_server + f"/data/result/{job_id_of('cross_compare')}")
+    with page.expect_navigation():
+        page.locator("span.score-swatch[data-href]").first.click()
+    assert re.search(r"/data/result/[0-9a-f]{24}\?samid=\d+$", page.url), page.url
+    assert admin.violations() == [] and admin.problems == []
 
 
 def test_the_modals_and_the_sortable_headers_work(admin, live_server):

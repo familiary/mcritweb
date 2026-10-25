@@ -206,6 +206,12 @@ rather than reconstructing it from the commit log at release time.
   `SESSION_COOKIE_SECURE = False`, one sharing the cookie across subdomains through
   `SESSION_COOKIE_DOMAIN`, one under a `SESSION_COOKIE_PATH` or `APPLICATION_ROOT` other than `/`,
   and one that sets `SESSION_COOKIE_NAME` itself.
+- Every value a page writes into a script now goes through `|tojson`, and the lint that already
+  refused `|safe` there refuses a bare one too. The admin server page's copied registration link
+  keeps a token with a quote or a trailing backslash intact instead of breaking the page's script, a
+  family name with `?`, `#` or a space links to that family on Malpedia rather than to a query of
+  its own, and a cross compare cell carries its link as data instead of a job id inside an
+  `onclick` script.
 
 ## [1.6.0] - 2026-10-16
 

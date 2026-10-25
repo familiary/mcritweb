@@ -98,7 +98,7 @@
     {% if column_type == "family_id" %}
       <th align="right" valign="middle" class="id" scope="row">{{ "%d"|format(family.family_id) }}</th>
     {% elif column_type == "family_name" %}
-      <td valign="middle" >{{ format_family_name(family.family_name, None, highlight_terms, "family_name") }}<a aria-label="Show family on Malpedia" title="Show family on Malpedia" name="malpedia" href="https://malpedia.caad.fkie.fraunhofer.de/details/{{ family.family }}" target="_blank"><i class="fa-solid fa-external-link-alt "></i></a></td>
+      <td valign="middle" >{{ format_family_name(family.family_name, None, highlight_terms, "family_name") }}<a aria-label="Show family on Malpedia" title="Show family on Malpedia" name="malpedia" href="https://malpedia.caad.fkie.fraunhofer.de/details/{{ family.family|urlencode }}" target="_blank"><i class="fa-solid fa-external-link-alt "></i></a></td>
     {% elif column_type == "num_samples" %}
       <td align="right" valign="middle">{{ "%d"|format(family.num_samples) }}</td>
     {% elif column_type == "num_functions" %}

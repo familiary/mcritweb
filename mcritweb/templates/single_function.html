@@ -182,7 +182,7 @@ Function: {{ function_id }}
         <div class="accordion-body">
           <script nonce="{{ csp_nonce() }}" type="text/javascript">
           window.onload = function() {
-              var js_function_id = {{ function_id }};
+              var js_function_id = {{ function_id|tojson }};
               // The graph viewer: d3, dagre and the scripts built on them, in the order they
               // build on each other, that only the graph and the code beside it use. They are
               // loaded, and the graph is fetched, laid out and drawn, once the graph comes into

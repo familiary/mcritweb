@@ -48,7 +48,7 @@
            sample, so its page would list nothing and its diagram would 404, as
            data.render_missing_match_diagram draws none for it. The diagonal is always such a
            pair, since mcrit counts a sample's matches with itself apart #}
-        <td><span{% if matching_matches[sample.sample_id|string][sample2.sample_id|string] %} onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}';"{% endif %} class="hint--top score-swatch" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
+        <td><span{% if matching_matches[sample.sample_id|string][sample2.sample_id|string] %} data-href="{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}"{% endif %} class="hint--top score-swatch" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
             style="background-color: #{{ score_to_color(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }}; width: 25px; height: 25px; "></span>
         </td>
       {% endfor %}
@@ -84,6 +84,15 @@ Results for Job: {{ job_info.job_id }}
   whenReady( function() {
     $( "#sortable" ).sortable();
   } );
+  // a matrix cell with matches leads to its row sample's matches with the column's; its
+  // data-href is relative to this page, as the onclick it replaces was. Bound now rather
+  // than in whenReady, so that a cell works as soon as it is drawn, as that one did
+  document.addEventListener("click", function (event) {
+    var cell = event.target.closest && event.target.closest("span.score-swatch[data-href]");
+    if (cell) {
+      window.location.href = cell.getAttribute("data-href");
+    }
+  });
   function changeorder() {
     var array1 = document.getElementById('sortable').children;
     var array2 = []
