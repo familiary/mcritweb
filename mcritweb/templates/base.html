@@ -7,10 +7,11 @@
   <meta name="description" content="{% block description %}MCRIT Web: explore, match and compare malware families, samples and functions by code similarity.{% endblock %}">
   {# how scripts reach the CSRF token - forms carry it as a hidden input instead #}
   <meta name="csrf-token" content="{{ csrf_token() }}">
-  {# the minified Bootstrap build and a Font Awesome subset holding only the icons the
-     templates use (scripts/subset_fontawesome.py regenerates it); together 336 KB of
-     render-blocking CSS less than the unminified full builds. See issue #63. #}
-  <link href="{{ url_for('static', filename='bootstrap-5.0.2-dist/css/bootstrap.min.css') }}" rel="stylesheet">
+  {# Bootstrap cut to the rules that can match something mcritweb renders, and a Font
+     Awesome subset holding only the icons the templates use; scripts/subset_bootstrap.py
+     and scripts/subset_fontawesome.py regenerate them. Both are render-blocking, so every
+     byte of them is waited for before the first paint. See issue #63. #}
+  <link href="{{ url_for('static', filename='css/bootstrap-subset.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/fontawesome-subset.css') }}" rel="stylesheet">
   {# the icon font is discovered only after the Font Awesome stylesheet is parsed and laid out, so it arrives
      a render-blocking round after everything else and every fa- icon - the navbar's Explore
