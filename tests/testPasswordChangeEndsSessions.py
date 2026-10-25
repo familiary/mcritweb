@@ -176,6 +176,20 @@ def test_logging_out_leaves_other_accounts_logged_in(app, carol):
     assert boss.get("/settings").status_code == 200
 
 
+def test_logging_out_says_the_api_token_still_works(app, carol):
+    """/settings shows the API token, so a copied session may have copied it too. A logout
+    leaves it as it is, since replacing it would break every client using it each time,
+    and says so, pointing to Settings."""
+    owner = logged_in(app)
+
+    assert "does not replace your API token" in owner.get("/logout").get_data(as_text=True)
+    page = owner.post("/logout", follow_redirects=True).get_data(as_text=True)
+
+    assert "Your API token still works" in page
+    with app.app_context():
+        assert UserInfo.fromDb(username="carol").apitoken == "apitoken-carol"
+
+
 def test_a_link_to_logout_only_asks(app, carol):
     """Ending every session of the account is a write, and a GET can come from a link on
     another site, which the Lax cookie follows. The page posts it."""

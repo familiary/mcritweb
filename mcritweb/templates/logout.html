@@ -5,6 +5,9 @@ Logout
 {% block content %}
 <h1 class="h3 mb-3">Log out</h1>
 <p>Logging out ends this account's sessions in every browser it is logged in to.</p>
+{% if can_use_api %}
+<p>It does not replace your API token, so anything using the token keeps working. If the token may have been copied, issue a new one on <a href="{{ url_for('authentication.settings') }}">Settings</a>.</p>
+{% endif %}
 <form method="post" action="{{ url_for('authentication.logout') }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <button type="submit" class="btn btn-primary">Log out</button>

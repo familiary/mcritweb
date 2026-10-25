@@ -422,6 +422,7 @@ This token can be used for API passthrough, using the MCRIT Web front-end as a r
 
 Additionally, users with level contributor and above can also change their username and password.
 Changing the password logs the account out in every other browser; logging out logs it out everywhere, this browser included.
+Logging out leaves the API token as it is, so a token that may have been copied has to be replaced with the button next to it.
 
 All users with level visitor or above can also set a number of filter preferences, that are automatically applied to all matching results.
 

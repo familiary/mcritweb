@@ -465,14 +465,20 @@ def logout():
     if request.method != 'POST':
         # ending every session of the account is a write, so a link - one on another
         # site, followed with the Lax cookie, among them - only gets to ask
-        return render_template('logout.html')
+        return render_template('logout.html', can_use_api=g.user.role in API_ROLES)
     # clearing the cookie only ends this browser's copy of the session, and a copy taken
     # elsewhere would stay valid for PERMANENT_SESSION_LIFETIME. Moving the generation on
     # ends every session of the account, this one included
     g.user.endSessions()
+    # the API token is left as it is, since replacing it would break every client using
+    # it on each logout; whoever may have copied it is pointed at /settings instead
+    can_use_api = g.user.role in API_ROLES
     # and nobody is logged in for the rest of this request, so the cleared session is
     # not given a mark on its way out
     g.user = None
     session.clear()
-    flash('You\'re logged out now', category='success')
+    if can_use_api:
+        flash('You\'re logged out now, in every browser. Your API token still works: if it may have been copied, issue a new one on Settings.', category='success')
+    else:
+        flash('You\'re logged out now', category='success')
     return redirect(url_for('index'))
