@@ -25,7 +25,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
     </div>
 <div style="float:right">
   {{ api_usage_button("apiUsageModal") }}
-  <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" role="button" aria-label="Go to the control flow graphs" title="Go to the control flow graphs"><i class="fa-solid fa-diagram-project"></i></a>
+  <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" role="button" aria-label="Go to the control flow graphs" title="Go to the control flow graphs"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i></a>
 </div>
 {% if entry_a is not none and entry_b is not none %}
     {{ function_column_table(

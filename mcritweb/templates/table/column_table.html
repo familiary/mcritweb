@@ -178,9 +178,9 @@
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">
             {{ format_pichash(name_fe_se_ph[1].pichash) }}
-            {{ name_fe_se_ph[3]["families"] }} <i class="fa-solid fa-bug" title="Families matched"> </i>, 
-            {{ name_fe_se_ph[3]["samples"] }} <i class="fa-solid fa-virus" title="Samples matched"> </i>,
-            {{ name_fe_se_ph[3]["functions"] }} <i class="fa-solid fa-project-diagram" title="Functions matched"> </i>
+            {{ name_fe_se_ph[3]["families"] }} <i class="fa-solid fa-bug" title="Families matched" aria-hidden="true"> </i>, 
+            {{ name_fe_se_ph[3]["samples"] }} <i class="fa-solid fa-virus" title="Samples matched" aria-hidden="true"> </i>,
+            {{ name_fe_se_ph[3]["functions"] }} <i class="fa-solid fa-project-diagram" title="Functions matched" aria-hidden="true"> </i>
           </td>
         {% endfor %}
       </tr>

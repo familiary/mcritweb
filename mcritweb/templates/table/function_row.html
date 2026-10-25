@@ -98,7 +98,7 @@
          url_for still writes the negative id into the href, so without this the row
          would offer a button that only ever answers 404 #}
       {% if function.function_id >= 0 %}
-      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('analyze.compare_function', function_id=function.function_id) }}" role="button" aria-label="New: 1 vs N for function {{ function.function_id }}" title="New: 1 vs N for function {{ function.function_id }}"><i class="fa-solid fa-flask"></i></a>
+      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('analyze.compare_function', function_id=function.function_id) }}" role="button" aria-label="New: 1 vs N for function {{ function.function_id }}" title="New: 1 vs N for function {{ function.function_id }}"><i class="fa-solid fa-flask" aria-hidden="true"></i></a>
       {% endif %}
     </td>
   </tr>

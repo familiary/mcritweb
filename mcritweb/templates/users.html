@@ -56,7 +56,7 @@ Users
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
           <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
+            <i class="fas fa-user-cog fa-xs" aria-hidden="true"></i>
           </button>
           <div class="dropdown-menu">
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='pending') }}">Change role to admin</button>
@@ -92,7 +92,7 @@ Users
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
           <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
+            <i class="fas fa-user-cog fa-xs" aria-hidden="true"></i>
           </button>
           <div class="dropdown-menu">
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='contributors') }}">Change role to admin</button>
@@ -127,7 +127,7 @@ Users
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
           <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
+            <i class="fas fa-user-cog fa-xs" aria-hidden="true"></i>
           </button>
           <div class="dropdown-menu">
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='admins') }}">Change role to contributor</button>
@@ -162,7 +162,7 @@ Users
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
           <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
+            <i class="fas fa-user-cog fa-xs" aria-hidden="true"></i>
           </button>
           <div class="dropdown-menu">
             {% if user.role == 'pending' %}
@@ -212,7 +212,7 @@ Users
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
           <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
+            <i class="fas fa-user-cog fa-xs" aria-hidden="true"></i>
           </button>
           <div class="dropdown-menu">
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='visitors') }}">Change role to admin</button>

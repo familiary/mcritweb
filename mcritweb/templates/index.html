@@ -13,7 +13,7 @@ Home
     <p>
       You are: {{g.user.role}}
       {% if g.user.role == "admin" %}
-      <i class="fas fa-crown"></i>
+      <i class="fas fa-crown" aria-hidden="true"></i>
       {% endif %}
     </p>
   {% if g.user.role == 'pending' %}

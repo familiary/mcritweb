@@ -76,7 +76,7 @@ Settings
           <button type="button" class="btn {% if legacy_apitoken %}btn-danger{% else %}btn-outline-dark{% endif %} btn-sm"
                   data-post="{{ url_for('admin.regenerate_apitoken') }}"
                   title="Issue a new token. Anything using the old one stops working.">
-            <i class="fa-solid fa-arrows-rotate"></i>
+            <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
           </button>
           {# a 32-character token predates 1.5.0's 64-character ones. The release kept
              the old ones valid, so without this notice nothing ever moves them on. #250 #}

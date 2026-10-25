@@ -8,7 +8,7 @@
    hide. Sort symbols follow the ones cursor_pagination_sort_symbol renders. #}
 {%- macro sortable_column(label, sort_type, align='left') -%}
   <th style="text-align: {{ align }};" scope="col" class="pointer" data-sort="{{ sort_type }}">
-    <span>{{ label }}</span>&nbsp;<span style="float: right;"><i class="fa fa-sort"></i></span>
+    <span>{{ label }}</span>&nbsp;<span style="float: right;"><i class="fa fa-sort" aria-hidden="true"></i></span>
   </th>
 {%- endmacro -%}
 {% block title%}
@@ -104,7 +104,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
           {%- set _ = requested_by_family.setdefault(sample_entry.family_id if sample_entry else none, []).append(id) -%}
         {%- endfor %}
         {% for family_id, family_sample_ids in requested_by_family.items() %}
-          <i class="fa-solid fa-bug " title="Family ID"></i> {% if family_id is none %}-{% else %}{{ format_family_name(samples_by_id[family_sample_ids[0]].family, family_id) }}{% endif %} | <i class="fa-solid fa-virus " title="Sample ID"></i> {% for id in family_sample_ids %}{{ format_sample_id(id) }} {% endfor %}<br />
+          <i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i> {% if family_id is none %}-{% else %}{{ format_family_name(samples_by_id[family_sample_ids[0]].family, family_id) }}{% endif %} | <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i> {% for id in family_sample_ids %}{{ format_sample_id(id) }} {% endfor %}<br />
         {% endfor %}
       </details></td>
     </tr>
@@ -250,7 +250,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
     <p class="alert alert-warning">These parameters selected no blocks at all, so there is no rule to show. Widen the bounds and regenerate.</p>
     {% else %}
     <div class="mb-2">
-      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyTextAreaToClipboard('#yara_text')"><i class="fa-regular fa-copy"></i> Copy YARA rule to clipboard</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyTextAreaToClipboard('#yara_text')"><i class="fa-regular fa-copy" aria-hidden="true"></i> Copy YARA rule to clipboard</button>
     </div>
     <textarea aria-label="YARA rule" style="font-family:monospace; min-width: 100%" id="yara_text" name="yara_text" 
         rows="50">{{yara_rule}}</textarea>

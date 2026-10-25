@@ -160,7 +160,7 @@ function handleSliderChange(val) {
         <td valign="middle">{{ sample.getShortFilename() }}</td>
         <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
         <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
-        <td valign="middle"><button type="button" class="btn btn-link p-0 text-dark" aria-label="Remove sample {{ sample.sample_id }}" title="Remove sample {{ sample.sample_id }}" onclick="deleteSample(this)"><i class="fa-solid fa-xmark"></i></button></td>
+        <td valign="middle"><button type="button" class="btn btn-link p-0 text-dark" aria-label="Remove sample {{ sample.sample_id }}" title="Remove sample {{ sample.sample_id }}" onclick="deleteSample(this)"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></td>
 
       </tr>
       {% endfor %}
