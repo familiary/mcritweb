@@ -14,6 +14,7 @@ nobody has taught it still raises NotImplementedError naming itself, so the next
 is a message rather than a silently empty page.
 """
 
+import copy
 import json
 import pathlib
 import re
@@ -51,6 +52,55 @@ def load(name):
 def job_id_of(report):
     """The job id a report fixture was captured under."""
     return load(f"{report}.job")["_id"]["$oid"]
+
+
+def altered_job(report, job_id, **payload_params):
+    """A copy of a captured job under a new id, with its payload fields replaced."""
+    job_dict = copy.deepcopy(load(f"{report}.job"))
+    job_dict["_id"]["$oid"] = job_id
+    job_dict["payload"].update(payload_params)
+    return job_dict
+
+
+def inject_job(fake, job_dict):
+    """Serve one more job from a CorpusMcritClient, as a real backend would answer
+    for any job id its queue holds."""
+    fake._queued_by_id[job_dict["_id"]["$oid"]] = job_dict
+    return job_dict["_id"]["$oid"]
+
+
+def remove_job(fake, job_id):
+    """Take a job out of a CorpusMcritClient's queue, as a delete in the backend would:
+    gone from getJobData and from getQueueData(job_ids=...) alike."""
+    fake._queued_by_id.pop(job_id)
+    fake._queue[:] = [entry for entry in fake._queue if _job_id(entry) != job_id]
+
+
+# mcrit 1.4.3, which the fixtures were captured from, records only the knobs a request
+# named. From 1.13 on the backend fills in every matching knob before it queues a job
+# (`resolveMatchingParams` in mcrit/index/MatchingParameters.py), so a job records all
+# of them.
+
+#: The knobs of a 1-vs-N job queued by mcrit 1.16 on its default configuration.
+CURRENT_KNOBS = {"minhash_threshold": 50, "pichash_size": 10, "band_matches_required": 2, "band_df_cutoff": 0, "shortlist_size": 0}
+#: A match restricted to the samples it names records no shortlist.
+CURRENT_RESTRICTED_KNOBS = {name: value for name, value in CURRENT_KNOBS.items() if name != "shortlist_size"}
+
+
+def make_cross_children_current(fake, group_only):
+    """Give the captured cross compare's children the params mcrit 1.16 records.
+
+    getMatchesCross asks a 1-vs-corpus child for shortlist_size=0, and a vs-group child
+    takes no shortlist (MinHashIndex.py:562-573 in 1.16)."""
+    for child_id in fake.getJobData(job_id_of("cross_compare")).all_dependencies:
+        child = fake._queued_by_id[child_id]
+        params = json.loads(child["payload"]["params"])
+        if group_only:
+            params = dict(CURRENT_RESTRICTED_KNOBS, **{"0": params["0"], "1": params["1"]})
+        else:
+            child["payload"]["method"] = "getMatchesForSample"
+            params = dict(CURRENT_KNOBS, **{"0": params["0"]})
+        child["payload"]["params"] = json.dumps(params)
 
 
 #: The sample the captured 1-vs-N report (`matches_for_sample`) was produced for, and
@@ -222,6 +272,11 @@ class CorpusMcritClient:
         self._functions.update({int(k): FunctionEntry.fromDict(v) for k, v in load("functions_matched").items()})
         self._jobs = {job_id_of(report): (load(f"{report}.job"), load(f"{report}.result")) for report in REPORTS}
         self._queue = load("queue")
+        # the captured queue holds jobs the reports do not - the per-sample children
+        # a cross compare combined among them - and a real backend answers getJobData
+        # for every one of them. Without this the cross compare's job page cannot even
+        # render, because it resolves its dependencies.
+        self._queued_by_id = {entry["_id"]["$oid"]: entry for entry in self._queue}
 
     def raw_variant(self):
         """The same backend answering in raw mode - see FakeMcritClient.raw_variant."""
@@ -445,7 +500,10 @@ class CorpusMcritClient:
     def getJobData(self, job_id, *args, **kwargs):
         self._record("getJobData", job_id, *args, **kwargs)
         entry = self._jobs.get(job_id)
-        return Job(entry[0], None) if entry else None
+        if entry:
+            return Job(entry[0], None)
+        queued = self._queued_by_id.get(job_id)
+        return Job(queued, None) if queued else None
 
     def getResultForJob(self, job_id, *args, **kwargs):
         self._record("getResultForJob", job_id, *args, **kwargs)
