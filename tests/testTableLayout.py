@@ -209,7 +209,7 @@ def test_a_result_s_function_matches_wait_until_they_come_near(template):
     held = [box for box in boxes if "table-deferred" in box]
     assert held == [boxes[-1]], boxes
     rows = DEFERRED_TABLES[template]
-    assert held[0] == f'<div class="table-scroll table-deferred" style="contain-intrinsic-block-size: auto calc({{{{ {rows}|length }}}} * 2.45rem + 3.75rem)">'
+    assert held[0] == f'<div class="table-scroll table-deferred" style="contain-intrinsic-block-size: auto calc({{{{ {rows}|length }}}} * (2.35rem + 1px) + 3rem)">'
 
 
 def test_the_deferral_is_held_to_where_the_box_scrolls():

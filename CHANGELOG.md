@@ -128,7 +128,8 @@ rather than reconstructing it from the commit log at release time.
 - On a phone, a tablet or a window under 1200px wide, a result page lays out its function matches
   only when they are scrolled near, in browsers that support `content-visibility`. With 250 rows a
   page that halves the layout and style work before the page is first shown (2.7 s to 1.0 s of
-  layout on a phone-speed processor), and the page is as long as before while the table waits.
+  layout on a phone-speed processor), and the page is as long as before while the table waits, to
+  within half a percent, so its scrollbar does not jump when the table is laid out.
 
 ### Fixed
 

@@ -382,6 +382,24 @@ def test_the_function_matches_are_laid_out_when_they_come_near(open_page, live_s
     assert abs(held_at - height) <= 0.05 * height, f"held at {held_at}px for a table {height}px tall"
 
 
+@pytest.mark.parametrize("name", ["matches_for_sample", "matches_for_sample_vs", "matches_for_query"])
+def test_the_function_matches_are_held_at_the_height_their_rows_measure(open_page, live_server, name):
+    """The page's scrollbar moves by the difference once the table is laid out. A row is
+    2.35rem and a 1px border, and the headings one or two lines: the estimate is within half
+    a percent of that at every width, where 2.45rem a row was 1.5% too tall."""
+    for width in [320, 390, 768, 1024, 1199]:
+        page = open_page(live_server + f"/data/result/{job_id_of(name)}", width)
+        box = page.evaluate_handle(FUNCTION_MATCHES)
+        held_at = page.evaluate("(box) => box.getBoundingClientRect().height", box)
+        document_height = page.evaluate("() => document.documentElement.scrollHeight")
+        page.evaluate("(box) => box.scrollIntoView({block: 'start', behavior: 'instant'})", box)
+        page.evaluate(TWO_FRAMES)
+        height = page.evaluate("(box) => box.getBoundingClientRect().height", box)
+        assert abs(held_at - height) <= 0.005 * height, f"{name} at {width}px: held at {held_at}px for a table {height}px tall"
+        moved = abs(page.evaluate("() => document.documentElement.scrollHeight") - document_height)
+        assert moved <= 0.005 * document_height, f"{name} at {width}px: the page grew by {moved}px"
+
+
 def test_scrolling_down_a_result_page_moves_nothing(open_page, live_server):
     """A table laid out as it comes near takes its own height in place of the estimate.
     That happens below the window, so nothing on screen moves."""
