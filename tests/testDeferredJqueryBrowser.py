@@ -48,7 +48,7 @@ AFTER_THE_READY_HANDLERS = """() => new Promise((resolve, reject) => {
 #: how long after DOMContentLoaded the queue started: the start of jquery.js's request
 QUEUE_DELAY = """() => {
     const loaded = performance.getEntriesByType("navigation")[0].domContentLoadedEventStart;
-    const jquery = performance.getEntriesByType("resource").find(entry => entry.name.endsWith("/static/jquery.js"));
+    const jquery = performance.getEntriesByType("resource").find(entry => entry.name.split("?")[0].endsWith("/static/jquery.js"));
     return jquery ? jquery.startTime - loaded : null;
 }"""
 
@@ -269,7 +269,7 @@ def held_back(open_as):
                 route.continue_()
             else:
                 waiting.append(route)
-        page.route("**/static/jquery.js", hold)
+        page.route("**/static/jquery.js*", hold)
 
         def release(settle=True):
             released.append(True)
@@ -449,7 +449,7 @@ RUN_ORDER = """
 window.mcritRunOrder = [];
 document.addEventListener("load", event => {
     if (event.target.tagName === "SCRIPT") {
-        window.mcritRunOrder.push(event.target.src.split("/static/")[1]);
+        window.mcritRunOrder.push(event.target.src.split("?")[0].split("/static/")[1]);
     }
 }, true);
 """
@@ -467,7 +467,7 @@ def test_the_queue_is_fetched_once_the_page_has_been_painted(open_as, live_serve
         paint: performance.getEntriesByName("first-contentful-paint")[0].startTime,
         scripts: performance.getEntriesByType("resource")
             .filter(entry => entry.initiatorType === "script")
-            .map(entry => [entry.name.split("/static/")[1], entry.startTime]),
+            .map(entry => [entry.name.split("?")[0].split("/static/")[1], entry.startTime]),
         ran: window.mcritRunOrder,
     })""")
     assert sorted(name for name, _ in timings["scripts"]) == sorted(QUEUED_ON_THE_SAMPLES_PAGE)
@@ -563,7 +563,7 @@ def test_the_queue_is_loaded_once(open_as, live_server):
     """The paint, the animation frame and the three-second backstop can all try to start it."""
     page = ready(open_as("visitor"), f"{live_server}/explore/samples")
     page.wait_for_timeout(3500)
-    assert page.evaluate("() => performance.getEntriesByType('resource').filter(entry => entry.name.endsWith('/static/jquery.js')).length") == 1
+    assert page.evaluate("() => performance.getEntriesByType('resource').filter(entry => entry.name.split('?')[0].endsWith('/static/jquery.js')).length") == 1
     assert page.errors == []
 
 
@@ -654,7 +654,7 @@ def test_a_page_that_includes_the_family_type_ahead_twice_fetches_it_once(open_a
     the overlay's family field."""
     page = open_as("contributor")
     requested = []
-    page.on("request", lambda request: requested.append(request.url) if request.url.endswith("/static/family_names.js") else None)
+    page.on("request", lambda request: requested.append(request.url) if request.url.split("?")[0].endswith("/static/family_names.js") else None)
     ready(page, f"{live_server}/explore/samples")
     assert len(requested) == 1, requested
     assert page.eval_on_selector("#family", "field => field.dataset.familyAutocomplete") == "attached"

@@ -113,7 +113,7 @@ def test_a_listing_page_does_not_download_dropzone(client, as_role):
     assert re.search(r'<script src="[^"]*dropzone[^"]*"', page) is None, "Dropzone is loaded up front"
     assert re.search(r'<link[^>]*dropzone\.min\.css', page) is None, "Dropzone's stylesheet is loaded up front"
     assert '/static/upload_form.js' in page, "the page does not queue the upload form's script, which holds the loader"
-    assert 'data-dropzone-js="/static/dropzone-patched.min.js"' in page, "the loader is not told where Dropzone is"
+    assert re.search(r'data-dropzone-js="/static/dropzone-patched\.min\.js(\?v=\w+)?"', page), "the loader is not told where Dropzone is"
     assert 'class="dropzone-pending"' in page, "the form must stay out of Dropzone's auto-discovery"
     # the options flask-dropzone renders are parked in a plain variable until the
     # library is there to receive them
@@ -142,7 +142,7 @@ def test_the_upload_pages_queue_dropzone_and_attach_it_with_their_options(client
     as_role("contributor")
     page = client.get(path).get_data(as_text=True)
     assert re.search(r'<script[^>]* src="[^"]*dropzone[^"]*"', page) is None, f"{path} loads Dropzone with a tag"
-    queued = re.findall(r'later\("([^"]+)"\)', page)
+    queued = re.findall(r'later\("([^"?]+)(?:\?v=\w+)?"\)', page)
     assert "/static/dropzone-patched.min.js" in queued, f"{path} does not queue the patched Dropzone"
     assert queued.index("/static/dropzone_attach.js") == queued.index("/static/dropzone-patched.min.js") + 1, queued
     assert re.search(r'<link[^>]*dropzone\.min\.css', page), f"{path} does not link Dropzone's stylesheet"

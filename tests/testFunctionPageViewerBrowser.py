@@ -36,8 +36,8 @@ CONTROLS = ["#showCycles", "#showLoops", "#loopBgFill", "#enableTooltip"]
 
 def viewer_requests(page):
     requested = []
-    page.on("request", lambda request: requested.append(request.url.split("/static/", 1)[1])
-            if "/static/" in request.url and request.url.split("/static/", 1)[1] in VIEWER else None)
+    page.on("request", lambda request: requested.append(request.url.split("?")[0].split("/static/", 1)[1])
+            if "/static/" in request.url and request.url.split("?")[0].split("/static/", 1)[1] in VIEWER else None)
     return requested
 
 
@@ -131,7 +131,7 @@ def test_the_keyboard_reaching_the_link_above_the_graph_draws_it(browser_page, l
 
 @pytest.mark.parametrize("script", ["trace_CFG/lib/d3.min.js", "trace_CFG/main.js"])
 def test_a_viewer_script_that_does_not_load_says_so(browser_page, live_server, script):
-    browser_page.route("**/static/" + script, lambda route: route.fulfill(status=404, body="gone"))
+    browser_page.route("**/static/" + script + "*", lambda route: route.fulfill(status=404, body="gone"))
     browser_page.goto(f"{live_server}/explore/functions/{FUNCTION_A}")
     assert browser_page.is_hidden("#viewer_error")
     scroll_to_the_graph(browser_page)
@@ -143,7 +143,7 @@ def test_a_viewer_script_that_does_not_load_says_so(browser_page, live_server, s
 def test_without_a_script_the_drawing_can_do_without_the_graph_is_still_drawn(browser_page, live_server):
     """loopCollapser.js is not needed to draw. A page that loaded the viewer from plain
     script tags drew the graph without it, and this one does too, under the message."""
-    browser_page.route("**/static/trace_CFG/loopCollapser.js", lambda route: route.fulfill(status=404, body="gone"))
+    browser_page.route("**/static/trace_CFG/loopCollapser.js*", lambda route: route.fulfill(status=404, body="gone"))
     browser_page.goto(f"{live_server}/explore/functions/{FUNCTION_A}")
     scroll_to_the_graph(browser_page)
     browser_page.wait_for_selector("#graphContainer g.node", state="attached")
@@ -156,7 +156,7 @@ def test_the_viewer_scripts_run_in_order_however_they_arrive(browser_page, live_
     def late(route):
         browser_page.wait_for_timeout(700)
         route.continue_()
-    browser_page.route("**/static/trace_CFG/lib/d3.min.js", late)
+    browser_page.route("**/static/trace_CFG/lib/d3.min.js*", late)
     errors = thrown_on(browser_page)
     browser_page.goto(f"{live_server}/explore/functions/{FUNCTION_A}")
     scroll_to_the_graph(browser_page)

@@ -76,7 +76,7 @@ def test_a_failed_load_is_tried_again_and_waiting_callers_are_queued_once(app, l
     with sync_api.sync_playwright() as playwright:
         browser, page = open_samples_page(playwright, app, live_url, user_id)
         try:
-            page.route("**/static/dropzone-patched.min.js", serve_dropzone)
+            page.route("**/static/dropzone-patched.min.js*", serve_dropzone)
             page.goto(live_url + "/explore/samples")
             # the page's scripts load after its first paint, which can come after load
             page.evaluate("() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })")
@@ -94,7 +94,7 @@ def test_a_failed_load_is_tried_again_and_waiting_callers_are_queued_once(app, l
             held[0].continue_()
             page.wait_for_function("() => window.mcritDropzoneReady === true", timeout=10000)
             assert page.evaluate("() => window.calls") == 1
-            assert page.evaluate("() => document.querySelectorAll('link[href$=\"dropzone.min.css\"]').length") == 1
+            assert page.evaluate("() => document.querySelectorAll('link[href*=\"/dropzone.min.css\"]').length") == 1
         finally:
             browser.close()
     assert len(fetches) == 2
@@ -114,7 +114,7 @@ def test_the_lazily_fetched_stylesheet_leaves_the_zones_own_look_alone(app, live
             # the page's scripts load after its first paint, which can come after load
             page.evaluate("() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })")
             page.evaluate("() => new Promise((resolve) => mcritLoadDropzone(resolve))")
-            page.wait_for_function("() => [...document.styleSheets].some((sheet) => (sheet.href || '').endsWith('dropzone.min.css'))")
+            page.wait_for_function("() => [...document.styleSheets].some((sheet) => (sheet.href || '').split('?')[0].endsWith('dropzone.min.css'))")
             zone = page.evaluate(
                 "() => { const style = getComputedStyle(document.getElementById('myDropzone'));"
                 " return [style.borderTopStyle, style.borderTopWidth, style.backgroundColor, style.borderTopLeftRadius]; }"
@@ -195,7 +195,7 @@ def test_an_upload_page_fetches_dropzone_after_its_first_paint_and_attaches_it_o
             page.goto(live_url + path)
             page.evaluate(WAIT_FOR_THE_QUEUE)
             fetched_at, painted_at = page.evaluate(
-                "() => [performance.getEntriesByType('resource').find((entry) => entry.name.endsWith('/static/dropzone-patched.min.js')).startTime,"
+                "() => [performance.getEntriesByType('resource').find((entry) => entry.name.split('?')[0].endsWith('/static/dropzone-patched.min.js')).startTime,"
                 " performance.getEntriesByName('first-contentful-paint')[0].startTime]"
             )
             attached = page.evaluate("() => [Dropzone.instances.length, Dropzone.forElement('#myDropzone').options.maxFilesize, Dropzone.autoDiscover]")

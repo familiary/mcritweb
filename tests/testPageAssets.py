@@ -139,8 +139,8 @@ def test_only_base_html_loads_a_jquery():
 
 
 #: a script base.html's queue loads after the first paint: `later({{ url_for(...)|tojson }})`
-#: in a template, `later("/static/...")` in a page
-QUEUED = re.compile(r"""later\((?:\{\{\s*url_for\('static',\s*filename='([^']+)'\)\|tojson\s*\}\}|"/static/([^"]+)")\)""")
+#: in a template, `later("/static/...?v=...")` in a page, the version left out
+QUEUED = re.compile(r"""later\((?:\{\{\s*url_for\('static',\s*filename='([^']+)'\)\|tojson\s*\}\}|"/static/([^"?]+)(?:\?v=\w+)?")\)""")
 
 
 def queued(code):
