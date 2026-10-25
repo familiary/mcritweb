@@ -223,3 +223,31 @@ def test_the_tab_a_unique_blocks_link_opens_on_is_the_one_marked_selected(client
     tabs = {attrs["id"]: attrs for tag, attrs, _ in tags if attrs.get("role") == "tab"}
     assert [tab_id for tab_id, attrs in tabs.items() if attrs["aria-selected"] == "true"] == [selected]
     assert "active" in tabs[selected]["class"].split()
+
+
+#: a picker row: compare's and compare_versus's sample_row, and the rows cross compare and
+#: unique blocks draw themselves - with what follows the row's opening tag
+PICKER_ROW = re.compile(r'<tr class="(sample-row parent_table_sample\w*|parent)( row-\w+)?"\s*>\s*(<td[^>]*>.*?</td>)', re.S)
+
+
+@pytest.mark.parametrize("path, kind", [
+    ("/analyze/compare", "radio"),
+    ("/analyze/compare_versus", "radio"),
+    ("/analyze/cross_compare?samples=0&cache=1", "checkbox"),
+    ("/analyze/unique_blocks?samples=0", "checkbox"),
+])
+def test_every_picker_row_leads_with_the_control_that_picks_it(client, as_role, path, kind):
+    """A picker row was picked by a click on the row and nothing else: no tab stop, no
+    key, and the only sign that it was picked a background tint. Each row leads with a
+    radio button or a checkbox now, ticked for a row the page already holds."""
+    rows = PICKER_ROW.findall(render(client, as_role, path))
+    assert rows, f"{path} has no picker rows"
+
+    for _, tint, first_cell in rows:
+        (tag, attrs, _), = start_tags(first_cell)[1:]
+        assert (tag, attrs["type"]) == ("input", kind)
+        assert attrs["aria-label"].startswith("Select sample ")
+        assert ("checked" in attrs) == (tint.strip() in ("row-pending", "row-selected")), first_cell
+        assert ("disabled" in attrs) == (tint.strip() == "row-selected"), first_cell
+    if "cache=" in path or "samples=" in path:
+        assert {tint.strip() for _, tint, _ in rows} >= {"row-selected"}

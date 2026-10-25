@@ -329,3 +329,64 @@ def test_a_cross_compare_tab_is_shown_by_enter_not_by_reaching_it(open_as):
     page.keyboard.press("Enter")
     wait_until_shown(page, second)
     assert tab_list_state(page) == [second, [second], [second]]
+
+
+def picked(page, row_class="tr.parent"):
+    """The ids of the rows a picker has tinted as chosen."""
+    return page.eval_on_selector_all(f"{row_class}.row-pending th", "cells => cells.map(cell => cell.textContent.trim())")
+
+
+def test_compare_picks_its_sample_with_the_arrow_keys(open_as):
+    page = open_as("visitor", "/analyze/compare")
+    ids = page.eval_on_selector_all("tr.parent_table_sample th.sample-id", "cells => cells.map(cell => cell.textContent.trim())")
+    assert page.evaluate("selected") == ids[0], "the first row is chosen when nothing else is"
+
+    tab_to(page, "tr.parent_table_sample input[type=radio]")
+    assert page.evaluate("document.activeElement.value") == ids[0]
+    page.keyboard.press("ArrowDown")
+
+    assert page.evaluate("selected") == ids[1]
+    assert picked(page, "tr.parent_table_sample") == [ids[1]]
+
+
+def test_compare_versus_picks_a_sample_on_each_side_from_the_keyboard(open_as):
+    page = open_as("visitor", "/analyze/compare_versus")
+    ids_b = page.eval_on_selector_all("tr.parent_table_sample_b th.sample-id", "cells => cells.map(cell => cell.textContent.trim())")
+
+    tab_to(page, "tr.parent_table_sample_a input[type=radio]")
+    page.keyboard.press("Space")
+    first_a = page.evaluate("document.activeElement.value")
+    tab_to(page, "tr.parent_table_sample_b input[type=radio]")
+    page.keyboard.press("Space")
+    page.keyboard.press("ArrowDown")
+
+    assert page.evaluate("[selected_a, selected_b]") == [first_a, ids_b[1]]
+    assert page.is_visible("#button_match")
+
+
+@pytest.mark.parametrize("path", ["/analyze/cross_compare?samples=0", "/analyze/unique_blocks?samples=0"])
+def test_a_multi_picker_ticks_a_sample_on_and_off_from_the_keyboard(open_as, path):
+    """A sample the URL already holds is ticked and disabled, so Tab passes it."""
+    page = open_as("visitor", path)
+
+    tab_to(page, "tr.parent input[type=checkbox]")
+    box = page.evaluate("document.activeElement.value")
+    assert box != "0", "Tab stopped on the sample the page already holds"
+    page.keyboard.press("Space")
+    assert page.evaluate("selected") == [box]
+    assert picked(page) == [box]
+
+    page.keyboard.press("Space")
+    assert page.evaluate("selected") == []
+    assert picked(page) == []
+
+
+def test_a_chosen_row_is_framed_in_forced_colours(open_as):
+    """Forced colours paint every row alike, the chosen one's tint included."""
+    page = open_as("visitor", "/analyze/compare")
+    page.emulate_media(forced_colors="active")
+
+    styles = page.eval_on_selector_all("tr.parent_table_sample", "rows => rows.map(row => [row.classList.contains('row-pending'), getComputedStyle(row).outlineStyle])")
+
+    assert [style for chosen, style in styles if chosen] == ["solid"]
+    assert {style for chosen, style in styles if not chosen} == {"none"}

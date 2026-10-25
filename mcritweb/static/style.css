@@ -408,3 +408,13 @@ th > .table-sort {
   text-align: inherit;
   text-decoration: none;
 }
+
+/* A sample picker's chosen rows are tinted, and forced colours paint every row alike. The
+   row's radio button or checkbox says it is chosen; the frame keeps the row easy to find. */
+@media (forced-colors: active) {
+  tr.row-selected,
+  tr.row-pending {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}

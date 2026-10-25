@@ -148,6 +148,12 @@ rather than reconstructing it from the commit log at release time.
   one. A tab is shown as the keys reach it, except a cross compare's, which builds its matrix when
   first shown and waits for Enter. A Unique Blocks link to its blocks or YARA tab no longer tells a
   screen reader the statistics tab is the one selected.
+- The sample pickers of Compare 1vsN, Compare 1vs1, Cross Compare and Unique Blocks can be used with
+  the keyboard and a screen reader. A sample was picked by clicking its row, which no key could do,
+  and the pale tint of the row was the only sign it was picked. Each row now leads with a radio
+  button (1vsN, and each side of 1vs1) or a checkbox, which a click anywhere on the row still ticks;
+  a sample a cross compare or Unique Blocks already holds is ticked and disabled. In forced colours,
+  where the tint is lost, a picked row is framed.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files
