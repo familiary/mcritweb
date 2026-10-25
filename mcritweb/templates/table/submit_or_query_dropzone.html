@@ -3,7 +3,10 @@
 
 {% macro submit_or_query_dropzone_js(select_form_type=False) %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
-{{ dropzone.style('border: 2px dashed black; margin: 20px auto; max-width: 600px; min-height: 200px; border-radius: 25px; background: rgb(240, 240, 240);') }}
+{# style.css's `.content form` rule, which this branch drops, made the zone half the column,
+   608px on a desktop. Centred in a flex column it was as wide as Dropzone's message instead,
+   and 44px before Dropzone had filled it; `width` makes it the column's, up to 600px #}
+{{ dropzone.style('border: 2px dashed black; margin: 20px auto; width: 100%; max-width: 600px; min-height: 200px; border-radius: 25px; background: rgb(240, 240, 240);') }}
 <script>
   function show_extended(x) {
     if (x.checked) {      

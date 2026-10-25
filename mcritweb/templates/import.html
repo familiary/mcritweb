@@ -4,7 +4,9 @@ Import
 {% endblock %}
 {% block style %}
 <link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
-{{ dropzone.style('border: 2px dashed black; margin: 10%; min-height: 400px;border-radius: 25px; background: rgb(240, 240, 240);') }}
+{# the upload pages' zone, taller: see table/submit_or_query_dropzone.html. Its `margin: 10%`
+   never applied, `.content form` set 1em instead #}
+{{ dropzone.style('border: 2px dashed black; margin: 20px auto; width: 100%; max-width: 600px; min-height: 400px; border-radius: 25px; background: rgb(240, 240, 240);') }}
 {% endblock %}
 {% set suppress_dropzone_overlay=true %}
 {% block content %}
