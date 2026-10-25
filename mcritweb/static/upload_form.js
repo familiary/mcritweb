@@ -29,6 +29,7 @@ function show_submit(x) {
         $(document.getElementsByClassName("query-form-exclusive")).slideUp();
     }
     requireDumpFields();
+    nameSubmitButton();
 }
 
 function hide_submit(x) {
@@ -37,6 +38,16 @@ function hide_submit(x) {
         $(document.getElementsByClassName("query-form-exclusive")).slideDown();
     }
     requireDumpFields();
+    nameSubmitButton();
+}
+
+// The overlay's button says what the chosen mode does, as the query and submit pages' buttons
+// do: it said "Submit" whichever was chosen, while the form opens on a query.
+function nameSubmitButton() {
+    const choice = document.getElementById("submit_form");
+    if (choice) {
+        document.getElementById("submit-dropzone-label").textContent = choice.checked ? "Submit" : "Query";
+    }
 }
 
 // A memory dump is mapped at its base address, and one added to the database needs its
@@ -273,6 +284,7 @@ function mcritLoadDropzone(done) {
             $(document.getElementsByClassName("query-form-exclusive")).show();
         }
         requireDumpFields();
+        nameSubmitButton();
         if (form.dataset.lazy === undefined) {
             mcritInitDropzone();
         }

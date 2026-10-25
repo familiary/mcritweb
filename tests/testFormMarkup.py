@@ -216,6 +216,37 @@ def test_a_minhash_slider_says_what_its_position_means(client, as_role, path):
     assert slider.get("aria-valuetext") == SLIDER_WORDS[int(slider["value"])]
 
 
+class ButtonText(HTMLParser):
+    """The visible text of the upload form's button, `#submit-dropzone`."""
+
+    def __init__(self, html):
+        super().__init__(convert_charrefs=True)
+        self.depth, self.text = 0, ""
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        if self.depth or (tag == "button" and dict(attrs).get("id") == "submit-dropzone"):
+            self.depth += 1
+
+    def handle_endtag(self, tag):
+        if self.depth:
+            self.depth -= 1
+
+    def handle_data(self, data):
+        if self.depth:
+            self.text += data
+
+
+@pytest.mark.parametrize("path, label", [("/data/submit", "Submit"), ("/analyze/query", "Query"),
+                                         # the drop overlay, whose form opens on "Match against database"
+                                         ("/explore/samples", "Query")])
+def test_the_upload_button_says_what_the_chosen_mode_does(client, as_role, path, label):
+    """The overlay's button said "Submit" while the form was set to match the file against
+    the database, which is a query; the query page's own button says "Query"."""
+    as_role("contributor")
+    assert ButtonText(page_of(client, path)).text.strip() == label
+
+
 def test_a_page_that_edits_samples_still_has_its_dialog(client, as_role):
     """The dialog is printed where an edit control can open it, and once."""
     as_role("contributor")

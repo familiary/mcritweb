@@ -232,3 +232,16 @@ def test_the_family_type_ahead_is_a_combobox_that_says_how_many_it_suggests(open
         page.keyboard.type("zzz")
     page.wait_for_function("() => document.querySelector('#family ~ [role=status]').textContent === 'No family suggestions'")
     assert page.errors == []
+
+
+def test_the_overlay_button_follows_the_chosen_mode(open_page):
+    """Match against the database or add to it: the button names the one that is chosen."""
+    page = open_page("/explore/samples")
+    label = "() => document.getElementById('submit-dropzone').textContent.trim()"
+    choose = "(id) => { const radio = document.getElementById(id); radio.checked = true; radio.dispatchEvent(new Event('change')); }"
+    assert page.evaluate(label) == "Query"
+    page.evaluate(choose, "submit_form")
+    assert page.evaluate(label) == "Submit"
+    page.evaluate(choose, "query_form")
+    assert page.evaluate(label) == "Query"
+    assert page.errors == []

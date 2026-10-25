@@ -179,7 +179,8 @@ rather than reconstructing it from the commit log at release time.
   server's refusal, which dropped the file, the family and version and the chosen options. The
   Submit button is enabled as soon as the page's script is in and says "Choose a file first" when
   there is none, instead of staying disabled without a reason. Family and version are marked
-  optional.
+  optional, and the drop overlay's button says Query or Submit after the chosen mode; it said
+  Submit while the form was set to match the file against the database.
 - The MinHash matching slider tells a screen reader its setting in words, "Standard" rather than
   "2", as the page shows it, and draws a focus ring when it is reached by keyboard: Bootstrap's faint
   halo was all there was.
