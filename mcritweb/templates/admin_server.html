@@ -78,7 +78,7 @@ Server settings
         <label for="mcrit_server_token" class="form-label">Backend Server Token</label>
         {# never written into the page, not even for the admin (AGENTS.md): the field starts
            empty, an empty one keeps the stored token, and removing it is the second button #}
-        <input type="text" name='mcrit_server_token' class="form-control" id="mcrit_server_token" placeholder="Enter optional server AUTH_TOKEN" autocomplete="off" aria-describedby="mcrit_server_token_state">
+        <input type="text" name='mcrit_server_token' class="form-control" id="mcrit_server_token" placeholder="Enter optional server AUTH_TOKEN" autocomplete="off" aria-describedby="mcrit_server_token_state" spellcheck="false" autocapitalize="off" autocorrect="off">
         <div id="mcrit_server_token_state" class="form-text">{% if server_info.server_token %}A token is set. Leave this empty to keep it.{% else %}No token is set.{% endif %}</div>
     </div>
     <button type="submit" class="btn btn-primary">Confirm Change</button>

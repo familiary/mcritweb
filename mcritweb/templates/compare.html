@@ -84,6 +84,8 @@ function fetchState() {
 function handleSliderChange(val) {
   const mapping = {{ minhash_slider_mapping|tojson }};
   document.getElementById("minhashBandRange-currentSelection").innerHTML = "&nbsp;"+mapping[val];
+  // the position is a number; what it means is the word beside it, and that is what is read out
+  document.getElementById("minhashBandRange").setAttribute("aria-valuetext", mapping[val]);
 }
 
 </script>
@@ -97,7 +99,8 @@ function handleSliderChange(val) {
 {{ compare_nav("1vsN") }}
 <h1>Compare Samples 1vsN</h1>
 <form style="width:100%" id="compare_search_form" action="#Search" method="GET">
-  <input type="text" class="form-control shadow-none" name="query" id="Search" value="{{ query }}" placeholder="Search" autofocus autocomplete="on">
+  <label for="Search" class="visually-hidden">Search samples</label>
+  <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" id="Search" value="{{ query }}" placeholder="Search" autofocus autocomplete="on">
 </form>
 {{ set_pagination_params(pagination, _js_argument_provider="fetchState", _anchor="Search") }}
 {# a search box sits directly above this table, so "upload your first sample" is
@@ -124,7 +127,7 @@ function handleSliderChange(val) {
       </div>
       <div class="col-sm-2" id="minhashBandRange-currentSelection">&nbsp;{{ minhash_slider_mapping[request.args.get('minhashBandRange', '2')|int] }}</div>
       <div class="col-sm-4">
-        <input type="range" class="form-range" min="0" max="3" value="{{ request.args.get('minhashBandRange', '2') }}" step="1" id="minhashBandRange" oninput="handleSliderChange(this.value)"/>
+        <input type="range" class="form-range" min="0" max="3" value="{{ request.args.get('minhashBandRange', '2') }}" step="1" id="minhashBandRange" aria-valuetext="{{ minhash_slider_mapping[request.args.get('minhashBandRange', '2')|int] }}" oninput="handleSliderChange(this.value)"/>
       </div>
     </div>
   </div>

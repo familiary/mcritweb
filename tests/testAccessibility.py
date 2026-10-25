@@ -63,7 +63,7 @@ VISITOR_PAGES = [
     f"/data/result/{job_id_of('matches_for_sample_vs')}?samid=3",
     f"/data/result/{job_id_of('matches_for_sample')}?funid=2",
 ]
-CONTRIBUTOR_PAGES = ["/data/submit"]
+CONTRIBUTOR_PAGES = ["/data/submit", "/data/export"]
 ADMIN_PAGES = ["/admin/server", "/admin/users/", "/data/import", f"/data/result/{job_id_of('maintenance_rebuild_index')}"]
 
 
@@ -173,6 +173,18 @@ def descendants(element, tag):
     return found
 
 
+def in_named_group(element):
+    """Inside a <fieldset> with a <legend>, or inside an element with a group role and a name."""
+    node = element.parent
+    while node is not None:
+        if node.tag == "fieldset" and any(child.tag == "legend" for child in node.children):
+            return True
+        if node.attrs.get("role") in ("group", "radiogroup") and (node.attrs.get("aria-label") or node.attrs.get("aria-labelledby")):
+            return True
+        node = node.parent
+    return False
+
+
 def problems_of(html):
     page = Page(html)
     problems = []
@@ -235,11 +247,25 @@ def problems_of(html):
                 and not descendants(table, "th"):
             problems.append(f"<table {table.attrs}> of {len(rows)} rows has no header cell")
     ids_labelled = {label.attrs.get("for") for label in page.all("label")}
+    for label in page.all("label"):
+        # a label with no `for` and no field inside names nothing: the filter forms captioned
+        # a row of fields with one, and a click on it did nothing
+        if not label.attrs.get("for") and not any(descendants(label, tag) for tag in ("input", "select", "textarea")):
+            problems.append(f"<label {label.attrs}> {label.text_content().strip()!r} names no field")
     for control in page.all("input", "select", "textarea"):
         attrs = control.attrs
         if (attrs.get("type") or "").lower() in UNLABELLED_INPUT_TYPES or "hidden" in attrs:
             continue
-        if any((attrs.get(attr) or "").strip() for attr in ("aria-label", "aria-labelledby", "placeholder")):
+        # a description that is the field itself reads its own value out a second time
+        if attrs.get("id") and attrs.get("id") in (attrs.get("aria-describedby") or "").split():
+            problems.append(f"<{control.tag} {attrs}> is described by itself")
+        # an aria-label replaces the visible label as the name (WCAG 2.5.3): the export page's
+        # field showed one sentence and answered to another
+        if (attrs.get("aria-label") or "").strip() and attrs.get("id") in ids_labelled:
+            problems.append(f"<{control.tag} {attrs}> has a visible label and an aria-label that replaces it")
+        # a placeholder is not a name: it goes once the field holds a value, and so does
+        # whatever it was telling apart
+        if any((attrs.get(attr) or "").strip() for attr in ("aria-label", "aria-labelledby")):
             continue
         if attrs.get("id") in ids_labelled:
             continue
@@ -248,6 +274,11 @@ def problems_of(html):
             node = node.parent
         if node is None:
             problems.append(f"<{control.tag} {attrs}> has no label")
+    for radio in page.all("input"):
+        # a radio is one answer to a question, and the group says what the question is: "Dumped,
+        # radio button" alone did not
+        if (radio.attrs.get("type") or "").lower() == "radio" and not in_named_group(radio):
+            problems.append(f"<input {radio.attrs}> is a radio outside a named group")
     previous = 0
     for heading in page.all("h1", "h2", "h3", "h4", "h5", "h6"):
         if heading.in_hidden_container():
@@ -337,6 +368,23 @@ def test_the_checker_catches_what_it_claims_to():
              '<button aria-label="Open"><span class="d-none">hidden</span>Open</button></main></body></html>')
     mismatches = [problem for problem in problems_of(shown) if "aria-label leaves it out" in problem]
     assert len(mismatches) == 1 and "Analyze sample" in mismatches[0], mismatches
+    fields = ('<!doctype html><html lang="en"><body><main><input id="by-placeholder" placeholder="min score">'
+              '<label for="self">Score</label><input id="self" aria-describedby="self">'
+              '<label for="named">Score</label><input id="named" placeholder="0-100">'
+              '<label class="col-6">Filter results to</label><label>Wrapped <input id="wrapped"></label>'
+              '<label for="renamed">Sample IDs</label><input id="renamed" aria-label="Export these">'
+              '<input type="radio" name="loose" id="loose"><label for="loose">Loose</label>'
+              '<fieldset><legend>Mode</legend><input type="radio" name="kept" id="kept"><label for="kept">Kept</label></fieldset>'
+              '</main></body></html>')
+    field_problems = "\n".join(problems_of(fields))
+    assert "'Filter results to' names no field" in field_problems
+    assert "'Wrapped' names no field" not in field_problems and "'id': 'wrapped'" not in field_problems
+    assert "'id': 'renamed'" in field_problems and "an aria-label that replaces it" in field_problems
+    assert "'id': 'loose'" in field_problems and "a radio outside a named group" in field_problems
+    assert "'id': 'kept'" not in field_problems
+    assert "'id': 'by-placeholder'" in field_problems and "has no label" in field_problems
+    assert "'id': 'self'" in field_problems and "is described by itself" in field_problems
+    assert "'id': 'named'" not in field_problems
     twice = ('<!doctype html><html lang="en"><head><meta name="description" content="a">'
              '<meta name="description" content="b"></head><body><main></main></body></html>')
     assert "2 meta descriptions, expected one" in problems_of(twice)

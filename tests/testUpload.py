@@ -855,11 +855,9 @@ def test_an_smda_query_needs_no_dump_fields_at_all(client, as_role, fake_mcrit):
     assert [call for call in fake_mcrit.calls if call[0] == "requestMatchesForSmdaReport"]
 
 
-def test_the_refusal_message_survives_to_the_page_the_dropzone_reloads(client, as_role):
-    """`flash()` followed by an empty 400 body says nothing by itself - the dropzone's
-    own error handler is what shows it: `myDropzone.on('error', ... location.reload())`
-    in table/submit_or_query_dropzone.html re-renders the page, and the message is
-    still in the session waiting for it."""
+def test_the_refusal_message_survives_to_the_next_page_of_a_plain_post(client, as_role):
+    """`flash()` followed by an empty 400 body, for a client other than the drop zone: the
+    message waits in the session for the next page that client loads."""
     as_role("contributor")
     refused = submit_binary(client, b"MZ dumped", options="dumped", bitness="32", base_addr="")
     assert refused.status_code == 400
@@ -867,3 +865,28 @@ def test_the_refusal_message_survives_to_the_page_the_dropzone_reloads(client, a
 
     reloaded = client.get("/data/submit").get_data(as_text=True)
     assert "Please enter the base address" in reloaded
+
+
+DROP_ZONE = {"X-Requested-With": "XMLHttpRequest"}
+
+
+@pytest.mark.parametrize("route, fields, message", [
+    ("/data/submit", {"options": "dumped", "bitness": "", "base_addr": "0x400000"}, "Please select the bitness of the sample."),
+    ("/data/submit", {"options": "dumped", "bitness": "32", "base_addr": "zz"}, "Please enter the base address"),
+    ("/analyze/query", {"options": "dumped", "base_addr": ""}, "Please enter the base address"),
+    ("/analyze/query", {"options": "smda"}, "That file could not be read as an SMDA report."),
+])
+def test_the_drop_zone_is_told_why_and_nothing_waits_for_the_next_page(client, as_role, route, fields, message):
+    """The drop zone used to get an empty 400 and reload the page to show the flash, which
+    dropped the file and everything typed. It sends X-Requested-With, as Dropzone does, and
+    gets the reason as plain text to show beside the form; no flash is left behind to turn
+    up on whatever page comes next."""
+    as_role("contributor")
+    data = dict({"family": "f", "version": "1", "file": (io.BytesIO(b"MZ dumped"), "sample.bin")}, **fields)
+    response = client.post(route, data=data, content_type="multipart/form-data", headers=DROP_ZONE)
+
+    assert response.status_code == 400
+    assert response.mimetype == "text/plain"
+    assert message in response.get_data(as_text=True)
+    with client.session_transaction() as session:
+        assert not session.get("_flashes")

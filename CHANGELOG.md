@@ -72,6 +72,9 @@ rather than reconstructing it from the commit log at release time.
   login. The first account registered cannot delete itself, as an admin cannot delete it either: it
   is the administrator the instance always keeps, and so is an admin when no other account holds the
   role, in case that account was demoted or removed in the database. Samples, families and jobs stay on the backend.
+- The password fields of the sign-in, registration and settings forms have a Show button, which shows
+  what was typed and hides it again, so a password typed on a phone keyboard can be checked without
+  typing it twice. A shown password is hidden again as the form is sent.
 
 ### Changed
 
@@ -202,6 +205,70 @@ rather than reconstructing it from the commit log at release time.
 - A reader who has asked the system for more contrast sees the arrow of a column that sorts but is
   not sorted at full strength. It is faint by design, 2.1:1 on the light table head, and it is the
   only sign that a column sorts.
+- Four markup slips in forms. The sample page's edit dialog had a stray quote after its form's
+  `action`, the settings page gave all seven column lists the same id, and the 1 vs 1 page printed
+  the sample edit dialog twice, so the second copy's labels named the first copy's fields. That
+  page has no edit control, so the dialog is now printed only where a row can open it. A family's
+  result page gave its two filter forms the same hidden `famid`, `samp` and `funp` ids; the hidden
+  inputs on the result pages are now found by name only.
+- The link hunt's link score filter survives a second Filter. Its field showed the link score only
+  while a library score was set, so a link score on its own showed nothing and was dropped by the
+  next submit, and a library score on its own put the word "None" in the link score field.
+- Adding a file to the upload form keeps the family and version typed before it. A file that
+  declares neither, which is any file but an SMDA report, emptied both fields. What a file filled
+  in is still taken back by the next file, unless it was edited.
+- Password managers are told which field is which. The sign-in, registration and settings forms
+  mark the username and the current and new passwords with their `autocomplete` tokens, and the
+  token fields with `off`, so the change-password form no longer gets the saved password put into
+  "new" and "confirm", and a strong password can be offered there and on registration. The sign-in
+  password field's id is now `current-password`; its name is unchanged.
+- Phone keyboards no longer capitalise or "correct" what is typed into a search box, a username, a
+  token or the family, version and base address of an upload, and the hash list and YARA rule are
+  not spellchecked. The search boxes are search fields, with a Search key on a phone keyboard, and
+  the last field of the sign-in, registration, rename and password forms has a Done key.
+- Every form field has a label of its own. The result, link hunt, unique blocks and default filter
+  forms named a row of fields with one caption that was tied to none of them, and told "regular"
+  from "nonlib" by placeholders, which are gone once a field holds a value; each field now has a
+  visible label above it, and no longer describes itself with its own value to a screen reader.
+  The sign-in, registration, settings and upload fields show their labels instead of relying on
+  placeholders, the search boxes have a label for screen readers, and the export field answers to
+  the label it shows. The filter fields are full-size form fields, so a phone no longer zooms in on
+  them.
+- A refused sign-in, registration or settings change says what was wrong beside the field it
+  concerns, which is marked invalid for screen readers and focused, and keeps what was typed apart
+  from passwords and the server token. A first-user setup with mistyped passwords used to come back
+  with the username, backend URL, operation mode and proposed registration token gone, and a refused
+  rename or password change came back on another tab. The message is still flashed above the page
+  too. A field the browser itself refuses is announced invalid when it is shown so. The username
+  rule is written out beside the registration and rename fields instead of as a regular expression
+  in a tooltip; it stays ASCII, since usernames are identifiers compared without regard to case.
+  The sign-in, registration, rename and password forms say at their top that all their fields are
+  required, and the first user's form that its fields are required unless they say optional.
+- The filter forms' number fields take numbers: a score is a whole number from 0 to 100 and a count
+  one from 0, with a digit keypad on a phone, offsets are decimal or 0x hexadecimal, and the
+  excluded family and sample IDs are numbers separated by commas; the browser says so before the
+  form is sent. Such a field used to take anything, and what it could not parse was dropped without
+  a word; a default filter of "abc" was even stored as 0 and reported as changed. The settings page
+  now refuses it, stores nothing and says why beside the field.
+- The upload form checks a memory dump's base address and bitness before the file is sent, and a
+  refusal from the server leaves the file and every field as they were, with the reason beside the
+  Submit button, ready to send again. The page used to send the whole file, then reload to show the
+  server's refusal, which dropped the file, the family and version and the chosen options. The
+  Submit button is enabled as soon as the page's script is in and says "Choose a file first" when
+  there is none, instead of staying disabled without a reason. Family and version are marked
+  optional, and the drop overlay's button says Query or Submit after the chosen mode; it said
+  Submit while the form was set to match the file against the database.
+- The MinHash matching slider tells a screen reader its setting in words, "Standard" rather than
+  "2", as the page shows it, and draws a focus ring when it is reached by keyboard: Bootstrap's faint
+  halo was all there was.
+- Radio buttons sit in named groups: the upload form's "what to do with the file", file type and
+  bitness, the registration's operation mode and the function comparison's graph view, and the
+  search page's "search in" checkboxes. A screen reader announced "Dumped, radio button" without the
+  question it answers.
+- The family type-ahead tells a screen reader what it is and what it found: the field is a combobox
+  controlling the list of suggestions, and how many there are is announced as they arrive. The
+  suggestion under the pointer or keyboard focus has an outline, and the typed part of each is
+  bold, where colour alone told them apart and forced colours took that away.
 
 ### Security
 

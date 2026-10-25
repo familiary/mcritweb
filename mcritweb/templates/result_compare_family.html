@@ -5,6 +5,7 @@
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
 {% from 'table/compare_breadcrumb.html' import compare_breadcrumb %}
 {% from 'table/match_row.html' import famlib_header, famlib_row, aggregated_function_header, aggregated_function_row %}
+{% from 'table/filter_fields.html' import filter_field %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -32,16 +33,14 @@ Results for Job: {{ job_info.job_id }}
 <p>total: {{ samp.max_value }}{% if samp.max_value > 0 %}, showing: {{ 1 + samp.start_index }} - {{ samp.end_index }}{% endif %} (filtered: {{ matching_result.num_original_sample_matches - samp.max_value}})</p>
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#family-matches" method='GET'>
   <div class="form-group row">
-    <input type="hidden" id="famid" name="famid" value="{{ famid }}">
-    <input type="hidden" id="samp" name="samp" value="{{ samp.page }}">
-    <input type="hidden" id="funp" name="funp" value="{{ funp.page }}">
-    <label class="col-6">Filter results to (nonlib) direct score</label>
-    <input class="col-3" type="text" name='filter_direct_min_score' id="filter_direct_min_score" aria-describedby="filter_direct_min_score" placeholder="regular (0-100)" {% if matching_result.getFilterValue("filter_direct_min_score") is not none %}value="{{matching_result.getFilterValue("filter_direct_min_score")}}"{% endif %}>
-    <input class="col-3" type="text" name='filter_direct_nonlib_min_score' id="filter_direct_nonlib_min_score" aria-describedby="filter_direct_nonlib_min_score" placeholder="nonlib (0-100)" {% if matching_result.getFilterValue("filter_direct_nonlib_min_score") is not none %}value="{{matching_result.getFilterValue("filter_direct_nonlib_min_score")}}"{% endif %}>
-    <label class="col-6">Filter results to (nonlib) frequency score</label>
-    <input class="col-3" type="text" name='filter_frequency_min_score' id="filter_frequency_min_score" aria-describedby="filter_frequency_min_score" placeholder="regular (0-100)" {% if matching_result.getFilterValue("filter_frequency_min_score") is not none %}value="{{matching_result.getFilterValue("filter_frequency_min_score")}}"{% endif %}>
-    <input class="col-3" type="text" name='filter_frequency_nonlib_min_score' id="filter_frequency_nonlib_min_score" aria-describedby="filter_frequency_nonlib_min_score" placeholder="nonlib (0-100)" {% if matching_result.getFilterValue("filter_frequency_nonlib_min_score") is not none %}value="{{matching_result.getFilterValue("filter_frequency_nonlib_min_score")}}"{% endif %}>
-    <input class="col-1" type="checkbox" name='filter_unique_only' id="filter_unique_only" aria-describedby="filter_unique_only" {% if matching_result.getFilterValue("filter_unique_only") %}checked{% endif %}>
+    <input type="hidden" name="famid" value="{{ famid }}">
+    <input type="hidden" name="samp" value="{{ samp.page }}">
+    <input type="hidden" name="funp" value="{{ funp.page }}">
+    {{ filter_field("filter_direct_min_score", "Min. direct score", matching_result.getFilterValue("filter_direct_min_score"), placeholder="0-100", kind="score") }}
+    {{ filter_field("filter_direct_nonlib_min_score", "Min. nonlib direct score", matching_result.getFilterValue("filter_direct_nonlib_min_score"), placeholder="0-100", kind="score") }}
+    {{ filter_field("filter_frequency_min_score", "Min. frequency score", matching_result.getFilterValue("filter_frequency_min_score"), placeholder="0-100", kind="score") }}
+    {{ filter_field("filter_frequency_nonlib_min_score", "Min. nonlib frequency score", matching_result.getFilterValue("filter_frequency_nonlib_min_score"), placeholder="0-100", kind="score") }}
+    <input class="col-1" type="checkbox" name='filter_unique_only' id="filter_unique_only" {% if matching_result.getFilterValue("filter_unique_only") %}checked{% endif %}>
     <label class="col-5" for="filter_unique_only">only show samples with unique matches</label>
     <div class="d-grid gap-4 d-md-block">
       <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">Filter</button>
@@ -76,20 +75,18 @@ Results for Job: {{ job_info.job_id }}
 <p>selection: {{ funp.max_value }}, showing: {{ 1 + funp.start_index }} - {{ funp.end_index }} (filtered: {{ num_original_aggregated_functions - funp.max_value}})</p>
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#function-matches" method='GET'>
   <div class="form-group row">
-    <input type="hidden" id="famid" name="famid" value="{{ famid }}">
-    <input type="hidden" id="samp" name="samp" value="{{ samp.page }}">
-    <input type="hidden" id="funp" name="funp" value="{{ funp.page }}">
-    <label class="col-4">Filter to match score</label>
-    <input class="col-4" type="text" name='filter_function_min_score' id="filter_function_min_score" aria-describedby="filter_function_min_score" placeholder="min score (0-100)" {% if matching_result.getFilterValue("filter_function_min_score") is not none %}value="{{matching_result.getFilterValue("filter_function_min_score")}}"{% endif %}>
-    <input class="col-4" type="text" name='filter_function_max_score' id="filter_function_max_score" aria-describedby="filter_function_max_score" placeholder="max score (0-100)" {% if matching_result.getFilterValue("filter_function_max_score") is not none %}value="{{matching_result.getFilterValue("filter_function_max_score")}}"{% endif %}>
-    <label class="col-4">Filter to sample count</label>
-    <input class="col-4" type="text" name='filter_min_num_samples' id="filter_min_num_samples" aria-describedby="filter_min_num_samples" placeholder="min. samples" {% if matching_result.getFilterValue("filter_min_num_samples") is not none %}value="{{matching_result.getFilterValue("filter_min_num_samples")}}"{% endif %}>
-    <input class="col-4" type="text" name='filter_max_num_samples' id="filter_max_num_samples" aria-describedby="filter_max_num_samples" placeholder="max. samples" {% if matching_result.getFilterValue("filter_max_num_samples") is not none %}value="{{matching_result.getFilterValue("filter_max_num_samples")}}"{% endif %}>
-    <input class="col-1" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" aria-describedby="filter_exclude_library" {% if matching_result.getFilterValue("filter_exclude_library") %}checked{% endif %}>
+    <input type="hidden" name="famid" value="{{ famid }}">
+    <input type="hidden" name="samp" value="{{ samp.page }}">
+    <input type="hidden" name="funp" value="{{ funp.page }}">
+    {{ filter_field("filter_function_min_score", "Min. score", matching_result.getFilterValue("filter_function_min_score"), placeholder="0-100", kind="score") }}
+    {{ filter_field("filter_function_max_score", "Max. score", matching_result.getFilterValue("filter_function_max_score"), placeholder="0-100", kind="score") }}
+    {{ filter_field("filter_min_num_samples", "Min. samples", matching_result.getFilterValue("filter_min_num_samples"), kind="count") }}
+    {{ filter_field("filter_max_num_samples", "Max. samples", matching_result.getFilterValue("filter_max_num_samples"), kind="count") }}
+    <input class="col-1" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" {% if matching_result.getFilterValue("filter_exclude_library") %}checked{% endif %}>
     <label class="col-3" for="filter_exclude_library">exclude functions with library hits</label>
-    <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" aria-describedby="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>
+    <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>
     <label class="col-3" for="filter_exclude_pic">exclude PIC hits</label>
-    <input class="col-1" type="checkbox" name='filter_func_unique' id="filter_func_unique" aria-describedby="filter_func_unique" {% if matching_result.getFilterValue("filter_func_unique") %}checked{% endif %}>
+    <input class="col-1" type="checkbox" name='filter_func_unique' id="filter_func_unique" {% if matching_result.getFilterValue("filter_func_unique") %}checked{% endif %}>
     <label class="col-3" for="filter_func_unique">unique only</label>
     <div class="d-grid gap-4 d-md-block">
       <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">Filter</button>

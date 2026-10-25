@@ -49,8 +49,10 @@ SECRET_VIEWS = {"mcritweb.views.authentication.settings": "settings.html",
                 "mcritweb.views.administration.change_server": "admin_server.html"}
 #: names with "token" in them that a template uses and that are not stored secrets: the
 #: visitor's own ?token= input, a registration token proposed afresh on every render, and
-#: whether one is asked for
-NOT_SECRETS = {"register.html": {"query_token", "proposed_registration_token", "is_registration_token_required"},
+#: whether one is asked for, and the form field's own name, which the form passes to the
+#: macros that mark it invalid. Its value is only what the visitor typed or ?token= carried.
+NOT_SECRETS = {"register.html": {"query_token", "proposed_registration_token", "is_registration_token_required",
+                                 "registrationToken"},
                # #254: who still holds a legacy token, and the button that rotates them
                "users.html": {"legacy_token_user_ids", "admin.regenerate_legacy_apitokens"}}
 #: a {{ }} or {% %} block, wherever a token can be printed from: directly, through a macro,
@@ -219,3 +221,31 @@ def test_an_already_encoded_body_is_not_encoded_twice(app):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_the_registration_form_does_not_print_the_stored_registration_token(app, client):
+    """The form keeps what was typed after a failed attempt. The token field has to hold
+    only that, never the token the server stores, or anyone could read it off /register."""
+    from werkzeug.security import generate_password_hash
+
+    from mcritweb.db import ServerInfo, UserInfo
+    with app.app_context():
+        server_info = ServerInfo.fromDb()
+        server_info.registration_token = "stored-registration-secret"
+        server_info.saveToDb()
+        user_info = UserInfo()
+        user_info.username = "alice"
+        user_info.password = generate_password_hash("pw-12345678")
+        user_info.role = "visitor"
+        user_info.apitoken = "apitoken-alice"
+        user_info.saveToDb()
+
+    fresh = client.get("/register").get_data(as_text=True)
+    typed = client.post("/register", data={
+        "username": "bob", "inputPassword1": "pw-12345678", "inputPassword2": "pw-12345678",
+        "registrationToken": "a-wrong-guess"}).get_data(as_text=True)
+
+    assert 'name="registrationToken"' in fresh
+    assert "stored-registration-secret" not in fresh
+    assert "stored-registration-secret" not in typed
+    assert 'value="a-wrong-guess"' in typed
