@@ -476,6 +476,42 @@ def test_existing_users_gain_a_session_generation_of_0(tmp_path):
         ("olduser", "preexisting-token", 0)]
 
 
+def test_a_session_generation_another_worker_added_first_is_kept(tmp_path, monkeypatch):
+    """Each gunicorn worker migrates on start. When two start at once, the other may add
+    the column between this one's look at the columns and its ALTER, which then fails
+    with a duplicate column; that must not stop this worker from starting."""
+    from mcritweb import db as mcritweb_db
+
+    db_path = _legacy_database(tmp_path, SCHEMA_V1_6_0)
+    _insert_legacy_user(db_path, "olduser", with_apitoken=True)
+    connect = sqlite3.connect
+
+    class OtherWorkerGoesFirst:
+        def __init__(self, connection):
+            self._connection = connection
+
+        def execute(self, statement, *args):
+            if statement.startswith("ALTER TABLE user ADD session_generation"):
+                other = connect(str(db_path))
+                other.execute(statement)
+                other.commit()
+                other.close()
+            return self._connection.execute(statement, *args)
+
+        def __getattr__(self, name):
+            return getattr(self._connection, name)
+
+    def connect_through_the_race(database, *args, **kwargs):
+        connection = connect(database, *args, **kwargs)
+        return OtherWorkerGoesFirst(connection) if database == str(db_path) else connection
+
+    monkeypatch.setattr(mcritweb_db.sqlite3, "connect", connect_through_the_race)
+    _run_migration(tmp_path, db_path)
+    monkeypatch.undo()
+
+    assert _query(db_path, "SELECT username, session_generation FROM user") == [("olduser", 0)]
+
+
 def test_the_current_schema_is_a_no_op(tmp_path):
     """Running the app twice on an up-to-date database must change nothing."""
     from mcritweb.db import init_db

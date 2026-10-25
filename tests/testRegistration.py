@@ -264,5 +264,27 @@ def test_two_registrations_cannot_take_one_name_in_two_cases(app, monkeypatch, o
     assert len([name for name in names if name.lower() == "eve"]) == 1, names
 
 
+def test_a_failed_write_lets_go_of_the_lock_it_took(app, open_instance):
+    """A new name is checked and written under one write lock. A write that fails after
+    taking it must not leave the lock held, nor its transaction open for the next write
+    on the connection to commit."""
+    with app.app_context():
+        user_info = UserInfo()
+        user_info.username = "mallory"
+        user_info.password = None
+        user_info.role = "pending"
+
+        with pytest.raises(sqlite3.IntegrityError):
+            user_info.saveToDb()
+
+        assert not get_db().in_transaction
+        other = sqlite3.connect(app.config["DATABASE"], timeout=0)
+        try:
+            other.execute("BEGIN IMMEDIATE;")
+            other.rollback()
+        finally:
+            other.close()
+
+
 if __name__ == "__main__":
     unittest.main()
