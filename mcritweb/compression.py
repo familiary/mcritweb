@@ -8,10 +8,16 @@ text, JSON, JavaScript and SVG bodies between 1 KiB and MAX_SIZE when the client
 gzip, static files included. A proxy that compresses leaves an already encoded body
 alone, so the two do not stack. Off with MCRITWEB_COMPRESS_RESPONSES.
 
+Pages are compressed too. A secret that is the same in every response, compressed next
+to input the page reflects (a search term), is what a BREACH attack reads out of the
+response's length. The one such secret every page carries, the CSRF token, is masked
+afresh on every render (`mcritweb.csrf.mask`), so it is never the same twice.
+
 Left alone:
-- HTML. The pages carry the session's CSRF token, which is the same in every response,
-  next to input they reflect (a search term), which is what a BREACH attack needs once
-  the page is compressed.
+- A page that shows any other secret: a view marked `@uncompressed`. The settings page
+  shows the user's API token, and the server page, before and after a change, the
+  registration token and the backend's token. The username is printed on every page,
+  next to a search term on some; it is not a secret, and is compressed.
 - Downloads (`Content-Disposition: attachment`) and the API passthrough. The exports and
   the cached result download are streamed so that they never sit in memory whole, and
   gzipping them here would read them in.
@@ -20,14 +26,27 @@ Left alone:
 
 import gzip
 
-from flask import request
+from flask import current_app, request
 
 COMPRESSIBLE_TYPES = ("text/", "application/json", "application/javascript", "application/xml", "image/svg+xml")
-UNCOMPRESSED_TYPES = ("text/html",)
+#: the views marked @uncompressed, as "module.name" - see uncompressed()
+_UNCOMPRESSED_VIEWS = set()
 MIN_SIZE = 1024
 # the largest asset that is compressed, static/jquery-ui.js, is 529,062 bytes
 MAX_SIZE = 1024 * 1024
 LEVEL = 6
+
+
+def uncompressed(view):
+    """Never gzip what this view answers: it shows a secret other than the CSRF token,
+    which an attacker could otherwise read out of the response's length (BREACH)."""
+    _UNCOMPRESSED_VIEWS.add(f"{view.__module__}.{view.__name__}")
+    return view
+
+
+def shows_a_secret():
+    view = current_app.view_functions.get(request.endpoint) if request.endpoint else None
+    return view is not None and f"{view.__module__}.{view.__name__}" in _UNCOMPRESSED_VIEWS
 
 
 def wants_gzip():
@@ -43,7 +62,7 @@ def is_compressible(response):
     length = response.content_length
     if length is None or not MIN_SIZE <= length <= MAX_SIZE:
         return False
-    if response.mimetype in UNCOMPRESSED_TYPES:
+    if shows_a_secret():
         return False
     return any(response.mimetype.startswith(prefix) for prefix in COMPRESSIBLE_TYPES)
 

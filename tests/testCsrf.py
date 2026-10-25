@@ -101,6 +101,66 @@ def test_the_token_is_accepted_as_a_header(client, as_role, header):
     assert client.post(TARGET, headers={header: token}).status_code == 302
 
 
+def masked(token):
+    """`token` masked the way the pages carry it - see unmasked()."""
+    raw = token.encode()
+    pad = os.urandom(len(raw))
+    return (pad + bytes(a ^ b for a, b in zip(pad, raw))).hex()
+
+
+def meta_token(page):
+    return re.search(r'<meta name="csrf-token" content="([0-9a-f]+)">', page).group(1)
+
+
+def test_the_token_a_page_carries_is_accepted(client, as_role):
+    """It is masked, so it never equals the session token, and has to unmask to it."""
+    as_role("admin")
+    prime_session(client)
+    token = meta_token(client.get("/settings").get_data(as_text=True))
+    assert client.post(TARGET, data={FIELD_NAME: token}).status_code == 302
+    assert client.post(TARGET, headers={"X-CSRFToken": token}).status_code == 302
+
+
+def test_every_render_masks_the_token_afresh(client, as_role):
+    """BREACH reads a secret out of compressed pages by its being the same in each
+    response. A masked token differs on every render, and within one page too."""
+    as_role("admin")
+    prime_session(client)
+    first = client.get("/settings").get_data(as_text=True)
+    second = client.get("/settings").get_data(as_text=True)
+    tokens = [meta_token(first), meta_token(second)] + re.findall(r'name="csrf_token" value="([0-9a-f]+)"', first)
+    assert len(tokens) > 2
+    assert len(set(tokens)) == len(tokens)
+    assert all(carries_the_session_token(token, client) for token in tokens)
+
+
+@pytest.mark.parametrize("path", ["/", "/settings", "/explore/samples?query=abc", "/data/submit", "/data/import"])
+def test_no_page_carries_the_session_token_itself(client, as_role, path):
+    as_role("admin")
+    prime_session(client)
+    page = client.get(path).get_data(as_text=True)
+    assert session_token(client) not in page
+
+
+def test_a_masked_token_of_another_session_is_rejected(client, as_role):
+    as_role("admin")
+    prime_session(client)
+    assert client.post(TARGET, data={FIELD_NAME: masked("a" * 64)}).status_code == 400
+
+
+def test_a_tampered_masked_token_is_rejected(client, as_role):
+    as_role("admin")
+    token = masked(prime_session(client))
+    last = "0" if token[-1] != "0" else "1"
+    assert client.post(TARGET, data={FIELD_NAME: token[:-1] + last}).status_code == 400
+
+
+def test_a_token_shaped_like_a_masked_one_that_is_not_hex_is_rejected(client, as_role):
+    as_role("admin")
+    token = prime_session(client)
+    assert client.post(TARGET, data={FIELD_NAME: "z" * (4 * len(token))}).status_code == 400
+
+
 def test_a_get_needs_no_token(client, as_role):
     as_role("admin")
     assert client.get("/settings").status_code == 200
@@ -140,11 +200,26 @@ def test_the_api_blueprint_is_exempt(client, make_user):
 
 # --- what the pages emit ---------------------------------------------------------
 
+def unmasked(token):
+    """What a masked token carries: hex of a random pad, then the session token XOR the pad.
+    Spelled out here rather than imported, so the format the pages carry is pinned."""
+    data = bytes.fromhex(token)
+    pad, masked = data[:len(data) // 2], data[len(data) // 2:]
+    return bytes(a ^ b for a, b in zip(pad, masked)).decode()
+
+
+def carries_the_session_token(token, client):
+    """The token a page carries unmasks to the session's, and is not the session's itself."""
+    expected = session_token(client)
+    return token != expected and unmasked(token) == expected
+
+
 def test_the_base_layout_exposes_the_token_to_scripts(client, as_role):
     """post_action.js reads this meta tag; without it every data-post control 400s."""
     as_role("admin")
     page = client.get("/settings").get_data(as_text=True)
-    assert f'<meta name="csrf-token" content="{session_token(client)}">' in page
+    token = re.search(r'<meta name="csrf-token" content="([0-9a-f]+)">', page).group(1)
+    assert carries_the_session_token(token, client)
 
 
 @pytest.mark.parametrize("path", ["/data/import", "/data/submit"])
@@ -154,7 +229,8 @@ def test_the_dropzones_send_the_token(client, as_role, path):
     under `app.extensions["csrf"]` - break either and the upload silently 400s."""
     as_role("admin")
     page = client.get(path).get_data(as_text=True)
-    assert f'headers: {{"X-CSRF-Token": "{session_token(client)}"}}' in page
+    token = re.search(r'headers: \{"X-CSRF-Token": "([0-9a-f]+)"\}', page).group(1)
+    assert carries_the_session_token(token, client)
 
 
 @pytest.mark.parametrize("script", ["trace_CFG/main.js", "trace_CFG/main_duo.js"])

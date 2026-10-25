@@ -30,12 +30,16 @@ standard library's `gzip`: compressible types only, bodies between 1 KiB and 1 M
 a known length only, clients that accept it only, `Vary: Accept-Encoding`, `mtime=0` so
 the bytes are stable, and an ETag suffix so a cache keeps the two encodings apart, with
 the conditional check made again against the renamed ETag so revalidation still ends in
-a 304. HTML is not compressed: a page carries the session's CSRF token, the same in
-every response, next to input it reflects, which is what BREACH needs. Downloads and
-the `/api` passthrough are not either, since they are streamed so that they never sit
-in memory whole. A proxy that compresses on its own sees
-`Content-Encoding` already set and leaves the body alone, so leaving it on behind NGINX
-costs nothing; `MCRITWEB_COMPRESS_RESPONSES = False` hands the job over entirely.
+a 304. Pages are compressed too. A page carries the session's CSRF token next to input
+it reflects, which is what BREACH needs if the token is the same in every response; it
+is not, since `mcritweb/csrf.py` masks it afresh on every render. The pages that show
+another secret are marked `@uncompressed` and left alone: settings, with the user's API
+token, and the server page, with the registration token and the backend's token. The
+username, printed on every page, is not a secret. Downloads and the `/api` passthrough
+are left alone too, since they are streamed so that they never sit in memory whole. A
+proxy that compresses on its own sees `Content-Encoding` already set and leaves the body
+alone, so leaving it on behind NGINX costs nothing; `MCRITWEB_COMPRESS_RESPONSES = False`
+hands the job over entirely.
 
 ## `defer`, after the audit
 
