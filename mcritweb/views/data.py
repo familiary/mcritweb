@@ -7,7 +7,7 @@ import types
 import uuid
 from urllib.parse import quote, urlencode
 
-from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Blueprint, Response, current_app, flash, g, json, redirect, render_template, request, send_from_directory, session, url_for
 from mcrit.client.McritClient import McritClient
 from mcrit.config.MinHashConfig import MinHashConfig
 from mcrit.config.StorageConfig import StorageConfig
@@ -2248,6 +2248,21 @@ def server_reruns():
     return callable(getattr(McritClient, "requestJobRerun", None))
 
 
+def may_rerun_query(job_info):
+    """Whether the logged-in user may have the backend rerun this query job.
+
+    A rerun resends no upload, so QUERY_UPLOAD_LIMITS has nothing to measure, but it
+    repeats a stored query that may be larger than the user's role could have uploaded
+    - and a binary query is disassembled again. So it is left to a role with no cap,
+    and to whoever submitted the query, whose upload passed theirs."""
+    if current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.user.role) is None:
+        return True
+    try:
+        return job_info.username is not None and job_info.username == g.user.username
+    except (AttributeError, KeyError, TypeError):
+        return False
+
+
 def has_stopped(job_info):
     """Finished, failed or terminated: the states mcrit reruns a job from."""
     if has_run_its_course(job_info):
@@ -2265,6 +2280,8 @@ def is_rerunnable(job_info, child_jobs=None):
         try:
             method = job_info.method
         except (AttributeError, KeyError, TypeError):
+            return False
+        if method in QUERY_UPLOAD_KINDS and not may_rerun_query(job_info):
             return False
         return method in SERVER_RERUNNABLE_METHODS and has_stopped(job_info)
     if not has_run_its_course(job_info):
@@ -2345,9 +2362,8 @@ def rerun_job_by_id(job_id):
     Visitor, because it grants nothing a visitor does not already have - the same three
     requests are reachable from /analyze/compare/<id>, /analyze/compare/<a>/<b> and
     /analyze/start_cross_compare, `rematch` included, and the analyses mcrit reruns
-    itself from the analyze pages too. A rerun query resends no upload, so the role's
-    QUERY_UPLOAD_LIMITS has nothing to measure; it does repeat a stored query that is
-    larger than the role could have uploaded.
+    itself from the analyze pages too. The one exception is a query, which a capped
+    role may only rerun when it was theirs (see may_rerun_query).
 
     Nothing from the request is forwarded to the backend except `job_id` itself, and
     only once it is a job id by JOB_ID_PATTERN, as in `job_by_id`. Where the installed
@@ -2361,6 +2377,13 @@ def rerun_job_by_id(job_id):
         flash('There is no job with that id.', category='error')
         return redirect(url_for('data.jobs'))
     if server_reruns():
+        job_info = client.getJobData(job_id)
+        if job_info is None:
+            flash('There is no job with that id.', category='error')
+            return redirect(url_for('data.jobs'))
+        if job_info.method in QUERY_UPLOAD_KINDS and not may_rerun_query(job_info):
+            flash('Only the user who submitted this query can rerun it with your role, since it may be larger than your upload limit.', category='error')
+            return redirect(url_for('data.job_by_id', job_id=job_id))
         # mcrit checks the job as the rebuild below does, and answers None for one it does
         # not know, one still queued or running, one that is no analysis and one whose
         # input file is no longer stored

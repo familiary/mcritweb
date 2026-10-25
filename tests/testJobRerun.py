@@ -577,8 +577,9 @@ def server_reruns_asked(fake):
 @pytest.mark.parametrize("report", ["matches_for_sample", "cross_compare", "matches_for_query", "unique_blocks"])
 def test_a_backend_that_reruns_jobs_is_asked_to_rerun_the_job(client, as_role, server_rerun, report):
     """Every analysis, the queries and unique blocks the rebuild cannot resend included,
-    and the request is not rebuilt here as well."""
-    as_role("visitor")
+    and the request is not rebuilt here as well. A contributor, whose uploads have no
+    cap, so that the query is anybody's."""
+    as_role("contributor")
     job_id = job_id_of(report)
 
     response = client.post(f"/data/jobs/{job_id}/rerun")
@@ -593,7 +594,7 @@ def test_a_rerun_the_backend_refuses_stays_on_the_job_and_says_so(client, as_rol
     is gone. Redirecting on it builds /data/jobs/None."""
     as_role("visitor")
     server_rerun.requestJobRerun = lambda job_id: None
-    job_id = job_id_of("matches_for_query")
+    job_id = job_id_of("matches_for_sample")
 
     response = client.post(f"/data/jobs/{job_id}/rerun")
 
@@ -615,7 +616,7 @@ def test_a_backend_that_reruns_jobs_is_not_asked_about_an_id_that_is_not_one(cli
 
 @pytest.mark.parametrize("report", ["matches_for_query", "unique_blocks"])
 def test_a_backend_that_reruns_jobs_has_the_button_on_every_analysis(client, as_role, server_rerun, report):
-    as_role("visitor")
+    as_role("contributor")
     job_id = job_id_of(report)
     page = client.get(f"/data/jobs/{job_id}").get_data(as_text=True)
 
@@ -659,6 +660,77 @@ def test_without_requestJobRerun_the_request_is_rebuilt_as_before(client, as_rol
 
     assert not rerun_button_for(page, job_id)
     assert [call[0] for call in queued_calls(fake_mcrit)] == ["requestMatchesForSample"]
+
+
+# --- a query is only rerun within the role's upload cap --------------------------------
+#
+# A rerun resends no upload, so QUERY_UPLOAD_LIMITS cannot measure it, but the backend
+# matches the stored query again, and disassembles a binary one again. A capped role -
+# by default a visitor, at 1 MiB - reruns only the queries it submitted itself.
+
+def query_job_of(fake, username, job_id="ddddddddddddddddddddddd3"):
+    job_dict = altered_job("matches_for_query", job_id)
+    job_dict["username"] = username
+    return inject_job(fake, job_dict)
+
+
+def test_a_visitor_reruns_a_query_of_their_own(client, as_role, server_rerun):
+    as_role("visitor")
+    job_id = query_job_of(server_rerun, "visitoruser")
+
+    page = client.get(f"/data/jobs/{job_id}").get_data(as_text=True)
+    response = client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert rerun_button_for(page, job_id)
+    assert server_reruns_asked(server_rerun) == [("requestJobRerun", (job_id,), {})]
+    assert response.headers["Location"] == f"/data/jobs/{NEW_JOB_ID}?refresh=3"
+
+
+@pytest.mark.parametrize("username", ["someone else", None])
+def test_a_visitor_does_not_rerun_somebody_elses_query(client, as_role, server_rerun, username):
+    """It may be larger than a visitor could have uploaded. A job that names nobody is
+    nobody's."""
+    as_role("visitor")
+    job_id = query_job_of(server_rerun, username)
+
+    page = client.get(f"/data/jobs/{job_id}").get_data(as_text=True)
+    response = client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert not rerun_button_for(page, job_id)
+    assert server_reruns_asked(server_rerun) == []
+    assert response.headers["Location"] == f"/data/jobs/{job_id}"
+    assert "Only the user who submitted this query can rerun it" in client.get(response.headers["Location"]).get_data(as_text=True)
+
+
+def test_a_visitor_still_reruns_somebody_elses_analysis_of_the_corpus(client, as_role, server_rerun):
+    """Only the queries are held to the cap: the rest reruns what the analyze pages
+    already let a visitor run."""
+    as_role("visitor")
+    job_id = job_id_of("matches_for_sample")
+
+    client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert server_reruns_asked(server_rerun) == [("requestJobRerun", (job_id,), {})]
+
+
+def test_a_visitor_without_an_upload_cap_reruns_any_query(app, client, as_role, server_rerun):
+    app.config["QUERY_UPLOAD_LIMITS"] = {}
+    as_role("visitor")
+    job_id = query_job_of(server_rerun, "someone else")
+
+    client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert server_reruns_asked(server_rerun) == [("requestJobRerun", (job_id,), {})]
+
+
+def test_a_query_job_nobody_knows_is_reported_before_the_backend_is_asked_to_rerun_it(client, as_role, server_rerun):
+    as_role("visitor")
+    job_id = "eeeeeeeeeeeeeeeeeeeeeee1"
+
+    response = client.post(f"/data/jobs/{job_id}/rerun")
+
+    assert response.headers["Location"] == "/data/jobs"
+    assert server_reruns_asked(server_rerun) == []
 
 
 if __name__ == "__main__":
