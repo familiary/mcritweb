@@ -505,3 +505,24 @@ table.table:not(.table-scroll > table) :is(td, th) {
     display: none;
   }
 }
+
+/* A result page's function matches are laid out only once they come near the window. With
+   250 rows a page the tables of a sample's result are 20,000 elements, all laid out before
+   the first paint; leaving the function matches, the last and longest, until they are
+   needed halved the layout and style time. Until then the table is held at about its
+   height, which the template works out from its number of rows (2.45rem a row of function
+   matches, one line at every width, and 3.75rem for the headings), so that the page, and
+   its scrollbar, are about as long as they will be; `auto` keeps the height it had once
+   it has been laid out. It is laid out before it scrolls into view, and when something in it
+   is found or focused. The tables above are left alone: the samples or families matched
+   are near the top and laid out at once anyway, and a library match's version wraps in a
+   narrow column, so that no estimate of their height would hold.
+   Below 1200px only: content-visibility clips the box as a scroll container does, and on
+   a wide screen, where the box does not scroll so that the headings can stick, a table
+   wider than the window would be cut off with no way to reach the rest. A browser without
+   content-visibility lays the table out at once, as before. */
+@media (max-width: 1199.98px) {
+  .table-deferred {
+    content-visibility: auto;
+  }
+}

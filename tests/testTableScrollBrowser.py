@@ -109,8 +109,9 @@ def browser():
 
 @pytest.fixture
 def open_page(app, browser, make_user):
-    """open_page(url, width, role="contributor", height=800) -> a signed-in page at that size,
-    loaded, its queued scripts run, counting layout shifts from the start.
+    """open_page(url, width, role="contributor", height=800, **context_options) -> a
+    signed-in page at that size, loaded, its queued scripts run, counting layout shifts from
+    the start.
 
     The icon fonts are refused. Whether one arrives before the first paint or after it
     depends on the test's server, which shares its process with the test, keeping up under
@@ -122,10 +123,10 @@ def open_page(app, browser, make_user):
     cookies = {}
     contexts = []
 
-    def _open(url, width, role="contributor", height=800):
+    def _open(url, width, role="contributor", height=800, **context_options):
         if role not in cookies:
             cookies[role] = session_cookie_for(app, make_user(role=role, username=f"{role}-browser"))
-        context = browser.new_context(viewport={"width": width, "height": height})
+        context = browser.new_context(viewport={"width": width, "height": height}, **context_options)
         contexts.append(context)
         context.add_cookies([{"name": app.config["SESSION_COOKIE_NAME"], "value": cookies[role], "domain": "127.0.0.1", "path": "/"}])
         context.add_init_script(COUNT_LAYOUT_SHIFTS)
@@ -354,3 +355,81 @@ def test_the_cross_compare_matrix_fades_where_it_goes_on(open_page, live_server)
     if page.evaluate("() => !CSS.supports('container-type', 'scroll-state')"):
         pytest.skip("this Chromium has no scroll-state container queries")
     assert page.evaluate(FADE_SHOWN, page.evaluate_handle("() => document.querySelector('.tab-pane.active .cross-pane-body')"))
+
+
+#: the function matches of a sample's 1:N result, the last of its three tables
+FUNCTION_MATCHES = "() => document.querySelector('.table-deferred')"
+
+#: whether a box's table is laid out, rather than skipped by content-visibility
+LAID_OUT = "(box) => box.querySelector('tbody td').checkVisibility({contentVisibilityAuto: true})"
+
+
+def test_the_function_matches_are_laid_out_when_they_come_near(open_page, live_server):
+    """With 250 rows a page, a sample's result is 20,000 elements, all laid out before the
+    first paint. The function matches, the last and longest table, wait until they come
+    near the window, held at about their height, so that the page is as long, and its
+    scrollbar where, it will be."""
+    page = open_page(live_server + f"/data/result/{job_id_of('matches_for_sample')}", 390)
+    box = page.evaluate_handle(FUNCTION_MATCHES)
+    assert "table-deferred" in page.evaluate("(box) => box.className", box)
+    assert not page.evaluate(LAID_OUT, box), "the function matches were laid out at once, 3,000px below the window"
+    held_at = page.evaluate("(box) => box.getBoundingClientRect().height", box)
+
+    page.evaluate("(box) => box.scrollIntoView({block: 'start', behavior: 'instant'})", box)
+    page.evaluate(TWO_FRAMES)
+    assert page.evaluate(LAID_OUT, box)
+    height = page.evaluate("(box) => box.getBoundingClientRect().height", box)
+    assert abs(held_at - height) <= 0.05 * height, f"held at {held_at}px for a table {height}px tall"
+
+
+def test_scrolling_down_a_result_page_moves_nothing(open_page, live_server):
+    """A table laid out as it comes near takes its own height in place of the estimate.
+    That happens below the window, so nothing on screen moves."""
+    page = open_page(live_server + f"/data/result/{job_id_of('matches_for_sample')}", 390)
+    page.evaluate(
+        "async () => { for (let y = 0; y < document.documentElement.scrollHeight; y += 400) {"
+        " window.scrollTo({top: y, behavior: 'instant'}); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); } }"
+    )
+    shifted, moved = page.evaluate(SHIFTED)
+    assert shifted == 0, moved
+
+
+def test_a_link_to_the_function_matches_lands_on_their_heading(open_page, live_server):
+    """The pagination and the filter of the function matches link to #function-matches,
+    the heading above the table: it has to be where the page scrolled to and stay there
+    once the table under it, held at its estimate until then, is laid out. (No table above
+    the heading is held, so nothing above it changes height when it comes into view.)"""
+    # Bootstrap scrolls to a fragment smoothly unless the reader asked for less motion
+    page = open_page(live_server + f"/data/result/{job_id_of('matches_for_sample')}#function-matches", 390, reduced_motion="reduce")
+    page.evaluate(TWO_FRAMES)
+    heading = "() => document.getElementById('function-matches').getBoundingClientRect().top"
+    top = page.evaluate(heading)
+    assert abs(top) <= 1, f"the heading is at {top}px"
+    assert page.evaluate(LAID_OUT, page.evaluate_handle(FUNCTION_MATCHES))
+    page.evaluate(TWO_FRAMES)
+    assert page.evaluate(heading) == top
+
+
+def test_the_keyboard_reaches_into_a_table_that_was_not_laid_out(open_page, live_server):
+    """Tab from the function filter's last button goes on into the function matches - the
+    first sortable heading - though the table was skipped until then."""
+    page = open_page(live_server + f"/data/result/{job_id_of('matches_for_sample')}", 390)
+    box = page.evaluate_handle(FUNCTION_MATCHES)
+    assert not page.evaluate(LAID_OUT, box)
+
+    page.focus("form[action$='#function-matches'] button[value=clear]")
+    for _ in range(3):
+        page.keyboard.press("Tab")
+        if page.evaluate("(box) => box.contains(document.activeElement)", box):
+            break
+    assert page.evaluate("(box) => box.contains(document.activeElement)", box), page.evaluate("() => document.activeElement.outerHTML.slice(0, 80)")
+    page.evaluate(TWO_FRAMES)
+    assert page.evaluate(LAID_OUT, box)
+
+
+def test_on_a_wide_screen_every_table_is_laid_out_at_once(open_page, live_server):
+    """There the box does not scroll, so that the headings can stick, and content-visibility
+    would clip a table wider than the window with no way to reach the rest."""
+    page = open_page(live_server + f"/data/result/{job_id_of('matches_for_sample')}", 1280)
+    assert page.evaluate(f"() => getComputedStyle(({FUNCTION_MATCHES})()).contentVisibility") == "visible"
+

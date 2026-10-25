@@ -117,6 +117,10 @@ rather than reconstructing it from the commit log at release time.
 - A table or cross compare matrix that scrolls sideways fades out at its right edge while there is
   more of it to the right, in Chrome and Edge; a touch scrollbar stays hidden until the table is
   touched, so nothing used to say there was more. Other browsers show no fade, as before.
+- On a phone, a tablet or a window under 1200px wide, a result page lays out its function matches
+  only when they are scrolled near, in browsers that support `content-visibility`. With 250 rows a
+  page that halves the layout and style work before the page is first shown (2.7 s to 1.0 s of
+  layout on a phone-speed processor), and the page is as long as before while the table waits.
 
 ### Fixed
 

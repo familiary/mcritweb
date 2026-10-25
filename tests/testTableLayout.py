@@ -189,5 +189,37 @@ def test_a_box_that_scrolls_fades_at_the_edge_with_more_to_come():
     assert "pointer-events: none" in fade and "position: sticky" in fade and "opacity: 0" in fade
 
 
+#: result template -> the rows its function matches are counted from; that table is laid
+#: out only when it comes near the window
+DEFERRED_TABLES = {
+    "result_compare_all.html": "function_rows",
+    "result_compare_family.html": "function_rows",
+    "result_compare_sample.html": "function_rows",
+    "result_compare_vs.html": "function_rows",
+}
+
+
+@pytest.mark.parametrize("template", sorted(DEFERRED_TABLES))
+def test_a_result_s_function_matches_wait_until_they_come_near(template):
+    """Held at their number of rows until then, so that the page is about as long as it
+    will be; they are the last box on the page, and the only one held."""
+    text = (TEMPLATES / template).read_text()
+    boxes = re.findall(r'<div class="table-scroll[^"]*"[^>]*>', text)
+
+    held = [box for box in boxes if "table-deferred" in box]
+    assert held == [boxes[-1]], boxes
+    rows = DEFERRED_TABLES[template]
+    assert held[0] == f'<div class="table-scroll table-deferred" style="contain-intrinsic-block-size: auto calc({{{{ {rows}|length }}}} * 2.45rem + 3.75rem)">'
+
+
+def test_the_deferral_is_held_to_where_the_box_scrolls():
+    css = STYLESHEET.read_text()
+
+    assert re.search(
+        r"@media \(max-width: 1199\.98px\)\s*\{\s*\.table-deferred\s*\{\s*content-visibility:\s*auto;\s*\}",
+        css,
+    )
+
+
 if __name__ == "__main__":
     unittest.main()
