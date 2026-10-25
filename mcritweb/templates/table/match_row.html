@@ -27,7 +27,7 @@ read straight from the render context - `matching_result`, the ScoreColorProvide
 here. `url_for`, `request` and `join_hint_strings` are Jinja globals and do reach a
 macro, which is why they are not parameters.
 #}
-{% from 'table/links.html' import format_family_name %}
+{% from 'table/links.html' import format_family_name, hint_copy %}
 {% from 'table/pagination_widget.html' import sortable_header_col %}
 
 {# Defaults for when a caller has no stored column settings. Mirrors
@@ -106,15 +106,20 @@ macro, which is why they are not parameters.
           {% elif column_type == "num_library" %}
             <td style="text-align: right;" valign="middle">{{ matched_sample.matched_functions_library }}</td>
           {% elif column_type == "direct_score" %}
-            <td style="text-align: right;" valign="middle"><span class="hint--left" data-hint="Weighted Direct Score: &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_score_weighted) }} / {{ '%.2f'|format(divisors.matchable) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_score_weighted) }}%">{{ "%3.0f"|format(matched_sample.matched_percent_score_weighted) }}</span></td>
+            {% set hint %}Weighted Direct Score: &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_score_weighted) }} / {{ '%.2f'|format(divisors.matchable) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_score_weighted) }}%{% endset %}
+            <td style="text-align: right;" valign="middle"><span class="hint--left" data-hint="{{ hint }}">{{ "%3.0f"|format(matched_sample.matched_percent_score_weighted) }}</span>{{ hint_copy(hint) }}</td>
           {% elif column_type == "direct_nonlib_score" %}
-            <td style="text-align: right;" valign="middle"><span class="hint--left" data-hint="Weighted Direct Score (Library Excluded): &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_nonlib_score_weighted) }} / {{ '%.2f'|format(divisors.nonlibrary) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_nonlib_score_weighted) }}%">{{ "%3.0f"|format(matched_sample.matched_percent_nonlib_score_weighted) }} </span></td>
+            {% set hint %}Weighted Direct Score (Library Excluded): &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_nonlib_score_weighted) }} / {{ '%.2f'|format(divisors.nonlibrary) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_nonlib_score_weighted) }}%{% endset %}
+            <td style="text-align: right;" valign="middle"><span class="hint--left" data-hint="{{ hint }}">{{ "%3.0f"|format(matched_sample.matched_percent_nonlib_score_weighted) }} </span>{{ hint_copy(hint) }}</td>
           {% elif column_type == "frequency_score" %}
-            <td style="text-align: right; background-color: {{ scp.getMatchTintFromResult(matched_sample, 'matched_percent_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="Frequency Weighted Score: &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_frequency_weighted) }} / {{ '%.2f'|format(divisors.matchable) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_frequency_weighted) }}%">{{ "%3.0f"|format(matched_sample.matched_percent_frequency_weighted) }}</span></td>
+            {% set hint %}Frequency Weighted Score: &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_frequency_weighted) }} / {{ '%.2f'|format(divisors.matchable) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_frequency_weighted) }}%{% endset %}
+            <td style="text-align: right; background-color: {{ scp.getMatchTintFromResult(matched_sample, 'matched_percent_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="{{ hint }}">{{ "%3.0f"|format(matched_sample.matched_percent_frequency_weighted) }}</span>{{ hint_copy(hint) }}</td>
           {% elif column_type == "frequency_nonlib_score" %}
-            <td style="text-align: right; background-color: {{ scp.getMatchTintFromResult(matched_sample, 'matched_percent_nonlib_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="Frequency Weighted Score (Library Excluded): &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_nonlib_frequency_weighted) }} / {{ '%.2f'|format(divisors.nonlibrary) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}%">{{ "%3.0f"|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}</span></td>
+            {% set hint %}Frequency Weighted Score (Library Excluded): &#10;Bytes: {{ '%5.2f'|format(matched_sample.matched_bytes_nonlib_frequency_weighted) }} / {{ '%.2f'|format(divisors.nonlibrary) }} &#10;Percent: {{ '%5.2f'|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}%{% endset %}
+            <td style="text-align: right; background-color: {{ scp.getMatchTintFromResult(matched_sample, 'matched_percent_nonlib_frequency_weighted') }}" valign="middle"><span class="hint--left" data-hint="{{ hint }}">{{ "%3.0f"|format(matched_sample.matched_percent_nonlib_frequency_weighted) }}</span>{{ hint_copy(hint) }}</td>
           {% elif column_type == "uniq_score" %}
-            <td style="text-align: right; background-color: {{ scp.getUniqueTint(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}" valign="middle"><span class="hint--left" data-hint="Unique Matching Score: &#10;Functions: {{ '%4d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['functions_matched']) }} &#10;Bytes: {{ '%2d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['bytes_matched']) }} &#10;Percent: {{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%">{{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%</span></td>
+            {% set hint %}Unique Matching Score: &#10;Functions: {{ '%4d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['functions_matched']) }} &#10;Bytes: {{ '%2d'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['bytes_matched']) }} &#10;Percent: {{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%{% endset %}
+            <td style="text-align: right; background-color: {{ scp.getUniqueTint(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}" valign="middle"><span class="hint--left" data-hint="{{ hint }}">{{ '%5.2f'|format(matching_result.getUniqueFamilyMatchInfoForSample(matched_sample.sample_id)['unique_score']) }}%</span>{{ hint_copy(hint) }}</td>
           {% endif %}
         {% endfor %}{% endmacro %}
 
@@ -162,7 +167,8 @@ macro, which is why they are not parameters.
               {% if aggregate["num_families_matched"] == 1 %}
                <span><i class="fa-solid fa-bug" title="Family ID"></i>&nbsp; {{ join_hint_strings(aggregate['families_matched']) }}</span>
               {% elif aggregate["num_families_matched"] in [2, 3, 4, 5] %}
-               <span class="hint--right" data-hint="{{ join_hint_strings(aggregate['families_matched']) }}">{{ aggregate["num_families_matched"] }}&nbsp;<i class="fa-solid fa-bug " title="Family ID"></i></span>
+               {% set hint = join_hint_strings(aggregate['families_matched']) %}
+               <span class="hint--right" data-hint="{{ hint }}">{{ aggregate["num_families_matched"] }}&nbsp;<i class="fa-solid fa-bug " title="Family ID"></i></span>{{ hint_copy(hint) }}
               {% else %}
                 {{ aggregate["num_families_matched"] }}
               {% endif %}

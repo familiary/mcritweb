@@ -48,12 +48,21 @@ Unique Blocks for {{ sample_ids|length }} Samples
     if (textarea === null) {
       return;
     }
+    // in the status message of status_message.js, which a click right after the page
+    // is painted can come before
     function report(copied) {
-      alert(copied ? "Copied YARA rule to clipboard!" : "Could not copy the YARA rule - please select it and copy manually.");
+      whenReady(function () {
+        if (copied) {
+          mcritStatus("Copied the YARA rule to the clipboard.");
+        } else {
+          mcritStatus("Could not copy the YARA rule to the clipboard. It is selected: press Ctrl+C to copy it.", {lasting: true});
+        }
+      });
     }
     // execCommand is deprecated, but navigator.clipboard is only exposed in a
     // secure context and MCRITweb is deployed over plain HTTP often enough that
-    // the selection fallback has to stay. It leaves the caret where it was.
+    // the selection fallback has to stay. It leaves the caret where it was, unless
+    // the copy failed: then the rule stays selected, for Ctrl+C.
     function copyBySelection() {
       var selectionStart = textarea.selectionStart;
       var selectionEnd = textarea.selectionEnd;
@@ -65,7 +74,9 @@ Unique Blocks for {{ sample_ids|length }} Samples
       } catch (error) {
         copied = false;
       }
-      textarea.setSelectionRange(selectionStart, selectionEnd);
+      if (copied) {
+        textarea.setSelectionRange(selectionStart, selectionEnd);
+      }
       return copied;
     }
     if (window.isSecureContext && navigator.clipboard) {

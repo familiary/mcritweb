@@ -269,6 +269,35 @@ rather than reconstructing it from the commit log at release time.
   controlling the list of suggestions, and how many there are is announced as they arrive. The
   suggestion under the pointer or keyboard focus has an outline, and the typed part of each is
   bold, where colour alone told them apart and forced colours took that away.
+- The tooltips of scores, matrix squares and "Total (since queued)" wrap and stay inside the
+  window. They were one line long, so on a phone or tablet they ran off the screen, and the matrix
+  pane cut off the top of those on its first rows at any width. Where the browser can anchor a box
+  to another, a tooltip opens above or below its element, whichever side has room; a phone without
+  that shows it across the foot of the window. A hidden tooltip is no longer laid out at all: it
+  made the cross compare pages 1120px wide in any narrower window, and the two hidden boxes behind
+  every matrix square were most of the time a large matrix took to draw, so loading one and
+  switching its tabs now take about half the layout work. The rules that do this are written to be
+  cheap to match, and the message box of the copy buttons is on the page from the start instead of
+  being added to it once it has loaded, so a 100 by 100 cross compare matrix styles as fast as it
+  did before the tooltips changed, rather than 250 ms slower.
+- What the tooltips say no longer needs a mouse. The byte counts behind each score, a sample's
+  details in the sample pickers and the families an aggregated function matched follow their cell
+  as text a screen reader reads; "Total (since queued)", "(whole job)" and the cross compare
+  order buttons take the keyboard focus, show their tooltip there, and are described by it. A
+  tooltip's element is underlined with dots, Escape puts a tooltip away, and the pointer can move
+  onto one without it closing.
+- A file let go beside the drop zone no longer replaces the page. The overlay opens under the
+  pointer on the first drag, and a file dropped a little off the zone, on the overlay or the page,
+  was opened by the browser in place of the page (a `.smda` report as JSON) or downloaded. Only the
+  zone takes a dragged file now; elsewhere the pointer shows that it cannot be dropped. The query,
+  submit and import pages, where the zone is the page's own content, are covered the same way.
+- A copy says whether it worked in a message at the foot of the window, which screen readers
+  announce. The YARA rule and the registration URL answered with an alert dialog, which took the
+  focus until it was dismissed, and the other copy buttons only with a "Copied!" tooltip, which a
+  screen reader was not told about. On a page served over plain HTTP, where browsers withhold the
+  clipboard API, the copy buttons and the registration URL now copy all the same; they threw
+  there, silently. Where a copy cannot be made at all, the text is left selected for Ctrl+C. The
+  registration URL is copied by a button the keyboard reaches, not by a bare icon.
 
 ### Security
 
