@@ -212,6 +212,10 @@ rather than reconstructing it from the commit log at release time.
   family name with `?`, `#` or a space links to that family on Malpedia rather than to a query of
   its own, and a cross compare cell carries its link as data instead of a job id inside an
   `onclick` script.
+- The admin server page no longer writes the backend server token into its form, where it sat in
+  clear in the page source, the browser's cache and on screen. The field starts empty and the page
+  says whether a token is set: an empty field keeps the stored token, a typed one replaces it, and
+  the new "Remove Token" button removes it, which an empty field used to do.
 
 ## [1.6.0] - 2026-10-16
 

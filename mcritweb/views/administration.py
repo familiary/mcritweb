@@ -303,7 +303,12 @@ def server():
 def change_server():
     server_info = db.get_server_info()
     new_url = request.form.get('mcrit_server_url', '')
-    new_token = request.form.get('mcrit_server_token', '')
+    # the page never shows the token (AGENTS.md), so its field comes back empty unless a
+    # new one was typed: empty keeps the stored token, and removing it is a button of its own
+    if request.form.get('remove_server_token'):
+        new_token = ''
+    else:
+        new_token = request.form.get('mcrit_server_token', '') or server_info.server_token
     if server_info.url != new_url or server_info.server_token != new_token:
         server_info.url = new_url
         server_info.server_token = new_token
