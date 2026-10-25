@@ -112,3 +112,43 @@ def test_each_drawn_comparison_graph_is_one_named_image(page, live_server):
     assert images == ['- img "Control flow graph of function A, 84"', '- img "Control flow graph of function B, 943"']
     assert "push ebp" not in tree
     assert page.errors == []
+
+
+def test_the_page_loading_status_is_there_before_it_is_written_to(page, live_server):
+    """The overlay used to be created holding its "Loading" text in a status role, which a
+    screen reader often does not read: a live region is read when it changes."""
+    open_page(page, f"{live_server}/explore/samples")
+    status = page.locator("#mcritweb-page-loading-status")
+    assert status.get_attribute("role") == "status"
+    assert status.text_content() == ""
+
+    page.evaluate("mcritwebPageLoading.show()")
+    page.wait_for_selector("#mcritweb-page-loading")
+
+    assert status.text_content() == "Loading, please wait."
+    assert page.locator("#mcritweb-page-loading").get_attribute("role") is None
+    page.evaluate("mcritwebPageLoading.hide()")
+    assert status.text_content() == ""
+    assert page.errors == []
+
+
+def test_an_upload_under_way_is_announced(page, live_server):
+    """The upload button's spinner was the only sign, a status role hidden from assistive
+    technology by its own aria-hidden."""
+    held = []
+    page.route("**/data/request_filename_info", lambda route: route.fulfill(status=200, content_type="application/json", body="{}"))
+    page.route("**/data/submit_or_query", lambda route: held.append(route))
+    open_page(page, f"{live_server}/explore/samples")
+    page.evaluate("() => new Promise(resolve => mcritLoadDropzone(resolve))")
+    assert page.locator("#submit-status").text_content() == ""
+
+    page.evaluate("Dropzone.forElement('#myDropzone').addFile(new File(['MZ'], 'sample.bin'))")
+    page.wait_for_function("Dropzone.forElement('#myDropzone').getQueuedFiles().length === 1")
+    # the overlay's form is in a closed modal; its Submit starts the upload
+    page.evaluate("document.getElementById('submit-dropzone').click()")
+    page.wait_for_function("document.getElementById('submit-status').textContent !== ''")
+
+    assert page.locator("#submit-status").text_content() == "Uploading, please wait."
+    assert page.locator("#submit-status").get_attribute("role") == "status"
+    for route in held:
+        route.abort()

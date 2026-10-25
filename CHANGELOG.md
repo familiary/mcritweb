@@ -148,6 +148,11 @@ rather than reconstructing it from the commit log at release time.
   a function's page the graph is hidden from them, since the code panel beside it is its text, and
   the panel can be scrolled from the keyboard in every browser; on the comparison page each graph is
   one image named after its function.
+- Screen readers are told when a page is loading, a file is uploading or an import moves on: each of
+  these says so in a status region that is on the page before it is written to, where the loading
+  overlay and the import box used to be created or shown together with their text, which a screen
+  reader often does not read. A running job's progress is also shown as a progress bar, which
+  assistive technology reports as one.
 
 ### Security
 

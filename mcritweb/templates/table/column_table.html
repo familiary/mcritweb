@@ -353,11 +353,17 @@
                    #46 about progress. The children carry the real number and this page
                    has already fetched them. #}
                 {{ "%5.2f"|format(100 * child_progress) }}% <span class="text-muted">(across {{ child_jobs|length }} dependencies)</span>
+                {% set shown_progress = child_progress %}
               {% elif job_info.started_at %}
                 {{ "%5.2f"|format(100 * job_info.progress) }}% 
+                {% set shown_progress = job_info.progress %}
               {% else %}
                 {{ "%5.2f"|format(0) }}% 
+                {% set shown_progress = 0 %}
               {% endif %}
+              {# the same number as a progress bar, which assistive technology reports as one;
+                 the overview's polling script moves it along with the number #}
+              <progress max="100" value="{{ "%.2f"|format(100 * shown_progress) }}" aria-label="Job progress"></progress>
             {% endif %}
           </td>
         </tr>

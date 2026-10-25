@@ -38,6 +38,14 @@ Overview for Job: {{ job_info.job_id }}
             return;
           }
           const progress = document.getElementById("job-progress");
+          // the cell's progress bar, kept and moved along with the number
+          const bar = progress ? progress.querySelector("progress") : null;
+          function showBar(fraction) {
+            if (bar) {
+              bar.value = (100 * fraction).toFixed(2);
+              progress.append(" ", bar);
+            }
+          }
           if (progress && progress.dataset.progressOf === "dependencies") {
             // a job waiting on sub-jobs has not started, and the cell shows their
             // average; the state carries it, unless none of them could be read
@@ -46,9 +54,11 @@ Overview for Job: {{ job_info.job_id }}
               count.className = "text-muted";
               count.textContent = "(across " + state.dependencies + " dependencies)";
               progress.replaceChildren((100 * state.dependency_progress).toFixed(2) + "% ", count);
+              showBar(state.dependency_progress);
             }
           } else if (progress && state.started) {
             progress.textContent = (100 * state.progress).toFixed(2) + "%";
+            showBar(state.progress);
           }
           window.setTimeout(poll, interval);
         })
