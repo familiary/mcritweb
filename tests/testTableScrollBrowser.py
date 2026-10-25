@@ -16,7 +16,10 @@ import threading
 
 import pytest
 from conftest import session_cookie_for
+from fixtureData import job_id_of
 from werkzeug.serving import make_server
+
+from mcritweb.db import UserInfo
 
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
 
@@ -37,19 +40,19 @@ LIST_PAGES = [
     "/data/jobs",
 ]
 
-#: as tests/testDropzoneBrowser.py counts them, keeping what moved for the failure message
+#: as tests/testDropzoneBrowser.py counts them, keeping when, and what moved, for the
+#: failure message
 COUNT_LAYOUT_SHIFTS = """
-window.mcritShifted = 0;
-window.mcritMoved = [];
+window.mcritShifts = [];
 new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
         if (!entry.hadRecentInput) {
-            window.mcritShifted += entry.value;
-            for (const source of entry.sources || []) {
+            const moved = (entry.sources || []).map((source) => {
                 const node = source.node;
                 const name = node ? node.nodeName + (node.id ? "#" + node.id : "") + " " + (node.textContent || "").trim().slice(0, 30) : "?";
-                window.mcritMoved.push([name, Math.round(source.previousRect.x), Math.round(source.previousRect.y), "->", Math.round(source.currentRect.x), Math.round(source.currentRect.y)]);
-            }
+                return [name, Math.round(source.previousRect.x), Math.round(source.previousRect.y), "->", Math.round(source.currentRect.x), Math.round(source.currentRect.y)];
+            });
+            window.mcritShifts.push({at: entry.startTime, value: entry.value, moved: moved});
         }
     }
 }).observe({type: "layout-shift", buffered: true});
@@ -57,8 +60,18 @@ new PerformanceObserver((list) => {
 
 WAIT_FOR_THE_QUEUE = "() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })"
 
-#: two frames on, so that a shift the queued scripts caused has been reported
-SHIFTED = "() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve([window.mcritShifted, window.mcritMoved]))))"
+#: Two frames on, so that a shift the queued scripts caused has been reported, the shifts
+#: from the moment the document was parsed. Before that, a browser kept short of time by a
+#: parallel run paints what it has parsed when it yields - a pagination whose page-size
+#: <select> has its first option and not yet its widest, say - and the rest moves things
+#: as it comes in, on master as much as here. The tables' boxes are styled from the start,
+#: so whatever they moved would move again once the page is whole.
+SHIFTED = (
+    "() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => {"
+    " const parsed = performance.getEntriesByType('navigation')[0].domInteractive;"
+    " const shifts = window.mcritShifts.filter((shift) => shift.at >= parsed);"
+    " resolve([shifts.reduce((sum, shift) => sum + shift.value, 0), shifts.map((shift) => shift.moved)]); })))"
+)
 
 PAGE_WIDTH = "() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]"
 
@@ -201,3 +214,43 @@ def test_the_actions_menu_of_a_user_is_not_cut_off(open_page, live_server, make_
     toggle.evaluate("(button) => { button.id = 'last-user-actions'; button.scrollIntoView({block: 'center'}); }")
 
     assert menu_items_hit(page, "#last-user-actions") == [True, True]
+
+
+#: pages whose tables list the fields of one thing, with a value that had nowhere to break:
+#: a 43-character filename, a 37-character field name, a sample's name
+FIELD_PAGES = [
+    "/explore/samples/0",
+    "/explore/functions/84",
+    "/data/matches/function/84/943",
+    "matches_for_sample",
+    "matches_for_sample_vs",
+    "matches_for_query",
+]
+
+
+@pytest.mark.parametrize("path", FIELD_PAGES)
+def test_a_table_of_fields_breaks_a_long_value_and_the_page_stays_the_width_of_the_window(open_page, live_server, path):
+    """At 390px the settings page was 641px wide, the API token on one line, and a result
+    page's reference sample 429px in a 358px column."""
+    url = live_server + (path if path.startswith("/") else f"/data/result/{job_id_of(path)}")
+    for width in NARROW_WIDTHS:
+        page = open_page(url, width)
+        scroll_width, client_width = page.evaluate(PAGE_WIDTH)
+        assert scroll_width <= client_width, f"{path} is {scroll_width}px wide in a {client_width}px window"
+        shifted, moved = page.evaluate(SHIFTED)
+        assert shifted == 0, f"{path} shifted at {width}px: {moved}"
+
+
+def test_the_api_token_breaks_on_the_settings_page(app, open_page, live_server):
+    """The settings page was 641px wide at 390px: the 64 characters of the token in one
+    line of a two-column table."""
+    open_page(live_server + "/settings", 1280)
+    with app.app_context():
+        user = UserInfo.fromDb(username="contributor-browser")
+        user.apitoken = "0123456789abcdef" * 4
+        user.saveToDb()
+    for width in [320, 390]:
+        page = open_page(live_server + "/settings", width)
+        assert "0123456789abcdef" * 4 in page.content()
+        scroll_width, client_width = page.evaluate(PAGE_WIDTH)
+        assert scroll_width <= client_width, f"the settings page is {scroll_width}px wide in a {client_width}px window"

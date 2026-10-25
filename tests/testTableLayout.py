@@ -146,5 +146,14 @@ def test_the_rows_with_a_menu_queue_what_keeps_it_out_of_the_box(template):
     assert "later({{ url_for('static', filename='table_scroll.js')|tojson }})" in (TEMPLATES / template).read_text()
 
 
+def test_a_table_outside_a_box_breaks_a_long_value():
+    """The tables in TABLES_THAT_WRAP scroll nowhere, so a long token - the API token on the
+    settings page - has to break in its cell, or it widens the page. `anywhere`, because
+    only that lets the table's narrowest width give up the token's."""
+    css = STYLESHEET.read_text()
+
+    assert re.search(r"table\.table:not\(\.table-scroll > table\) :is\(td, th\)\s*\{\s*overflow-wrap:\s*anywhere;", css)
+
+
 if __name__ == "__main__":
     unittest.main()

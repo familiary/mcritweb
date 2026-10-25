@@ -424,3 +424,13 @@ form.form-inline input {
     overflow-x: auto;
   }
 }
+
+/* A table that is not in a box lists the fields of one thing - a sample, a function, a
+   job, an account - and breaks a long value instead: the 64-character API token, a
+   43-character filename or a 37-character field name had nowhere to break, and pushed the
+   table and the page past the window, 641px wide at 390px on the settings page.
+   `anywhere`, as for td.job-description above, because a table is sized from the narrowest
+   its cells can be, and only `anywhere` lets a long token give that up. */
+table.table:not(.table-scroll > table) :is(td, th) {
+  overflow-wrap: anywhere;
+}
