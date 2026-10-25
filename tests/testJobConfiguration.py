@@ -156,7 +156,7 @@ def test_the_1vsn_form_opens_with_the_jobs_sample_selected(client, as_role):
     as_role("visitor")
     page = client.get(link_for(client, job_id_of("matches_for_sample"))).get_data(as_text=True)
 
-    assert "var selected = '0'" in page
+    assert 'var selected = "0"' in page
     assert "0" in sample_ids_on(page)
 
 
@@ -166,8 +166,8 @@ def test_the_1vs1_form_opens_with_both_samples_selected(client, as_role):
     as_role("visitor")
     page = client.get(link_for(client, job_id_of("matches_for_sample_vs"))).get_data(as_text=True)
 
-    assert "var selected_a = '1'" in page
-    assert "var selected_b = '3'" in page
+    assert 'var selected_a = "1"' in page
+    assert 'var selected_b = "3"' in page
 
 
 def test_the_cross_compare_form_opens_with_every_sample_of_the_job(client, as_role):
@@ -211,7 +211,7 @@ def test_the_link_survives_the_sample_being_off_the_search_page(client, as_role,
     page = client.get(f"{link}&ascending=false").get_data(as_text=True)
 
     assert "0" in sample_ids_on(page), "the job's sample is not on the page it was linked to"
-    assert "var selected = '0'" in page
+    assert 'var selected = "0"' in page
 
 
 # --- the matching parameters -----------------------------------------------------
