@@ -179,7 +179,7 @@ def test_nothing_touches_bootstrap_while_the_page_parses():
     builds a Bootstrap dropdown - waits in whenReady, by which time the queued bundle has
     run. DOMContentLoaded is too early now: the queue starts loading after it. Measured:
     without the wait every page logged "bootstrap is not defined" from autocomplete.js."""
-    for path in TEMPLATE_ROOT.rglob("*.html"):
+    for path in [*TEMPLATE_ROOT.rglob("*.html"), STATIC_ROOT / "family_names.js"]:
         code = path.read_text()
         for match in re.finditer(r"new Autocomplete\(", code):
             before = code[max(0, match.start() - 600):match.start()]

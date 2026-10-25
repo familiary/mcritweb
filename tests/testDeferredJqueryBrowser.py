@@ -404,8 +404,10 @@ def test_a_search_keeps_the_pickers_state(held_back, live_server, picker, when):
 
 # --- the queue -------------------------------------------------------------------------------
 
-QUEUED_IN_BASE = ["jquery.js", "post_action.js", "page_loading.js", "autocomplete.js",
-                  "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js"]
+#: what the samples page queues: base.html's scripts, the upload form's for the drop overlay,
+#: and the family type-ahead, which the page and the overlay's form each include
+QUEUED_ON_THE_SAMPLES_PAGE = ["jquery.js", "post_action.js", "page_loading.js", "autocomplete.js", "upload_form.js",
+                              "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js", "family_names.js"]
 
 
 #: the scripts in the order they run: a script's load event fires once it has run
@@ -434,8 +436,8 @@ def test_the_queue_is_fetched_once_the_page_has_been_painted(open_as, live_serve
             .map(entry => [entry.name.split("/static/")[1], entry.startTime]),
         ran: window.mcritRunOrder,
     })""")
-    assert sorted(name for name, _ in timings["scripts"]) == sorted(QUEUED_IN_BASE)
-    assert timings["ran"] == QUEUED_IN_BASE
+    assert sorted(name for name, _ in timings["scripts"]) == sorted(QUEUED_ON_THE_SAMPLES_PAGE)
+    assert timings["ran"] == QUEUED_ON_THE_SAMPLES_PAGE
     assert all(start > timings["paint"] for _, start in timings["scripts"]), timings
     assert page.errors == []
 
@@ -593,4 +595,33 @@ def test_a_press_on_an_element_with_a_tooltip_is_not_held(held_back, live_server
     assert page.evaluate("() => navigator.clipboard.readText()") == button.get_attribute("data-clipboard-value")
     assert page.evaluate("() => mcritScripts.pressed.length") == 0
     release()
+    assert page.errors == []
+
+
+def test_the_slider_label_follows_the_slider_moved_before_the_scripts_are_in(held_back, live_server):
+    """The label beside the upload form's minhash slider follows it before the upload
+    form's script is in, and after: its handler stays in the template, which is all it
+    needs."""
+    page, release = held_back("contributor")
+    page.goto(f"{live_server}/analyze/query", wait_until="commit")
+    page.wait_for_selector("#minhashBandRange_dropzone")
+    page.eval_on_selector("#minhashBandRange_dropzone", "range => { range.value = 0; range.dispatchEvent(new Event('input')); }")
+    assert page.inner_text("#minhashBandRange-currentSelection_dropzone").strip() == "Off"
+    release()
+
+    page.eval_on_selector("#minhashBandRange_dropzone", "range => { range.value = 3; range.dispatchEvent(new Event('input')); }")
+    assert page.inner_text("#minhashBandRange-currentSelection_dropzone").strip() == "Complete"
+    assert page.errors == []
+
+
+def test_a_page_that_includes_the_family_type_ahead_twice_fetches_it_once(open_as, live_server):
+    """A listing includes js/ac_family_names.html for its edit modals and again with the
+    drop overlay's form. later() queues static/family_names.js once, and it attaches to
+    the overlay's family field."""
+    page = open_as("contributor")
+    requested = []
+    page.on("request", lambda request: requested.append(request.url) if request.url.endswith("/static/family_names.js") else None)
+    ready(page, f"{live_server}/explore/samples")
+    assert len(requested) == 1, requested
+    assert page.eval_on_selector("#family", "field => field.dataset.familyAutocomplete") == "attached"
     assert page.errors == []

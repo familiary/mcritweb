@@ -51,22 +51,25 @@
      tests/testParseTimeScripts.py fails on a `$` that runs before the queue has. #}
   <script>
     var mcritScripts = {queued: [], waiting: [], pressed: []};
+    {# a file queued twice, by a partial that a page includes twice, is fetched and run once #}
     function later(src) {
-      mcritScripts.queued.push(src);
+      if (mcritScripts.queued.indexOf(src) < 0) {
+        mcritScripts.queued.push(src);
+      }
     }
-    // replaced, once the queue has run, by one that hands fn to jQuery at once
+    {# replaced, once the queue has run, by one that hands fn to jQuery at once #}
     function whenReady(fn) {
       mcritScripts.waiting.push(fn);
     }
-    // Reads the token the meta tag above carries. Without it a POST is indistinguishable
-    // from a forged one and the server rejects it with a 400. See mcritweb/csrf.py and
-    // issue #83.
+    {# Reads the token the meta tag above carries. Without it a POST is indistinguishable
+       from a forged one and the server rejects it with a 400. See mcritweb/csrf.py and
+       issue #83. #}
     function csrfToken() {
       var meta = document.querySelector('meta[name="csrf-token"]');
       return meta ? meta.getAttribute("content") : "";
     }
-    // A tooltip is shown on hover and focus, not on a press, so a press on an element
-    // that has one goes on to the element's own handler.
+    {# A tooltip is shown on hover and focus, not on a press, so a press on an element
+       that has one goes on to the element's own handler. #}
     function holdEarlyPress(event) {
       var target = event.target.closest && event.target.closest('[data-bs-toggle]:not([data-bs-toggle="tooltip"]), [data-bs-dismiss], [data-post]');
       if (target) {
@@ -92,7 +95,7 @@
         mcritScripts.queued.forEach(function (src) {
           var script = document.createElement("script");
           script.src = src;
-          // added by a script, they would run as each arrives; this runs them in order
+          {# added by a script, they would run as each arrives; this runs them in order #}
           script.async = false;
           script.onload = script.onerror = function () {
             left -= 1;
@@ -103,11 +106,11 @@
           document.head.appendChild(script);
         });
       }
-      // once the browser reports the first contentful paint: a frame is presented some
-      // time after the main thread has produced it, so a timer set from
-      // requestAnimationFrame, which is what a browser without paint timing gets, can come
-      // before it. A page that is not visible paints nothing and loads at once, and one
-      // that has painted nothing three seconds on loads anyway.
+      {# once the browser reports the first contentful paint: a frame is presented some
+         time after the main thread has produced it, so a timer set from
+         requestAnimationFrame, which is what a browser without paint timing gets, can come
+         before it. A page that is not visible paints nothing and loads at once, and one
+         that has painted nothing three seconds on loads anyway. #}
       var queueStarted = false;
       function startTheQueue() {
         if (!queueStarted) {
@@ -156,31 +159,6 @@
 
   {% if not suppress_dropzone_overlay %}
     {{ submit_or_query_dropzone_js(select_form_type=True, lazy=True) }}
-    <script>
-    whenReady(function(){
-      function showDropModal() {
-        $("#submitFileModal").modal("show");
-      }
-      function clearDropzone(e) {
-        if (!window.Dropzone) { return; }
-        const myDropzone = Dropzone.forElement("#myDropzone");
-        myDropzone.removeAllFiles();
-      }
-
-      $("#submitFileModal").on("hidden.bs.modal", function () {
-          clearDropzone();
-      });
-
-      // the drop overlay is on every page, but Dropzone itself (its script and
-      // stylesheet) is only fetched once a file is actually dragged in - issue #63
-      window.addEventListener('dragover', function(e) {
-        var dt = e.dataTransfer;
-        if (dt.effectAllowed == "copy" || dt.dropEffect == "copy"){
-          mcritLoadDropzone(showDropModal);
-        }
-      });
-    });
-    </script>
   {% endif %}
   {{ clipboard_js() }}
   {% block style %}{% endblock %}
