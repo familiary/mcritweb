@@ -55,6 +55,9 @@ dev = [
     "pytest-cov==7.1.0",
     # pinned: a ruff release can add rules and redden an unchanged tree on someone else's schedule
     "ruff==0.16.0",
+    # what scripts/minify_dropzone.py writes dropzone-patched.min.js with, so that
+    # tests/testAssetDiet.py can check the file still matches dropzone.js
+    "rjsmin==1.3.0",
 ]
 
 [project.urls]

@@ -24,6 +24,7 @@ logging.disable(logging.CRITICAL)
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+import minify_dropzone  # noqa: E402
 import subset_fontawesome  # noqa: E402
 
 TEMPLATES = ROOT / "mcritweb" / "templates"
@@ -112,7 +113,7 @@ def test_a_listing_page_does_not_download_dropzone(client, as_role):
     assert re.search(r'<script src="[^"]*dropzone[^"]*"', page) is None, "Dropzone is loaded up front"
     assert re.search(r'<link[^>]*dropzone\.min\.css', page) is None, "Dropzone's stylesheet is loaded up front"
     assert '/static/upload_form.js' in page, "the page does not queue the upload form's script, which holds the loader"
-    assert 'data-dropzone-js="/static/dropzone.js"' in page, "the loader is not told where Dropzone is"
+    assert 'data-dropzone-js="/static/dropzone-patched.min.js"' in page, "the loader is not told where Dropzone is"
     assert 'class="dropzone-pending"' in page, "the form must stay out of Dropzone's auto-discovery"
     # the options flask-dropzone renders are parked in a plain variable until the
     # library is there to receive them
@@ -142,13 +143,41 @@ def test_the_upload_pages_queue_dropzone_and_attach_it_with_their_options(client
     page = client.get(path).get_data(as_text=True)
     assert re.search(r'<script[^>]* src="[^"]*dropzone[^"]*"', page) is None, f"{path} loads Dropzone with a tag"
     queued = re.findall(r'later\("([^"]+)"\)', page)
-    assert "/static/dropzone.js" in queued, f"{path} does not queue the patched Dropzone"
-    assert queued.index("/static/dropzone_attach.js") == queued.index("/static/dropzone.js") + 1, queued
+    assert "/static/dropzone-patched.min.js" in queued, f"{path} does not queue the patched Dropzone"
+    assert queued.index("/static/dropzone_attach.js") == queued.index("/static/dropzone-patched.min.js") + 1, queued
     assert re.search(r'<link[^>]*dropzone\.min\.css', page), f"{path} does not link Dropzone's stylesheet"
     # styled as it will be from the first paint, and parked options instead of an
     # assignment to a Dropzone that is not there yet
     assert re.search(r'<form[^>]* class="dropzone"[^>]* id="myDropzone"', page), f"{path} does not render the form as a drop zone"
     assert "window.mcritDropzoneOptions = {" in page and "Dropzone.options.myDropzone" not in page
+
+
+def test_no_template_loads_the_unminified_dropzone():
+    """dropzone.js is the source dropzone-patched.min.js is written from; compiling its
+    343 KB was most of the upload pages' long task after the first paint."""
+    loading = sorted(path.name for path in TEMPLATES.rglob("*.html") if "filename='dropzone.js'" in path.read_text())
+    assert loading == [], f"{loading} load static/dropzone.js; load dropzone-patched.min.js"
+
+
+def test_the_minified_dropzone_is_the_patched_source_minified():
+    """scripts/minify_dropzone.py writes it from dropzone.js; a change to one without the other
+    would serve a Dropzone without it, or without the pre-fill patch."""
+    pytest.importorskip("rjsmin", reason="rjsmin is not installed: python -m pip install rjsmin==1.3.0")
+    written = (STATIC / "dropzone-patched.min.js").read_text(encoding="utf-8")
+    assert written == minify_dropzone.minified((STATIC / "dropzone.js").read_text(encoding="utf-8")), (
+        "dropzone-patched.min.js is stale: run python scripts/minify_dropzone.py"
+    )
+
+
+def test_the_minified_dropzone_keeps_the_patch_and_the_notices():
+    """Read without rjsmin: the patch's two helpers and its field are there, the licence
+    notices the comments carried are in the header, and the file is a third smaller."""
+    written = (STATIC / "dropzone-patched.min.js").read_text(encoding="utf-8")
+    for needle in ("const bufferToText=", "const sliceAroundKey=", "header_metadata", 'Dropzone.version="5.9.2"'):
+        assert needle in written, needle
+    for notice in ("Matias Meno, MIT License", "Diego Perini (MIT License)", "Denis Pushkarev (MIT License)"):
+        assert notice in written.split("*/", 1)[0], notice
+    assert len(written) < 0.7 * (STATIC / "dropzone.js").stat().st_size
 
 
 def test_the_attach_file_attaches_before_auto_discovery_with_the_parked_options():

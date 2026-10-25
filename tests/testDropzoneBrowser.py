@@ -1,8 +1,9 @@
 #!/usr/bin/python
 """The drop overlay's Dropzone, loaded on the first drag (issue #63), in a browser.
 
-It has to be the project's patched `static/dropzone.js`: stock Dropzone sends no head of
-the file, and the submit form is pre-filled from that head. The browser tests need
+It has to be the project's patched Dropzone, `static/dropzone-patched.min.js` written from
+`static/dropzone.js`: stock Dropzone sends no head of the file, and the submit form is
+pre-filled from that head. The browser tests need
 playwright with a chromium build; without either they skip, as in CI.
 """
 
@@ -75,7 +76,7 @@ def test_a_failed_load_is_tried_again_and_waiting_callers_are_queued_once(app, l
     with sync_api.sync_playwright() as playwright:
         browser, page = open_samples_page(playwright, app, live_url, user_id)
         try:
-            page.route("**/static/dropzone.js", serve_dropzone)
+            page.route("**/static/dropzone-patched.min.js", serve_dropzone)
             page.goto(live_url + "/explore/samples")
             # the page's scripts load after its first paint, which can come after load
             page.evaluate("() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })")
@@ -194,7 +195,7 @@ def test_an_upload_page_fetches_dropzone_after_its_first_paint_and_attaches_it_o
             page.goto(live_url + path)
             page.evaluate(WAIT_FOR_THE_QUEUE)
             fetched_at, painted_at = page.evaluate(
-                "() => [performance.getEntriesByType('resource').find((entry) => entry.name.endsWith('/static/dropzone.js')).startTime,"
+                "() => [performance.getEntriesByType('resource').find((entry) => entry.name.endsWith('/static/dropzone-patched.min.js')).startTime,"
                 " performance.getEntriesByName('first-contentful-paint')[0].startTime]"
             )
             attached = page.evaluate("() => [Dropzone.instances.length, Dropzone.forElement('#myDropzone').options.maxFilesize, Dropzone.autoDiscover]")
