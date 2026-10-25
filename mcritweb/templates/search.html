@@ -29,8 +29,8 @@ Search
   {% endfor %}
 
   
-  <form style="width:100%" method="GET" required action="#">
-    <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" {% if focus_search.value %}autofocus{% endif %} autocomplete="on">
+  <form style="width:100%" method="GET" action="#">
+    <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" {% if focus_search.value %}autofocus{% endif %} autocomplete="on">
     <div>
       <input class="form-check-input shadow-none" type="checkbox" name="type" value="family" id="families_checkbox" {% if search_types.__contains__('family') %}checked{% endif %}>
       <label class="form-check-label" for="families_checkbox">

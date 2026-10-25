@@ -15,8 +15,8 @@ Family: {{ family.family }}
 {% block content %}
 <h1>Family: {{ family.family }}</h1>
 
-  <form style="width:100%" method="GET" required action="#" data-live-search="family-samples">
-    <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" aria-label="Search this family's samples" aria-controls="family-samples" autofocus autocomplete="on">
+  <form style="width:100%" method="GET" action="#" data-live-search="family-samples">
+    <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" aria-label="Search this family's samples" aria-controls="family-samples" autofocus autocomplete="on">
     <input type='submit' hidden>
   </form>
   <p id="family-samples-status" class="visually-hidden" role="status"></p>

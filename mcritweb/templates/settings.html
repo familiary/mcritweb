@@ -95,7 +95,7 @@ Settings
       <form action = "{{ url_for('admin.change_username') }}" method='post'>
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group mb-2">
-            <input name='username' class="form-control" id="username" aria-label="Enter new username" placeholder="Enter new username" autocomplete="off" autofocus required >
+            <input name='username' class="form-control" id="username" aria-label="Enter new username" placeholder="Enter new username" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" autofocus required >
           </div>
           <div class="form-group mb-2">
             <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" aria-label="Enter password" placeholder="Enter password" autocomplete="current-password" required>

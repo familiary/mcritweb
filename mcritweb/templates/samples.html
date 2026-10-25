@@ -15,8 +15,8 @@ Samples
 {% block content %}
 <h1>Overview of Samples</h1>
   <div class="d-flex align-items-center" style="width:100%">
-    <form class="flex-grow-1 me-3" method="GET" required action="#" data-live-search="sample-list">
-    <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" aria-label="Search samples" aria-controls="sample-list" autofocus autocomplete="on">
+    <form class="flex-grow-1 me-3" method="GET" action="#" data-live-search="sample-list">
+    <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" aria-label="Search samples" aria-controls="sample-list" autofocus autocomplete="on">
     <input type='submit' hidden>
   </form>
     <div class="d-flex align-items-center">

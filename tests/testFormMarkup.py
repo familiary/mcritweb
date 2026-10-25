@@ -9,6 +9,7 @@ import collections
 from html.parser import HTMLParser
 
 import pytest
+from fixtureData import job_id_of
 
 from mcritweb.db import ServerInfo
 
@@ -115,6 +116,62 @@ def test_the_sign_in_password_is_the_current_password_by_id_too(client, make_use
     assert inputs_by_name(html)["inputPassword"].get("id") == "current-password"
     labels = [dict(attrs).get("for") for tag, attrs in Tags(html).tags if tag == "label"]
     assert "current-password" in labels
+
+
+#: an identifier, a code or a search term: what a phone keyboard must not capitalise or "correct"
+NO_CORRECTION = {"spellcheck": "false", "autocapitalize": "off", "autocorrect": "off"}
+
+#: page -> the ids of its search boxes
+SEARCH_BOXES = {
+    "/explore/search?query=a": ["query"],
+    "/explore/families": ["query"],
+    "/explore/samples": ["query"],
+    "/explore/functions": ["query"],
+    "/explore/families/0": ["query"],
+    "/explore/samples/0": ["query"],
+    "/data/jobs?active=getMatchesForSample": ["Search"],
+    "/analyze/compare": ["Search"],
+    "/analyze/compare_versus": ["Search_a", "Search_b"],
+    "/analyze/cross_compare": ["Search"],
+    "/analyze/unique_blocks": ["Search"],
+}
+
+
+@pytest.mark.parametrize("path", sorted(SEARCH_BOXES))
+def test_a_search_box_is_a_search_field_without_text_correction(client, as_role, path):
+    """The search language is lowercase `field:value` terms, which a phone capitalised and
+    "corrected", and its Enter key said "go" or "return" rather than search. `required` on
+    the <form> itself means nothing to a browser."""
+    as_role("contributor")
+    tags = Tags(page_of(client, path)).tags
+    fields = {dict(attrs).get("id"): dict(attrs) for tag, attrs in tags if tag == "input"}
+    for box in SEARCH_BOXES[path]:
+        attrs = fields[box]
+        assert {name: attrs.get(name) for name in ("type", "enterkeyhint", *NO_CORRECTION)} == \
+            dict(type="search", enterkeyhint="search", **NO_CORRECTION), (path, box)
+    assert [attrs for tag, attrs in tags if tag == "form" and "required" in dict(attrs)] == []
+
+
+def test_identifiers_and_codes_are_typed_as_they_are(client, as_role, make_user):
+    """Usernames, the family, version and base address of an upload, and the tokens."""
+    pages = credential_fields(client, as_role, make_user)
+    fields = [("login", "username"), ("registration", "username"), ("registration", "registrationToken"),
+              ("first registration", "mcritServerToken"), ("first registration", "setRegistrationToken"),
+              ("settings", "username"), ("settings", "family"), ("settings", "version"), ("settings", "base_addr")]
+    wrong = [(page, name) for page, name in fields
+             if {attr: pages[page][name].get(attr) for attr in NO_CORRECTION} != NO_CORRECTION]
+    assert wrong == []
+
+
+@pytest.mark.parametrize("path, textarea", [("/analyze/cross_compare_from_hash_list", "hashlist"),
+                                            (None, "yara_text")])
+def test_a_list_of_hashes_and_a_rule_are_not_spellchecked(client, as_role, path, textarea):
+    """One SHA-256 per line, or a YARA rule: a spellchecker underlines every line."""
+    as_role("contributor")
+    if path is None:
+        path = f"/data/result/{job_id_of('unique_blocks')}?tab=yara"
+    areas = {dict(attrs).get("name"): dict(attrs) for tag, attrs in Tags(page_of(client, path)).tags if tag == "textarea"}
+    assert areas[textarea].get("spellcheck") == "false"
 
 
 def test_a_page_that_edits_samples_still_has_its_dialog(client, as_role):

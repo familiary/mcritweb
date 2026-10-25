@@ -145,6 +145,9 @@ rather than reconstructing it from the commit log at release time.
   token fields with `off`, so the change-password form no longer gets the saved password put into
   "new" and "confirm", and a strong password can be offered there and on registration. The sign-in
   password field's id is now `current-password`; its name is unchanged.
+- Phone keyboards no longer capitalise or "correct" what is typed into a search box, a username, a
+  token or the family, version and base address of an upload, and the hash list and YARA rule are
+  not spellchecked. The search boxes are search fields, with a Search key on a phone keyboard.
 
 ### Security
 

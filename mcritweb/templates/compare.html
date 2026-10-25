@@ -97,7 +97,7 @@ function handleSliderChange(val) {
 {{ compare_nav("1vsN") }}
 <h1>Compare Samples 1vsN</h1>
 <form style="width:100%" id="compare_search_form" action="#Search" method="GET">
-  <input type="text" class="form-control shadow-none" name="query" id="Search" value="{{ query }}" placeholder="Search" autofocus autocomplete="on">
+  <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" id="Search" value="{{ query }}" placeholder="Search" autofocus autocomplete="on">
 </form>
 {{ set_pagination_params(pagination, _js_argument_provider="fetchState", _anchor="Search") }}
 {# a search box sits directly above this table, so "upload your first sample" is

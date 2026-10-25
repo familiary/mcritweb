@@ -249,7 +249,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
     <div class="mb-2">
       <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyTextAreaToClipboard('#yara_text')"><i class="fa-regular fa-copy"></i> Copy YARA rule to clipboard</button>
     </div>
-    <textarea aria-label="YARA rule" style="font-family:monospace; min-width: 100%" id="yara_text" name="yara_text" 
+    <textarea aria-label="YARA rule" style="font-family:monospace; min-width: 100%" id="yara_text" name="yara_text" spellcheck="false"
         rows="50">{{yara_rule}}</textarea>
     {% endif %}
   </div>
