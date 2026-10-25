@@ -139,5 +139,61 @@ def test_a_dropped_file_sends_its_head_for_the_pre_fill(app, live_url, make_user
     assert posted[0].get("file_metadata", "").startswith('"metadata"')
 
 
+#: the page's layout shifts from its first paint on, as Lighthouse adds them up
+COUNT_LAYOUT_SHIFTS = """
+window.mcritShifted = 0;
+new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+        if (!entry.hadRecentInput) { window.mcritShifted += entry.value; }
+    }
+}).observe({type: "layout-shift", buffered: true});
+"""
+
+WAIT_FOR_THE_QUEUE = "() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })"
+
+
+@pytest.mark.parametrize("path", ["/analyze/query", "/data/submit", "/data/import"])
+def test_an_upload_page_fetches_dropzone_after_its_first_paint_and_attaches_it_once(app, live_url, make_user, path):
+    """The drop zone is these pages' content, and Dropzone was a tag in the body: the
+    first paint shared the network with its 77 KB. Queued now, it is requested after the
+    paint, and dropzone_attach.js attaches the zone with the page's options before
+    auto-discovery could attach it with none. The zone is styled as a drop zone from the
+    first paint, so attaching it moves nothing."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+    user_id = make_user("contributor")
+    errors = []
+
+    with sync_api.sync_playwright() as playwright:
+        browser, page = open_samples_page(playwright, app, live_url, user_id)
+        try:
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.add_init_script(COUNT_LAYOUT_SHIFTS)
+            page.goto(live_url + path)
+            page.evaluate(WAIT_FOR_THE_QUEUE)
+            fetched_at, painted_at = page.evaluate(
+                "() => [performance.getEntriesByType('resource').find((entry) => entry.name.endsWith('/static/dropzone.js')).startTime,"
+                " performance.getEntriesByName('first-contentful-paint')[0].startTime]"
+            )
+            attached = page.evaluate("() => [Dropzone.instances.length, Dropzone.forElement('#myDropzone').options.maxFilesize, Dropzone.autoDiscover]")
+            # two frames on, so that a shift the attach caused has been reported
+            shifted = page.evaluate("() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(window.mcritShifted))))")
+            if path == "/data/import":
+                # the import page's own handlers, from its options' init
+                page.evaluate("() => Dropzone.forElement('#myDropzone').emit('sending', {name: 'export.json'})")
+                status = page.inner_text("#import-status-text")
+            else:
+                status = None
+                assert page.evaluate("() => Dropzone.forElement('#myDropzone').options.autoProcessQueue") is False
+        finally:
+            browser.close()
+
+    assert fetched_at > painted_at, f"dropzone.js was requested at {fetched_at:.0f} ms, before the first paint at {painted_at:.0f} ms"
+    # one zone, with the page's 100,000,000 MB cap rather than Dropzone's default of 256
+    assert attached == [1, 100000000, False], attached
+    assert shifted == 0, f"the page shifted by {shifted}"
+    assert status in (None, "Uploading export.json ..."), status
+    assert errors == []
+
+
 if __name__ == "__main__":
     unittest.main()
