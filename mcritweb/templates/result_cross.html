@@ -258,13 +258,13 @@ Results for Job: {{ job_info.job_id }}
     {% for method in matching_percent.keys() %}
       {% if method == rendered_method %}
       <div class="tab-pane fade show active" id="pills-{{ method }}" role="tabpanel" aria-labelledby="pills-{{ method }}-tab">
-          <div class="d-flex justify-content-center overflow-auto cross-pane-body">
+          <div class="overflow-auto cross-pane-body">
             {{ cross_table(method, samples[method], matching_percent[method], matching_matches[method], sample_indices[method], job_info) }}
           </div>
       </div>
       {% else %}
       <div class="tab-pane fade" id="pills-{{ method }}" role="tabpanel" aria-labelledby="pills-{{ method }}-tab" data-lazy-method="{{ method }}">
-          <div class="d-flex justify-content-center overflow-auto cross-pane-body"></div>
+          <div class="overflow-auto cross-pane-body"></div>
       </div>
       {% endif %}
     {% endfor %}

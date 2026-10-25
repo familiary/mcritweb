@@ -283,3 +283,33 @@ def test_below_1200px_the_headings_scroll_with_their_box(open_page, live_server)
     height limit, so nothing would stick, and the headings stay as they were."""
     page = open_page(live_server + f"/data/result/{job_id_of('matches_for_sample')}", 1024)
     assert page.evaluate(f"() => getComputedStyle(({LONG_TABLE})().tHead.rows[0].cells[0]).position") == "static"
+
+
+MATRIX_IN_PANE = (
+    "() => [...document.querySelectorAll('.cross-pane-body')].filter((pane) => pane.offsetParent && pane.querySelector('table')).map((pane) => {"
+    " const box = pane.getBoundingClientRect(), matrix = pane.querySelector('table').getBoundingClientRect();"
+    " return [box.left, box.right, matrix.left, matrix.right]; })"
+)
+
+
+def test_a_matrix_wider_than_its_pane_starts_where_the_pane_does(open_page, live_server):
+    """Centred by the pane's justify-content, a matrix wider than the pane started 56px to
+    the left of it at 390px, where no scrolling reaches: the first column - the index, the
+    hash and its copy button - was cut off. That holds for a tab filled in the browser too."""
+    page = open_page(live_server + f"/data/result/{job_id_of('cross_compare')}", 390)
+    for tab in ["rendered", "filled later"]:
+        if tab == "filled later":
+            page.click("#pills-tab button:not(.active)")
+            page.wait_for_function("() => document.querySelector('.tab-pane.active.show .cross-pane-body table')")
+        panes = page.evaluate(MATRIX_IN_PANE)
+        assert len(panes) == 1, panes
+        pane_left, pane_right, matrix_left, matrix_right = panes[0]
+        assert matrix_right > pane_right, "the matrix fits its pane at 390px, so this proves nothing"
+        assert matrix_left >= pane_left, f"the {tab} matrix starts {pane_left - matrix_left}px left of its pane"
+
+
+def test_a_matrix_that_fits_its_pane_is_centred_in_it(open_page, live_server):
+    page = open_page(live_server + f"/data/result/{job_id_of('cross_compare')}", 1280)
+    pane_left, pane_right, matrix_left, matrix_right = page.evaluate(MATRIX_IN_PANE)[0]
+    assert abs((matrix_left - pane_left) - (pane_right - matrix_right)) <= 1
+    assert matrix_left - pane_left > 100

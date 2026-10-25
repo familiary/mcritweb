@@ -166,5 +166,17 @@ def test_on_a_wide_screen_a_data_table_keeps_its_headings_in_view():
     )
 
 
+def test_the_cross_compare_matrix_is_centred_by_its_margins():
+    """`justify-content: center` on the pane pushed the start of a matrix wider than the
+    pane out of the reach of its scrollbar; auto margins fall to 0 instead."""
+    template = (TEMPLATES / "result_cross.html").read_text()
+    css = STYLESHEET.read_text()
+
+    panes = re.findall(r'<div class="([^"]*cross-pane-body[^"]*)"', template)
+    assert len(panes) == 2
+    assert all("justify-content-center" not in classes and "d-flex" not in classes for classes in panes), panes
+    assert re.search(r"\.cross-pane-body > table\s*\{\s*margin-inline:\s*auto;", css)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -450,3 +450,13 @@ table.table:not(.table-scroll > table) :is(td, th) {
     background-color: var(--surface-page);
   }
 }
+
+/* The cross compare matrix is centred in its pane by its margins. It used to be by the
+   pane's justify-content: center, which, once the matrix is wider than the pane, pushes
+   its start out to the left, where a scroll position cannot go below 0: on a phone the
+   index, the hash and the copy button of every row were cut off, and so were about 126px
+   of a 40-sample matrix on a desktop. Auto margins centre what fits and fall to 0 for
+   what does not, so the pane scrolls from the matrix's first column. */
+.cross-pane-body > table {
+  margin-inline: auto;
+}
