@@ -71,3 +71,33 @@ def test_the_check_sees_an_anchor_that_opens_a_dialog():
 
     assert [(tag, attrs.get("data-bs-toggle")) for tag, attrs, _ in tags] == [("a", "modal")]
 
+
+
+@pytest.mark.parametrize("path", SIGNED_IN_PAGES)
+def test_a_link_is_announced_as_a_link_and_a_menu_toggle_is_a_button(client, as_role, path):
+    """Fifteen links that go to another page carried role="button", so a screen reader
+    called them buttons and its user pressed Space, which follows no link. The navbar's
+    and the jobs page's menu toggles were the opposite: links to "#" that open a menu,
+    on which Space did nothing either."""
+    tags = start_tags(render(client, as_role, path))
+
+    posing = [line for tag, attrs, line in tags if tag == "a" and "href" in attrs and attrs.get("role") == "button"]
+    assert posing == [], f"{path}: a link poses as a button on lines {posing}"
+    toggles = [(tag, line) for tag, attrs, line in tags if attrs.get("data-bs-toggle") == "dropdown"]
+    assert toggles and [(tag, line) for tag, line in toggles if tag != "button"] == []
+
+
+def test_a_pending_account_s_menus_are_disabled_for_assistive_technology_too(client, as_role):
+    """An account waiting for a role gets the Explore, Analyze and Data menus switched
+    off. `disabled` on the anchors they were did nothing for a screen reader, which read
+    three working buttons; on a button it disables it."""
+    as_role("pending")
+    tags = start_tags(client.get("/").get_data(as_text=True))
+
+    toggles = {attrs["id"]: (tag, "disabled" in attrs) for tag, attrs, _ in tags if attrs.get("id", "").startswith("navbarDropdown")}
+    assert toggles == {
+        "navbarDropdownExplore": ("button", True),
+        "navbarDropdownAnalyze": ("button", True),
+        "navbarDropdownData": ("button", True),
+        "navbarDropdownUser": ("button", False),
+    }

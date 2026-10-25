@@ -118,6 +118,11 @@ rather than reconstructing it from the commit log at release time.
   sample lists, a sample's and a function's page and the cross compare result were links without an
   address, which Tab passes over, so editing or deleting a family or sample, renaming a function or
   reading its API usage took a mouse. They are buttons now.
+- Links that go to another page, such as a row's export, unique blocks and Show result buttons,
+  no longer tell a screen reader they are buttons, on which its user would press Space and nothing
+  happen. The navbar's and the jobs page's menus open with Space as well as Enter, now that their
+  toggles are buttons rather than links to "#", and an account waiting for a role has its Explore,
+  Analyze and Data menus switched off for a screen reader too, which read them as working buttons.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files

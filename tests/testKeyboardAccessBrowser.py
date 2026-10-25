@@ -110,3 +110,19 @@ def test_a_dialog_opens_from_the_keyboard(open_as, path, opener, dialog):
 
     page.wait_for_selector(f"{dialog}.show")
     assert page.get_attribute(dialog, "aria-modal") == "true"
+
+
+@pytest.mark.parametrize("path, toggle", [
+    ("/explore/samples", "#navbarDropdownExplore"),
+    ("/explore/samples", "#navbarDropdownUser"),
+    ("/data/jobs?active=getMatchesForSample", "[id^=navbarDropdown-]"),
+])
+def test_space_opens_a_menu(open_as, path, toggle):
+    """A button toggle, where a link to "#" took Enter only."""
+    page = open_as("contributor", path)
+
+    page.locator(toggle).first.focus()
+    page.keyboard.press("Space")
+
+    assert page.locator(toggle).first.get_attribute("aria-expanded") == "true"
+    assert page.locator(f"{toggle} + .dropdown-menu.show").count() == 1
