@@ -27,6 +27,11 @@ import pytest
 from mcrit.queue.LocalQueue import Job
 
 LOG = logging.getLogger(__name__)
+#: job ids are hex object ids; the job page refuses anything else
+PARENT_JOB_ID = "abababababababababababab"
+DONE_JOB_ID = "cdcdcdcdcdcdcdcdcdcdcdcd"
+UNKNOWN_JOB_ID = "efefefefefefefefefefefef"
+SOLO_JOB_ID = "bcbcbcbcbcbcbcbcbcbcbcbc"
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
 logging.disable(logging.CRITICAL)
 
@@ -92,7 +97,7 @@ def overview(app, client, as_role):
 
 
 def test_a_job_whose_dependencies_are_all_gone_still_renders(overview):
-    parent = job_data("parent", 10, "combineMatchesToCross", ["gone-a", "gone-b"])
+    parent = job_data(PARENT_JOB_ID, 10, "combineMatchesToCross", ["gone-a", "gone-b"])
     response = overview(parent, [])
     assert response.status_code == 200, "a deleted dependency should not 500 the page"
 
@@ -100,7 +105,7 @@ def test_a_job_whose_dependencies_are_all_gone_still_renders(overview):
 def test_the_page_says_that_children_are_missing(overview):
     """Silently rendering a shorter list would misreport the job: the overview would
     claim a cross compare combined nothing."""
-    parent = job_data("parent", 10, "combineMatchesToCross", ["gone-a", "gone-b"])
+    parent = job_data(PARENT_JOB_ID, 10, "combineMatchesToCross", ["gone-a", "gone-b"])
     response = overview(parent, [])
     assert b"2 of this job's 2 sub-jobs" in response.data, response.data[-2000:]
     assert response.data.count(b"no longer in the system") == 1, "said once. `in` is as true of two copies as of one, and a resolution that keeps both sides of this block has happened twice in the integration merges."
@@ -109,7 +114,7 @@ def test_the_page_says_that_children_are_missing(overview):
 def test_the_children_that_remain_are_still_listed_and_ordered(overview):
     """Ids chosen so that only sorting by job number gives this order - dependency
     order and alphabetical order both put aaa-job first."""
-    parent = job_data("parent", 10, "combineMatchesToCross", ["gone", "aaa-job", "zzz-job"])
+    parent = job_data(PARENT_JOB_ID, 10, "combineMatchesToCross", ["gone", "aaa-job", "zzz-job"])
     # a 1vN job carries its sample id as argument 0; the overview reads it to build the
     # sample lookup, so the children need a real one
     children = [job_data("aaa-job", 9, params='{"0": 7}'), job_data("zzz-job", 4, params='{"0": 8}')]
@@ -122,7 +127,7 @@ def test_the_children_that_remain_are_still_listed_and_ordered(overview):
 
 
 def test_a_job_without_dependencies_is_unaffected(overview):
-    parent = job_data("parent", 10, "getMatchesForSample", [])
+    parent = job_data(PARENT_JOB_ID, 10, "getMatchesForSample", [])
     response = overview(parent, [])
 
     assert response.status_code == 200
@@ -176,7 +181,7 @@ def cross_compare_backend(app):
     children = [job_data(f"child-{sample_id}", sample_id, params=f'{{"0": {sample_id}}}') for sample_id in (7, 8, 9)]
     children[1] = running(children[1])
     children[2] = running(children[2])
-    parent = running(job_data("parent", 10, "combineMatchesToCross", [child["_id"] for child in children]))
+    parent = running(job_data(PARENT_JOB_ID, 10, "combineMatchesToCross", [child["_id"] for child in children]))
     parent["unfinished_dependencies"] = ["child-8", "child-9"]
     parent["started_at"] = None
     backend = CountingJobs(parent, children)
@@ -190,7 +195,7 @@ def test_the_status_of_a_running_job_reads_its_sub_jobs_but_nothing_they_name(cl
     The sub-jobs are one queue read; the samples they name, most of what a reload
     reads, are not read at all."""
     as_role("visitor")
-    response = client.get("/data/jobs/parent/status")
+    response = client.get(f"/data/jobs/{PARENT_JOB_ID}/status")
 
     assert response.status_code == 200
     assert response.get_json() == {
@@ -204,40 +209,43 @@ def test_the_status_of_a_running_job_reads_its_sub_jobs_but_nothing_they_name(cl
         "dependencies": 3,
     }
     assert cross_compare_backend.calls == [
-        ("getJobData", "parent"),
+        ("getJobData", PARENT_JOB_ID),
         ("getQueueData", ("child-7", "child-8", "child-9")),
     ], "a tick fetched more than the job it polls and its sub-jobs"
 
 
 def test_the_status_of_a_job_without_sub_jobs_is_read_off_the_job_alone(client, as_role, app):
-    backend = CountingJobs(running(job_data("solo", 3, "getMatchesForSample", [], params='{"0": 7}')), [])
+    backend = CountingJobs(running(job_data(SOLO_JOB_ID, 3, "getMatchesForSample", [], params='{"0": 7}')), [])
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend
     as_role("visitor")
 
-    assert client.get("/data/jobs/solo/status").get_json() == {
+    assert client.get(f"/data/jobs/{SOLO_JOB_ID}/status").get_json() == {
         "started": True,
         "finished": False,
         "failed": False,
         "progress": 0.25,
         "unfinished_sub_jobs": 0,
     }
-    assert backend.calls == [("getJobData", "solo")]
+    assert backend.calls == [("getJobData", SOLO_JOB_ID)]
 
 
 def test_the_status_of_a_finished_job_does_not_read_its_sub_jobs(client, as_role, app):
     """Nothing polls a finished job, but a stray request must not cost the queue reads."""
     children = [job_data("child-7", 7, params='{"0": 7}')]
-    backend = CountingJobs(job_data("done", 10, "combineMatchesToCross", ["child-7"]), children)
+    backend = CountingJobs(job_data(DONE_JOB_ID, 10, "combineMatchesToCross", ["child-7"]), children)
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend
     as_role("visitor")
 
-    assert "dependency_progress" not in client.get("/data/jobs/done/status").get_json()
-    assert backend.calls == [("getJobData", "done")]
+    state = client.get(f"/data/jobs/{DONE_JOB_ID}/status").get_json()
+
+    assert state["finished"] is True, state
+    assert "dependency_progress" not in state
+    assert backend.calls == [("getJobData", DONE_JOB_ID)]
 
 
 def test_the_status_of_an_unknown_job_is_a_404(client, as_role, cross_compare_backend):
     as_role("visitor")
-    response = client.get("/data/jobs/no-such-job/status")
+    response = client.get(f"/data/jobs/{UNKNOWN_JOB_ID}/status")
 
     assert response.status_code == 404
     assert response.is_json
@@ -245,9 +253,9 @@ def test_the_status_of_an_unknown_job_is_a_404(client, as_role, cross_compare_ba
 
 def test_a_running_job_polls_rather_than_reloading_on_every_tick(client, as_role, cross_compare_backend):
     as_role("visitor")
-    body = client.get("/data/jobs/parent?refresh=3").get_data(as_text=True)
+    body = client.get(f"/data/jobs/{PARENT_JOB_ID}?refresh=3").get_data(as_text=True)
 
-    assert '"/data/jobs/parent/status"' in body, "the page does not poll the status endpoint"
+    assert f'"/data/jobs/{PARENT_JOB_ID}/status"' in body, "the page does not poll the status endpoint"
     # without scripting, the meta refresh is still what brings the page up to date
     assert re.search(r'<noscript>\s*<meta http-equiv="refresh" content="3">\s*</noscript>', body)
     assert body.count('http-equiv="refresh"') == 1, "a meta refresh outside <noscript> would still reload every tick"
@@ -257,19 +265,19 @@ def test_the_page_compares_against_what_the_endpoint_answers(client, as_role, cr
     """The page reloads when the endpoint's answer differs from the state it rendered,
     so the two have to agree on an unchanged job - or every tick reloads after all."""
     as_role("visitor")
-    body = client.get("/data/jobs/parent?refresh=3").get_data(as_text=True)
+    body = client.get(f"/data/jobs/{PARENT_JOB_ID}?refresh=3").get_data(as_text=True)
     rendered = json.loads(re.search(r"const shown = (\{.*?\});", body).group(1))
 
-    assert rendered == client.get("/data/jobs/parent/status").get_json()
+    assert rendered == client.get(f"/data/jobs/{PARENT_JOB_ID}/status").get_json()
 
 
 def test_a_finished_job_neither_polls_nor_refreshes(client, as_role, app):
-    backend = CountingJobs(job_data("done", 3, "getMatchesForSample", [], params='{"0": 7}'), [])
+    backend = CountingJobs(job_data(DONE_JOB_ID, 3, "getMatchesForSample", [], params='{"0": 7}'), [])
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend
     as_role("visitor")
-    body = client.get("/data/jobs/done?refresh=3").get_data(as_text=True)
+    body = client.get(f"/data/jobs/{DONE_JOB_ID}?refresh=3").get_data(as_text=True)
 
-    assert "/data/jobs/done/status" not in body
+    assert f"/data/jobs/{DONE_JOB_ID}/status" not in body
     assert 'http-equiv="refresh"' not in body
 
 
@@ -282,12 +290,12 @@ def test_a_page_that_will_not_poll_does_not_build_the_poll_state(client, as_role
         raise AssertionError("built the poll state for a page that does not poll")
 
     monkeypatch.setattr(data_views, "job_overview_state", unexpected)
-    backend = CountingJobs(job_data("done", 3, "getMatchesForSample", [], params='{"0": 7}'), [])
+    backend = CountingJobs(job_data(DONE_JOB_ID, 3, "getMatchesForSample", [], params='{"0": 7}'), [])
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend
     as_role("visitor")
 
-    assert client.get("/data/jobs/done?refresh=3").status_code == 200
-    assert client.get("/data/jobs/done").status_code == 200
+    assert client.get(f"/data/jobs/{DONE_JOB_ID}?refresh=3").status_code == 200
+    assert client.get(f"/data/jobs/{DONE_JOB_ID}").status_code == 200
 
 
 def test_the_poll_state_survives_a_job_without_its_raw_document():
