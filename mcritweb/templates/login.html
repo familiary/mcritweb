@@ -1,8 +1,10 @@
+{% from 'table/field_feedback.html' import error_attrs, error_message %}
 {% extends 'base.html' %}
 {% block title%}
 Login
 {% endblock %}
-{% block style %}  <link href="{{ url_for('static', filename='signin.css') }}" rel="stylesheet">{% endblock %}
+{% block style %}  <link href="{{ url_for('static', filename='signin.css') }}" rel="stylesheet">
+<script>later({{ url_for('static', filename='form_fields.js')|tojson }})</script>{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-center">
     <form class="form-signin" method='POST'>
@@ -10,11 +12,12 @@ Login
         <h1 class="h3 mb-3 text-center mono-font">Please sign in</h1>
         <div class="mb-2">
             <label for="username" class="form-label">Username</label>
-            <input type='text' name='username' id="username" class="form-control" autocomplete="username" spellcheck="false" autocapitalize="off" autocorrect="off" required autofocus>
+            <input type='text' name='username' id="username" class="form-control" autocomplete="username" spellcheck="false" autocapitalize="off" autocorrect="off" required{% if username %} value="{{ username }}"{% endif %}{{ error_attrs(field_error, "username") }}{% if not field_error %} autofocus{% endif %}>
         </div>
         <div class="mb-3">
             <label for="current-password" class="form-label">Password</label>
-            <input type="password" name='inputPassword' id="current-password" class="form-control" autocomplete="current-password" required>
+            <input type="password" name='inputPassword' id="current-password" class="form-control" autocomplete="current-password" required{{ error_attrs(field_error, "current-password") }}{% if field_error %} autofocus{% endif %}>
+            {{ error_message(field_error, "current-password") }}
         </div>
         <button class="btn btn-lg btn-primary w-100 mb-2" type="submit">Sign in</button>
         {% if g.operation_mode == 'multi' %}

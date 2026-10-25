@@ -156,6 +156,14 @@ rather than reconstructing it from the commit log at release time.
   placeholders, the search boxes have a label for screen readers, and the export field answers to
   the label it shows. The filter fields are full-size form fields, so a phone no longer zooms in on
   them.
+- A refused sign-in, registration or settings change says what was wrong beside the field it
+  concerns, which is marked invalid for screen readers and focused, and keeps what was typed apart
+  from passwords and the server token. A first-user setup with mistyped passwords used to come back
+  with the username, backend URL, operation mode and proposed registration token gone, and a refused
+  rename or password change came back on another tab. The message is still flashed above the page
+  too. A field the browser itself refuses is announced invalid when it is shown so. The username
+  rule is written out beside the registration and rename fields instead of as a regular expression
+  in a tooltip; it stays ASCII, since usernames are identifiers compared without regard to case.
 
 ### Security
 

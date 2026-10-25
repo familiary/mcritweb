@@ -1,0 +1,35 @@
+{#
+  The username rule in words, for the registration and rename forms, which used to state it
+  only as the regular expression in a `title`. db.USERNAME_PATTERN is the rule; it stays to
+  ASCII on purpose, since a username is an identifier compared without regard to case, and
+  letting other scripts in would need normalising and a guard against names that look alike.
+#}
+{% set USERNAME_RULE = "3 to 20 characters: letters A to Z without accents, digits, and dots or underscores, which may not start or end the name or stand two in a row." %}
+
+{% macro username_hint(id) -%}
+  <div class="form-text mb-1" id="{{ id }}">{{ USERNAME_RULE }}</div>
+{%- endmacro %}
+
+{#
+  A refused submit's message beside the fields it concerns. The sign-in, registration and
+  settings forms used to say what was wrong only in the flash above the page, tied to no
+  field, and came back empty. `error` is what the view hands the page: {"fields": [ids],
+  "message": text}, or none. The fields are marked invalid and described by the message,
+  which is printed once, under the last of them; static/form_fields.js withdraws both once
+  the field is edited.
+
+  `hint` is the id of the field's own description, which it keeps.
+#}
+{% macro error_attrs(error, field, hint=none) -%}
+  {%- set described_by = [hint] if hint else [] -%}
+  {%- if error and field in error.fields -%}
+    {%- set described_by = described_by + [error.fields[-1] ~ "-error"] %} aria-invalid="true" data-server-invalid
+  {%- endif -%}
+  {%- if described_by %} aria-describedby="{{ described_by|join(' ') }}"{% endif -%}
+{%- endmacro %}
+
+{% macro error_message(error, field) -%}
+  {%- if error and error.fields and field == error.fields[-1] %}
+  <div class="field-error" id="{{ field }}-error"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> {{ error.message }}</div>
+  {%- endif -%}
+{%- endmacro %}

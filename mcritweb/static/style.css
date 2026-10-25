@@ -400,3 +400,17 @@ form.form-inline input {
   flex-direction: column;
   justify-content: flex-end;
 }
+
+/* A refused field and what was wrong with it (templates/table/field_feedback.html,
+   static/form_fields.js). The message carries an icon as well as the colour. From :root, so
+   the dark theme's border for every field does not win over it. */
+.field-error {
+  margin-top: 0.25rem;
+  color: var(--text-danger);
+}
+:root .form-control[aria-invalid="true"] {
+  border-color: var(--text-danger);
+}
+:root .form-control:user-invalid {
+  border-color: var(--text-danger);
+}
