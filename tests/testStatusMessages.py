@@ -111,4 +111,4 @@ def test_the_empty_message_box_is_on_every_page_from_the_start(client, as_role):
     for path in ("/explore/samples", "/help"):
         page = client.get(path).get_data(as_text=True)
         assert page.count('<div class="status-message"></div>') == 1, path
-        assert page.index('<div class="status-message">') < page.index('<main class="content">'), path
+        assert page.index('<div class="status-message">') < page.index('<main class="content"'), path
