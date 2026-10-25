@@ -155,6 +155,11 @@ rather than reconstructing it from the commit log at release time.
 - The upload form's extra fields open and close at once, instead of sliding, for a reader who has
   asked the system for reduced motion; jQuery's slides took no notice of the setting. A change of
   the setting is followed while the page is open.
+- A page that is not there, one the account's role does not reach, a form the CSRF check refuses
+  and a method a route does not take (404, 403, 400 and 405) are answered with a page in the site's
+  layout and in the account's theme. They were Werkzeug's bare documents, white even on the dark
+  theme. The page needs nothing from the MCRIT backend. The API, and scripts that ask for JSON,
+  get the same answer as before.
 
 ### Security
 
