@@ -572,6 +572,10 @@
   content: "\f105"; }
 
 
+.fa-key::before {
+  content: "\f084"; }
+
+
 .fa-crown::before {
   content: "\f521"; }
 
