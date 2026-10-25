@@ -169,7 +169,15 @@ The API usage lists the requests that fetch the same data through the API passth
 
 #### Statistics
 
-Provides a short numerical summary of the MCRIT database contents.
+Provides a short summary of the MCRIT installation and its database contents:
+
+* **Versions**: MCRITweb, the MCRIT backend, the mcrit client library MCRITweb talks to the backend with, and the SMDA version the backend disassembles with.
+* **Corpus**: how many families, samples, functions and unique PicHashes the database holds.
+* **Index**: the storage, the number of MinHash bands, the oldest SMDA whose MinHashes are still comparable, and the database revision with the time of its last change.
+* **Maintenance**: samples whose hashes an older SMDA produced and that a maintenance job under *Server Management* can redo, or a storage migration still to run on the backend. When nothing is due, it says so.
+* **Escaper fingerprints**: per architecture, how the backend escapes instructions before hashing them. MinHashes are only comparable between functions escaped the same way.
+
+A value the backend reports that the page has no label for is listed under *Other*.
 
 ### Analyze
 
