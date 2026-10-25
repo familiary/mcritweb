@@ -22,6 +22,7 @@ STATIC = ROOT / "static"
 LITERAL_STYLES = [
     re.compile(r'style="[^"]*text-align:\s*(?:right|center)\s*;'),
     re.compile(r'style="[^"]*color:\s*var\(--status-(?:yes|no)\)'),
+    re.compile(r'style="[^"]*justify-content:\s*space-between'),
 ]
 
 
@@ -53,3 +54,10 @@ def test_the_status_classes_take_their_colour_from_the_theme_token(name):
     follow it."""
     css = (STATIC / "style.css").read_text()
     assert re.search(rf"\.status-{name}\s*\{{\s*color:\s*var\(--status-{name}\);\s*\}}", css)
+
+
+def test_the_settings_columns_are_spread_by_their_class():
+    """A .row is a flex box already: the class says the one thing the inline style added."""
+    css = (STATIC / "style.css").read_text()
+    assert re.search(r"\.settings-columns\s*\{\s*justify-content:\s*space-between;\s*\}", css)
+    assert (TEMPLATES / "settings.html").read_text().count('class="row settings-columns"') == 14

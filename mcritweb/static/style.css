@@ -614,3 +614,9 @@ main #xcfg_text_right {
 .status-no {
   color: var(--status-no);
 }
+
+/* The Active and Available columns of the settings page's table views: a Bootstrap .row, which
+   is a flex box already, so that only the spacing was left to say. */
+.settings-columns {
+  justify-content: space-between;
+}
