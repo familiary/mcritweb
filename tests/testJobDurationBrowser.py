@@ -11,6 +11,7 @@ import logging
 import os
 
 import pytest
+from conftest import session_cookie_for
 from fixtureData import job_id_of
 from testFunctionVsBrowser import live_server  # noqa: F401 - a fixture
 from testJobDuration import CorpusStillRunningCross
@@ -31,7 +32,7 @@ def fake_mcrit():
 def browser_page(app, live_server, make_user):  # noqa: F811
     """A Chromium page logged in as a visitor, with its clock under the test's control."""
     user_id = make_user(role="visitor")
-    cookie = app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id})
+    cookie = session_cookie_for(app, user_id)
     with sync_api.sync_playwright() as playwright:
         try:
             browser = playwright.chromium.launch(executable_path=os.environ.get("MCRITWEB_CHROMIUM") or None)
