@@ -113,6 +113,8 @@ def served(tmp_path_factory):
                 "value": session_cookie_for(app, user_id),
                 "domain": "127.0.0.1",
                 "path": "/",
+                # as the app sets it, which a __Host- name requires
+                "secure": app.config["SESSION_COOKIE_SECURE"],
             }
     server = make_server("127.0.0.1", 0, app, threaded=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
