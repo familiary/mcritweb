@@ -135,22 +135,25 @@ def test_a_pager_entry_that_goes_nowhere_is_no_tab_stop_and_says_it_is_disabled(
 
 @pytest.mark.parametrize("path", SIGNED_IN_PAGES)
 def test_no_anchor_relies_on_a_disabled_attribute(client, as_role, path):
-    """An anchor has no `disabled`; what reads as disabled is aria-disabled."""
+    """An anchor has no `disabled`; what reads as disabled is aria-disabled, and a greyed
+    link that keeps its href is out of the tab order."""
     tags = start_tags(render(client, as_role, path))
 
     assert [line for tag, attrs, line in tags if tag == "a" and "disabled" in attrs] == []
     greyed = [(attrs, line) for tag, attrs, line in tags if tag == "a" and "disabled" in (attrs.get("class") or "").split()]
-    assert [line for attrs, line in greyed if "href" in attrs or attrs.get("aria-disabled") != "true"] == []
+    assert [line for attrs, line in greyed if attrs.get("aria-disabled") != "true" or ("href" in attrs and attrs.get("tabindex") != "-1")] == []
 
 
 def test_a_jobs_menu_entry_greyed_out_is_disabled_for_a_screen_reader_too(client, as_role):
     """The jobs page greys out a category with nothing in it; the entry was still a link
-    Tab stopped on, and nothing said it was unavailable."""
+    Tab stopped on, and nothing said it was unavailable. It keeps its href, which
+    testMaintenanceJobs.py relies on to find a type's entry, as Bootstrap's own disabled
+    menu entries do, out of the tab order."""
     html = render(client, as_role, "/data/jobs?active=getMatchesForSample")
     entries = [attrs for tag, attrs, _ in start_tags(html) if "dropdown-item" in (attrs.get("class") or "").split() and "disabled" in attrs.get("class").split()]
 
     assert entries, "no category is greyed out any more - this case has stopped guarding anything"
-    assert all("href" not in attrs and attrs.get("aria-disabled") == "true" for attrs in entries)
+    assert all(attrs.get("tabindex") == "-1" and attrs.get("aria-disabled") == "true" for attrs in entries)
 
 
 @pytest.fixture

@@ -108,7 +108,7 @@ Jobs
               </button>
               <div class="dropdown-menu" aria-labelledby="navbarDropdown-{{entry['group']}}">
                 {% for subentry in entry["submenu"] %}
-                  <a class="dropdown-item {% if not subentry['available'] %}disabled{% endif %}" {% if subentry['available'] %}href="{{ url_for('data.jobs', active=subentry['name']) }}"{% else %}role="link" aria-disabled="true"{% endif %}>{{subentry["title"]}}</a>
+                  <a class="dropdown-item {% if not subentry['available'] %}disabled{% endif %}" href="{{ url_for('data.jobs', active=subentry['name']) }}"{% if not subentry['available'] %} tabindex="-1" aria-disabled="true"{% endif %}>{{subentry["title"]}}</a>
                 {% endfor %}
               </div>
             </li>
