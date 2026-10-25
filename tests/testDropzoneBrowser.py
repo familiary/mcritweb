@@ -100,6 +100,30 @@ def test_a_failed_load_is_tried_again_and_waiting_callers_are_queued_once(app, l
     assert len(fetches) == 2
 
 
+def test_the_lazily_fetched_stylesheet_leaves_the_zones_own_look_alone(app, live_url, make_user):
+    """Dropzone's stock `.dropzone` rule (a thin solid grey border on white) is as specific
+    as the macro's `dropzone.style()`; appended at the end of the head it came last and won,
+    so the overlay lost its dashed outline and its fill the moment it was fetched."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+    user_id = make_user("contributor")
+
+    with sync_api.sync_playwright() as playwright:
+        browser, page = open_samples_page(playwright, app, live_url, user_id)
+        try:
+            page.goto(live_url + "/explore/samples")
+            page.wait_for_load_state("load")
+            page.evaluate("() => new Promise((resolve) => mcritLoadDropzone(resolve))")
+            page.wait_for_function("() => [...document.styleSheets].some((sheet) => (sheet.href || '').endsWith('dropzone.min.css'))")
+            zone = page.evaluate(
+                "() => { const style = getComputedStyle(document.getElementById('myDropzone'));"
+                " return [style.borderTopStyle, style.borderTopWidth, style.backgroundColor, style.borderTopLeftRadius]; }"
+            )
+        finally:
+            browser.close()
+
+    assert zone == ["dashed", "2px", "rgb(240, 240, 240)", "25px"], zone
+
+
 def test_a_dropped_file_sends_its_head_for_the_pre_fill(app, live_url, make_user):
     """The lazily loaded Dropzone must be the patched build: stock 5.9.2 sets no
     `file.upload.header`, so `file_header` went missing from the pre-fill request and
