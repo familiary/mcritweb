@@ -743,8 +743,24 @@ def enable_write_ahead_log(db):
     SQLite does not refuse a mode it cannot use, it keeps the old one and answers with
     that - ":memory:" says "memory". That is reported rather than raised: the app works
     without WAL, it just serializes readers behind writers as it always has.
+
+    A database this process may not write is the one case it does raise for, since
+    the switch is a write: "attempt to write a readonly database". That is reported
+    too, so an instance whose mcritweb.sqlite is read-only starts and serves reads as
+    it did before WAL. Only that error, though - anything else SQLite raises here is a
+    database that is broken rather than read-only, and still stops the start.
     """
-    journal_mode = db.execute("PRAGMA journal_mode=WAL;").fetchone()[0]
+    try:
+        journal_mode = db.execute("PRAGMA journal_mode=WAL;").fetchone()[0]
+    except sqlite3.OperationalError as error:
+        # by the primary result code, so that the extended ones count too: a writable
+        # file in a read-only directory is SQLITE_READONLY_DIRECTORY, because the -wal
+        # file would have to be created beside it
+        if getattr(error, "sqlite_errorcode", 0) & 0xFF != sqlite3.SQLITE_READONLY:
+            raise
+        journal_mode = db.execute("PRAGMA journal_mode;").fetchone()[0]
+        print(f"SQLite kept journal_mode={journal_mode} instead of WAL, the database is read-only: {error}")
+        return journal_mode
     if journal_mode.lower() != "wal":
         print(f"SQLite kept journal_mode={journal_mode} instead of WAL, readers will wait for writers.")
     return journal_mode
