@@ -39,7 +39,7 @@ def test_a_graph_note_sits_inside_its_pane():
     templates = (ROOT / "templates" / "single_function.html").read_text() + (ROOT / "templates" / "result_compare_function_vs.html").read_text()
     assert "margin-top:400px" not in templates.replace(" ", "")
     for note in ["loading", "loading_a", "loading_b", "loading_c", "combined_error"]:
-        assert re.search(rf'<div id="{note}" class="hidden graph-note"', templates), note
+        assert re.search(rf'<div id="{note}" class="hidden graph-note[ "]', templates), note
 
     rule = re.search(r"\.graph-note\s*\{([^}]*)\}", STYLESHEET.read_text())
     assert rule and re.search(r"margin-top:\s*min\(400px, calc\(50svh - 73px\)\)", rule.group(1))

@@ -438,10 +438,11 @@ def test_a_search_keeps_the_pickers_state(held_back, live_server, picker, when):
 # --- the queue -------------------------------------------------------------------------------
 
 #: what the samples page queues: base.html's scripts, the upload form's for the drop overlay,
-#: the search as you type (#293), and the family type-ahead, which the page and the
-#: overlay's form each include
+#: the search as you type (#293), the family type-ahead, which the page and the overlay's
+#: form each include, and what keeps the Analyze menu of a row out of its table's scroll box
 QUEUED_ON_THE_SAMPLES_PAGE = ["jquery.js", "post_action.js", "page_loading.js", "autocomplete.js", "upload_form.js",
-                              "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js", "live_search.js", "family_names.js"]
+                              "table_scroll.js", "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js", "live_search.js",
+                              "family_names.js"]
 
 
 #: the scripts in the order they run: a script's load event fires once it has run
