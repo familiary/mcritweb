@@ -434,3 +434,19 @@ form.form-inline input {
 table.table:not(.table-scroll > table) :is(td, th) {
   overflow-wrap: anywhere;
 }
+
+/* On a wide screen a data table's headings stay at the top of the window while its rows
+   go by: a page holds up to 250 rows, and a score table's columns are told apart by their
+   headings alone. Not below 1200px, where the box scrolls and is what a heading would stick
+   to, and nothing would. The light head's cells carry Bootstrap's opaque background, which
+   hides the rows passing under them; any other head gets the page's. */
+@media (min-width: 1200px) {
+  .table-scroll > .table > thead > tr > th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .table-scroll > .table > thead:not(.table-light) > tr > th {
+    background-color: var(--surface-page);
+  }
+}

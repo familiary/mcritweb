@@ -155,5 +155,16 @@ def test_a_table_outside_a_box_breaks_a_long_value():
     assert re.search(r"table\.table:not\(\.table-scroll > table\) :is\(td, th\)\s*\{\s*overflow-wrap:\s*anywhere;", css)
 
 
+def test_on_a_wide_screen_a_data_table_keeps_its_headings_in_view():
+    """Up to 250 rows a page, told apart by their headings. Only from 1200px, where the box
+    does not scroll: a box that scrolls is what a sticky heading sticks to."""
+    css = STYLESHEET.read_text()
+
+    assert re.search(
+        r"@media \(min-width: 1200px\)\s*\{\s*\.table-scroll > \.table > thead > tr > th\s*\{\s*position:\s*sticky;\s*top:\s*0;",
+        css,
+    )
+
+
 if __name__ == "__main__":
     unittest.main()

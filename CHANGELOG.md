@@ -111,6 +111,9 @@ rather than reconstructing it from the commit log at release time.
 - Control flow graphs are laid out about three times faster on large functions, with the same
   result: 5.6 s instead of 21.7 s for a 971-block function. A patch to the vendored dagre builds the
   graph of each rank in one pass instead of walking the whole graph once per rank.
+- On a screen 1200px wide or more, the column headings of a list or result table stay at the top of
+  the window while its rows scroll by, so the 100 or 250 rows of a page can be read without
+  scrolling back up to tell the score columns apart.
 
 ### Fixed
 

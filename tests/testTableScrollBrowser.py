@@ -254,3 +254,32 @@ def test_the_api_token_breaks_on_the_settings_page(app, open_page, live_server):
         assert "0123456789abcdef" * 4 in page.content()
         scroll_width, client_width = page.evaluate(PAGE_WIDTH)
         assert scroll_width <= client_width, f"the settings page is {scroll_width}px wide in a {client_width}px window"
+
+
+#: the function matches of a sample's 1:N result: 100 rows, 3,900px at 1280px
+LONG_TABLE = "() => document.querySelectorAll('.table-scroll table')[2]"
+
+
+def test_on_a_wide_screen_the_headings_of_a_long_table_stay_in_view(open_page, live_server):
+    """1,500px into the function matches nobody could tell the Direct column from the
+    Frequency one any more: the headings had scrolled away with the first rows."""
+    page = open_page(live_server + f"/data/result/{job_id_of('matches_for_sample')}", 1280)
+    table = page.evaluate_handle(LONG_TABLE)
+    page.evaluate("(table) => window.scrollTo({top: table.getBoundingClientRect().top + window.scrollY + 1500, behavior: 'instant'})", table)
+
+    heading = page.evaluate(
+        "(table) => { const cell = table.tHead.rows[0].cells[0]; const box = cell.getBoundingClientRect();"
+        " const hit = document.elementFromPoint(box.left + 4, box.top + box.height / 2);"
+        " return [box.top, cell.contains(hit), table.getBoundingClientRect().top]; }",
+        table,
+    )
+    assert heading[2] < -1000, "the page did not scroll into the table"
+    assert heading[0] == 0, f"the headings are at {heading[0]}px, not at the top of the window"
+    assert heading[1], "a row is drawn over the headings"
+
+
+def test_below_1200px_the_headings_scroll_with_their_box(open_page, live_server):
+    """The box scrolls there, so it is what a sticky heading would stick to; it has no
+    height limit, so nothing would stick, and the headings stay as they were."""
+    page = open_page(live_server + f"/data/result/{job_id_of('matches_for_sample')}", 1024)
+    assert page.evaluate(f"() => getComputedStyle(({LONG_TABLE})().tHead.rows[0].cells[0]).position") == "static"
