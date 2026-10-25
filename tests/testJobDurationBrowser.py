@@ -64,3 +64,27 @@ def test_the_running_total_counts_on(browser_page, live_server):  # noqa: F811
     browser_page.clock.fast_forward((25 * 3600 - 2) * 1000)
     assert total.text_content() == "1 day, 1:00:08"
     assert errors == []
+
+
+def test_the_running_total_stops_while_the_tab_is_hidden(browser_page, live_server):  # noqa: F811
+    """Nobody sees it count in a hidden tab, which it woke once a second for. It counts from
+    the time the page was loaded, so it is right again as soon as the tab is shown."""
+    from testJobOverviewBrowser import HIDDEN_TAB
+    browser_page.add_init_script(HIDDEN_TAB)
+    browser_page.goto(f"{live_server}/data/jobs/{job_id_of('cross_compare')}")
+    total = browser_page.locator("[data-elapsed-seconds]")
+    browser_page.evaluate("""() => {
+        window.mcritWrites = 0;
+        new MutationObserver((records) => { window.mcritWrites += records.length; })
+            .observe(document.querySelector("[data-elapsed-seconds]"), {childList: true, characterData: true, subtree: true});
+    }""")
+
+    browser_page.evaluate("mcritSetHidden(true)")
+    browser_page.clock.run_for(5000)
+    assert total.text_content() == "0:00:08"
+    assert browser_page.evaluate("window.mcritWrites") == 0
+
+    browser_page.evaluate("mcritSetHidden(false)")
+    assert total.text_content() == "0:00:13"
+    browser_page.clock.run_for(1000)
+    assert total.text_content() == "0:00:14"

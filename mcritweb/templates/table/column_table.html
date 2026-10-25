@@ -322,13 +322,25 @@
               const rendered = Number(cell.dataset.elapsedSeconds);
               const loaded = Date.now();
               function two(n) { return String(n).padStart(2, "0"); }
-              window.setInterval(function () {
+              function tick() {
                 const total = rendered + Math.floor((Date.now() - loaded) / 1000);
                 const days = Math.floor(total / 86400);
                 const rest = total % 86400;
                 const clock = Math.floor(rest / 3600) + ":" + two(Math.floor(rest % 3600 / 60)) + ":" + two(rest % 60);
                 cell.textContent = days ? days + (days === 1 ? " day, " : " days, ") + clock : clock;
-              }, 1000);
+              }
+              // stopped while the tab is hidden, where nobody sees it count; it counts from
+              // the time it was loaded, so it is right again on the first tick once shown
+              let ticking = document.hidden ? null : window.setInterval(tick, 1000);
+              document.addEventListener("visibilitychange", function () {
+                if (document.hidden) {
+                  window.clearInterval(ticking);
+                  ticking = null;
+                } else if (ticking === null) {
+                  tick();
+                  ticking = window.setInterval(tick, 1000);
+                }
+              });
             })();
           </script>
         {% endif %}
