@@ -89,22 +89,21 @@ def test_the_js_pagination_helper_announces_its_own_navigation():
 
 
 def test_the_sort_headers_still_navigate_the_way_the_script_expects():
-    """`sortable_header_col` puts its target in an inline `onclick` rather than an
-    href, so `page_loading.js` reads the URL back out of the attribute to decide
-    whether the click loads anything. That is a coupling to the macro's shape: if
-    the assignment is rewritten, sorting silently stops showing a spinner."""
+    """`sortable_header_col` sorts through a link inside the header, `a.table-sort`,
+    and `page_loading.js` watches links of that class besides the pager's. That is a
+    coupling to the macro's shape: rename the class on one side only, and sorting
+    silently stops showing a spinner."""
     with open(WIDGET, encoding="utf-8") as template:
         source = template.read()
     header = source[source.find("macro sortable_header_col"):]
     assert header, "sortable_header_col moved or was renamed"
 
-    assert "window.location.href='" in header, (
-        "the sort headers no longer navigate by assigning window.location.href to a "
-        "single-quoted string; HEADER_TARGET in static/page_loading.js reads that "
-        "shape and now matches nothing, so a sort click shows no spinner"
+    assert '<a class="table-sort" href="' in header, (
+        "the sort headers no longer sort through an a.table-sort link, which is what "
+        "static/page_loading.js watches, so a sort click shows no spinner"
     )
     with open(SCRIPT, encoding="utf-8") as script:
-        assert "HEADER_TARGET" in script.read()
+        assert "th > a.table-sort[href]" in script.read()
 
 
 if __name__ == "__main__":

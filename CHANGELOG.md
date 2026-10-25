@@ -150,6 +150,65 @@ rather than reconstructing it from the commit log at release time.
 
 ### Fixed
 
+- The edit, rename and API-usage dialogs open from the keyboard. Their buttons on the family and
+  sample lists, a sample's and a function's page and the cross compare result were links without an
+  address, which Tab passes over, so editing or deleting a family or sample, renaming a function or
+  reading its API usage took a mouse. They are buttons now.
+- Links that go to another page, such as a row's export, unique blocks and Show result buttons,
+  no longer tell a screen reader they are buttons, on which its user would press Space and nothing
+  happen. The navbar's and the jobs page's menus open with Space as well as Enter, now that their
+  toggles are buttons rather than links to "#", and an account waiting for a role has its Explore,
+  Analyze and Data menus switched off for a screen reader too, which read them as working buttons.
+- Controls that look disabled say so to a screen reader and are no tab stop where they lead
+  nowhere. A pager's First and Previous on the first page, and Next and Last on the last, were links
+  that reloaded the page; the search pager's Last page was a tab stop without a role whose reason
+  was only in its tooltip; a jobs category with nothing in it, and the YARA tab of a report without
+  a rule, were greyed out with nothing to say why.
+- A sortable column's header is still read as the header of its column, and says whether the table
+  is sorted by it and which way. It used to be a button standing in for the header, so a screen
+  reader named no column for the cells below it and never said how the table was sorted. The sort
+  is a link inside the header now, which also opens in a new tab with a middle click, and the Unique
+  Blocks statistics, which only took a mouse click, sort from the keyboard too.
+- "Rows per page" can be changed with the keyboard. A select changes its value at every press of an
+  arrow key, and the page loaded at the first one, so stepping from 25 to 100 loaded the page at 50
+  and put the cursor back at the top. A change made with a key now waits for Enter, or for focus to
+  leave the select; one made with the mouse or a touch screen still loads at once. On the search
+  page the select did nothing at all, for want of the script it calls.
+- Dialogs put the cursor where it belongs and give it back. The compare and rename dialogs of a
+  function's page open with the cursor in their field, which their `autofocus` asked for and
+  Bootstrap never gave. Closing the jobs page's delete dialog, or one opened from a menu, puts
+  focus back on the button or menu that opened it; it fell to the top of the page, where a
+  keyboard user started over.
+- Tab lists (Settings, Users, a cross compare's matching methods, Unique Blocks) work with the arrow
+  keys: a list is one tab stop, and Left, Right, Home and End move between its tabs, past a disabled
+  one. A tab is shown as the keys reach it, except a cross compare's, which builds its matrix when
+  first shown and waits for Enter. A Unique Blocks link to its blocks or YARA tab no longer tells a
+  screen reader the statistics tab is the one selected.
+- The sample pickers of Compare 1vsN, Compare 1vs1, Cross Compare and Unique Blocks can be used with
+  the keyboard and a screen reader. A sample was picked by clicking its row, which no key could do,
+  and the pale tint of the row was the only sign it was picked. Each row now leads with a radio
+  button (1vsN, and each side of 1vs1) or a checkbox, which a click anywhere on the row still ticks;
+  a sample a cross compare or Unique Blocks already holds is ticked and disabled. In forced colours,
+  where the tint is lost, a picked row is framed.
+- Every row of the sample, family, function and job lists, the search results and a cross compare
+  result opens its page from the keyboard: its id is a link now. A click on the row was the only
+  way in, which no key can make, and a queued or running job's page had no other way in at all. A
+  click elsewhere on the row still opens it.
+- The table columns under Settings, and the sample order of a cross compare result, can be ordered
+  with the keyboard and on a touch screen. Dragging was the only way: no key reached the items, and
+  the cross compare's drag took no touch, so a keyboard user could not choose a table's columns and
+  a phone could not set a custom sample order. Each item has buttons to move it up and down, and a
+  column one to move it between Active and Available; a screen reader is told where it went.
+  The page's script adds the buttons after the first paint, into room the stylesheet keeps, rather
+  than the server writing them into every item: the settings page is sent uncompressed, and with
+  the buttons in it would have gone from 42 KB to 100 KB. Dragging works as before.
+- A cross compare's matrix can be read and followed with the keyboard and a screen reader. Each
+  score was an empty coloured square: its number showed in a tooltip on hover alone, a pair's
+  report opened from a mouse click alone, and nothing named the pair a square stood for. A score is
+  now a link (or, for a pair without matches, an image) named by its percentage and match count,
+  under headers naming its row's and its column's sample; the matrix is one tab stop, the arrow keys
+  move between its scores and show each one's tooltip, and Enter opens a pair's report. A key above
+  the tabs says which range of scores each colour stands for.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files

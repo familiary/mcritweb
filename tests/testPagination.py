@@ -114,8 +114,8 @@ def fake_mcrit(corpus_mcrit):
 def pagination_links(response, path):
     """The paging and sorting URLs the pagination macros built for `path`.
 
-    Sort links are emitted inside an onclick rather than an href, so both spellings
-    are collected: `_external` poisons them just the same. Other links on the page
+    Page and sort links are both hrefs; the `window.location.href='...'` onclick sort
+    links once were is still collected: `_external` poisons either. Other links on the page
     point at the same path - the jobs state menu, for one - so a link only counts as
     a pagination link once it carries the page parameter.
     """

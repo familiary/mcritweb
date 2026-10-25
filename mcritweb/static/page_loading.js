@@ -108,24 +108,6 @@ var mcritwebPageLoading = (function () {
     }
   }
 
-  /* The sortable table headers carry their navigation in an inline onclick, in one
-   * of two shapes (see the sortable_header_col macro): a direct assignment, whose
-   * target has to be read out of the attribute, or a pagination_js_helper() call,
-   * which raises the spinner itself. Reading the attribute rather than showing the
-   * spinner for any header click keeps the "does this actually load?" test on every
-   * path - a header rendered without a pagination gets an empty target, and would
-   * otherwise leave a spinner over a page that only reloaded itself. */
-  var HEADER_TARGET = /window\.location\.href\s*=\s*(['"])([\s\S]*?)\1/;
-
-  function headerTarget(element) {
-    var onclick = element.getAttribute("onclick");
-    if (!onclick) {
-      return null;
-    }
-    var match = HEADER_TARGET.exec(onclick);
-    return match === null ? null : match[2];
-  }
-
   function isPlainLeftClick(event) {
     return event.button === 0
       && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey;
@@ -140,7 +122,10 @@ var mcritwebPageLoading = (function () {
     if (!element || typeof element.closest !== "function") {
       return;
     }
-    var link = element.closest("ul.pagination a.page-link[href]");
+    /* a pager link, or the link in a sortable table header (sortable_header_col). One
+     * whose onclick calls pagination_js_helper() has cancelled the click above, and
+     * the helper raises the spinner itself */
+    var link = element.closest("ul.pagination a.page-link[href], th > a.table-sort[href]");
     if (link !== null) {
       if (link.hasAttribute("download")) {
         return;
@@ -150,12 +135,6 @@ var mcritwebPageLoading = (function () {
       }
       /* .href on the element is already resolved against the document */
       showFor(link.href);
-      return;
-    }
-    /* sortable table headers: .pointer is set only when the header really sorts */
-    var header = element.closest("th.pointer[onclick]");
-    if (header !== null) {
-      showFor(headerTarget(header));
     }
   });
 

@@ -2,8 +2,13 @@
 
 {% macro job_row_std_js() %}
 <script nonce="{{ csp_nonce() }}">
+  // a click on the row is a pointer's shortcut to the link its number cell holds; a link or
+  // button in the row does its own thing
   whenReady(function(){
-    $("td.job-cell").click(function(){
+    $("td.job-cell").click(function(e){
+      if ($(e.target).closest("a, button").length) {
+        return;
+      }
       var job_id = $(this)[0].getAttribute('job_id')
       window.location.href="/data/jobs/" + job_id;
     });
@@ -205,7 +210,7 @@
   
 {% macro job_row(job) %}
   <tr class="job-row parent_{{ kwargs['parent'] }}" >
-    <th job_id="{{ job.job_id }}" class="job-cell" align="right" valign="middle" class="id" scope="row">{{ "%d"|format(job.number) }}</th>
+    <th job_id="{{ job.job_id }}" class="job-cell" align="right" valign="middle" class="id" scope="row"><a href="{{ url_for('data.job_by_id', job_id=job.job_id) }}">{{ "%d"|format(job.number) }}</a></th>
     <td job_id="{{ job.job_id }}" class="job-cell job-description" valign="middle">{{ job_description(job, kwargs['families_by_id'], kwargs['samples_by_id']) }}</td>
     {# who asked for the job (fkie-cad/mcritweb#37); a backend that does not record it, or a job from before it did, shows a dash #}
     <td job_id="{{ job.job_id }}" class="job-cell" valign="middle">{{ job.username if job.username is defined and job.username else "-" }}</td>
@@ -231,7 +236,7 @@
       <button aria-label="Delete job" title="Delete job" type="button" id="job_id_{{ job.job_id }}" class="confirm-delete btn btn-outline-dark btn-sm"><i class="fa-solid fa-trash"></i></button>
       {% endif %}
       {% if job.finished_at %}
-      <a aria-label="Show result" title="Show result" class="btn btn-outline-dark btn-sm" href="{{ url_for('data.result', job_id=job.job_id) }}"  role="button" target="_self"><i class="fa-solid fa-square-poll-vertical"></i></a>
+      <a aria-label="Show result" title="Show result" class="btn btn-outline-dark btn-sm" href="{{ url_for('data.result', job_id=job.job_id) }}" target="_self"><i class="fa-solid fa-square-poll-vertical"></i></a>
       {% endif %}
     </td>
   </tr>
@@ -254,7 +259,7 @@
     <td job_id="{{ job.job_id }}" class="job-cell" align="right" valign="middle">{{ job.finished_at|date_time }}</td>
     <td job_id="{{ job.job_id }}" class="job-cell job-description" valign="middle">{{ job_description(job, kwargs['families_by_id'], kwargs['samples_by_id']) }}</td>
     <td align="right" class="buttons">
-      <a aria-label="Show result" title="Show result" class="btn btn-outline-dark btn-sm" href="{{ url_for('data.result', job_id=job.job_id) }}"  role="button" target="_self"><i class="fa-solid fa-square-poll-vertical"></i></a>
+      <a aria-label="Show result" title="Show result" class="btn btn-outline-dark btn-sm" href="{{ url_for('data.result', job_id=job.job_id) }}" target="_self"><i class="fa-solid fa-square-poll-vertical"></i></a>
     </td>
   </tr>
 {% endmacro %}  

@@ -1,6 +1,6 @@
 {% from 'table/compare_nav.html' import compare_nav %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
-{% from 'table/sample_row.html' import sample_header %}
+{% from 'table/sample_row.html' import sample_header, pick_cell %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -13,21 +13,34 @@ Unique Blocks
   var selected = [];
 
   whenReady(function(){
-    $("tr.parent").click(function(){
-      var id = $(this).children("th.id").text().trim();
-      // a row the URL already selected is removed with the x in the table above, not by
-      // clicking it again - toggling here would only ever add a duplicate
-      if ({{ selected_ids|tojson }}.map(String).indexOf(id) != -1) {
-        return;
-      }
+    // a row's checkbox is what a keyboard and a screen reader reach: a click anywhere else
+    // on the row ticks it, and either way pick() follows it
+    function pick(box) {
+      var row = box.closest("tr");
+      var id = $(row).children("th.id").text().trim();
       var position = selected.indexOf(id);
-      if (position == -1) {
-        this.classList.add("row-pending");
+      if (box.checked && position == -1) {
+        row.classList.add("row-pending");
         selected.push(id);
-      } else {
-        this.classList.remove("row-pending");
+      } else if (!box.checked && position != -1) {
+        row.classList.remove("row-pending");
         selected.splice(position, 1);
       }
+    }
+    $("tr.parent").click(function(event){
+      var box = this.querySelector("input[type=checkbox]");
+      var id = $(this).children("th.id").text().trim();
+      // a row the URL already selected is removed with the x in the table above, not by
+      // clicking it again - toggling here would only ever add a duplicate. Its box is
+      // ticked and disabled
+      if (event.target === box || {{ selected_ids|tojson }}.map(String).indexOf(id) != -1) {
+        return;
+      }
+      box.checked = !box.checked;
+      pick(box);
+    });
+    $("tr.parent input[type=checkbox]").change(function(){
+      pick(this);
     });
 
   });
@@ -158,11 +171,12 @@ Unique Blocks
   {{ set_pagination_params(pagination, _anchor="Search", _js_argument_provider="fetchState") }}
   <table class="table table-hover">
       <thead class="table-light">
-        {{ sample_header(show_analyze=False, sort_pagination=pagination) }}
+        {{ sample_header(show_analyze=False, sort_pagination=pagination, pick="checkbox") }}
       </thead>
       <tbody>
         {% for sample in samples %}
         <tr class="parent{% if sample.sample_id in selected_ids %} row-selected{% endif %}">
+          {{ pick_cell("checkbox", none, sample.sample_id, "selected" if sample.sample_id in selected_ids else none) }}
           <th align="right" valign="middle" scope="row" class="id">{{ "%d"|format(sample.sample_id) }}</th>
           <td align="right" valign="middle" class="font-monospace">{{ sample.getShortSha256() }}</td>
           <td valign="middle">{{ sample.family }}</td>

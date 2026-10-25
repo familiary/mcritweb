@@ -23,35 +23,54 @@ whenReady(function(){
     if ($(table_a.item(i)).children("th.sample-id").text()==selected_a){
       selected_column_a = table_a.item(i);
       table_a.item(i).classList.add("row-pending");
+      table_a.item(i).querySelector("input[type=radio]").checked = true;
     }
   }
   for (var i = 0; i < table_b.length; i++) {
     if ($(table_b.item(i)).children("th.sample-id").text()==selected_b){
       selected_column_b = table_b.item(i);
       table_b.item(i).classList.add("row-pending");
+      table_b.item(i).querySelector("input[type=radio]").checked = true;
     }
   }
 
-  // the tint of a chosen row is the class `row-pending` (style.css), so the theme paints it
-  $("tr.parent_table_sample_a").click(function(){
+  // the tint of a chosen row is the class `row-pending` (style.css), so the theme paints it;
+  // its radio button, one group per table, is the choice a keyboard and a screen reader
+  // reach. A click anywhere on the row checks it, and a radio checked from the keyboard
+  // chooses its row
+  function choose_a(row) {
     if (selected_column_a === null) {
       document.getElementById("button_match").style.display = "initial";
     } else {
       selected_column_a.classList.remove("row-pending");
     }
-    selected_column_a = this;
+    selected_column_a = row;
     selected_a = $(selected_column_a).children("th.sample-id").text();
-    this.classList.add("row-pending");
-  });
-  $("tr.parent_table_sample_b").click(function(){
+    row.classList.add("row-pending");
+    row.querySelector("input[type=radio]").checked = true;
+  }
+  function choose_b(row) {
     if (selected_column_b === null) {
       document.getElementById("button_match").style.display = "initial";
     } else {
       selected_column_b.classList.remove("row-pending");
     }
-    selected_column_b = this;
+    selected_column_b = row;
     selected_b = $(selected_column_b).children("th.sample-id").text();
-    this.classList.add("row-pending");
+    row.classList.add("row-pending");
+    row.querySelector("input[type=radio]").checked = true;
+  }
+  $("tr.parent_table_sample_a").click(function(){
+    choose_a(this);
+  });
+  $("tr.parent_table_sample_a input[type=radio]").change(function(){
+    choose_a(this.closest("tr"));
+  });
+  $("tr.parent_table_sample_b").click(function(){
+    choose_b(this);
+  });
+  $("tr.parent_table_sample_b input[type=radio]").change(function(){
+    choose_b(this.closest("tr"));
   });
 
 });
@@ -140,7 +159,7 @@ function handleSliderChange(val) {
       <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query_a" id="Search_a" value="{{ query_a }}" placeholder="Search" autofocus autocomplete="on">
     </form>
     {{ set_pagination_params(pagination_a, _js_argument_provider="fetchState", _anchor="Search_a") }}
-    {{ sample_table(samples_a, table_id="table_sample_a", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_a,
+    {{ sample_table(samples_a, table_id="table_sample_a", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_a, pick="radio",
                 empty_message="No sample matches \"" ~ query_a ~ "\"." if query_a else "No samples available. Click here to upload your first sample",
                 empty_link=none if query_a else url_for("data.submit")) }}
     {% if samples_a %}
@@ -153,7 +172,7 @@ function handleSliderChange(val) {
       <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query_b" id="Search_b" value="{{ query_b }}" placeholder="Search" autofocus autocomplete="on">
     </form>
     {{ set_pagination_params(pagination_b, _js_argument_provider="fetchState", _anchor="Search_b") }}
-    {{ sample_table(samples_b, table_id="table_sample_b", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_b,
+    {{ sample_table(samples_b, table_id="table_sample_b", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_b, pick="radio",
                 empty_message="No sample matches \"" ~ query_b ~ "\"." if query_b else "No samples available. Click here to upload your first sample",
                 empty_link=none if query_b else url_for("data.submit")) }}
     {% if samples_b %}

@@ -24,6 +24,37 @@
       }
       window.location.href=result;
     }
+
+    // "Rows per page" loads the page at the size it is changed to. A select changes its
+    // value at every press of an arrow key, and loading at the first one left a keyboard
+    // no way to step through the sizes. So a change made with a key waits for Enter, or
+    // for focus to leave the select; one made with the pointer, or a touch screen's
+    // picker, loads at once, as before.
+    function pagination_limit_key(select, event) {
+      if (event.key === "Enter" && select.pendingLimit) {
+        event.preventDefault();
+        pagination_limit_apply(select);
+      } else if (event.key !== "Tab" && event.key !== "Shift") {
+        select.limitByKey = true;
+      }
+    }
+    function pagination_limit_pointer(select) {
+      select.limitByKey = false;
+    }
+    function pagination_limit_change(select, load) {
+      select.pendingLimit = load;
+      if (!select.limitByKey) {
+        pagination_limit_apply(select);
+      }
+    }
+    function pagination_limit_apply(select) {
+      var load = select.pendingLimit;
+      select.pendingLimit = null;
+      select.limitByKey = false;
+      if (load) {
+        load(select.value);
+      }
+    }
   </script>
 {% endmacro %}
 
@@ -48,8 +79,13 @@
 
 {% macro std_pagination_widget(pagination) %}
 
-  {%- macro _get_href_or_onclick(page, _js_argument_provider=none) -%}
-    {% if _js_argument_provider is not none %}
+  {#- a page that is not there (before the first, after the last) is no link at all: with an
+      href it was a tab stop that reloaded this page, and nothing told a screen reader why
+      it did nothing -#}
+  {%- macro _get_href_or_onclick(page, _js_argument_provider=none, disabled=false) -%}
+    {% if disabled %}
+      role="link" aria-disabled="true"
+    {% elif _js_argument_provider is not none %}
       {# the href keeps the link crawlable and middle-clickable; the handler adds the other tables' state #}
       href="{{ pagination.get_link(page, **kwargs) }}" onclick="pagination_js_helper('{{ pagination.get_link(page, **kwargs).replace("'", "\\'") }}', {{ _js_argument_provider }}() ); return false"
     {% else %}
@@ -58,28 +94,30 @@
   {%- endmacro -%}
 
   {%- macro _get_limit_onchange(_js_argument_provider=none) -%}
+    {# see pagination_limit_key: a change by key waits for Enter or for focus to leave #}
+    onkeydown="pagination_limit_key(this, event)" onpointerdown="pagination_limit_pointer(this)" onblur="pagination_limit_apply(this)"
     {% if _js_argument_provider is not none %}
-      onchange="pagination_js_helper('{{ pagination.get_link(1, **kwargs).replace("'", "\\'") }}', Object.assign({{ _js_argument_provider }}(), { {{ pagination.limit_param }}: this.value}) )"
+      onchange="pagination_limit_change(this, function (limit) { pagination_js_helper('{{ pagination.get_link(1, **kwargs).replace("'", "\\'") }}', Object.assign({{ _js_argument_provider }}(), { {{ pagination.limit_param }}: limit}) ) })"
     {% else %}
-      onchange="pagination_js_helper('{{ pagination.get_link(1, **kwargs).replace("'", "\\'") }}', { {{ pagination.limit_param }}: this.value} )"
+      onchange="pagination_limit_change(this, function (limit) { pagination_js_helper('{{ pagination.get_link(1, **kwargs).replace("'", "\\'") }}', { {{ pagination.limit_param }}: limit} ) })"
     {% endif %}
   {%- endmacro -%}
 
   <ul class="pagination justify-content-center">
     <li class="page-item {% if pagination.page_index == 0 %}disabled{% endif %}">
-      <a aria-label="First page" title="First page" class="page-link" {{ _get_href_or_onclick(1, **kwargs) }}><i class="fa-solid fa-angles-left"></i></a>
+      <a aria-label="First page" title="First page" class="page-link" {{ _get_href_or_onclick(1, disabled=pagination.page_index == 0, **kwargs) }}><i class="fa-solid fa-angles-left"></i></a>
     </li>
     <li class="page-item {% if pagination.page_index == 0 %}disabled{% endif %}">
-      <a aria-label="Previous page" title="Previous page" class="page-link" {{ _get_href_or_onclick(pagination.page - 1, **kwargs) }}><i class="fa-solid fa-angle-left"></i></a>
+      <a aria-label="Previous page" title="Previous page" class="page-link" {{ _get_href_or_onclick(pagination.page - 1, disabled=pagination.page_index == 0, **kwargs) }}><i class="fa-solid fa-angle-left"></i></a>
     </li>
     {% for item in pagination.pages %}
       <li class="page-item {% if loop.index == pagination.page_index + 1 %}active{% endif %}"><a class="page-link" {{ _get_href_or_onclick(item, **kwargs) }}>{{ item }}</a></li>
     {% endfor %}
     <li class="page-item {% if pagination.pages[pagination.page_index] == pagination.max_page %}disabled{% endif %}">
-      <a aria-label="Next page" title="Next page" class="page-link" {{ _get_href_or_onclick(pagination.page + 1, **kwargs) }}><i class="fa-solid fa-angle-right "></i></a>
+      <a aria-label="Next page" title="Next page" class="page-link" {{ _get_href_or_onclick(pagination.page + 1, disabled=pagination.pages[pagination.page_index] == pagination.max_page, **kwargs) }}><i class="fa-solid fa-angle-right "></i></a>
     </li>
     <li class="page-item {% if pagination.pages[pagination.page_index] == pagination.max_page %}disabled{% endif %}">
-      <a aria-label="Last page" title="Last page" class="page-link" {{ _get_href_or_onclick(pagination.max_page, **kwargs) }}><i class="fa-solid fa-angles-right "></i></a>
+      <a aria-label="Last page" title="Last page" class="page-link" {{ _get_href_or_onclick(pagination.max_page, disabled=pagination.pages[pagination.page_index] == pagination.max_page, **kwargs) }}><i class="fa-solid fa-angles-right "></i></a>
     </li>
     <li class="page-item">
       <select aria-label="Rows per page" class="form-select page-link" {{ _get_limit_onchange(**kwargs) }} style="border: none; background: transparent;">
@@ -95,8 +133,10 @@
 {####### search cursor pagination + generation of sortable table headers ########}
 
 {% macro cursor_pagination_widget(pagination) %}
-  {%- macro _get_href_or_onclick(page, _js_argument_provider=none) -%}
-    {% if _js_argument_provider is not none %}
+  {%- macro _get_href_or_onclick(page, _js_argument_provider=none, disabled=false) -%}
+    {% if disabled %}
+      role="link" aria-disabled="true"
+    {% elif _js_argument_provider is not none %}
       href="{{ pagination.get_link(page, **kwargs) }}" onclick="pagination_js_helper('{{ pagination.get_link(page, **kwargs).replace("'", "\\'") }}', {{ _js_argument_provider }}() ); return false"
     {% else %}
       href="{{ pagination.get_link(page, **kwargs) }}"
@@ -107,10 +147,11 @@
     {% set params = dict() %}
     {{ params.update(pagination|getattr("_extra_pagination_params", {}))|silent }}
     {{ params.update(**kwargs)|silent }}
+    onkeydown="pagination_limit_key(this, event)" onpointerdown="pagination_limit_pointer(this)" onblur="pagination_limit_apply(this)"
     {% if _js_argument_provider is not none %}
-      onchange="pagination_js_helper('{{ pagination.get_link('first', **params).replace("'", "\\'") }}', Object.assign({{ _js_argument_provider }}(), { {{ pagination.limit_param }}: this.value}) )"
+      onchange="pagination_limit_change(this, function (limit) { pagination_js_helper('{{ pagination.get_link('first', **params).replace("'", "\\'") }}', Object.assign({{ _js_argument_provider }}(), { {{ pagination.limit_param }}: limit}) ) })"
     {% else %}
-      onchange="pagination_js_helper('{{ pagination.get_link('first', **params).replace("'", "\\'") }}', { {{ pagination.limit_param }}: this.value} )"
+      onchange="pagination_limit_change(this, function (limit) { pagination_js_helper('{{ pagination.get_link('first', **params).replace("'", "\\'") }}', { {{ pagination.limit_param }}: limit} ) })"
     {% endif %}
   {%- endmacro -%}
 
@@ -119,10 +160,10 @@
   {{ params.update(**kwargs)|silent }}
   <ul class="pagination justify-content-center">
     <li class="page-item {% if not pagination.hasBackward %}disabled{% endif %}">
-      <a aria-label="First page" title="First page" class="page-link" {{ _get_href_or_onclick('first', **params) }}><i class="fa-solid fa-angles-left"></i></a>
+      <a aria-label="First page" title="First page" class="page-link" {{ _get_href_or_onclick('first', disabled=not pagination.hasBackward, **params) }}><i class="fa-solid fa-angles-left"></i></a>
     </li>
     <li class="page-item {% if not pagination.hasBackward %}disabled{% endif %}">
-      <a aria-label="Previous page" title="Previous page" class="page-link" {{ _get_href_or_onclick('backward', **params) }}><i class="fa-solid fa-angle-left"></i></a>
+      <a aria-label="Previous page" title="Previous page" class="page-link" {{ _get_href_or_onclick('backward', disabled=not pagination.hasBackward, **params) }}><i class="fa-solid fa-angle-left"></i></a>
     </li>
     {% if pagination.hasBackward %}
       <li class="page-item"><a class="page-link" {{ _get_href_or_onclick('backward', **params) }}>{{ pagination.page-1 }}</a></li>
@@ -132,11 +173,14 @@
       <li class="page-item"><a class="page-link" {{ _get_href_or_onclick('forward', **params) }}>{{ pagination.page+1 }}</a></li>
     {% endif %}
     <li class="page-item {% if not pagination.hasForward %}disabled{% endif %}">
-      <a aria-label="Next page" title="Next page" class="page-link" {{ _get_href_or_onclick('forward', **params) }}><i class="fa-solid fa-angle-right "></i></a>
+      <a aria-label="Next page" title="Next page" class="page-link" {{ _get_href_or_onclick('forward', disabled=not pagination.hasForward, **params) }}><i class="fa-solid fa-angle-right "></i></a>
     </li>
     <li class="page-item disabled">
-      <span class="d-inline-block" tabindex="0" data-toggle="tooltip" data-placement="top" title="Last page not supported for search.&#013;Please reverse sort order instead.">
-        <a role="link" aria-disabled="true" aria-label="Last page" title="Last page" class="page-link"><i class="fa-solid fa-angles-right"></i></a>
+      {# the tab stop is the link, which says it is disabled and why; focus moving into the
+         span still shows the span's tooltip, for whoever does not hear the name. The span
+         was the tab stop, without a role, and its explanation was only that tooltip #}
+      <span class="d-inline-block" data-toggle="tooltip" data-placement="top" title="Last page not supported for search.&#013;Please reverse sort order instead.">
+        <a role="link" aria-disabled="true" tabindex="0" aria-label="Last page, not supported for search: reverse the sort order instead" class="page-link"><i class="fa-solid fa-angles-right"></i></a>
       </span>
     </li>
     <li class="page-item">
@@ -153,70 +197,58 @@
   {% if not pagination is none %}
     {% if pagination.sort_by is none %}
       {# we do not know the search order #}
-      <i class="fa-solid fa-sort"></i>
+      <i class="fa-solid fa-sort" aria-hidden="true"></i>
     {% else %}
       {% if pagination.sort_by == sort_by %}
         {# we are considering the column that is sorted by #}
         {% if pagination.is_ascending %}
-          <i class="fa-solid fa-sort-up"></i>
+          <i class="fa-solid fa-sort-up" aria-hidden="true"></i>
         {% else %}
-          <i class="fa-solid fa-sort-down"></i>
+          <i class="fa-solid fa-sort-down" aria-hidden="true"></i>
         {% endif %}
       {% else %}
         {# a column not used for sort right now #}
-        <i class="fa-solid fa-sort"></i>
-      {% endif %}
-    {% endif %}
-  {% endif %}
-{%- endmacro -%}
-
-{# Only used inside the single-quoted JS strings of sortable_header_col, so the quote
-    is escaped here, on the plain URL. Escaping the macro's output instead does nothing:
-    it is markup by then, with every quote already turned into &#39;, which the HTML
-    parser turns back into a quote before the handler runs. #}
-{%- macro cursor_pagination_sort_link(pagination, sort_by) -%}
-  {% if not pagination is none %}
-    {% if pagination.sort_by is none %}
-      {# we do not know the search order #}
-      {{ pagination.get_sort_link(sort_by, True, **kwargs).replace("'", "\\'") }}
-    {% else %}
-      {% if pagination.sort_by == sort_by %}
-        {# we are considering the column that is sorted by #}
-        {% if pagination.is_ascending %}
-          {{ pagination.get_sort_link(sort_by, False, **kwargs).replace("'", "\\'") }}
-        {% else %}
-          {{ pagination.get_sort_link(sort_by, True, **kwargs).replace("'", "\\'") }}
-        {% endif %}
-      {% else %}
-        {# a column not used for sort right now #}
-        {{ pagination.get_sort_link(sort_by, True, **kwargs).replace("'", "\\'") }}
+        <i class="fa-solid fa-sort" aria-hidden="true"></i>
       {% endif %}
     {% endif %}
   {% endif %}
 {%- endmacro -%}
 
 {# `colspan` is for the result pages, where one header covers a score column and its
-   library-excluded twin. Only the named column sorts; the twin has no header of its own. #}
+   library-excluded twin. Only the named column sorts; the twin has no header of its own.
+
+   A header that sorts is still the column's header, and says with aria-sort whether the
+   table is sorted by it and which way. What sorts is a link inside it, since a sort loads
+   the page sorted another way: it used to be the cell, as role="button", which took the
+   column header away from every cell below it and left the sort order unsaid. #}
 {%- macro sortable_header_col(pagination, sort_by, align='left', colspan=none, caller='') -%}
-
-  {%- macro _get_onclick(_js_argument_provider=none) -%}
-    {% if _js_argument_provider is not none %}
-      pagination_js_helper('{{ cursor_pagination_sort_link(pagination, sort_by, **kwargs).strip() }}', {{ _js_argument_provider }}() )
+  {%- set params = {} -%}
+  {{- params.update(pagination|getattr("_extra_pagination_params", {}))|silent -}}
+  {%- set js_argument_provider = params.pop("_js_argument_provider", none) -%}
+  {%- set sorted_here = pagination is not none and pagination.sort_by == sort_by %}
+  <th style="text-align:{{align}};" scope="col" {% if colspan is not none %}colspan="{{ colspan }}" {% endif %}{% if sorted_here %}aria-sort="{{ 'ascending' if pagination.is_ascending else 'descending' }}"{% endif %}>
+    {% if pagination is not none %}
+    {# a click on the column sorted ascending sorts it descending, any other ascending #}
+    {% set sort_link = pagination.get_sort_link(sort_by, not (sorted_here and pagination.is_ascending), **params) %}
+    {# the href keeps the link middle-clickable; the handler adds the other tables' state.
+       The quote is escaped on the plain URL, before autoescaping turns it into &#39;,
+       which the HTML parser turns back into a quote before the handler runs #}
+    <a class="table-sort" href="{{ sort_link }}"{% if js_argument_provider is not none %} onclick="pagination_js_helper('{{ sort_link.replace("'", "\\'") }}', {{ js_argument_provider }}() ); return false"{% endif %}>
+      <span>
+        {{ caller() }}
+      </span>
+      &nbsp;
+      <span style="float: right;">
+        {{ cursor_pagination_sort_symbol(pagination, sort_by) }}
+      </span>
+    </a>
     {% else %}
-      window.location.href='{{ cursor_pagination_sort_link(pagination, sort_by, **kwargs).strip() }}'
-    {% endif %}
-  {%- endmacro -%}
-
-  {% set params = {} %}
-  {{ params.update(pagination|getattr("_extra_pagination_params", {}))|silent }}
-  <th style="text-align:{{align}};" scope="col" {% if colspan is not none %}colspan="{{ colspan }}" {% endif %}{% if pagination is not none %}class="pointer" role="button" tabindex="0" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }"{% endif %} onclick="{{ _get_onclick(**params).strip() }}">
     <span>
       {{ caller() }}
     </span>
     &nbsp;
-    <span style="float: right;">
-      {{ cursor_pagination_sort_symbol(pagination, sort_by) }}
-    </span>
+    <span style="float: right;"></span>
+    {% endif %}
   </th>
 {%- endmacro -%}
 

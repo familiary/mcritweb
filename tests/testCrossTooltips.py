@@ -108,7 +108,7 @@ class _Matrices(HTMLParser):
             self._rows = self.matrices.setdefault(attrs["id"][len("pills-"):], [])
         elif tag == "tr" and "sample-row" in (attrs.get("class") or "").split():
             self._rows.append({"sample_line": attrs.get("data-hint-sample"), "hints": []})
-        elif tag == "span" and "data-hint" in attrs and self._rows:
+        elif tag in ("span", "a") and "data-hint" in attrs and self._rows:
             self._rows[-1]["hints"].append(attrs["data-hint"])
 
 
@@ -159,7 +159,7 @@ SCRIPT_TIMEOUT_MS = 20000
 #: Where the pointer has to go to be over each cell of one matrix, in the order of the
 #: rows and their cells.
 CELL_CENTRES = """
-pane => Array.from(document.querySelectorAll('#' + pane + ' tr.sample-row span[data-hint]')).map(span => {
+pane => Array.from(document.querySelectorAll('#' + pane + ' tr.sample-row .score-swatch')).map(span => {
     const box = span.getBoundingClientRect();
     return [box.left + box.width / 2, box.top + box.height / 2];
 })
@@ -169,7 +169,7 @@ pane => Array.from(document.querySelectorAll('#' + pane + ' tr.sample-row span[d
 #: hint.css gives the ::after that shows it, in the order of the rows and their cells.
 READ_TOOLTIPS = """
 pane => Array.from(document.querySelectorAll('#' + pane + ' tr.sample-row')).map(row =>
-    Array.from(row.querySelectorAll('span[data-hint]')).map(span =>
+    Array.from(row.querySelectorAll('.score-swatch')).map(span =>
         [span.getAttribute('data-hint'), getComputedStyle(span, '::after').content]))
 """
 
