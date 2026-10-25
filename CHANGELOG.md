@@ -156,6 +156,10 @@ rather than reconstructing it from the commit log at release time.
   that quotes the term, the notice the search flashes and an empty table's message break the hash
   across lines, as do the other headings, a family's name among them. The rule meant to do this for
   headings was written for a `<section>` no page has.
+- On a phone the control flow graph and its code, or the two graphs of a comparison, are stacked
+  and each takes the width of the page; side by side at every width, they were two slivers of
+  about 150px. The panes are as tall as the window with the browser's bars shown, so the bottom
+  of a pane no longer hides behind them.
 
 ### Security
 

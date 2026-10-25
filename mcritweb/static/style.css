@@ -350,7 +350,8 @@ form.form-inline input {
   background-color: var(--cfg-canvas);
   width: 100%;
   min-height: 100px;
-  height: calc(100vh - 106px);
+  /* svh, as the panes below */
+  height: calc(100svh - 106px);
 }
 /* out of the flow, so the graph does not move up by the note's 400 px when it goes: the
    graph is drawn when its layout comes back from the worker, seconds after the click on a
@@ -528,5 +529,29 @@ table.table:not(.table-scroll > table) :is(td, th) {
 @media (max-width: 1199.98px) {
   .table-deferred {
     content-visibility: auto;
+  }
+}
+
+/* The panes of the control flow graph viewer. trace_CFG/cfg_style.css floats the graph and
+   the code (or the two graphs) side by side, 50% each at every width, as tall as the
+   window less the 106px above them. On a phone that was two 147px slivers - the graph a
+   speck, the code cut after twenty characters - so below 768px they stack, each most of
+   the window's height. Heights are in svh, the window with the browser's bars shown,
+   rather than vh, which on a phone is the window without them and so taller than what
+   shows while they are; and rather than dvh, which follows the bars as they come and go
+   and would resize the panes, and move what is below them, as the reader scrolls.
+   `main` outweighs cfg_style.css's id rules, which are linked after this sheet. */
+main #xcfg_left,
+main #xcfg_right,
+main #xcfg_text_right {
+  height: calc(100svh - 106px);
+}
+@media (max-width: 767.98px) {
+  main #xcfg_left,
+  main #xcfg_right,
+  main #xcfg_text_right {
+    float: none;
+    width: 100%;
+    height: 70svh;
   }
 }
