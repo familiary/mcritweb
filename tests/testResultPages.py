@@ -1843,9 +1843,14 @@ def test_a_hint_tooltip_takes_room_only_while_it_is_shown():
     skips where playwright is not installed, CI included."""
     rules = stylesheet_rules()
     for pseudo in ("::before", "::after"):
-        idle = rules.get(f"[data-hint]:not(:hover):not(:focus-visible){pseudo}", {})
+        # one plain selector: a :not() chain here is matched against every hinted element,
+        # tens of thousands on a large matrix, and cost more at load than the boxes it saved
+        assert f"[data-hint]:not(:hover):not(:focus-visible){pseudo}" not in rules
+        idle = rules.get(f"[data-hint]{pseudo}", {})
         assert idle.get("display") == "none", f"an idle hint's {pseudo} is still laid out"
-    shown = rules.get(":root [data-hint]::after", {})
+        for state in (":hover", ":focus-visible"):
+            assert rules.get(f"[data-hint]{state}{pseudo}", {}).get("display") == "block", f"a hint's {pseudo} is not shown on {state}"
+    shown = rules.get(":root [data-hint]:hover::after", {})
     assert shown.get("white-space") == "pre-wrap", "the tooltip text does not wrap"
     assert "100vw" in shown.get("max-width", ""), "the tooltip is not held to the width of the window"
 

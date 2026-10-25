@@ -399,15 +399,30 @@ form.form-inline input {
    A tooltip is laid out only while it is shown. hint.css merely hides the others, and a hidden
    box still takes its room: one long hint on one line made the cross compare pages 1120px
    wide in any window narrower than that, and the two boxes behind each square of a cross
-   compare matrix were most of the time a large one took to draw. */
-[data-hint]:not(:hover):not(:focus-visible)::before,
-[data-hint]:not(:hover):not(:focus-visible)::after {
+   compare matrix were most of the time a large one took to draw.
+
+   The rules are written for the matrix, where tens of thousands of elements carry a hint and
+   every selector that mentions their pseudo-elements is matched against each of them: the
+   idle state is one plain selector, and the rules for a shown tooltip start with :hover or
+   :focus-visible, which fail at once on all but one element. A :not() chain or an ancestor
+   in front of a pseudo-element cost more at load than the boxes it saved. */
+[data-hint]::before,
+[data-hint]::after {
   display: none;
 }
 
+[data-hint]:hover::before,
+[data-hint]:hover::after,
+[data-hint]:focus-visible::before,
+[data-hint]:focus-visible::after {
+  display: block;
+}
+
 /* Escape puts the tooltip that is showing away (static/hints.js) */
-:root.hints-dismissed [data-hint]::before,
-:root.hints-dismissed [data-hint]::after {
+:root.hints-dismissed [data-hint]:hover::before,
+:root.hints-dismissed [data-hint]:hover::after,
+:root.hints-dismissed [data-hint]:focus-visible::before,
+:root.hints-dismissed [data-hint]:focus-visible::after {
   display: none;
 }
 
@@ -420,7 +435,8 @@ span[data-hint]:not(.score-swatch) {
 
 /* the text wraps, at a width that fits a phone; pre-wrap keeps the line breaks and the
    padding the templates write into it */
-:root [data-hint]::after {
+:root [data-hint]:hover::after,
+:root [data-hint]:focus-visible::after {
   white-space: pre-wrap;
   width: max-content;
   max-width: min(32rem, calc(100vw - 2rem));
@@ -430,7 +446,8 @@ span[data-hint]:not(.score-swatch) {
 /* a shown tooltip is not filtered with its element: the dark theme dims the matrix squares
    with a filter, which dimmed their tooltips too, and which would make the square the box
    a fixed tooltip is placed in */
-:root [data-hint]:is(:hover, :focus-visible) {
+:root [data-hint]:hover,
+:root [data-hint]:focus-visible {
   filter: none;
 }
 
@@ -449,11 +466,13 @@ span[data-hint]:not(.score-swatch) {
     position-area: bottom;
     margin: 0 0.5rem 0.5rem;
   }
-  :root [data-hint]:is(:hover, :focus-visible) {
+  :root [data-hint]:hover,
+  :root [data-hint]:focus-visible {
     anchor-name: --hint;
     anchor-scope: --hint;
   }
-  :root [data-hint]:is(:hover, :focus-visible)::after {
+  :root [data-hint]:hover::after,
+  :root [data-hint]:focus-visible::after {
     position: fixed;
     position-anchor: --hint;
     position-area: top span-right;
@@ -465,15 +484,18 @@ span[data-hint]:not(.score-swatch) {
        magnifier for instance, without it closing (WCAG 1.4.13) */
     pointer-events: auto;
   }
-  :root .hint--left:is(:hover, :focus-visible)::after {
+  :root .hint--left:hover::after,
+  :root .hint--left:focus-visible::after {
     position-area: top span-left;
     margin: 0.5rem 0 0 0.5rem;
   }
-  :root .hint--bottom:is(:hover, :focus-visible)::after {
+  :root .hint--bottom:hover::after,
+  :root .hint--bottom:focus-visible::after {
     position-area: bottom span-right;
     margin: 0 0.5rem 0.5rem 0;
   }
-  :root [data-hint]::before {
+  :root [data-hint]:hover::before,
+  :root [data-hint]:focus-visible::before {
     display: none;
   }
 }
@@ -482,14 +504,16 @@ span[data-hint]:not(.score-swatch) {
    it fits wherever its element is (the modern-web-guidance tooltip guides' fallback) */
 @supports not (anchor-scope: all) {
   @media (max-width: 575.98px) {
-    :root [data-hint]:is(:hover, :focus-visible)::after {
+    :root [data-hint]:hover::after,
+    :root [data-hint]:focus-visible::after {
       position: fixed;
       inset: auto 0.5rem 0.5rem;
       width: auto;
       margin: 0;
       transform: none;
     }
-    :root [data-hint]::before {
+    :root [data-hint]:hover::before,
+    :root [data-hint]:focus-visible::before {
       display: none;
     }
   }
