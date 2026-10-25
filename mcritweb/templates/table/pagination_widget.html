@@ -24,6 +24,37 @@
       }
       window.location.href=result;
     }
+
+    // "Rows per page" loads the page at the size it is changed to. A select changes its
+    // value at every press of an arrow key, and loading at the first one left a keyboard
+    // no way to step through the sizes. So a change made with a key waits for Enter, or
+    // for focus to leave the select; one made with the pointer, or a touch screen's
+    // picker, loads at once, as before.
+    function pagination_limit_key(select, event) {
+      if (event.key === "Enter" && select.pendingLimit) {
+        event.preventDefault();
+        pagination_limit_apply(select);
+      } else if (event.key !== "Tab" && event.key !== "Shift") {
+        select.limitByKey = true;
+      }
+    }
+    function pagination_limit_pointer(select) {
+      select.limitByKey = false;
+    }
+    function pagination_limit_change(select, load) {
+      select.pendingLimit = load;
+      if (!select.limitByKey) {
+        pagination_limit_apply(select);
+      }
+    }
+    function pagination_limit_apply(select) {
+      var load = select.pendingLimit;
+      select.pendingLimit = null;
+      select.limitByKey = false;
+      if (load) {
+        load(select.value);
+      }
+    }
   </script>
 {% endmacro %}
 
@@ -63,10 +94,12 @@
   {%- endmacro -%}
 
   {%- macro _get_limit_onchange(_js_argument_provider=none) -%}
+    {# see pagination_limit_key: a change by key waits for Enter or for focus to leave #}
+    onkeydown="pagination_limit_key(this, event)" onpointerdown="pagination_limit_pointer(this)" onblur="pagination_limit_apply(this)"
     {% if _js_argument_provider is not none %}
-      onchange="pagination_js_helper('{{ pagination.get_link(1, **kwargs).replace("'", "\\'") }}', Object.assign({{ _js_argument_provider }}(), { {{ pagination.limit_param }}: this.value}) )"
+      onchange="pagination_limit_change(this, function (limit) { pagination_js_helper('{{ pagination.get_link(1, **kwargs).replace("'", "\\'") }}', Object.assign({{ _js_argument_provider }}(), { {{ pagination.limit_param }}: limit}) ) })"
     {% else %}
-      onchange="pagination_js_helper('{{ pagination.get_link(1, **kwargs).replace("'", "\\'") }}', { {{ pagination.limit_param }}: this.value} )"
+      onchange="pagination_limit_change(this, function (limit) { pagination_js_helper('{{ pagination.get_link(1, **kwargs).replace("'", "\\'") }}', { {{ pagination.limit_param }}: limit} ) })"
     {% endif %}
   {%- endmacro -%}
 
@@ -114,10 +147,11 @@
     {% set params = dict() %}
     {{ params.update(pagination|getattr("_extra_pagination_params", {}))|silent }}
     {{ params.update(**kwargs)|silent }}
+    onkeydown="pagination_limit_key(this, event)" onpointerdown="pagination_limit_pointer(this)" onblur="pagination_limit_apply(this)"
     {% if _js_argument_provider is not none %}
-      onchange="pagination_js_helper('{{ pagination.get_link('first', **params).replace("'", "\\'") }}', Object.assign({{ _js_argument_provider }}(), { {{ pagination.limit_param }}: this.value}) )"
+      onchange="pagination_limit_change(this, function (limit) { pagination_js_helper('{{ pagination.get_link('first', **params).replace("'", "\\'") }}', Object.assign({{ _js_argument_provider }}(), { {{ pagination.limit_param }}: limit}) ) })"
     {% else %}
-      onchange="pagination_js_helper('{{ pagination.get_link('first', **params).replace("'", "\\'") }}', { {{ pagination.limit_param }}: this.value} )"
+      onchange="pagination_limit_change(this, function (limit) { pagination_js_helper('{{ pagination.get_link('first', **params).replace("'", "\\'") }}', { {{ pagination.limit_param }}: limit} ) })"
     {% endif %}
   {%- endmacro -%}
 

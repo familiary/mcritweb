@@ -157,3 +157,51 @@ def test_the_unique_blocks_statistics_sort_from_the_keyboard(open_as):
     assert header.get_attribute("aria-sort") == "ascending"
     assert page.eval_on_selector_all(cells, "cells => cells.map(cell => Number(cell.dataset.sortValue))") == sorted(before)
     assert page.locator("table.sortable-table thead th[aria-sort]").count() == 1
+
+
+@pytest.mark.parametrize("path", [
+    # a cursor pagination, an offset pagination with the other tables' state to carry, and
+    # the search page, which did not define the helper the select calls
+    "/explore/functions",
+    "/analyze/compare",
+    "/explore/search?query=a&type=function",
+])
+def test_rows_per_page_waits_for_enter_when_changed_with_the_keyboard(open_as, path):
+    """A select changes its value at every arrow key, and the page loaded at the first
+    one: a keyboard user could not step from 25 to 100 without loading the page at 50."""
+    page = open_as("visitor", path)
+    select = page.locator("select[aria-label='Rows per page']").first
+    start = page.url
+
+    select.focus()
+    page.keyboard.press("ArrowDown")
+    page.keyboard.press("ArrowDown")
+    page.wait_for_timeout(500)
+    assert page.url == start, "the page loaded before the choice was made"
+
+    chosen = select.input_value()
+    with page.expect_navigation():
+        page.keyboard.press("Enter")
+    assert f"={chosen}" in page.url
+
+
+def test_rows_per_page_chosen_with_the_pointer_loads_at_once(open_as):
+    page = open_as("visitor", "/explore/functions")
+
+    with page.expect_navigation():
+        page.locator("select[aria-label='Rows per page']").first.select_option("100")
+
+    assert "limit=100" in page.url
+
+
+def test_rows_per_page_changed_with_the_keyboard_loads_when_focus_leaves(open_as):
+    page = open_as("visitor", "/explore/functions")
+    select = page.locator("select[aria-label='Rows per page']").first
+
+    select.focus()
+    page.keyboard.press("ArrowUp")
+    chosen = select.input_value()
+    with page.expect_navigation():
+        page.keyboard.press("Tab")
+
+    assert f"limit={chosen}" in page.url

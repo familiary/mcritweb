@@ -133,6 +133,11 @@ rather than reconstructing it from the commit log at release time.
   reader named no column for the cells below it and never said how the table was sorted. The sort
   is a link inside the header now, which also opens in a new tab with a middle click, and the Unique
   Blocks statistics, which only took a mouse click, sort from the keyboard too.
+- "Rows per page" can be changed with the keyboard. A select changes its value at every press of an
+  arrow key, and the page loaded at the first one, so stepping from 25 to 100 loaded the page at 50
+  and put the cursor back at the top. A change made with a key now waits for Enter, or for focus to
+  leave the select; one made with the mouse or a touch screen still loads at once. On the search
+  page the select did nothing at all, for want of the script it calls.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files
