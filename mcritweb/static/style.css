@@ -391,3 +391,19 @@ form.form-inline input {
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }
+
+/* What the page's structure says to assistive technology. A rule here changes how a
+   screen reader reads the page, not how it looks. */
+
+/* Generated text that is decoration is not read out: the diagram's placeholder stays in
+   the accessibility tree once the diagram covers it, and a breadcrumb read "slash"
+   between its items. The alternative text, written after a slash, is newer than the rest
+   of `content`, so a browser without it drops these declarations and keeps the rule above
+   and Bootstrap's, as before. */
+.mcrit-diagram::before {
+  content: "rendering diagram\2026" / "";
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+  content: "/" / "";
+}

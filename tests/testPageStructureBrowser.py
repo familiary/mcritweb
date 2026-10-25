@@ -152,3 +152,28 @@ def test_an_upload_under_way_is_announced(page, live_server):
     assert page.locator("#submit-status").get_attribute("role") == "status"
     for route in held:
         route.abort()
+
+
+def static_texts(page):
+    """The text nodes of the page's accessibility tree, as Chromium builds it."""
+    session = page.context.new_cdp_session(page)
+    nodes = session.send("Accessibility.getFullAXTree")["nodes"]
+    return [node.get("name", {}).get("value", "") for node in nodes
+            if node.get("role", {}).get("value") == "StaticText" and not node.get("ignored")]
+
+
+def test_decorative_generated_text_is_not_in_the_accessibility_tree(page, live_server):
+    """A family's matches: the breadcrumb has two items, and the diagram its placeholder."""
+    open_page(page, f"{live_server}/data/result/{job_id_of('matches_for_sample')}?famid=1")
+    assert page.locator("nav .breadcrumb-item").count() == 2
+    assert page.locator(".mcrit-diagram").count() == 1
+
+    texts = static_texts(page)
+
+    assert "rendering diagram…" not in texts
+    assert "/" not in texts
+    assert "All Matches" in texts, "the tree was read"
+    # and both are still drawn
+    drawn = page.evaluate("""() => [".breadcrumb-item + .breadcrumb-item", ".mcrit-diagram"].map(
+        (selector) => getComputedStyle(document.querySelector(selector), "::before").content)""")
+    assert drawn == ['"/" / ""', '"rendering diagram\u2026" / ""']

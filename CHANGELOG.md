@@ -153,6 +153,10 @@ rather than reconstructing it from the commit log at release time.
   overlay and the import box used to be created or shown together with their text, which a screen
   reader often does not read. A running job's progress is also shown as a progress bar, which
   assistive technology reports as one.
+- Screen readers no longer read out the match diagram's "rendering diagram..." placeholder, which
+  stayed in the page after the diagram covered it, nor a "slash" between the items of the result
+  pages' breadcrumb. Browsers that predate alternative text for generated content show and read them
+  as before.
 
 ### Security
 
