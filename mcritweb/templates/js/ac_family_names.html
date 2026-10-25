@@ -1,6 +1,6 @@
 {# The family type-ahead: static/family_names.js, queued with later() (ADR-0021), which a
    listing page queues once although it includes this twice. #}
-<script>
+<script nonce="{{ csp_nonce() }}">
     var mcritFamilyNamesUrl = {{ url_for('explore.family_names')|tojson }};
     later({{ url_for('static', filename='family_names.js')|tojson }});
 </script>

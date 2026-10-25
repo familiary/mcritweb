@@ -82,7 +82,7 @@ def _open(page, live_server, errors):
             if message.type == "error" and not message.text.startswith("Failed to load resource") else None)
     page.goto(f"{live_server}/explore/functions/{FUNCTION_A}")
     scroll_to_the_graph(page)
-    page.wait_for_function("document.querySelectorAll('#text_code p').length > 0")
+    page.wait_for_function("() => document.querySelectorAll('#text_code p').length > 0")
 
 
 def test_a_small_graph_is_drawn_on_load(browser_page, live_server):
@@ -138,7 +138,7 @@ def test_a_failed_loop_request_gives_the_button_back(browser_page, live_server):
     _open(browser_page, live_server, errors)
 
     browser_page.click("#drawGraph")
-    browser_page.wait_for_function("!document.getElementById('drawGraph').disabled")
+    browser_page.wait_for_function("() => !document.getElementById('drawGraph').disabled")
     failed = _state(browser_page)
     assert failed["prompt"] and failed["nodes"] == 0
     assert "not drawn" in failed["note"] and "HTTP 500" in failed["note"]
@@ -155,7 +155,7 @@ def test_an_answer_that_is_not_loop_data_is_reported_for_a_small_graph_too(brows
     errors = []
     browser_page.route("**/findLoops/", lambda route: route.fulfill(status=200, body="<!doctype html><p>log in</p>"))
     _open(browser_page, live_server, errors)
-    browser_page.wait_for_function("!document.getElementById('cfgDeferred').classList.contains('hidden')")
+    browser_page.wait_for_function("() => !document.getElementById('cfgDeferred').classList.contains('hidden')")
     state = _state(browser_page)
     assert state["nodes"] == 0 and state["code"] > 0
     assert "did not answer with loop data" in state["note"]
@@ -179,7 +179,7 @@ def test_a_layout_that_fails_after_the_code_panel_keeps_one_panel(browser_page, 
         browser_page.wait_for_load_state("networkidle")
         lookups_before = len(lookups)
         browser_page.click("#drawGraph")
-    browser_page.wait_for_function("document.getElementById('cfgDeferredNote').textContent.includes('not drawn')")
+    browser_page.wait_for_function("() => document.getElementById('cfgDeferredNote').textContent.includes('not drawn')")
     browser_page.wait_for_load_state("networkidle")
     state = _state(browser_page)
     assert state["prompt"] and state["nodes"] == 0

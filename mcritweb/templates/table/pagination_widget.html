@@ -3,7 +3,7 @@
 {########## js helper for js pagination ###########}
 
 {% macro pagination_js() %}
-  <script>
+  <script nonce="{{ csp_nonce() }}">
     function pagination_js_helper(base_url, kwargs) {
       var url = new URL(base_url, document.location);
       for (const key in kwargs) {

@@ -12,7 +12,7 @@ Compare
 {% set minhash_slider_mapping = ["Off", "Fast", "Standard", "Complete"] %} 
 
 {% block style %}
-<script>
+<script nonce="{{ csp_nonce() }}">
   // the ids the URL carried arrive as numbers and a clicked row's as the text of its id
   // cell, and indexOf compares strictly: kept as strings, a row the URL tinted clicks off
   var selected = {{ cached|tojson }}.map(String);

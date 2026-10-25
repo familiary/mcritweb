@@ -41,7 +41,7 @@ and then to run MCRITweb, execute:
 
 Note that most functionality of MCRITweb will only work if an MCRIT backend is configured and available.
 
-MCRITweb gzips its pages, stylesheets, scripts and JSON for browsers that accept it, so a bare `flask run` or waitress deployment is not stuck with uncompressed transfers. The reference `docker-mcrit` deployment does not compress either: its NGINX configuration has no `gzip` directive (`docs/adr/0015-the-rest-of-63-is-gzip-in-the-proxy.md`). A page carries the session's CSRF token next to input it reflects, which a compressed response would leak to a BREACH attack if the token were the same in every response; it is masked afresh on every render, so it never is. The settings page shows the user's API token and the server page the registration and backend tokens, so both are left uncompressed, as are downloads and the `/api` passthrough, which are streamed rather than read into memory, and bodies over 1 MiB. A proxy that compresses on its own leaves already encoded bodies alone; keep `text/html` out of its `gzip_types` all the same, or it compresses the settings and server pages. To hand the job to the proxy entirely, set `MCRITWEB_COMPRESS_RESPONSES = False` in `instance/config.py`.
+MCRITweb gzips its pages, stylesheets, scripts and JSON for browsers that accept it, so a bare `flask run` or waitress deployment is not stuck with uncompressed transfers. The reference `docker-mcrit` deployment does not compress either: its NGINX configuration has no `gzip` directive (`docs/adr/0015-the-rest-of-63-is-gzip-in-the-proxy.md`). A page carries the session's CSRF token next to input it reflects, which a compressed response would leak to a BREACH attack if the token were the same in every response; it is masked afresh on every render, so it never is. The settings page shows the user's API token and the server page the registration token, so both are left uncompressed, as are downloads and the `/api` passthrough, which are streamed rather than read into memory, and bodies over 1 MiB. A proxy that compresses on its own leaves already encoded bodies alone; keep `text/html` out of its `gzip_types` all the same, or it compresses the settings and server pages. To hand the job to the proxy entirely, set `MCRITWEB_COMPRESS_RESPONSES = False` in `instance/config.py`.
 
 ### Running behind a reverse proxy
 
@@ -76,6 +76,19 @@ The hop count applies to `X-Forwarded-For` only. `X-Forwarded-Proto` is always r
 
 One rough edge, noted rather than fixed: Werkzeug parses `X-Forwarded-For` as a list header, so a client sending something unparseable - an unterminated quote, say - produces no usable address and MCRITweb falls back to the proxy's. Those attempts are then metered against the proxy. It costs the sender their own attempts and nobody else's, since a well-formed request still resolves to its own address, so the fix would be re-parsing the header in front of Werkzeug for no gain.
 
+
+### HTTPS
+
+Served over HTTPS - directly, or through a proxy that terminates TLS and that `TRUSTED_PROXY_COUNT` counts, so that MCRITweb believes its `X-Forwarded-Proto` - every response carries `Strict-Transport-Security: max-age=31536000; includeSubDomains` and `Cross-Origin-Opener-Policy: same-origin-allow-popups`. Neither is sent over plain HTTP, where a browser ignores HSTS and Chromium reports the COOP header as an error on every page. The HSTS value is the one docker-mcrit's TLS site already adds in NGINX. A browser acts on the first such header in a response, which is MCRITweb's, so set another value here rather than in the proxy, or `None` to send none:
+
+```python
+# while trying HTTPS out: a day, to be raised once it works
+STRICT_TRANSPORT_SECURITY = "max-age=86400"
+```
+
+A browser that has seen the header refuses plain HTTP for the host until its `max-age` has run out, so shorten it well before moving a host off HTTPS.
+
+The session cookie is named `__Host-session`, which a browser accepts only from the host itself, over HTTPS, for the whole site. It falls back to `session` when the cookie cannot meet those terms: with `SESSION_COOKIE_SECURE = False` for plain HTTP, with a `SESSION_COOKIE_DOMAIN`, or with a `SESSION_COOKIE_PATH` or `APPLICATION_ROOT` other than `/`. `SESSION_COOKIE_NAME` in `instance/config.py` overrides either.
 
 ### Backend timeout
 

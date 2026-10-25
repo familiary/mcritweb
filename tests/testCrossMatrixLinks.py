@@ -51,7 +51,7 @@ def serve_report(corpus_mcrit, monkeypatch):
 
 
 class _Cells(HTMLParser):
-    """The matrix cells of the rendered pane, as {(row id, column id): onclick or None}."""
+    """The matrix cells of the rendered pane, as {(row id, column id): data-href or None}."""
 
     def __init__(self, order):
         super().__init__()
@@ -68,7 +68,7 @@ class _Cells(HTMLParser):
         elif tag == "td" and "id" in (attrs.get("class") or "").split():
             self._row = "pending"
         elif tag == "span" and "data-hint" in attrs and self._row not in (None, "pending"):
-            self.cells[(self._row, self.order[self._column])] = attrs.get("onclick")
+            self.cells[(self._row, self.order[self._column])] = attrs.get("data-href")
             self._column += 1
 
     def handle_data(self, data):
@@ -96,7 +96,7 @@ def test_a_pair_with_matches_opens_the_rows_report_filtered_to_the_column(client
     linked = [(row_id, col_id) for row_id in order for col_id in order if matches[row_id][col_id]]
     assert linked
     for row_id, col_id in linked:
-        assert cells[(row_id, col_id)].startswith(f"window.location.href='{job_of_sample[row_id]}?samid={col_id}'")
+        assert cells[(row_id, col_id)] == f"{job_of_sample[row_id]}?samid={col_id}"
 
 
 def test_the_diagonal_links_nowhere(client, as_role, report):
@@ -124,5 +124,5 @@ def test_a_pair_of_samples_without_matches_links_nowhere(client, as_role, report
 
     assert cells[(first, second)] is None
     assert cells[(second, first)] is None
-    linked = {pair for pair, onclick in cells.items() if onclick}
+    linked = {pair for pair, href in cells.items() if href}
     assert linked == {(row_id, col_id) for row_id in order for col_id in order if row_id != col_id} - {(first, second), (second, first)}

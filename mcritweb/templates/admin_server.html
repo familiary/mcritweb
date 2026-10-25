@@ -76,9 +76,15 @@ Server settings
     </div>
     <div class="form-group mb-2">
         <label for="mcrit_server_token" class="form-label">Backend Server Token</label>
-        <input type="text" name='mcrit_server_token' class="form-control" id="mcrit_server_token" placeholder="Enter optional server AUTH_TOKEN" value="{{ server_info.server_token }}">
+        {# never written into the page, not even for the admin (AGENTS.md): the field starts
+           empty, an empty one keeps the stored token, and removing it is the second button #}
+        <input type="text" name='mcrit_server_token' class="form-control" id="mcrit_server_token" placeholder="Enter optional server AUTH_TOKEN" autocomplete="off" aria-describedby="mcrit_server_token_state">
+        <div id="mcrit_server_token_state" class="form-text">{% if server_info.server_token %}A token is set. Leave this empty to keep it.{% else %}No token is set.{% endif %}</div>
     </div>
     <button type="submit" class="btn btn-primary">Confirm Change</button>
+    {% if server_info.server_token %}
+    <button type="submit" class="btn btn-outline-danger" name="remove_server_token" value="1">Remove Token</button>
+    {% endif %}
 </form>
 
 <h2 class="h3">Reset Server:</h2>
@@ -93,9 +99,9 @@ Server settings
     <button type="submit" class="btn btn-danger">Reset Server</button>
 </form>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
     function copyRegistrationUrl() {
-      var js_token = "{{ server_info.registration_token }}";
+      var js_token = {{ server_info.registration_token|tojson }};
       const var_register_url = "{{ url_for('authentication.register', _external=True) }}";
       // Copy the text inside the text field
       navigator.clipboard.writeText(var_register_url + "?token=" + js_token);

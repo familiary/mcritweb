@@ -10,7 +10,7 @@ Compare
 {% set minhash_slider_mapping = ["Off", "Fast", "Standard", "Complete"] %} 
 
 {% block style %}
-<script>
+<script nonce="{{ csp_nonce() }}">
 var selected = {{ (selected or "")|tojson }}
 var selected_column = null;
 whenReady(function(){

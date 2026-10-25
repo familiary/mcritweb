@@ -38,7 +38,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
 {% endblock %}
 
 {% block content %}
-<script>
+<script nonce="{{ csp_nonce() }}">
   // The rule is editable, so what has to reach the clipboard is what the textarea
   // currently holds. Copying a detached element filled from .innerHTML instead lost
   // every edit and handed back HTML entities for & < > - see issue #80.
@@ -255,7 +255,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   // Sorts a table in place on a header click. Only tables marked sortable-table are
   // touched, and only headers carrying data-sort.
   (function () {

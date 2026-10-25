@@ -5,7 +5,7 @@ from flask import Blueprint, current_app, flash, g, redirect, render_template, r
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.compression import uncompressed
+from mcritweb.compression import no_store, uncompressed
 from mcritweb.db import THEMES, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, is_legacy_apitoken
 from mcritweb.views.authentication import (
     KNOWN_ROLES,
@@ -309,6 +309,7 @@ def delete_user(user_id, tab = None):
 @bp.route('/server')
 @admin_required
 @uncompressed
+@no_store
 def server():
     server_info = db.get_server_info()
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
@@ -321,10 +322,16 @@ def server():
 @bp.route('/change_server' , methods=('POST',))
 @admin_required
 @uncompressed
+@no_store
 def change_server():
     server_info = db.get_server_info()
     new_url = request.form.get('mcrit_server_url', '')
-    new_token = request.form.get('mcrit_server_token', '')
+    # the page never shows the token (AGENTS.md), so its field comes back empty unless a
+    # new one was typed: empty keeps the stored token, and removing it is a button of its own
+    if request.form.get('remove_server_token'):
+        new_token = ''
+    else:
+        new_token = request.form.get('mcrit_server_token', '') or server_info.server_token
     if server_info.url != new_url or server_info.server_token != new_token:
         server_info.url = new_url
         server_info.server_token = new_token

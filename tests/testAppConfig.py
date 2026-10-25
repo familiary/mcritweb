@@ -22,9 +22,10 @@ import io
 import logging
 
 import pytest
+from werkzeug.security import generate_password_hash
 
 from mcritweb import create_app
-from mcritweb.db import ServerInfo, init_db
+from mcritweb.db import ServerInfo, UserInfo, init_db
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -76,6 +77,56 @@ def test_debug_relaxes_it_so_a_local_run_can_log_in(tmp_path, monkeypatch):
 def test_an_explicit_setting_wins(tmp_path):
     """For an operator serving plain HTTP behind something we did not anticipate."""
     assert build_app(tmp_path, SESSION_COOKIE_SECURE=False).config["SESSION_COOKIE_SECURE"] is False
+
+
+def test_the_session_cookie_is_named_for_this_host_alone(tmp_path):
+    """Under a plain name, a sibling subdomain - or anyone in the middle of a plain-HTTP
+    request to this host before the user signs in - could set a session cookie of their
+    own, validly signed for their own account, that the browser then sends in place of
+    ours. A browser takes a `__Host-` cookie only from this host, over HTTPS."""
+    assert build_app(tmp_path).config["SESSION_COOKIE_NAME"] == "__Host-session"
+
+
+@pytest.mark.parametrize("overrides", [
+    {"SESSION_COOKIE_SECURE": False},
+    {"SESSION_COOKIE_DOMAIN": "example.org"},
+    {"SESSION_COOKIE_PATH": "/mcritweb"},
+    {"APPLICATION_ROOT": "/mcritweb"},
+], ids=["plain HTTP", "shared with subdomains", "under a path", "under an application root"])
+def test_a_cookie_the_prefix_does_not_allow_keeps_the_plain_name(tmp_path, overrides):
+    """The prefix demands Secure, Path=/ and no Domain; a browser drops a `__Host-` cookie
+    without them, and nobody could log in."""
+    assert build_app(tmp_path, **overrides).config["SESSION_COOKIE_NAME"] == "session"
+
+
+def test_debug_keeps_the_plain_name_too(tmp_path, monkeypatch):
+    monkeypatch.setenv("FLASK_DEBUG", "1")
+    assert build_app(tmp_path).config["SESSION_COOKIE_NAME"] == "session"
+
+
+@pytest.mark.parametrize("name", ["session", "mcritweb_session"])
+def test_a_name_the_operator_chose_wins(tmp_path, name):
+    assert build_app(tmp_path, SESSION_COOKIE_NAME=name).config["SESSION_COOKIE_NAME"] == name
+
+
+def test_the_prefixed_cookie_carries_what_the_prefix_demands(tmp_path):
+    """The name alone proves nothing: without these attributes a browser drops it."""
+    app = build_app(tmp_path, WTF_CSRF_ENABLED=False)
+    with app.app_context():
+        user = UserInfo()
+        user.username = "cookieuser"
+        user.password = generate_password_hash("password")
+        user.role = "visitor"
+        user.saveToDb()
+
+    response = app.test_client().post("/login", data={"username": "cookieuser", "inputPassword": "password"})
+
+    cookies = [value for header, value in response.headers if header == "Set-Cookie"]
+    assert len(cookies) == 1, cookies
+    attributes = [part.strip() for part in cookies[0].split(";")]
+    assert attributes[0].startswith("__Host-session=")
+    assert "Secure" in attributes and "Path=/" in attributes
+    assert not any(attribute.lower().startswith("domain=") for attribute in attributes)
 
 
 def test_the_flag_reaches_the_set_cookie_header(client, make_user):

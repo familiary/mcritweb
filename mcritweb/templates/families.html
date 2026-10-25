@@ -32,6 +32,6 @@ Families
 {{ pagination_widget(pagination) }}
 {% endif %}
   </div>
-<script>later({{ url_for('static', filename='live_search.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='live_search.js')|tojson }})</script>
 {% include 'js/ac_family_names.html' %}
 {% endblock %}

@@ -8,7 +8,7 @@ Unique Blocks
 {% endblock %}
 
 {% block style %}
-<script>
+<script nonce="{{ csp_nonce() }}">
   // ids clicked on this page, on top of what the URL already carries
   var selected = [];
 
