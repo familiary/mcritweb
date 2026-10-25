@@ -54,7 +54,7 @@
       <tr>
         <td valign="middle">SHA256 | Filename: </td>
         {% for name_and_sample in varargs %}
-          <td valign="middle">{{ format_sha_short_clipboard(name_and_sample[1].sha256) }} | {{ name_and_sample[1].getShortFilename() or "-" }} {{ clipboard_btn(name_and_sample[1].filename) }}{% if kwargs.show_sha256_provenance %}{{ sha256_provenance(name_and_sample[1]|getattr("sha256_verified", none)) }}{% endif %}</td>
+          <td valign="middle">{{ format_sha_short_clipboard(name_and_sample[1].sha256) }} | {{ name_and_sample[1].getShortFilename() or "-" }} {{ clipboard_btn(name_and_sample[1].filename, "Copy filename " ~ (name_and_sample[1].getShortFilename() or "")) }}{% if kwargs.show_sha256_provenance %}{{ sha256_provenance(name_and_sample[1]|getattr("sha256_verified", none)) }}{% endif %}</td>
         {% endfor %}
       </tr>
       <tr>
@@ -112,7 +112,7 @@
       <tr>
         <td valign="middle">SHA256 | Filename: </td>
         {% for name_fe_se_ph in varargs %}
-          <td valign="middle">{{ format_sha_short_clipboard(name_fe_se_ph[2].sha256) }} | {{ name_fe_se_ph[2].getShortFilename(16) }} {{ clipboard_btn(name_fe_se_ph[2].filename) }}</td>
+          <td valign="middle">{{ format_sha_short_clipboard(name_fe_se_ph[2].sha256) }} | {{ name_fe_se_ph[2].getShortFilename(16) }} {{ clipboard_btn(name_fe_se_ph[2].filename, "Copy filename " ~ name_fe_se_ph[2].getShortFilename(16)) }}</td>
         {% endfor %}
       </tr>
       <tr>
@@ -188,7 +188,7 @@
           <td valign="middle">
             {% if name_fe_se_ph[1].minhash|length > 0 %}
               <i style="color: var(--status-yes);" class="fa-solid fa-square-check" title="MinHash available" aria-hidden="true"></i>
-              <span class="font-monospace">{{ name_fe_se_ph[1].minhash.hex()[:16] }}&hellip;</span> {{ clipboard_btn(name_fe_se_ph[1].minhash.hex()) }}
+              <span class="font-monospace">{{ name_fe_se_ph[1].minhash.hex()[:16] }}&hellip;</span> {{ clipboard_btn(name_fe_se_ph[1].minhash.hex(), "Copy the MinHash of function " ~ name_fe_se_ph[1].function_id) }}
               ({{ name_fe_se_ph[1].minhash|length // 4 }} x 32 bit)
             {% else %}
               <i style="color: var(--status-no);" class="fa-solid fa-times-circle" title="No MinHash" aria-hidden="true"></i> not calculated

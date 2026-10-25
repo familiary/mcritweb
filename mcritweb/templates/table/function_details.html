@@ -24,7 +24,7 @@
         <td valign="middle" style="white-space: nowrap;">{{ description }}</td>
         <td valign="middle">
           <code>curl -H "apitoken: &lt;your API token&gt;" {{ api_base }}{{ api_path }}</code>
-          {{ clipboard_btn('curl -H "apitoken: <your API token>" ' + api_base + api_path) }}
+          {{ clipboard_btn('curl -H "apitoken: <your API token>" ' + api_base + api_path, "Copy the command: " ~ description) }}
         </td>
       </tr>
     {% endfor %}
@@ -95,7 +95,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
       <i style="color:var(--status-yes);" class="fa-solid fa-square-check" aria-hidden="true"></i>
       MinHash available, {{ num_slots }} x 32 bit:
     </p>
-    <div class="font-monospace" style="word-break: break-all; font-size: 0.85em;">{{ function_entry.minhash.hex() }} {{ clipboard_btn(function_entry.minhash.hex()) }}</div>
+    <div class="font-monospace" style="word-break: break-all; font-size: 0.85em;">{{ function_entry.minhash.hex() }} {{ clipboard_btn(function_entry.minhash.hex(), "Copy the MinHash of function " ~ function_entry.function_id) }}</div>
     {% set composition = function_entry.minhash_shingle_composition or {} %}
     {% if composition %}
       <h6 class="mt-3">Shingle composition</h6>
@@ -148,7 +148,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
           <td class="font-monospace">0x{{ "%x"|format(picblock.offset) }}</td>
           <td style="text-align: right;">{{ picblock.length }}</td>
           <td style="text-align: right;">{{ picblock.size }}</td>
-          <td class="font-monospace">0x{{ "%016x"|format(picblock.hash) }} {{ clipboard_btn("0x%016x"|format(picblock.hash)) }}</td>
+          <td class="font-monospace">0x{{ "%016x"|format(picblock.hash) }} {{ clipboard_btn("0x%016x"|format(picblock.hash), "Copy PicBlockHash " ~ "0x%016x"|format(picblock.hash)) }}</td>
         </tr>
       {% endfor %}
       </tbody>

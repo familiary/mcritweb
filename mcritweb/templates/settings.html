@@ -69,7 +69,7 @@ Settings
       <tr>
         <td>apitoken:</td>
         <td>
-          {{user_info.apitoken}} {{ clipboard_btn(user_info.apitoken) }}
+          {{user_info.apitoken}} {{ clipboard_btn(user_info.apitoken, "Copy your API token") }}
           {# a write, so it is a button that POSTs rather than a link - see post_action.js #}
           <button type="button" class="btn {% if legacy_apitoken %}btn-danger{% else %}btn-outline-dark{% endif %} btn-sm"
                   data-post="{{ url_for('admin.regenerate_apitoken') }}"

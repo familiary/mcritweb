@@ -83,7 +83,7 @@ Results for Job: {{ job_info.job_id }}
             0x{{ "%x"|format(link_entry.offset) }}</a>
             {% endif %}
             {% if not matching_result.is_query %}
-              <a aria-label="Compare the two functions" title="Compare the two functions" target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>
+              <a aria-label="Compare function {{ link_entry.function_id }} with function {{ link_entry.matched_function_id }}" title="Compare function {{ link_entry.function_id }} with function {{ link_entry.matched_function_id }}" target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>
               &nbsp;
             {% endif %}
             {% if loop.index > 0 and loop.index % 4 == 0 %}
@@ -132,7 +132,7 @@ Results for Job: {{ job_info.job_id }}
           {% else %}
           {{ link_entry.matched_function_id }}
           {% endif %}
-        </a>{% if not matching_result.is_query %}&nbsp;<a aria-label="Compare the two functions" title="Compare the two functions" target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>{% endif %}</td>
+        </a>{% if not matching_result.is_query %}&nbsp;<a aria-label="Compare function {{ link_entry.function_id }} with function {{ link_entry.matched_function_id }}" title="Compare function {{ link_entry.function_id }} with function {{ link_entry.matched_function_id }}" target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>{% endif %}</td>
         <td style="text-align: right;" valign="middle">{{ "%5.2f"|format(link_entry.matched_score) }}</td>
      </tr>
       {% endfor %}

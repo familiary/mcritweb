@@ -87,11 +87,11 @@ macro, which is why they are not parameters.
    in views/data.py gives the page: the byte totals each score's tooltip divides by. #}
 {% macro famlib_row(matched_sample, matching_result, scp, funp, divisors, ucs_famlib) %}{% set columns = FAMLIB_COLUMNS if ucs_famlib is none else ucs_famlib %}{% for column_type in columns %}
           {% if column_type == "family_name" %}
-            <td valign="middle" class="family">{{ format_family_name(matched_sample.family, matched_sample.family_id) }}&nbsp;<a aria-label="Filter by this family" title="Filter by this family" href="{{ url_for(request.endpoint, famid=matched_sample.family_id, samp=1, funp=1, **request.view_args) }}#sample-matches"><i class="fa-solid fa-filter"></i></a></td>
+            <td valign="middle" class="family">{{ format_family_name(matched_sample.family, matched_sample.family_id) }}&nbsp;{% set family_label = "Filter by family " ~ (matched_sample.family or matched_sample.family_id) %}<a aria-label="{{ family_label }}" title="{{ family_label }}" href="{{ url_for(request.endpoint, famid=matched_sample.family_id, samp=1, funp=1, **request.view_args) }}#sample-matches"><i class="fa-solid fa-filter"></i></a></td>
           {% elif column_type == "version" %}
             <td valign="middle">{{ matched_sample.version }}</td>
           {% elif column_type == "sample_id" %}
-            <td style="text-align: right;" valign="middle" scope="row" class="id"><a href="{{ url_for('explore.sample_by_id', sample_id=matched_sample.sample_id) }}">{{ matched_sample.sample_id }}</a>&nbsp;<a aria-label="Filter by this sample" title="Filter by this sample" href="{{ url_for(request.endpoint, samid=matched_sample.sample_id, funp=funp.page, **request.view_args) }}"><i class="fa-solid fa-filter"></i></a></td>
+            <td style="text-align: right;" valign="middle" scope="row" class="id"><a href="{{ url_for('explore.sample_by_id', sample_id=matched_sample.sample_id) }}">{{ matched_sample.sample_id }}</a>&nbsp;<a aria-label="Filter by sample {{ matched_sample.sample_id }}" title="Filter by sample {{ matched_sample.sample_id }}" href="{{ url_for(request.endpoint, samid=matched_sample.sample_id, funp=funp.page, **request.view_args) }}"><i class="fa-solid fa-filter"></i></a></td>
           {% elif column_type == "sha256" %}
             <td style="text-align: right;" valign="middle" class="font-monospace">{{ matched_sample.getShortSha256() }}</td>
           {% elif column_type == "filename" %}
@@ -153,7 +153,7 @@ macro, which is why they are not parameters.
    `aggregate_function_matches_page()` in views/data.py. #}
 {% macro aggregated_function_row(aggregate, matching_result, ucs_functions) %}{% set columns = AGGREGATED_FUNCTION_COLUMNS if ucs_functions is none else ucs_functions %}{% for column_type in columns %}
           {% if column_type == "matched_function_id" %}
-            <td valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=aggregate['function_id'] * -1 if matching_result.is_query else aggregate['function_id']) }}">{% if matching_result.is_query %}*{% endif %}{{ aggregate["function_id"] }}</a>&nbsp;<a aria-label="Filter by this function" title="Filter by this function" href="{{ url_for(request.endpoint, funid=aggregate['function_id'], samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
+            <td valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=aggregate['function_id'] * -1 if matching_result.is_query else aggregate['function_id']) }}">{% if matching_result.is_query %}*{% endif %}{{ aggregate["function_id"] }}</a>&nbsp;<a aria-label="Filter by function {{ aggregate['function_id'] }}" title="Filter by function {{ aggregate['function_id'] }}" href="{{ url_for(request.endpoint, funid=aggregate['function_id'], samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
           {% elif column_type == "offset" %}
             <td style="text-align: right;" valign="middle">0x{{ "%x"|format(aggregate["offset"]) }}</td>
           {% elif column_type == "num_bytes" %}
@@ -222,13 +222,13 @@ macro, which is why they are not parameters.
 {# One function-to-function match row's cells. #}
 {% macro matched_function_row(matched_function, matching_result, ucs_functions, unique_match_known=True) %}{% set columns = MATCHED_FUNCTION_COLUMNS if ucs_functions is none else ucs_functions %}{% for column_type in columns %}
       {% if column_type == "function_id_a" %}
-      <td valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.function_id * -1 if matching_result.is_query else matched_function.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ matched_function.function_id }}</a>&nbsp;<a aria-label="Filter by this function" title="Filter by this function" href="{{ url_for(request.endpoint, funid=matched_function.function_id, samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
+      <td valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.function_id * -1 if matching_result.is_query else matched_function.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ matched_function.function_id }}</a>&nbsp;<a aria-label="Filter by function {{ matched_function.function_id }}" title="Filter by function {{ matched_function.function_id }}" href="{{ url_for(request.endpoint, funid=matched_function.function_id, samp=1, funp=1, **request.view_args) }}#function-matches"><i class="fa-solid fa-filter"></i></a></td>
       {% elif column_type == "offset_a" %}
       <td style="text-align: right;" valign="middle">0x{{ "%x"|format(matched_function.offset) }}</td>
       {% elif column_type == "offset_b" %}
       <td style="text-align: right;" valign="middle">0x{{ "%x"|format(matched_function.matched_offset) }}</td>
       {% elif column_type == "function_id_b" %}
-      <td style="text-align: right;" valign="middle"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.matched_function_id) }}">{{ matched_function.matched_function_id }}</a>{% if not matching_result.is_query %}&nbsp;<a aria-label="Compare the two functions" title="Compare the two functions" target="_blank" href="{{ url_for('data.match_functions', function_id_a=matched_function.function_id, function_id_b=matched_function.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>{% endif %}</td>
+      <td style="text-align: right;" valign="middle"><a href="{{ url_for('explore.function_by_id', function_id=matched_function.matched_function_id) }}">{{ matched_function.matched_function_id }}</a>{% if not matching_result.is_query %}&nbsp;<a aria-label="Compare function {{ matched_function.function_id }} with function {{ matched_function.matched_function_id }}" title="Compare function {{ matched_function.function_id }} with function {{ matched_function.matched_function_id }}" target="_blank" href="{{ url_for('data.match_functions', function_id_a=matched_function.function_id, function_id_b=matched_function.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>{% endif %}</td>
       {% elif column_type == "num_bytes" %}
       <td style="text-align: right;" valign="middle">{{ "%d"|format(matched_function.num_bytes) }}</td>
       {% elif column_type == "best_score" %}
