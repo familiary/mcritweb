@@ -360,7 +360,9 @@ def test_the_requested_samples_unfold_under_their_families(client, as_role, corp
     corpus_mcrit.calls.clear()
     unfolded = requested_samples(client)
 
-    lines = re.findall(r'<i class="fa-solid fa-bug " title="Family ID"></i> (.*?) \| <i class="fa-solid fa-virus " title="Sample ID"></i> (.*?) ?<br />', unfolded)
+    # the icons are read by their titles: they may carry more attributes, and a word for screen readers
+    icon = r'<i class="fa-solid fa-{} " title="{} ID"[^>]*></i>(?:<span class="visually-hidden">[^<]*</span>)?'
+    lines = re.findall(icon.format("bug", "Family") + r' (.*?) \| ' + icon.format("virus", "Sample") + r' (.*?) ?<br />', unfolded)
     assert [(re.sub(r"<[^>]*>", "", family).strip(), re.findall(r'/explore/samples/(\d+)"', samples)) for family, samples in lines] == [
         ("win.citadel", ["0", "1", "2"]),
         ("win.vmzeus", ["3", "4"]),
