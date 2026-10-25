@@ -172,7 +172,7 @@ def test_the_edit_modal_still_opens_for_a_row_swapped_in(page, live_server, list
     type_term(page, "zeus")
     row_id = row_ids(page, row)[0]
 
-    page.locator(f"tr.{row}", has=page.locator(f"th:text-is('{row_id}')")).locator(f"a[data-bs-target='#{modal}']").click()
+    page.locator(f"tr.{row}", has=page.locator(f"th:text-is('{row_id}')")).locator(f"button[data-bs-target='#{modal}']").click()
 
     page.wait_for_selector(f"#{modal}.show")
     assert page.locator(f"#{modal} .modal-title").inner_text() == f"Change Data for {kind} {row_id}"
@@ -212,7 +212,7 @@ def test_an_edit_modal_a_search_brings_in_works_like_one_loaded_with_the_page(pa
     type_term(page, "zeus")
     family_id = row_ids(page, "family-row")[0]
 
-    page.locator("tr.family-row", has=page.locator(f"th:text-is('{family_id}')")).locator("a[data-bs-target='#editFamilyModal']").click()
+    page.locator("tr.family-row", has=page.locator(f"th:text-is('{family_id}')")).locator("button[data-bs-target='#editFamilyModal']").click()
     page.wait_for_selector("#editFamilyModal.show")
     page.locator("#family_new_name").focus()
 
@@ -242,7 +242,7 @@ def test_an_edit_modal_open_when_the_answer_comes_is_left_alone(page, live_serve
                lambda route: route.continue_() if held else held.append(route))
     page.locator("#query").press_sequentially("zeus", delay=20)
     page.wait_for_function("() => document.querySelector('[aria-busy]')")
-    page.locator("tr.family-row a[data-bs-target='#editFamilyModal']").first.click()
+    page.locator("tr.family-row button[data-bs-target='#editFamilyModal']").first.click()
     page.wait_for_selector("#editFamilyModal.show")
 
     held[0].continue_()

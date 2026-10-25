@@ -114,6 +114,10 @@ rather than reconstructing it from the commit log at release time.
 
 ### Fixed
 
+- The edit, rename and API-usage dialogs open from the keyboard. Their buttons on the family and
+  sample lists, a sample's and a function's page and the cross compare result were links without an
+  address, which Tab passes over, so editing or deleting a family or sample, renaming a function or
+  reading its API usage took a mouse. They are buttons now.
 - The YARA copy button copies what the text area holds (#147).
 - One unreadable job no longer takes a job listing down (#115).
 - A match diagram is cached under its whole name, its aggregation is counted once, and cache files

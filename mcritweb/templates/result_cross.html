@@ -38,7 +38,7 @@
         <td class="sha256" style="font-size: 13px; min-width: 100px;">{{ format_sha_short_clipboard(sample.sha256) }}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.family}}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.version}}</td>
-        <td><a aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square"></i></a></td>
+        <td><button type="button" aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square"></i></button></td>
         <td class="id clickable" style="padding: 0 5px; font-size: 13px; color: var(--text-strong)">{{ sample.sample_id }}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.bitness}}</td>
         <td class="" style="padding: 0 5px; font-size: 13px; color: var(--text-strong)">{{sample.statistics['num_functions']}}</td>
@@ -319,7 +319,7 @@ Results for Job: {{ job_info.job_id }}
           span.setAttribute("data-hint", "MCRIT: " + data.percent[i][j].toFixed(2) + "% (" + data.matches[i][j] + " matches) ");
           span.style.backgroundColor = "#" + lazy.palette[data.color[i][j]];
         });
-        row.querySelector("a[data-bs-target='#editSampleModal']").id = method + "_sample_" + sampleId + "_edit";
+        row.querySelector("[data-bs-target='#editSampleModal']").id = method + "_sample_" + sampleId + "_edit";
       });
       // the tooltips of the clipboard buttons are set up once, on load - see clipboard_js
       $(table).find('[data-toggle="tooltip"]').removeAttr("aria-describedby").tooltip();

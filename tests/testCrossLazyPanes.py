@@ -185,7 +185,7 @@ class _Rows(HTMLParser):
             self.rows[-1]["cells"].append(self._cell)
         elif tag == "span" and "data-hint" in attrs:
             self._cell["hint"] = attrs["data-hint"]
-        elif tag == "a" and attrs.get("data-bs-target") == "#editSampleModal":
+        elif tag == "button" and attrs.get("data-bs-target") == "#editSampleModal":
             self._cell["edit"] = True
 
     def handle_endtag(self, tag):
