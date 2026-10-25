@@ -159,6 +159,14 @@ rather than reconstructing it from the commit log at release time.
   password change used to survive it - and since the mark now covers the generation, the sessions
   v1.6.0 marked end too. **Upgrading:** the `user` table gains a `session_generation` column, added
   on first start by an idempotent migration that starts every account at 0.
+- The pre-1.5.0 (32-character) API tokens, which 1.5.0 had left valid indefinitely, are now visible
+  and movable: a user whose token has the old shape sees a warning and a highlighted regenerate
+  button on the settings page, and the admin users page counts the accounts still holding one, marks
+  their rows, and offers a "Regenerate all legacy tokens" action (#250). An operator can then retire
+  the old tokens by setting `ACCEPT_LEGACY_APITOKENS = False` in `instance/config.py` - the default
+  stays `True` for one release - after which a 32-character token is answered with a 403 that says
+  so, rather than the bare 403 an unknown token gets. See "API tokens issued before 1.5.0" in
+  `README.md` for the operator's view.
 
 ## [1.6.0] - 2026-10-16
 

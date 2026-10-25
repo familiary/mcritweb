@@ -91,6 +91,18 @@ python3 -c "import sqlite3; sqlite3.connect('file:instance/mcritweb.sqlite?mode=
 
 Run it from the directory that holds `instance/`: opened read-only, a database that is not there is an error rather than a new, empty one to back up, and the backup goes into `instance/`, so under `docker exec` it lands on the bind mount rather than in the container. Or stop MCRITweb and copy all three files together. WAL needs `instance/` on a local filesystem, as docker-mcrit's bind mount is; it does not work on a network share.
 
+### API tokens issued before 1.5.0
+
+Tokens issued before 1.5.0 have the 32-character `md5` form; every token since is 64 hex characters. The 1.5.0 release left the old ones valid - the entropy was always UUID4's, so they were never weak - but nothing moved them on: a 32-character token stayed valid until its owner happened to press regenerate. MCRITweb now tells people about them. A user whose token has the old shape sees a warning next to it on the settings page, with the regenerate button highlighted; an admin sees a count of the accounts still holding one on the users page, a key icon on each such row, and a "Regenerate all legacy tokens" action that rotates all of them at once.
+
+When you are satisfied your users have had the chance to update their scripts, retire the old tokens by setting this in `instance/config.py`:
+
+```python
+ACCEPT_LEGACY_APITOKENS = False
+```
+
+A request that authenticates with a 32-character token is then answered with a 403 whose message says the token has the pre-1.5.0 form and has to be regenerated - rather than the bare 403 an unknown token gets, so the owner can tell the two apart. The default stays `True` for one release, so nothing changes until an operator chooses the cutover moment.
+
 ## Version History
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
