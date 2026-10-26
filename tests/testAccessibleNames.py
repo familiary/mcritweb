@@ -13,12 +13,15 @@ pager under each, and each one's nav and links are named after its table.
 """
 
 import collections
+import pathlib
 import re
 import urllib.parse
 
 import pytest
 from fixtureData import job_id_of
 from testAccessibility import ADMIN_PAGES, CONTRIBUTOR_PAGES, VISITOR_PAGES, Page, descendants
+
+PACKAGE = pathlib.Path(__file__).resolve().parents[1] / "mcritweb"
 
 
 @pytest.fixture
@@ -168,7 +171,7 @@ def names_sent_twice(html):
                          + [("admin", path) for path in ADMIN_PAGES])
 def test_no_control_sends_its_name_twice(client, as_role, role, path):
     """A hundred-row match table named each row's filter link in an aria-label and again,
-    word for word, in a title that only a mouse reads. icon_titles.js gives the tooltip once
+    word for word, in a title that only a mouse reads. page_loading.js gives the tooltip once
     the page is painted, from the aria-label, so the markup says the name once."""
     as_role(role)
     response = client.get(path, follow_redirects=path == "/data/jobs")
@@ -194,7 +197,16 @@ def test_the_checker_leaves_a_bootstrap_tooltip_its_title():
     assert names_sent_twice(page) == ["Filter"]
 
 
-def test_the_page_queues_the_script_that_gives_icons_their_tooltips(client, as_role):
+def test_the_icon_tooltips_have_no_file_of_their_own(client, as_role):
+    """The tooltips of the icon-only controls were icon_titles.js, a file of its own queued
+    on every page. Each file the queue adds is one more ordered request before the page's
+    scripts have run: on the build of all the pull requests the index page took 35 to 45 ms
+    of blocking time in Lighthouse's mobile run against the base's 8 to 15, and folding the
+    every-page files into the ones the base already queued brought it back to 10. The code
+    rides in page_loading.js, which every page queues already."""
     as_role("visitor")
     page = client.get("/explore/samples").get_data(as_text=True)
-    assert re.search(r"<script( nonce=\"[^\"]*\")?>later\(\"/static/icon_titles\.js(\?v=\w+)?\"\)</script>", page)
+    assert "/static/icon_titles.js" not in page
+    assert not (PACKAGE / "static" / "icon_titles.js").exists()
+    assert "titleIt(" in (PACKAGE / "static" / "page_loading.js").read_text()
+    assert re.search(r"<script( nonce=\"[^\"]*\")?>later\(\"/static/page_loading\.js(\?v=\w+)?\"\)</script>", page)
