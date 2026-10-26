@@ -55,7 +55,7 @@ def javascript_sources():
             yield path, text, block
 
     for name in ("post_action.js", "upload_form.js", "family_names.js", "form_fields.js", "hints.js", "status_message.js",
-                 "clipboard.js"):
+                 "clipboard.js", "show_apitoken.js"):
         path = ROOT / "static" / name
         text = path.read_text()
         yield path, text, list(enumerate(text.splitlines(), 1))

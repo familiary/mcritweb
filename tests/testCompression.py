@@ -34,17 +34,19 @@ def test_a_page_is_gzipped(client, as_role):
     assert b"abc" in gzip.decompress(page.get_data())
 
 
-def test_the_settings_page_is_not_gzipped(client, as_role):
-    """It shows the user's API token, a secret that is the same in every response."""
+def test_the_settings_page_is_gzipped(client, as_role):
+    """It used to show the user's API token, and was sent uncompressed for it. The token
+    is fetched on demand now (admin.show_apitoken), and the page carries no secret."""
     as_role("contributor")
     page = client.get("/settings", headers={"Accept-Encoding": "gzip, deflate"})
     assert page.status_code == 200 and page.mimetype == "text/html"
-    assert page.headers.get("Content-Encoding") is None
-    assert b"apitoken" in page.get_data()
+    assert page.headers["Content-Encoding"] == "gzip"
+    assert b"apitoken-contributor" not in gzip.decompress(page.get_data())
 
 
-#: every view that renders a template printing a stored token, and those templates
-SECRET_VIEWS = {"mcritweb.views.authentication.settings": "settings.html",
+#: every view that answers with a stored token, and the template it prints it from; the
+#: settings page's token comes from admin.show_apitoken, which renders no template
+SECRET_VIEWS = {"mcritweb.views.administration.show_apitoken": None,
                 "mcritweb.views.administration.server": "admin_server.html",
                 "mcritweb.views.administration.change_server": "admin_server.html"}
 #: names with "token" in them that a template uses and that are not stored secrets: the
@@ -54,7 +56,11 @@ SECRET_VIEWS = {"mcritweb.views.authentication.settings": "settings.html",
 NOT_SECRETS = {"register.html": {"query_token", "proposed_registration_token", "is_registration_token_required",
                                  "registrationToken"},
                # #254: who still holds a legacy token, and the button that rotates them
-               "users.html": {"legacy_token_user_ids", "admin.regenerate_legacy_apitokens"}}
+               "users.html": {"legacy_token_user_ids", "admin.regenerate_legacy_apitokens"},
+               # whether the token is a legacy one, whether to fetch it at once after a
+               # regenerate, and the routes that replace it and fetch it - not the token
+               "settings.html": {"legacy_apitoken", "show_apitoken_now", "admin.regenerate_apitoken",
+                                 "admin.show_apitoken", "show_apitoken.js"}}
 #: a {{ }} or {% %} block, wherever a token can be printed from: directly, through a macro,
 #: a subscript or a variable set first. What it finds are names with "token" in them; the
 #: views hand templates the user and server records, whose fields are printed by name.
@@ -92,7 +98,16 @@ def test_the_pages_that_print_a_token_are_marked_as_showing_a_secret(app):
         names = token_names(path.read_text()) - {"csrf_token"} - NOT_SECRETS.get(path.name, set())
         if names:
             printing[str(path.relative_to(templates))] = names
-    assert set(printing) == set(SECRET_VIEWS.values()), printing
+    assert set(printing) == set(SECRET_VIEWS.values()) - {None}, printing
+
+
+def test_the_token_scan_still_fails_on_the_settings_page_printing_the_token():
+    """The names the settings page may use are listed, so that printing the token on it
+    again is found, however it is printed, and fails the test above."""
+    template = pathlib.Path(__file__).resolve().parent.parent / "mcritweb" / "templates" / "settings.html"
+    for printed in ("{{user_info.apitoken}}", "{{ clipboard_btn(user_info.apitoken) }}", "{{ g.user.apitoken }}"):
+        names = token_names(template.read_text() + printed) - {"csrf_token"} - NOT_SECRETS["settings.html"]
+        assert names, printed
 
 
 @pytest.mark.parametrize("path", ["/admin/server"])

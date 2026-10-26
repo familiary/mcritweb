@@ -82,9 +82,10 @@
       return meta ? meta.getAttribute("content") : "";
     }
     {# A tooltip is shown on hover and focus, not on a press, so a press on an element
-       that has one goes on to the element's own handler. #}
+       that has one goes on to the element's own handler. settings.html's Show token
+       button is acted on by show_apitoken.js, which is queued too. #}
     function holdEarlyPress(event) {
-      var target = event.target.closest && event.target.closest('[data-bs-toggle]:not([data-bs-toggle="tooltip"]), [data-bs-dismiss], [data-post]');
+      var target = event.target.closest && event.target.closest('[data-bs-toggle]:not([data-bs-toggle="tooltip"]), [data-bs-dismiss], [data-post], [data-show-apitoken]');
       if (target) {
         event.preventDefault();
         event.stopImmediatePropagation();

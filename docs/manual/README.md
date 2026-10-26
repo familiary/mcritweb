@@ -441,6 +441,8 @@ At this time, there are 4 user roles with different access rights implemented.
 The user settings page allows user to edit their preferences.
 On the home screen, name and registration date for the user are shown.
 If the user has access level contributor or administrator, it further shows an apitoken.
+The token is not on the page until it is asked for: press "Show token" next to "apitoken:" and it appears there, with a button that copies it.
+Regenerating the token shows the new one straight away.
 This token can be used for API passthrough, using the MCRIT Web front-end as a relay when using the MCRIT python client to interact with (normally not exposed) MCRIT server.
 A token issued before MCRITweb 1.5.0 has only 32 characters; the settings page marks it as deprecated and asks you to regenerate it, since a deployment may be configured to refuse such tokens.
 
