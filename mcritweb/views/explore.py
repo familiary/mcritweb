@@ -19,6 +19,7 @@ from mcritweb.views.data import JOB_ID_PATTERN
 from mcritweb.views.functiondiff import get_combined_dot_graph
 from mcritweb.views.pagination import request_args_for_link_building
 from mcritweb.views.search import search_page
+from mcritweb.views.tags import can_edit_tags, requested_tags, save_tags, tag_counts
 from mcritweb.views.utility import describable_jobs, get_user_column_setup, mcrit_server_required
 
 bp = Blueprint('explore', __name__, url_prefix='/explore')
@@ -389,6 +390,15 @@ def modifyFamily():
             job_id = require_result(with_server_errors(client).deleteFamily(family_id, keep_samples=is_family_keeping_samples), "a job for the family deletion")
             flash("Job to delete family was scheduled.", category="info")
             return redirect(url_for('data.job_by_id', job_id=job_id, refresh=5))
+        # a tag mcrit would refuse fails the whole form, before anything is written
+        try:
+            new_tags = requested_tags(client, request.form, "family_tags")
+        except ValueError as invalid_tags:
+            flash(str(invalid_tags), category="error")
+            return redirect(url_for('explore.families'))
+        # tags are written at once and the rest by a queued job, so they go first: a rename
+        # that job performs takes the family's tags along, a merge included
+        tags_changed = save_tags(client, "family", family_id, getattr(family_entry, "tags", []), new_tags)
         # check if sample_entry should be modified
         new_family_name = request.form.get("family_new_name", None)
         new_is_library = True if request.form.get("family_is_library", None) is not None else False
@@ -400,7 +410,7 @@ def modifyFamily():
             sent = client.modifyFamily(family_id, family_name=new_family_name, is_library=new_is_library)
             flash_modification("family", sent, is_family_modified, client, family_id,
                                family_name=new_family_name, is_library=new_is_library)
-        else:
+        elif not tags_changed:
             flash("Nothing to change.", category="info")
     return redirect(url_for('explore.families'))
 
@@ -468,7 +478,8 @@ def families():
         families = list(by_id.values())
         row_decorations = exact_match_decorations(results, 'family_id')
     user_column_setup = get_user_column_setup("family_table")
-    return render_template("families.html", families=families, pagination=pagination, query=query, user_column_setup=user_column_setup, row_decorations=row_decorations)
+    return render_template("families.html", families=families, pagination=pagination, query=query, user_column_setup=user_column_setup, row_decorations=row_decorations,
+                           tags_editable=can_edit_tags(client))
 
 @bp.route('/modifySample', methods=['POST'])
 @contributor_required
@@ -509,6 +520,13 @@ def modifySample():
             job_id = require_result(with_server_errors(client).deleteSample(sample_id), "a job for the sample deletion")
             flash("Job to delete sample was scheduled.", category="info")
             return redirect(url_for('data.job_by_id', job_id=job_id, refresh=5))
+        try:
+            new_tags = requested_tags(client, request.form, "sample_tags")
+        except ValueError as invalid_tags:
+            flash(str(invalid_tags), category="error")
+            return redirect(url_for('explore.samples'))
+        # before the queued modification, as in modifyFamily: tags stay with the sample when it moves
+        tags_changed = save_tags(client, "sample", sample_id, getattr(sample_entry, "tags", []), new_tags)
         # check if sample_entry should be modified
         new_family_name = request.form.get("sample_family_name", None)
         new_version = request.form.get("sample_version", None)
@@ -523,7 +541,7 @@ def modifySample():
             sent = client.modifySample(sample_id, family_name=new_family_name, version=new_version, is_library=new_is_library)
             flash_modification("sample", sent, is_sample_modified, client, sample_id,
                                family_name=new_family_name, version=new_version, is_library=new_is_library)
-        else:
+        elif not tags_changed:
             flash("Nothing to change.", category="info")
         if redirection_job_id:
             return redirect(url_for('data.result', job_id=redirection_job_id))
@@ -562,7 +580,8 @@ def samples():
     job_collection = sample_row_job_collection(client, samples)
 
     user_column_setup = get_user_column_setup("samples_table")
-    return render_template("samples.html", samples=samples, job_collection=job_collection, pagination=pagination, query=query, user_column_setup=user_column_setup, row_decorations=row_decorations)
+    return render_template("samples.html", samples=samples, job_collection=job_collection, pagination=pagination, query=query, user_column_setup=user_column_setup, row_decorations=row_decorations,
+                           tags_editable=can_edit_tags(client))
 
 
 @bp.route('/functions')
@@ -625,7 +644,8 @@ def family_by_id(family_id):
             samples = results.entries
         job_collection = sample_row_job_collection(client, samples)
         user_column_setup = get_user_column_setup("samples_table")
-        return render_template("single_family.html", family=family_info, samples=samples, job_collection=job_collection, pagination=pagination, query=original_query, user_column_setup=user_column_setup)
+        return render_template("single_family.html", family=family_info, samples=samples, job_collection=job_collection, pagination=pagination, query=original_query, user_column_setup=user_column_setup,
+                               tags_editable=can_edit_tags(client))
     else:
         flash("The given Family ID doesn't exist", category='error')
         return redirect(url_for('explore.families'))
@@ -692,7 +712,8 @@ def sample_by_id(sample_id):
         remember_samples([sample_entry])
         samples_by_id = get_sample_entries(sid for job in job_collection.getJobs() for sid in job.sample_ids or [])
         user_column_setup = get_user_column_setup("functions_table")
-        return render_template("single_sample.html", entry=sample_entry, functions=functions, pagination=pagination, query=original_query, samples=samples_by_id, job_collection=job_collection, user_column_setup=user_column_setup)
+        return render_template("single_sample.html", entry=sample_entry, functions=functions, pagination=pagination, query=original_query, samples=samples_by_id, job_collection=job_collection, user_column_setup=user_column_setup,
+                               tags_editable=can_edit_tags(client))
     else:
         flash("The given Sample ID doesn't exist", category='error')
         return redirect(url_for('explore.samples'))
@@ -767,6 +788,31 @@ def modifyFunction():
     return redirect(url_for('explore.function_by_id', function_id=function_id))
 
 
+@bp.route('/modifyFunctionTags', methods=['POST'])
+@contributor_required
+@mcrit_server_required
+def modify_function_tags():
+    """Set a function's tags (familiary/mcrit#53), from the form on the function page.
+    Functions have no modify modal of their own to carry the field, as families and samples do."""
+    client = get_client()
+    try:
+        function_id = int(request.form.get("function_id", ""))
+        function_entry = client.getFunctionById(function_id) if function_id >= 0 else None
+        if function_entry is None:
+            raise ValueError
+    except (TypeError, ValueError):
+        flash("No valid function_id received.", category="error")
+        return redirect(url_for('explore.functions'))
+    try:
+        new_tags = requested_tags(client, request.form, "function_tags")
+    except ValueError as invalid_tags:
+        flash(str(invalid_tags), category="error")
+        return redirect(url_for('explore.function_by_id', function_id=function_id))
+    if not save_tags(client, "function", function_id, getattr(function_entry, "tags", []), new_tags):
+        flash("Nothing to change.", category="info")
+    return redirect(url_for('explore.function_by_id', function_id=function_id))
+
+
 @bp.route('/functions/<int(signed=True):function_id>')
 @visitor_required
 @mcrit_server_required
@@ -783,6 +829,8 @@ def function_by_id(function_id):
             sample_entry=sample_entry,
             pichash_match_summary=pichash_match_summary,
             can_modify_function=can_modify_functions(client),
+            # query functions (negative ids) carry no tags in mcrit
+            tags_editable=function_id >= 0 and can_edit_tags(client),
         )
     else:
         flash("The given Function ID doesn't exist", category="error")
@@ -940,7 +988,8 @@ def statistics():
         mcritweb_version=current_app.config.get("MCRITWEB_VERSION"),
         mcrit_version=backend_version(client),
     )
-    return render_template("statistics.html", page=page)
+    # None, and no section, where the client or the backend has no tags
+    return render_template("statistics.html", page=page, tag_counts=tag_counts(client))
 
 
 @bp.route('/search')
