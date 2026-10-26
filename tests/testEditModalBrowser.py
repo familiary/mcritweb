@@ -46,6 +46,18 @@ def live_server(app):
         server.server_close()
 
 
+def open_and_wait_until_shown(page, dialog, opener):
+    """Bootstrap 5.0.2 adds `.show` when the show transition starts and ignores Escape until
+    it ends, so `.show` alone is too early to press Escape on: wait for `shown.bs.modal`."""
+    page.evaluate(
+        "(dialog) => { window.mcritDialogShown = false;"
+        " document.querySelector(dialog).addEventListener('shown.bs.modal', () => { window.mcritDialogShown = true; }, {once: true}); }",
+        dialog,
+    )
+    opener.click()
+    page.wait_for_function("() => window.mcritDialogShown")
+
+
 @pytest.mark.parametrize("path", sorted(PAGES))
 def test_a_delete_ticked_and_cancelled_is_not_ticked_when_the_dialog_opens_again(app, live_server, make_user, path):
     dialog, delete_box, delete_button = PAGES[path]
@@ -66,16 +78,14 @@ def test_a_delete_ticked_and_cancelled_is_not_ticked_when_the_dialog_opens_again
             openers = page.locator(f"[data-bs-target='{dialog}']")
             assert openers.count() >= 1, f"{path} has no button opening {dialog}"
 
-            openers.nth(0).click()
-            page.wait_for_selector(f"{dialog}.show")
+            open_and_wait_until_shown(page, dialog, openers.nth(0))
             page.check(delete_box)
             assert page.is_visible(delete_button)
             page.keyboard.press("Escape")
             page.wait_for_selector(f"{dialog}.show", state="detached")
             page.wait_for_function(f"() => !document.querySelector('{dialog}').classList.contains('show') && !document.body.classList.contains('modal-open')")
 
-            openers.nth(1 if openers.count() > 1 else 0).click()
-            page.wait_for_selector(f"{dialog}.show")
+            open_and_wait_until_shown(page, dialog, openers.nth(1 if openers.count() > 1 else 0))
             armed = page.is_checked(delete_box)
             confirm_shown = page.is_visible(delete_button)
             keeps_samples = page.is_checked("#family_keeping_samples") if dialog == "#editFamilyModal" else True
