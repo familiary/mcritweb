@@ -89,7 +89,7 @@ def create_app(test_config=None, instance_path=None):
     # import - including a test that only wants a pure-python helper. See issue #88.
     from flask_dropzone import Dropzone
 
-    from . import backend_errors, compression, db, manual, static_cache
+    from . import backend_errors, compression, db, manual, static_cache, thin_pages
     from .csrf import CsrfProtect
     from .jobnames import folded_sample_ids, job_method_name, job_task, unique_blocks_samples
     from .search_highlighting import get_highlight_terms, split_search_matches
@@ -296,6 +296,7 @@ def create_app(test_config=None, instance_path=None):
     app.config['MCRITWEB_VERSION'] = get_mcritweb_version()
     # gzip the text responses for deployments without a compressing proxy (issue #63)
     compression.register(app)
+    thin_pages.register(app)
     # static URLs carry a digest of their file, so a browser keeps the file until it changes
     static_cache.register(app)
     app.config['DROPZONE_DEFAULT_MESSAGE'] = "Drop file or click here to import"

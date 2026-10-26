@@ -137,6 +137,11 @@ rather than reconstructing it from the commit log at release time.
   "Matches" line says "looking up..." until its answer arrives.
 - A cross compare result no longer waits for jQuery UI's 36 KB theme stylesheet before its first
   paint; the one rule of it the sample list uses is in `style.css`.
+- A page is sent without the indentation and blank lines of its templates, and without the comment
+  lines of its inline scripts: a result page is 1.5 KB smaller gzipped, a tenth of it, which is
+  what a slow connection's first round trip, about 14.6 KB, can be the difference of for the
+  page's first paint. It is drawn as before. `MCRITWEB_THIN_PAGES = False` in `instance/config.py`
+  sends the page as the templates write it.
 
 ### Fixed
 
