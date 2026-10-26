@@ -28,8 +28,10 @@ var mcritwebPageLoading = (function () {
 
   /* A screen reader reads out a live region when its text changes, and only one it
    * already knew of: a region made with its text in it, as the overlay was, is often
-   * not read at all. So the region is made empty, when this file runs, long before a
-   * click can need it, and the overlay itself is only the picture. */
+   * not read at all. So the region is on the page empty, long before a click can need
+   * it, and the overlay itself is only the picture. base.html carries it, since an
+   * element added to <body> once the page has loaded makes the browser restyle all of
+   * it (bootstrap's `legend + *`); only a page without it makes its own. */
   function statusElement() {
     var element = document.getElementById(STATUS_ID);
     if (element === null) {

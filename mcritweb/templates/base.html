@@ -294,6 +294,9 @@
      restyle the whole page for any element added to <body> or <main> after it loaded, which
      on a 100 by 100 cross compare matrix took 300 ms. #}
   <div class="status-message"></div>
+  {# the status region of static/page_loading.js, empty until a navigation is under way,
+     here for the same reason #}
+  <div id="mcritweb-page-loading-status" class="visually-hidden" role="status"></div>
   <main class="content" id="content" tabindex="-1">
       {% for category, message in get_flashed_messages(with_categories=true) %}
         {% if category == 'error' %}
