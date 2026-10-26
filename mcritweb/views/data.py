@@ -799,7 +799,14 @@ def result(job_id):
         elif job_info.parameters.startswith("getUniqueBlocks"):
             return result_unique_blocks(job_info, result_json)
         elif job_info.parameters.startswith("addBinarySample"):
-            return redirect(url_for('explore.sample_by_id', sample_id=result_json['sample_info']['sample_id']))
+            # mcrit answers None here for a sample deleted while its uploaded binary
+            # replaced its analysis (familiary/mcrit#306), and an older result may lack it
+            sample_info = result_json.get('sample_info') if isinstance(result_json, dict) else None
+            sample_id = sample_info.get('sample_id') if isinstance(sample_info, dict) else None
+            if isinstance(sample_id, int) and not isinstance(sample_id, bool):
+                return redirect(url_for('explore.sample_by_id', sample_id=sample_id))
+            flash('The sample this job added is no longer in the collection.', category='warning')
+            return redirect(url_for('explore.samples'))
         # modify and delete samples and families
         elif job_info.parameters.startswith("deleteSample"):
             return redirect(url_for('explore.samples'))
