@@ -440,6 +440,9 @@ th[scope="row"] > a:not(.btn) {
 }
 li[data-reorder-item] {
   padding-right: 56px;
+  /* the buttons are out of the flow, and a line of small text is shorter than they are:
+     without this each item's buttons ran over the next one's */
+  min-height: 24px;
 }
 .reorder-buttons {
   position: absolute;
