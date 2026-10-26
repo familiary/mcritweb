@@ -441,7 +441,7 @@ def test_a_search_keeps_the_pickers_state(held_back, live_server, picker, when):
 #: the search as you type (#293), and the family type-ahead, which the page and the
 #: overlay's form each include
 QUEUED_ON_THE_SAMPLES_PAGE = ["jquery.js", "post_action.js", "page_loading.js", "hints.js", "status_message.js",
-                              "clipboard.js", "autocomplete.js", "upload_form.js",
+                              "autocomplete.js", "upload_form.js",
                               "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js", "live_search.js", "family_names.js"]
 
 
