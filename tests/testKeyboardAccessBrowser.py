@@ -56,7 +56,7 @@ def open_as(app, live_server, make_user):
         except sync_api.Error as error:
             pytest.skip(f"no Chromium for playwright to drive: {error}")
         try:
-            def _open(role, path, init_script=None, **context_options):
+            def _open(role, path, init_script=None, before=None, **context_options):
                 context = browser.new_context(**{"viewport": {"width": 1280, "height": 900}, **context_options})
                 context.add_cookies([{
                     "name": app.config["SESSION_COOKIE_NAME"],
@@ -68,6 +68,11 @@ def open_as(app, live_server, make_user):
                 page.set_default_timeout(SCRIPT_TIMEOUT_MS)
                 if init_script:
                     page.add_init_script(init_script)
+                if before:
+                    # a test that holds a request back does not wait for the queue to run
+                    before(page)
+                    page.goto(live_server + path)
+                    return page
                 page.goto(live_server + path)
                 ready(page)
                 return page
@@ -187,6 +192,24 @@ def test_rows_per_page_waits_for_enter_when_changed_with_the_keyboard(open_as, p
     with page.expect_navigation():
         page.keyboard.press("Enter")
     assert f"={chosen}" in page.url
+
+
+def test_rows_per_page_chosen_before_the_keyboard_script_is_in_loads_once_it_is(open_as):
+    """The select's behaviour is keyboard.js's, queued after the first paint. A size chosen
+    in the moment before it runs would otherwise be lost: the select would show 100 rows
+    and the page would still hold 25."""
+    held = []
+    page = open_as("visitor", "/explore/functions", before=lambda page: page.route("**/static/keyboard.js*", lambda route: held.append(route)))
+    page.wait_for_function("() => document.querySelector('select[data-pager-url]') !== null")
+    while not held:
+        page.wait_for_timeout(50)
+
+    page.locator("select[aria-label^='Rows per page']").first.select_option("100")
+    assert "limit=100" not in page.url
+    with page.expect_navigation():
+        held[0].continue_()
+
+    assert "limit=100" in page.url
 
 
 def test_rows_per_page_chosen_with_the_pointer_loads_at_once(open_as):

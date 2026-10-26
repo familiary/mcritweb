@@ -188,6 +188,12 @@ rather than reconstructing it from the commit log at release time.
   script, are in `clipboard.js`, queued after the first paint like the status message they use. The
   page keeps only the part that copies, so a press right after the first paint still copies, and
   every page is about 190 bytes smaller gzipped.
+- What a keyboard needs from a page is sent once, in the cached scripts, instead of in every copy of
+  the page: the "Rows per page" select's wait for Enter is part of `keyboard.js` (the select only
+  says where it loads), and the cross compare matrix's arrow keys and score tooltips are
+  `cross_matrix.js`. A page with a pager is about 440 bytes smaller gzipped, the cross compare
+  result about as much. A size chosen in the moment before the script has loaded is applied
+  once it has.
 
 ### Fixed
 
