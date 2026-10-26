@@ -53,6 +53,7 @@ NEW_JOB_ID = "fedcba9876543210fedcba98"
 
 #: Bytes small enough to keep in a fixture and real enough to hash.
 QUERIED_BYTES = b"MZ" + bytes(range(256)) * 4
+QUERIED_SHA256 = hashlib.sha256(QUERIED_BYTES).hexdigest()
 
 #: An entry to stand in for what `addReport` gives back - a real one out of the
 #: corpus, because the view reads `.sample_id` off it to build a redirect.
@@ -203,6 +204,30 @@ def calls_to(backend, method):
 def wrote_nothing(backend):
     """No sample reached the corpus, by either of the two routes into it."""
     return not calls_to(backend, "addBinarySample") and not calls_to(backend, "addReport")
+
+
+#: a sample with no `sha256_verified` at all, as an mcrit package older than the field builds
+NO_FIELD = object()
+
+REPLACING = "MCRIT is replacing its stored analysis with its own disassembly of this file."
+
+
+def flashes(client):
+    with client.session_transaction() as session:
+        return [message for _category, message in session.get("_flashes", [])]
+
+
+def know_sample(backend, sha256_verified, sha256=None):
+    """A sample of the corpus, given the provenance asked for, and the sha256 of the bytes
+    a binary query ran on when it is to be the sample those bytes are."""
+    known = next(iter(backend._samples.values()))
+    if sha256 is not None:
+        known.sha256 = sha256
+    if sha256_verified is NO_FIELD:
+        vars(known).pop("sha256_verified", None)
+    else:
+        known.sha256_verified = sha256_verified
+    return known
 
 
 # --- what the result page offers ---------------------------------------------------
@@ -379,9 +404,10 @@ def test_an_smda_report_keeps_its_own_family_when_none_is_typed(client, as_role,
 
 def test_promoting_a_query_that_is_already_in_the_corpus_creates_nothing(client, as_role, fake_mcrit, uploads):
     """Promoting twice must not make two samples. The corpus is checked by hash before
-    anything is submitted, and the second attempt lands on the sample that exists."""
+    anything is submitted, and the second attempt lands on the sample that exists.
+    A sample MCRIT has verified, that is: one it has not is the case below."""
     as_role("contributor")
-    known = next(iter(fake_mcrit._samples.values()))
+    known = know_sample(fake_mcrit, True)
     register_query(fake_mcrit, digest=known.sha256)
     store_upload(uploads, QUERIED_BYTES)
 
@@ -389,20 +415,88 @@ def test_promoting_a_query_that_is_already_in_the_corpus_creates_nothing(client,
 
     assert wrote_nothing(fake_mcrit)
     assert f"/explore/samples/{known.sample_id}" in response.headers["Location"]
+    assert flashes(client) == ["Sample was already in database"]
 
 
-def test_the_corpus_is_checked_even_once_the_local_copy_is_gone(client, as_role, fake_mcrit):
+@pytest.mark.parametrize("sha256_verified", [True, False, None, NO_FIELD])
+def test_the_corpus_is_checked_even_once_the_local_copy_is_gone(client, as_role, fake_mcrit, sha256_verified):
     """"Already promoted" is the true answer whether or not the upload survived, so it
     is answered first. Reporting a missing file for a sample that is plainly in the
-    database would send the analyst looking for it again."""
+    database would send the analyst looking for it again. Without the bytes, an
+    unverified sample cannot be verified either, so it is answered the same way."""
     as_role("contributor")
-    known = next(iter(fake_mcrit._samples.values()))
+    known = know_sample(fake_mcrit, sha256_verified)
     register_query(fake_mcrit, digest=known.sha256)
 
     response = promote(client)
 
     assert wrote_nothing(fake_mcrit)
     assert f"/explore/samples/{known.sample_id}" in response.headers["Location"]
+    assert flashes(client) == ["Sample was already in database"]
+
+
+# --- a binary query of a sample MCRIT has not verified (familiary/mcrit#270, #306) --
+
+@pytest.mark.parametrize("sha256_verified", [False, None, NO_FIELD])
+def test_a_binary_query_of_an_unverified_sample_is_sent_to_replace_its_analysis(client, as_role, fake_mcrit, uploads, sha256_verified):
+    as_role("contributor")
+    known = know_sample(fake_mcrit, sha256_verified, sha256=QUERIED_SHA256)
+    register_query(fake_mcrit, digest=known.sha256)
+    store_upload(uploads, QUERIED_BYTES)
+
+    response = promote(client, family="", version="")
+
+    submitted = calls_to(fake_mcrit, "addBinarySample")
+    assert len(submitted) == 1
+    _, args, kwargs = submitted[0]
+    assert args[0] == QUERIED_BYTES
+    assert kwargs["family"] is None and kwargs["version"] is None
+    assert f"/data/jobs/{NEW_JOB_ID}" in response.headers["Location"]
+    assert flashes(client) == [f"Sample {known.sample_id} already has this sha256, but MCRIT has not verified it against a binary. {REPLACING}"]
+
+
+def test_a_mapped_query_of_an_unverified_sample_is_sent_as_the_dump_it_was(client, as_role, fake_mcrit, uploads):
+    as_role("contributor")
+    known = know_sample(fake_mcrit, False, sha256=QUERIED_SHA256)
+    register_query(fake_mcrit, method="getMatchesForMappedBinary", digest=known.sha256, base_address=0x400000, bitness=64)
+    store_upload(uploads, QUERIED_BYTES)
+
+    promote(client)
+
+    _, _, kwargs = calls_to(fake_mcrit, "addBinarySample")[0]
+    assert kwargs["is_dump"] is True
+    assert kwargs["base_addr"] == 0x400000
+    assert kwargs["bitness"] == 64
+
+
+def test_a_backend_that_refuses_the_unverified_sample_lands_on_it_as_before(client, as_role, fake_mcrit, uploads):
+    """An mcrit before #306 answers 409, which addBinarySample hands back as None."""
+    as_role("contributor")
+    known = know_sample(fake_mcrit, False, sha256=QUERIED_SHA256)
+    register_query(fake_mcrit, digest=known.sha256)
+    store_upload(uploads, QUERIED_BYTES)
+    fake_mcrit.addBinarySample = lambda binary, **kwargs: fake_mcrit._record("addBinarySample", binary, **kwargs)
+
+    response = promote(client)
+
+    assert len(calls_to(fake_mcrit, "addBinarySample")) == 1
+    assert f"/explore/samples/{known.sample_id}" in response.headers["Location"]
+    assert flashes(client) == ["Sample was already in database"]
+
+
+@pytest.mark.parametrize("sha256_verified", [False, None, True])
+def test_an_smda_query_of_a_known_sample_verifies_nothing(client, as_role, fake_mcrit, uploads, sha256_verified):
+    as_role("contributor")
+    known = know_sample(fake_mcrit, sha256_verified)
+    queried = smda_upload(known.sha256)
+    register_query(fake_mcrit, method="getMatchesForSmdaReport", digest=known.sha256, queried_report=queried)
+    store_upload(uploads, queried)
+
+    response = promote(client)
+
+    assert wrote_nothing(fake_mcrit)
+    assert f"/explore/samples/{known.sample_id}" in response.headers["Location"]
+    assert flashes(client) == ["Sample was already in database"]
 
 
 def test_promotion_without_the_local_copy_writes_nothing(client, as_role, fake_mcrit):

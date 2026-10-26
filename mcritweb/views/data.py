@@ -2043,6 +2043,27 @@ def submit_or_query():
 #: `\Z` rather than `$`, which would also match before a trailing newline.
 SMDA_SHA256 = re.compile(r"^[0-9a-fA-F]{64}\Z")
 
+#: What a binary upload of a sample MCRIT has not verified says (familiary/mcrit#270).
+REPLACING_ANALYSIS_MESSAGE = (
+    "Sample {sample_id} already has this sha256, but MCRIT has not verified it against a binary. "
+    "MCRIT is replacing its stored analysis with its own disassembly of this file."
+)
+
+
+def awaits_binary_verification(sample_entry):
+    """Whether uploading this sample's binary lets MCRIT replace its analysis by its own.
+
+    mcrit answers a binary upload of a known sha256 with 409 only for a sample whose
+    `sha256_verified` is True (familiary/mcrit#306); for False (indexed from a
+    submitted report or an import) or None (stored before that was recorded) it
+    queues a job that disassembles the bytes and replaces the stored analysis under
+    the same sample_id. An entry without the attribute, from an mcrit package that
+    predates the field, is asked about too. An mcrit that predates #306 refuses with
+    409, which `addBinarySample` answers as None, so the caller falls back to the
+    sample that is there.
+    """
+    return getattr(sample_entry, "sha256_verified", None) is not True
+
 
 @bp.route('/submit',methods=('GET', 'POST'))
 @contributor_required
@@ -2096,9 +2117,21 @@ def submit():
                     version=quote_backend_query_value(version),
                     is_dump=is_dump, base_addr=base_address, bitness=bitness)
                 return url_for('data.job_by_id', job_id=job_id, refresh=3, forward=1), 202 # Accepted
-        else:
-            flash('Sample was already in database', category='warning')
-            return url_for('explore.sample_by_id', sample_id=sample_entry.sample_id), 202 # Accepted
+        if form_options != "smda" and awaits_binary_verification(sample_entry):
+            # a report cannot verify anything, so only the binary itself is sent. Blank
+            # fields go as None: mcrit applies whatever family or version the upload
+            # names to the sample it replaces, and an empty one would clear them.
+            job_id = client.addBinarySample(binary_content,
+                filename=quote_backend_query_value(f.filename),
+                family=quote_backend_query_value(family) if family else None,
+                version=quote_backend_query_value(version) if version else None,
+                is_dump=is_dump, base_addr=base_address, bitness=bitness)
+            if job_id:
+                flash(REPLACING_ANALYSIS_MESSAGE.format(sample_id=sample_entry.sample_id), category='info')
+                return url_for('data.job_by_id', job_id=job_id, refresh=3, forward=1), 202 # Accepted
+            # an mcrit that predates replacing such samples refuses the upload with 409
+        flash('Sample was already in database', category='warning')
+        return url_for('explore.sample_by_id', sample_id=sample_entry.sample_id), 202 # Accepted
     return render_template('submit.html', show_submit_fields=True)
 
 
@@ -2238,17 +2271,25 @@ def promote_query(job_id):
         return redirect(result_page)
     # whether the local copy survived or not, a sample that is already stored is the
     # answer to "promote this" - so promoting twice lands on it instead of adding it.
-    # Two promotions racing past this check still make one sample, but they are not
-    # told the same thing: addReport answers a known sha256 with the entry that already
-    # exists, while SampleResource.on_post_submit_binary refuses one with 409, which
+    # The exception is a binary query of a sample MCRIT has not verified against a
+    # binary: its bytes are sent, and mcrit replaces the stored analysis by their
+    # disassembly (see awaits_binary_verification). Two promotions racing past this
+    # check still make one sample, but they are not told the same thing: addReport
+    # answers a known sha256 with the entry that already exists, while
+    # SampleResource.on_post_submit_binary refuses a verified one with 409, which
     # handle_response turns into None - so the second promotion of a binary query says
     # the sample could not be added. It is one sample all the same: the corpus is
     # checked again by Worker.addBinarySample when the job runs.
     sample_entry = client.getSampleBySha256(upload_sha256)
-    if sample_entry is not None:
+    upload_kind = QUERY_UPLOAD_KINDS[job_info.method]
+    replacing = sample_entry is not None and upload_kind != "smda" and awaits_binary_verification(sample_entry)
+    if sample_entry is not None and not replacing:
         flash('Sample was already in database', category='warning')
         return redirect(url_for('explore.sample_by_id', sample_id=sample_entry.sample_id))
     if not os.path.isfile(upload_path):
+        if replacing:
+            flash('Sample was already in database', category='warning')
+            return redirect(url_for('explore.sample_by_id', sample_id=sample_entry.sample_id))
         flash('The file this query was run for is no longer available on this server, so it cannot be promoted. Please submit it again.', category='error')
         return redirect(result_page)
     family = request.form.get('family', '').strip()
@@ -2259,7 +2300,6 @@ def promote_query(job_id):
             return redirect(result_page)
     with open(upload_path, "rb") as fin:
         upload_content = fin.read()
-    upload_kind = QUERY_UPLOAD_KINDS[job_info.method]
     smda_report = None
     stored_sha256 = None
     if upload_kind == "smda":
@@ -2305,7 +2345,14 @@ def promote_query(job_id):
             return redirect(result_page)
     new_job_id = client.addBinarySample(upload_content, family=family or None, version=version or None, is_dump=is_dump, base_addr=base_address, bitness=bitness)
     if not new_job_id:
+        if replacing:
+            # an mcrit that predates replacing such samples refuses the upload with 409
+            flash('Sample was already in database', category='warning')
+            return redirect(url_for('explore.sample_by_id', sample_id=sample_entry.sample_id))
         flash('The sample could not be added to the database.', category='error')
         return redirect(result_page)
-    flash('The query was promoted to a sample.', category='success')
+    if replacing:
+        flash(REPLACING_ANALYSIS_MESSAGE.format(sample_id=sample_entry.sample_id), category='info')
+    else:
+        flash('The query was promoted to a sample.', category='success')
     return redirect(url_for('data.job_by_id', job_id=new_job_id, refresh=3, forward=1))
