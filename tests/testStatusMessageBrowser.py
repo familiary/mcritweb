@@ -119,6 +119,14 @@ def open_page(app, live_server, make_user):
             browser.close()
 
 
+def show_the_api_token(page):
+    """Where the settings page fetches the token on request (#330) rather than printing it,
+    ask for it, as a user does, before looking at it."""
+    if page.locator("[data-show-apitoken]").count():
+        page.click("[data-show-apitoken]")
+        page.wait_for_selector("#apitoken-copy:not([hidden])")
+
+
 def wait_for_status(page, text):
     page.wait_for_function("(text) => document.querySelector('.status-message [role=status]').textContent.includes(text)", arg=text)
     return page.evaluate(STATUS)
@@ -156,6 +164,7 @@ def test_a_copy_is_announced_without_moving_the_page(open_page, init_script):
     about. The status message is a live region on the page from the start, drawn over the
     page in the top layer, or fixed where there is no popover, so it moves nothing."""
     page = open_page("/settings", init_script=init_script)
+    show_the_api_token(page)
     shifted = page.evaluate("window.mcritShifted")
     page.click("button.btn-clipboard")
     status = wait_for_status(page, "Copied to the clipboard")
@@ -175,6 +184,7 @@ def test_a_copy_works_on_a_page_served_over_plain_http(open_page):
     over plain HTTP: the copy threw before it did anything, and said nothing. It copies a
     selection there instead."""
     page = open_page("/settings", init_script=PLAIN_HTTP)
+    show_the_api_token(page)
     assert page.evaluate("navigator.clipboard") is None
     page.click("button.btn-clipboard")
     wait_for_status(page, "Copied to the clipboard")
@@ -186,6 +196,7 @@ def test_a_copy_that_cannot_be_made_leaves_the_text_selected(open_page):
     """Where neither the clipboard nor a selection can be copied, the message says so and
     shows the text, selected, for Ctrl+C - and stays until it is closed."""
     page = open_page("/settings", init_script=NO_COPY_AT_ALL)
+    show_the_api_token(page)
     page.click("button.btn-clipboard")
     wait_for_status(page, "Ctrl+C")
     assert page.evaluate("window.getSelection().toString()") == "apitoken-contributor"
