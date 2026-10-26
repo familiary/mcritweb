@@ -57,7 +57,7 @@ Sample: {{ entry.sample_id }}
         <h5 class="modal-title" id="editSampleModalLabel">Modify Sample</h5>
       </div>
       <div class="modal-body">
-          <form action='{{ url_for("explore.modifySample") }}'' method="POST" style="width: 80%">
+          <form action='{{ url_for("explore.modifySample") }}' method="POST" style="width: 80%">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" class="form-control" name="sample_id" id="sample_id" hidden value="">
           <div class="form-group mb-3">
@@ -148,8 +148,9 @@ Sample: {{ entry.sample_id }}
   {% endif %}
 </div>
 <h2 class="h3">Search</h2>
-  <form style="width:100%" method="GET" required action="#" data-live-search="sample-functions">
-    <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search by function name or offset (0x...)" aria-label="Search this sample's functions by name or offset" aria-controls="sample-functions" autofocus autocomplete="on">
+  <form style="width:100%" method="GET" action="#" data-live-search="sample-functions">
+    <label for="query" class="visually-hidden">Search this sample's functions by name or offset</label>
+    <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search by function name or offset (0x...)" aria-controls="sample-functions" autofocus autocomplete="on">
     <input type='submit' hidden>
   </form>
   <p id="sample-functions-status" class="visually-hidden" role="status"></p>

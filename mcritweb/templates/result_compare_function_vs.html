@@ -167,10 +167,11 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
         <span><h2 class="h3" id="function_xcfg">Function CFGs</h2></span>
         <span style="float:right"><a href="#top">go to top</a></span>
         <div class="d-flex flex-wrap align-items-center" style="gap: 4px 12px;">
-          <span>
+          <fieldset>
+            <legend class="visually-hidden">Graph view</legend>
             <label style="margin:3px; padding:3px;"><input type="radio" name="viewMode" value="side-by-side" id="viewSideBySide" checked> Side by side</label>
             <label style="margin:3px; padding:3px;"><input type="radio" name="viewMode" value="combined" id="viewCombined" disabled title="Available once both graphs are rendered"> Combined</label>
-          </span>
+          </fieldset>
           <label style="margin:3px; padding:3px;" title="Pan and zoom both graphs together"><input style="margin:3px;" type="checkbox" id="syncGraphs" checked> Sync graphs</label>
           <input style="margin:3px;" type="button" id="resetView" value="Reset view" title="Fit each graph to its pane again, at its own scale. Both graphs are fitted independently, so panning and zooming preserves whatever offset they started with - this puts them back."/>
           <span>

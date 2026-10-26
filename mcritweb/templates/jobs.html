@@ -133,7 +133,8 @@ Jobs
     {% if active %}<input type="hidden" name="active" value="{{ active }}">{% endif %}
     {% if state %}<input type="hidden" name="state" value="{{ state }}">{% endif %}
     {% if ascending %}<input type="hidden" name="ascending" value="true">{% endif %}
-    <input type="text" class="form-control shadow-none" name="Search" id="Search" placeholder="Search jobs" value="{{ query or '' }}" autocomplete="on">
+    <label for="Search" class="visually-hidden">Search jobs</label>
+    <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="Search" id="Search" placeholder="Search jobs" value="{{ query or '' }}" autocomplete="on">
     <input type='submit' hidden>
   </form>
   {% if query and match_count is not none %}

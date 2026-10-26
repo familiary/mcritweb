@@ -119,6 +119,8 @@ function fetchState() {
 function handleSliderChange(val) {
   const mapping = {{ minhash_slider_mapping|tojson }};
   document.getElementById("minhashBandRange-currentSelection").innerHTML = "&nbsp;"+mapping[val];
+  {# the position is a number; what it means is the word beside it, and that is what is read out #}
+  document.getElementById("minhashBandRange").setAttribute("aria-valuetext", mapping[val]);
 }
 
 </script>
@@ -134,7 +136,8 @@ function handleSliderChange(val) {
 <div class="row">
   <div class="col-12 col-lg-6 mb-3">
     <form style="width:100%" id="compare_search_form_a">
-      <input type="text" class="form-control shadow-none" name="query_a" id="Search_a" value="{{ query_a }}" placeholder="Search" autofocus autocomplete="on">
+      <label for="Search_a" class="visually-hidden">Search for sample A</label>
+      <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query_a" id="Search_a" value="{{ query_a }}" placeholder="Search" autofocus autocomplete="on">
     </form>
     {{ set_pagination_params(pagination_a, _js_argument_provider="fetchState", _anchor="Search_a") }}
     {{ sample_table(samples_a, table_id="table_sample_a", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_a,
@@ -146,7 +149,8 @@ function handleSliderChange(val) {
   </div>
   <div class="col-12 col-lg-6 mb-3">
     <form style="width:100%" id="compare_search_form_b">
-      <input type="text" class="form-control shadow-none" name="query_b" id="Search_b" value="{{ query_b }}" placeholder="Search" autofocus autocomplete="on">
+      <label for="Search_b" class="visually-hidden">Search for sample B</label>
+      <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query_b" id="Search_b" value="{{ query_b }}" placeholder="Search" autofocus autocomplete="on">
     </form>
     {{ set_pagination_params(pagination_b, _js_argument_provider="fetchState", _anchor="Search_b") }}
     {{ sample_table(samples_b, table_id="table_sample_b", compact_view=True, show_analyze=False, show_hint=True, sort_pagination=pagination_b,
@@ -173,7 +177,7 @@ function handleSliderChange(val) {
       </div>
       <div class="col-sm-2" id="minhashBandRange-currentSelection">&nbsp;{{ minhash_slider_mapping[request.args.get('minhashBandRange', '2')|int] }}</div>
       <div class="col-sm-4">
-        <input type="range" class="form-range" min="0" max="3" value="{{ request.args.get('minhashBandRange', '2') }}" step="1" id="minhashBandRange" oninput="handleSliderChange(this.value)"/>
+        <input type="range" class="form-range" min="0" max="3" value="{{ request.args.get('minhashBandRange', '2') }}" step="1" id="minhashBandRange" aria-valuetext="{{ minhash_slider_mapping[request.args.get('minhashBandRange', '2')|int] }}" oninput="handleSliderChange(this.value)"/>
       </div>
     </div>
 </div>

@@ -149,7 +149,8 @@ Unique Blocks
   {% endif %}
   <br>
   <form style="width:100%" id="unique_blocks_search_form">
-      <input type="text" class="form-control shadow-none" name="query" value="{{ query }}" id="Search" placeholder="Search" autofocus autocomplete="on">
+      <label for="Search" class="visually-hidden">Search samples</label>
+      <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query }}" id="Search" placeholder="Search" autofocus autocomplete="on">
       <input type='submit' hidden>
   </form>
 

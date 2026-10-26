@@ -96,7 +96,7 @@ def test_no_filter_form_control_crowds_another(live_server, browser):
     page = browser.new_page(viewport=VIEWPORT)
     page.goto(f"{live_server}/login")
     page.fill("#username", "walker")
-    page.fill("#inputPassword", "password")
+    page.fill("#current-password", "password")
     page.click("button[type=submit]")
     page.wait_for_load_state()
 
@@ -112,3 +112,35 @@ def test_no_filter_form_control_crowds_another(live_server, browser):
 
     assert forms == FORMS, f"{forms} filter forms on {len(paths)} pages"
     assert crowded == [], "\n".join(crowded)
+
+
+#: field -> (values the view parses, values it does not)
+CHECKED_VALUES = {
+    "filter_min_offset": (["0x401000", "4198400", "0xABCdef"], ["zz", "0x", "0X10", "-1", "1 2"]),
+    "filter_exclude_families": (["1", "1, 2", "1,2 ,3"], ["a", "1,,2", "1;2", ", 1"]),
+    "filter_link_score": (["0", "65", "100"], ["101", "-1", "50.5"]),
+}
+
+
+def test_a_filter_field_refuses_what_its_view_cannot_parse(live_server, browser):
+    """A pattern the browser cannot compile is no constraint at all, and logs an error; the
+    fields' patterns are compiled with the v flag, which is stricter than the default."""
+    page = browser.new_page(viewport=VIEWPORT)
+    errors = []
+    page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+    page.goto(f"{live_server}/login")
+    page.fill("#username", "walker")
+    page.fill("#current-password", "password")
+    page.click("button[type=submit]")
+    page.wait_for_load_state()
+    page.goto(f"{live_server}/data/linkhunt/{job_id_of('matches_for_sample')}")
+
+    verdicts = {}
+    for field, (good, bad) in CHECKED_VALUES.items():
+        for value in good + bad:
+            page.fill(f"#{field}", "")
+            page.locator(f"#{field}").press_sequentially(value)
+            verdicts[(field, value)] = page.evaluate(f"() => document.getElementById('{field}').checkValidity()")
+    expected = {(field, value): value in good for field, (good, bad) in CHECKED_VALUES.items() for value in good + bad}
+    assert verdicts == expected
+    assert [error for error in errors if "pattern" in error.lower()] == []

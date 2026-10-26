@@ -7,7 +7,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from mcritweb import db
 from mcritweb.compression import uncompressed
 from mcritweb.db import THEMES, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, is_legacy_apitoken
-from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
+from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user, refuse_settings_form
 from mcritweb.views.client import backend_version, get_client
 from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
@@ -23,6 +23,7 @@ def change_username():
     # g.user is the caller's row, read fresh for this request by load_logged_in_user
     user_info = g.user
     error_msg = None
+    error_field = 'username'
     # cheapest check first, and the password before the lookup, so that whether a
     # name is taken is only ever answered to someone who proved who they are
     if not db.is_well_formed_username(new_username):
@@ -30,7 +31,7 @@ def change_username():
     elif db.is_reserved_username(new_username):
         error_msg = "Username is reserved."
     elif not check_password_hash(user_info.password, password):
-        error_msg = 'Incorrect Password!'
+        error_msg, error_field = 'Incorrect Password!', 'inputPassword1'
     elif UserInfo.fromDb(username=new_username) is not None:
         error_msg = 'Username is already taken!'
     if error_msg is None:
@@ -46,10 +47,7 @@ def change_username():
     if error_msg is None:
         flash('Username successfully changed', category='success')
         return redirect(url_for('index'))
-    flash(error_msg, category='error')
-    # settings.html needs a context this view does not assemble - let the settings
-    # view build it, so the flash is the only thing this one has to carry over
-    return redirect(url_for('authentication.settings'))
+    return refuse_settings_form('username', [error_field], error_msg, {'username': new_username})
 
 
 @bp.route('/change_password' , methods=('POST',))
@@ -61,11 +59,11 @@ def change_password():
     error_msg = None
     # as registration asks: an empty password would sign in with an empty password field
     if not new_password:
-        error_msg = 'Password is required.'
+        error_msg, error_field = 'Password is required.', 'inputPassword3'
     elif not new_password == request.form['inputPassword4']:
-        error_msg = 'The entered passwords do not match!'
+        error_msg, error_field = 'The entered passwords do not match!', 'inputPassword4'
     elif not check_password_hash(user_info.password, old_password):
-        error_msg = 'Incorrect password!'
+        error_msg, error_field = 'Incorrect password!', 'inputPassword2'
     if error_msg is None:
         user_info.password = generate_password_hash(new_password)
         # the token is on /settings, so whoever could read that page with a stolen session
@@ -74,8 +72,37 @@ def change_password():
         user_info.saveToDb()
         flash('Password successfully changed. Your API token was replaced too; anything using the old one has to be updated.', category='success')
         return redirect(url_for('index'))
-    flash(error_msg, category='error')
-    return redirect(url_for('authentication.settings'))
+    return refuse_settings_form('password', [error_field], error_msg)
+
+
+#: The default filter's number fields, with the largest value each takes: the scores are
+#: percentages, the last a number of families. All are whole numbers from 0, as the
+#: settings form asks; an empty one is stored as the default it always was.
+DEFAULT_FILTER_NUMBERS = {
+    "filter_direct_min_score": 100,
+    "filter_direct_nonlib_min_score": 100,
+    "filter_frequency_min_score": 100,
+    "filter_frequency_nonlib_min_score": 100,
+    "filter_function_min_score": 100,
+    "filter_function_max_score": 100,
+    "filter_max_num_families": None,
+}
+DEFAULT_FILTER_CHECKBOXES = ("filter_unique_only", "filter_exclude_own_family", "filter_exclude_library", "filter_exclude_pic")
+
+
+def refused_default_filter_number(request):
+    """(field, message) for the first number field holding something that is not a whole
+    number in its range, or None. Such a value used to be stored as 0 - or 100 for the
+    maximum score - and the change reported as a success."""
+    for name, maximum in DEFAULT_FILTER_NUMBERS.items():
+        if not request.form.get(name, "").strip():
+            continue
+        value = parse_integer_post_param(request, name)
+        if value is None or value < 0 or (maximum is not None and value > maximum):
+            if maximum is None:
+                return name, "Default filters not changed: the number of families has to be a whole number from 0."
+            return name, f"Default filters not changed: a score has to be a whole number from 0 to {maximum}."
+    return None
 
 
 @bp.route('/change_default_filter' , methods=('POST',))
@@ -85,6 +112,11 @@ def change_default_filter():
     if user_id is None:
         flash('User ID was not recognized', category='error')
         return redirect(url_for('index'))
+    refused = refused_default_filter_number(request)
+    if refused is not None:
+        typed = {name: request.form.get(name, "") for name in DEFAULT_FILTER_NUMBERS}
+        typed.update({name: "on" if parse_checkbox_post_param(request, name) else "" for name in DEFAULT_FILTER_CHECKBOXES})
+        return refuse_settings_form("default-filter", [refused[0]], refused[1], typed)
     # generic filtering on family/sample results
     filter_direct_min_score = parse_integer_post_param(request, "filter_direct_min_score")
     filter_direct_nonlib_min_score = parse_integer_post_param(request, "filter_direct_nonlib_min_score")

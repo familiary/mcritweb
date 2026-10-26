@@ -1,5 +1,6 @@
 {% from 'table/links.html' import format_pichash, format_function_id, format_sample_id, format_family_name %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
+{% from 'table/filter_fields.html' import filter_field %}
 {% extends 'base.html' %}
 
 {# Click-to-sort for a table that is already fully in memory, so no round trip and
@@ -178,12 +179,11 @@ Unique Blocks for {{ sample_ids|length }} Samples
     <h2 class="h3" id="unique-blocks">Explore Unique Blocks</h2>
     <form class="form-inline" action ="{{ url_for('data.result', job_id=job_info.job_id) }}" method='GET'>
         <div class="form-group row">
-          <label class="col-3" for="min_score">Filter blocks to</label>
           {# prefilled, so that the filter is not silently reset by using it twice - the
              rule form below carries these across for the same reason #}
-          <input class="col-3" type="text" name='min_score' id="min_score" placeholder="min score (0-100)" value="{{ request.args.get('min_score', '') }}">
-          <input class="col-3" type="text" name='min_block_length' id="min_block_length" placeholder="min block length" value="{{ request.args.get('min_block_length', '') }}">
-          <input class="col-3" type="text" name='max_block_length' id="max_block_length" placeholder="max block length" value="{{ request.args.get('max_block_length', '') }}">
+          {{ filter_field("min_score", "Min. score", request.args.get('min_score', ''), cols="col-6 col-sm-4", placeholder="0-100", kind="score") }}
+          {{ filter_field("min_block_length", "Min. block length", request.args.get('min_block_length', ''), cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("max_block_length", "Max. block length", request.args.get('max_block_length', ''), cols="col-6 col-sm-4", kind="count") }}
           <input type="hidden" name="tab" value="blocks">{{ carry_yara_rule_params() }}
           <button type="submit" class="btn btn-primary">Filter</button>
         </div>
@@ -229,12 +229,12 @@ Unique Blocks for {{ sample_ids|length }} Samples
     </p>
     <form class="form-inline" action="{{ url_for('data.result', job_id=job_info.job_id) }}" method='GET'>
         <div class="form-group row">
-          <input class="col-2" type="text" name='min_ins' id="min_ins" placeholder="min instructions" value="{{ yara_params['min_ins'] if yara_params['min_ins'] is not none }}">
-          <input class="col-2" type="text" name='max_ins' id="max_ins" placeholder="max instructions" value="{{ yara_params['max_ins'] if yara_params['max_ins'] is not none }}">
-          <input class="col-2" type="text" name='min_bytes' id="min_bytes" placeholder="min bytes" value="{{ yara_params['min_bytes'] if yara_params['min_bytes'] is not none }}">
-          <input class="col-2" type="text" name='max_bytes' id="max_bytes" placeholder="max bytes" value="{{ yara_params['max_bytes'] if yara_params['max_bytes'] is not none }}">
-          <input class="col-2" type="text" name='required_per_sample' id="required_per_sample" placeholder="blocks per sample" value="{{ yara_params['required_per_sample'] }}">
-          <input class="col-2" type="text" name='condition_required' id="condition_required" placeholder="strings required" value="{{ yara_params['condition_required'] }}">
+          {{ filter_field("min_ins", "Min. instructions", yara_params['min_ins'], cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("max_ins", "Max. instructions", yara_params['max_ins'], cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("min_bytes", "Min. bytes", yara_params['min_bytes'], cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("max_bytes", "Max. bytes", yara_params['max_bytes'], cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("required_per_sample", "Blocks per sample", yara_params['required_per_sample'], cols="col-6 col-sm-4", kind="count") }}
+          {{ filter_field("condition_required", "Strings required", yara_params['condition_required'], cols="col-6 col-sm-4", kind="count") }}
           <input type="hidden" name="tab" value="yara">{{ carry_block_filter_params() }}
           <button type="submit" class="btn btn-primary">Regenerate Rule</button>
         </div>
@@ -249,7 +249,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
     <div class="mb-2">
       <button type="button" class="btn btn-sm btn-outline-secondary" onclick="copyTextAreaToClipboard('#yara_text')"><i class="fa-regular fa-copy"></i> Copy YARA rule to clipboard</button>
     </div>
-    <textarea aria-label="YARA rule" style="font-family:monospace; min-width: 100%" id="yara_text" name="yara_text" 
+    <textarea aria-label="YARA rule" style="font-family:monospace; min-width: 100%" id="yara_text" name="yara_text" spellcheck="false"
         rows="50">{{yara_rule}}</textarea>
     {% endif %}
   </div>

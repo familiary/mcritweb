@@ -26,6 +26,8 @@
 function handleSliderChange_dropzone(val) {
   const mapping = {{ minhash_slider_mapping|tojson }};
   document.getElementById("minhashBandRange-currentSelection_dropzone").innerHTML = "&nbsp;"+mapping[val];
+  {# the position is a number; what it means is the word beside it, and that is what is read out #}
+  document.getElementById("minhashBandRange_dropzone").setAttribute("aria-valuetext", mapping[val]);
 }
 </script>
 {% endmacro %}
@@ -58,9 +60,11 @@ function handleSliderChange_dropzone(val) {
   {# what static/upload_form.js needs from the template: where to ask about a dropped
      file, and on the overlay, where Dropzone is fetched from on the first drag #}
   <form id="dropzone-additional-fields-form" data-filename-info="{{ url_for('data.request_filename_info') }}"
+    {%- if show_submit_fields %} data-submit-fields{% endif %}
     {%- if lazy %} data-lazy data-dropzone-css="{{ url_for('static', filename='dropzone.min.css') }}" data-dropzone-js="{{ url_for('static', filename='dropzone-patched.min.js') }}"{% endif %}>
   {% if select_form_type %}
-    <div class="container-fluid">
+    <fieldset class="container-fluid">
+      <legend class="visually-hidden">What to do with the file</legend>
       <div class="form-check form-check-inline col-xs-6" align="left">
           <input class="form-check-input" type="radio" name="form_type" id="query_form" value="query_form" checked>
           <label class="form-check-label" for="query_form">Match against database</label>
@@ -69,24 +73,32 @@ function handleSliderChange_dropzone(val) {
           <input class="form-check-input" type="radio" name="form_type" id="submit_form" value="submit_form">
           <label class="form-check-label" for="submit_form">Add to database</label>
       </div>
-    </div>
+    </fieldset>
   {% endif %}
     <div class="form-group submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
-      <input type='text' name='family' class="form-control" id="family" aria-label="Family" placeholder="Enter family" autofocus autocomplete="off">
-      <input name='version' class="form-control" id="version" aria-label="Version" placeholder="Enter version">
+      <label for="family" class="form-label">Family (optional)</label>
+      <input type='text' name='family' class="form-control" id="family" autofocus autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">
+      <label for="version" class="form-label mt-2">Version (optional)</label>
+      <input name='version' class="form-control" id="version" spellcheck="false" autocapitalize="off" autocorrect="off">
     </div>
     <div class="form-group" style="display:none" id='extendedFields'>
-        <input name='base_addr' class="form-control" id="base_addr" aria-label="Base address" placeholder="Enter base address">
-        <div class="form-check form-check-inline submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
+        <label for="base_addr" class="form-label">Base address</label>
+        <input name='base_addr' class="form-control" id="base_addr" placeholder="e.g. 0x400000" title="A hexadecimal address of up to 16 digits, e.g. 0x400000" spellcheck="false" autocapitalize="off" autocorrect="off">
+        <fieldset class="submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
+        <legend class="visually-hidden">Bitness</legend>
+        <div class="form-check form-check-inline">
           <input class="form-check-input" type="radio" name="bitness" id="bitness32" value="32">
           <label class="form-check-label" for="bitness32">32bit</label>
         </div>
-        <div class="form-check form-check-inline submit-form-exclusive" {% if not show_submit_fields %}style="display:none"{% endif %}>
+        <div class="form-check form-check-inline">
           <input class="form-check-input" type="radio" name="bitness" id="bitness64" value="64">
           <label class="form-check-label" for="bitness64">64bit</label>
         </div>
+        </fieldset>
       </div>
 
+      <fieldset class="d-inline-block">
+      <legend class="visually-hidden">File type</legend>
       <div class="form-check form-check-inline" align="left">
         <input class="form-check-input" type="radio" name="options" id="unmapped" value="unmapped" checked>
         <label class="form-check-label" for="unmapped">Unmapped</label>
@@ -99,6 +111,7 @@ function handleSliderChange_dropzone(val) {
           <input class="form-check-input" type="radio" name="options" id="smda" value="smda">
           <label class="form-check-label" for="smda">SMDA</label>
       </div>
+      </fieldset>
      <!-- TODO: only show if file available -->
     <div class="form-group query-form-exclusive" {% if not show_query_fields %}style="display:none"{% endif %}>
     <div class="col-sm-12 d-inline-flex justify-content-center">
@@ -109,11 +122,15 @@ function handleSliderChange_dropzone(val) {
       </div>
       <div class="col-sm-3" id="minhashBandRange-currentSelection_dropzone">&nbsp; {{ minhash_slider_mapping[2] }}</div>
       <div class="col-sm-6">
-        <input type="range" class="form-range" min="0" max="3" value="2" step="1" id="minhashBandRange_dropzone" name="minhashBandRange" oninput="handleSliderChange_dropzone(this.value)"/>
+        <input type="range" class="form-range" min="0" max="3" value="2" step="1" id="minhashBandRange_dropzone" name="minhashBandRange" aria-valuetext="{{ minhash_slider_mapping[2] }}" oninput="handleSliderChange_dropzone(this.value)"/>
       </div>
     </div>
     </div>
-    <button type="submit" class="btn btn-primary" id="submit-dropzone" disabled>{% if not select_form_type and not show_submit_fields %}Query{% else %}Submit{% endif %} <span id="submit-spinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display:none"></span></button>
+    {# named by what the form will do: the overlay opens on "Match against database", a query,
+       and static/upload_form.js renames it when the mode changes #}
+    <button type="submit" class="btn btn-primary" id="submit-dropzone" disabled><span id="submit-dropzone-label">{% if show_submit_fields %}Submit{% else %}Query{% endif %}</span> <span id="submit-spinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display:none"></span></button>
+    {# the form's word on the upload: a file still to be chosen, or why the server refused it #}
+    <div id="upload-feedback" class="upload-feedback" aria-live="polite"></div>
 </form>
 </div>
 {% include 'js/ac_family_names.html' %}
