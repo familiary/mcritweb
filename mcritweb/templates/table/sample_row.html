@@ -33,6 +33,11 @@
     else {
       modalBodyLibrary.checked = false;
     }
+    // present only where tags are editable, see sample_table
+    var modalBodyTags = editSampleModal.querySelector('.modal-body #sample_tags');
+    if (modalBodyTags) {
+      modalBodyTags.value = button.getAttribute('data-bs-tags') || '';
+    }
     })
 
     $("tr.sample-row").click(function(e){
@@ -174,7 +179,7 @@
           <a aria-label="Export" title="Export" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=sample.sample_id) }}" role="button" target="_self"><i class="fa-solid fa-file-export"></i></a>
         {% endif %}
         {% if show_edit %}
-          <a aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square"></i></a>
+          <a aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" id="sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"{% if kwargs.get('tags_editable') %} data-bs-tags="{{ sample|getattr('tags', [])|join(', ') }}"{% endif %}><i class="fa-solid fa-pen-to-square"></i></a>
         {% endif %}
       </td>
     {% endif %}

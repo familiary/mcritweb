@@ -15,4 +15,32 @@ Statistics
     {% endfor %}
 
   </table>
+  {# the tags in use (familiary/mcrit#53); None where the client or the backend has no tags #}
+  {% if tag_counts is not none %}
+  <h2 class="h3" id="tags">Tags</h2>
+  {% if tag_counts %}
+  <table class="table table-sm" style="width:50%;">
+    <thead>
+      <tr>
+        <th scope="col">Tag</th>
+        <th scope="col" class="text-end">Families</th>
+        <th scope="col" class="text-end">Samples</th>
+        <th scope="col" class="text-end">Functions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tag, counts in tag_counts.items() %}
+      <tr>
+        <th scope="row"><a href="{{ url_for('explore.search', query=tag_search_query(tag), type='family,sample,function') }}">{{ tag }}</a></th>
+        {% for entity in ('family', 'sample', 'function') %}
+        <td class="text-end">{{ counts.get(entity, 0) }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted">No family, sample or function carries a tag yet.</p>
+  {% endif %}
+  {% endif %}
 {% endblock %}

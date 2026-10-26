@@ -59,6 +59,8 @@ MUTATING_CLIENT_CALLS = {
     "addBinarySample",
     "addImportData",
     "addReport",
+    # tags (familiary/mcrit#53)
+    "addTags",
     "deleteFamily",
     "deleteJob",
     "deleteSample",
@@ -69,6 +71,7 @@ MUTATING_CLIENT_CALLS = {
     "recalculateMinHashes",
     "recalculateMinHashesForSample",
     "recalculatePicHashes",
+    "removeTags",
     "requestMatchesCross",
     "requestMatchesForMappedBinary",
     "requestMatchesForSample",
@@ -209,6 +212,7 @@ ROUTE_POLICY = {
     "explore.modifyFamily": (CONTRIBUTOR, WRITES_ON_POST),
     "explore.modifyFunction": (CONTRIBUTOR, WRITES_ON_POST),
     "explore.modifySample": (CONTRIBUTOR, WRITES_ON_POST),
+    "explore.modify_function_tags": (CONTRIBUTOR, WRITES_ON_POST),
 
     # --- admin only --------------------------------------------------------------
     "admin.users": (ADMIN, READ_ONLY),

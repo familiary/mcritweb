@@ -1,4 +1,4 @@
-{% from 'table/links.html' import format_pichash, format_offset, format_family_name_tuple, format_family_id, format_sample_id, format_function_id, format_sha_short_clipboard, clipboard_btn %}
+{% from 'table/links.html' import format_pichash, format_offset, format_family_name_tuple, format_family_id, format_sample_id, format_function_id, format_sha_short_clipboard, clipboard_btn, tag_badges %}
 {% from 'table/column_table.html' import function_column_table %}
 {% from 'table/function_details.html' import api_usage_modal, api_usage_button, minhash_shingles, picblock_table %}
 {% extends 'base.html' %}
@@ -68,6 +68,33 @@ Function: {{ function_id }}
   </div>
 </div>
 {% endif %}
+{# "Tags": sets the function's tags through explore.modify_function_tags (familiary/mcrit#53).
+   tags_editable already says contributor and a backend that stores tags. #}
+{% if tags_editable %}
+<div class="modal fade" id="functionTagsModal" tabindex="-1" aria-labelledby="functionTagsModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="functionTagsModalLabel">Tags of function {{ function_id }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="POST" action="{{ url_for('explore.modify_function_tags') }}" id="function_tags_form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="function_id" value="{{ function_id }}">
+        <div class="modal-body">
+          <label for="function_tags" class="col-form-label">Tags</label>
+          <input type="text" class="form-control" id="function_tags" name="function_tags" value="{{ entry|getattr('tags', [])|join(', ') }}" aria-describedby="function_tags_help">
+          <div class="form-text" id="function_tags_help">Separated by commas. Emptying the field removes them all.</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">Save tags</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 {{ api_usage_modal("apiUsageModal", "API usage for function %d" % function_id, [
     ("This function", "/functions/%d" % function_id),
     ("With its control flow graph", "/functions/%d?with_xcfg=true" % function_id),
@@ -95,6 +122,7 @@ Function: {{ function_id }}
   <div class="row">
     <div class="col">
       <h1>Function: {{ function_id }}</h1>
+      {{ tag_badges(entry) }}
     </div>
     <div align="right" class="col">
       <div class="btn-group dropdown">
@@ -128,6 +156,9 @@ Function: {{ function_id }}
         {% else %}
         <a class="btn btn-outline-dark btn-sm disabled" id="button_function_rename" role="button" aria-disabled="true" title="Renaming functions needs an MCRIT backend of version 1.10.0 or newer"><i class="fa-solid fa-pen"></i></a>
         {% endif %}
+      {% endif %}
+      {% if tags_editable %}
+      <a class="btn btn-outline-dark btn-sm" id="button_function_tags" role="button" data-bs-toggle="modal" data-bs-target="#functionTagsModal" aria-label="Edit tags" title="Edit tags"><i class="fa-solid fa-tags"></i></a>
       {% endif %}
       {{ api_usage_button("apiUsageModal") }}
       <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" role="button" aria-label="Go to the control flow graph" title="Go to the control flow graph"><i class="fa-solid fa-diagram-project"></i></a>
