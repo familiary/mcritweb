@@ -296,7 +296,7 @@ Results for Job: {{ job_info.job_id }}
         sourceIndex[row.querySelector("th.id").textContent.trim()] = index;
       });
       var table = rendered.cloneNode(false);
-      // the caption names the table; the tab around it says which method it shows
+      {# the caption names the table; the tab around it says which method it shows #}
       if (rendered.caption) {
         table.appendChild(rendered.caption.cloneNode(true));
       }
