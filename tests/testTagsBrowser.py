@@ -17,6 +17,7 @@ import os
 import threading
 
 import pytest
+from conftest import session_cookie_for
 from testTags import FAMILY_ID, SAMPLE_ID, TaggingCorpus, mcrit_tag_rule  # noqa: F401 - the rule is an autouse fixture
 from werkzeug.serving import make_server
 
@@ -57,7 +58,7 @@ def live_server(app):
 def browser_page(app, live_server, make_user):
     """A Chromium page signed in as a contributor, collecting console errors."""
     user_id = make_user(role="contributor")
-    cookie = app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id})
+    cookie = session_cookie_for(app, user_id)
     with sync_api.sync_playwright() as playwright:
         try:
             browser = playwright.chromium.launch(executable_path=os.environ.get("MCRITWEB_CHROMIUM") or None)
