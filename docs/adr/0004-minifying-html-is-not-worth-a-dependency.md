@@ -1,7 +1,9 @@
 # Minifying HTML is not worth a dependency
 
 ---
-status: accepted — measured 2026-08-30
+status: accepted — measured 2026-08-30; the whitespace half is revisited by
+[ADR-0022](0022-pages-are-thinned-before-they-are-gzipped.md), which does it in the
+application, without a dependency
 ---
 
 Issue #48 asks for three things: `{%- -%}` whitespace control in Jinja, an HTML

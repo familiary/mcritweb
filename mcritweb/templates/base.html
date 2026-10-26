@@ -28,12 +28,15 @@
      page draws is the navbar help icon, which sits inside .navbar-collapse - below 992px
      Bootstrap gives that display:none, so the glyph has no box and the font is fetched and
      discarded. Measured: /login at 390x844 requests fa-solid-900.woff2 (150KB) and
-     document.fonts reports nothing loaded. Signed-in pages draw icons in the content
-     itself, at every width, so there the preload is paid for. The file preloaded is the
-     face cut to the glyphs the templates draw, 6KB (scripts/subset_fontawesome.py).
+     document.fonts reports nothing loaded. Most signed-in pages draw icons in the content
+     itself, at every width, so there the preload is paid for. The manual and the upload and
+     export forms draw none outside the navbar; they set icons_only_in_the_navbar, and
+     preload the font only from 992px up, where the navbar shows its help icon. At 390x844
+     the preload held their first paint up by about 50 ms. The file preloaded is the face
+     cut to the glyphs the templates draw, 6KB (scripts/subset_fontawesome.py).
      See issue #62 and tests/testIconPreload.py #}
   {% if g.user %}
-  <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ url_for('static', filename='webfonts/subset/fa-solid-900.woff2') }}">
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ url_for('static', filename='webfonts/subset/fa-solid-900.woff2') }}"{% if icons_only_in_the_navbar %} media="(min-width: 992px)"{% endif %}>
   {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="icon" type="image/png" href=" {{ url_for('static',filename='d20_mcrit_cabaret_small.png') }}">
@@ -164,8 +167,9 @@
   <script>later({{ url_for('static', filename='page_loading.js')|tojson }})</script>
   <script>later({{ url_for('static', filename='autocomplete.js')|tojson }})</script>
 
+  {# the drop overlay's behaviour, and what builds it on the first drag: see the slot below #}
   {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
-    {{ submit_or_query_dropzone_js(select_form_type=True, lazy=True) }}
+  <script>later({{ url_for('static', filename='upload_form.js')|tojson }})</script>
   {% endif %}
   {{ clipboard_js() }}
   {% block style %}{% endblock %}
@@ -193,8 +197,10 @@
   <button class="navbar-toggler navbar-toggler-end float-end" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
     <span class="navbar-toggler-icon"></span>
   </button>
+  {# lazy, so that below 992px, where it has no box, a phone or tablet does not download it;
+     where it is shown it is in view and loads at once #}
   <a class="right-logo d-none d-lg-block ms-lg-auto mb-lg-auto" href="https://www.fkie.fraunhofer.de/">
-    {{ themed_img(url_for('static', filename='fkie_190x52.gif'), url_for('static', filename='fkie_190x52_dark.png'), alt="Fraunhofer FKIE", width="187", height="52") }}
+    {{ themed_img(url_for('static', filename='fkie_190x52.gif'), url_for('static', filename='fkie_190x52_dark.png'), alt="Fraunhofer FKIE", width="187", height="52", loading="lazy") }}
   </a>
 
 
@@ -289,19 +295,11 @@
       {% block content %}{% endblock %}
 
       {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
-        <div class="modal fade" id="submitFileModal" tabindex="-1" aria-labelledby="submitFileModalLabel" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h5 class="modal-title" id="submitFileModalLabel">Submit File</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="close-submit-modal"></button>
-              </div>
-              <div class="modal-body">
-                {{ submit_or_query_dropzone(show_submit_fields=False, select_form_type=True, lazy=True) }}
-              </div>
-            </div>
-          </div>
-        </div>
+        {# The drop overlay, its dialog and upload form, was about 2 KB of every signed-in
+           page's gzipped weight, for the moment a file is dragged over it.
+           static/upload_form.js fetches it from data.drop_overlay on the first drag that
+           carries a file, with Dropzone's stylesheet and library, and puts it here. #}
+        <div id="drop-overlay-slot" hidden data-overlay="{{ url_for('data.drop_overlay') }}" data-dropzone-css="{{ url_for('static', filename='dropzone.min.css') }}" data-dropzone-js="{{ url_for('static', filename='dropzone-patched.min.js') }}"></div>
       {% endif %}
   </main>
 

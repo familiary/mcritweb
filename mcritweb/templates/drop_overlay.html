@@ -1,0 +1,19 @@
+{% from 'table/submit_or_query_dropzone.html' import submit_or_query_dropzone, submit_or_query_dropzone_js with context %}
+{# The drop overlay: what data.drop_overlay answers, and static/upload_form.js puts in the
+   place of base.html's #drop-overlay-slot on the first drag that carries a file. Not a
+   page, and no script: one in markup a script inserts does not run. With `lazy` the
+   first macro writes only the zone's style. #}
+{{ submit_or_query_dropzone_js(select_form_type=True, lazy=True) }}
+<div class="modal fade" id="submitFileModal" tabindex="-1" aria-labelledby="submitFileModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="submitFileModalLabel">Submit File</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="close-submit-modal"></button>
+      </div>
+      <div class="modal-body">
+        {{ submit_or_query_dropzone(show_submit_fields=False, select_form_type=True, lazy=True) }}
+      </div>
+    </div>
+  </div>
+</div>

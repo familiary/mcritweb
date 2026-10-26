@@ -459,18 +459,20 @@ def test_the_submit_form_asks_for_family_names_as_they_are_typed(client, as_role
 
 def test_the_drop_overlay_brings_its_own_family_type_ahead(client, as_role, fake_mcrit):
     """The drop overlay's family field used to be built with no names at all. Since
-    #192 the dropzone macro includes `js/ac_family_names.html` itself, so a listing
-    page - which includes the partial for its edit modals too - queues the type-ahead
-    twice. later() queues a file once, and the guard that stops a second run attaching a
-    second widget to a field stays in the file. The browser test in
-    testAutocompleteEscaping.py shows the effect; this pins both includes and the guard
-    offline."""
+    #192 it has the type-ahead too: the overlay, fetched on the first drag, names the
+    file, and static/upload_form.js loads it unless the page queued it for its edit
+    modals, as a listing does. The guard that stops a second run attaching a second
+    widget to a field stays in the file. The browser test in testAutocompleteEscaping.py
+    shows the effect; this pins both and the guard offline."""
     as_role("contributor")
 
     markup = client.get("/explore/samples").get_data(as_text=True)
+    overlay = client.get("/data/drop_overlay").get_data(as_text=True)
 
-    assert markup.count("/static/family_names.js") == 2, (
-        "the listing and its drop overlay should each include the family type-ahead"
+    assert markup.count("/static/family_names.js") == 1, "the listing should include the family type-ahead for its modals"
+    queued = re.search(r'later\("(/static/family_names\.js[^"]*)"\)', markup).group(1)
+    assert f'data-family-names-js="{queued}"' in overlay, (
+        "the drop overlay should name the same type-ahead, so that it is not loaded twice"
     )
     assert FAMILY_NAMES_JS.read_text().count("field.dataset.familyAutocomplete") == 2, (
         "the guard against attaching a second widget to a field is gone"
