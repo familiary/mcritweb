@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from fixtureData import CorpusMcritClient
+from fixtureData import CorpusMcritClient, RawResponse
 from mcrit.storage.FamilyEntry import FamilyEntry
 from mcrit.storage.SampleEntry import SampleEntry
 
@@ -99,21 +99,30 @@ class TaggingCorpus(CorpusMcritClient):
     def searchSamples(self, search_term, cursor=None, is_ascending=True, sort_by=None, limit=None):
         return self._typed_search("sample", SampleEntry, self.search_samples(search_term, cursor=cursor, is_ascending=is_ascending, sort_by=sort_by, limit=limit or 100))
 
+    def _answer(self, entity, entity_id, tags):
+        """The resulting tags, or in raw mode - the API passthrough's - the response mcrit's
+        TagResource sends, whose data names the entity beside them."""
+        if not self.raw:
+            return tags
+        if tags is None:
+            return RawResponse(400)
+        return RawResponse(200, {"entity": entity, "entity_id": entity_id, "tags": tags})
+
     def addTags(self, entity, entity_id, tags):
         self._record("addTags", entity, entity_id, list(tags))
         if self.refuses_changes:
-            return None
+            return self._answer(entity, entity_id, None)
         stored = self.stored_tags[entity].setdefault(entity_id, [])
         stored.extend(tag for tag in tags if tag not in stored)
-        return list(stored)
+        return self._answer(entity, entity_id, list(stored))
 
     def removeTags(self, entity, entity_id, tags):
         self._record("removeTags", entity, entity_id, list(tags))
         if self.refuses_changes:
-            return None
+            return self._answer(entity, entity_id, None)
         stored = self.stored_tags[entity].setdefault(entity_id, [])
         stored[:] = [tag for tag in stored if tag not in tags]
-        return list(stored)
+        return self._answer(entity, entity_id, list(stored))
 
     def getTags(self, entity):
         self._record("getTags", entity)
@@ -121,7 +130,8 @@ class TaggingCorpus(CorpusMcritClient):
         for tags in self.stored_tags[entity].values():
             for tag in tags:
                 counts[tag] = counts.get(tag, 0) + 1
-        return dict(sorted(counts.items()))
+        counts = dict(sorted(counts.items()))
+        return RawResponse(200, {"entity": entity, "tags": counts}) if self.raw else counts
 
 
 @pytest.fixture
@@ -441,3 +451,57 @@ def test_the_statistics_page_has_no_tags_section_without_tags(app, client, as_ro
     assert response.status_code == 200
     assert 'id="tags"' not in response.data.decode()
 
+
+# --- the API passthrough -----------------------------------------------------------
+
+def _token(role):
+    return {"apitoken": f"apitoken-{role}"}
+
+
+def test_a_contributor_token_tags_through_the_api(client, make_user, tagging_mcrit):
+    """The passthrough follows McritClient's tag methods on mcrit's own paths, as it does
+    every client method, so a token is not left without what the UI offers."""
+    make_user("contributor")
+    response = client.post(f"/api/samples/{SAMPLE_ID}/tags", headers=_token("contributor"), json={"tags": ["packed", "reviewed"]})
+    assert response.status_code == 200
+    assert response.get_json()["tags"] == ["packed", "reviewed"]
+    response = client.delete(f"/api/samples/{SAMPLE_ID}/tags", headers=_token("contributor"), json={"tags": ["packed"]})
+    assert response.get_json()["tags"] == ["reviewed"]
+    assert _calls(tagging_mcrit, "addTags", "removeTags") == [
+        ("addTags", ("sample", SAMPLE_ID, ["packed", "reviewed"]), {}),
+        ("removeTags", ("sample", SAMPLE_ID, ["packed"]), {}),
+    ]
+    response = client.get("/api/tags?entity=sample", headers=_token("contributor"))
+    assert response.get_json()["tags"] == {"reviewed": 1}
+
+
+def test_a_visitor_token_cannot_tag_through_the_api(client, make_user, tagging_mcrit):
+    make_user("visitor")
+    for method in (client.post, client.delete):
+        assert method(f"/api/functions/{FUNCTION_ID}/tags", headers=_token("visitor"), json={"tags": ["x"]}).status_code == 403
+    assert not _calls(tagging_mcrit, "addTags", "removeTags")
+    # reading the tags in use is a visitor's, as the statistics page is
+    assert client.get("/api/tags?entity=function", headers=_token("visitor")).status_code == 200
+
+
+@pytest.mark.parametrize("method, path, body, status", [
+    ("delete", "samples/0", {"tags": ["x"]}, 405),
+    ("delete", "functions/6/tags/extra", {"tags": ["x"]}, 405),
+    ("post", "families/1/tags", {"tag": ["x"]}, 400),
+    ("post", "families/1/tags", {"tags": {"x": 1}}, 400),
+    ("get", "families/1/tags", None, 405),
+    ("get", "tags?entity=report", None, 400),
+])
+def test_a_malformed_api_tag_request_is_refused(client, make_user, tagging_mcrit, method, path, body, status):
+    make_user("admin")
+    response = getattr(client, method)(f"/api/{path}", headers=_token("admin"), json=body)
+    assert response.status_code == status
+    assert not _calls(tagging_mcrit, "addTags", "removeTags", "getTags")
+
+
+def test_the_api_has_no_tags_without_a_client_that_has(app, client, make_user):
+    backend = CorpusMcritClient()
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: backend.raw_variant() if kwargs.get("raw_responses") else backend
+    make_user("admin")
+    assert client.post("/api/families/1/tags", headers=_token("admin"), json={"tags": ["x"]}).status_code == 501
+    assert client.get("/api/tags?entity=family", headers=_token("admin")).status_code == 501

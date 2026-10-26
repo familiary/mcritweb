@@ -172,6 +172,7 @@ Contributors edit the tags where they edit the record: in the *Edit* dialog of a
 Tags are separated by commas, and emptying the field removes them all.
 MCRIT stores them lower-cased; a tag is 1-64 letters, digits, spaces, dots, colons, underscores or dashes and starts with a letter or digit, and anything else is refused with the form left unapplied.
 Saving adds and removes only what you changed, so a tag someone else added meanwhile is kept.
+API tokens with the contributor role can do the same with `POST` (add) and `DELETE` (remove) on `/api/<families|samples|functions>/<id>/tags` and a JSON body `{"tags": [...]}`; `GET /api/tags?entity=family|sample|function` counts the tags in use.
 
 #### Statistics
 
