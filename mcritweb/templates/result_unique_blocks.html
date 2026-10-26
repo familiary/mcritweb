@@ -50,8 +50,8 @@ Unique Blocks for {{ sample_ids|length }} Samples
     if (textarea === null) {
       return;
     }
-    // in the status message of status_message.js, which a click right after the page
-    // is painted can come before
+    {# in the status message of status_message.js, which a click right after the page
+       is painted can come before #}
     function report(copied) {
       whenReady(function () {
         if (copied) {
@@ -63,8 +63,8 @@ Unique Blocks for {{ sample_ids|length }} Samples
     }
     // execCommand is deprecated, but navigator.clipboard is only exposed in a
     // secure context and MCRITweb is deployed over plain HTTP often enough that
-    // the selection fallback has to stay. It leaves the caret where it was, unless
-    // the copy failed: then the rule stays selected, for Ctrl+C.
+    {# the selection fallback has to stay. It leaves the caret where it was, unless
+       the copy failed: then the rule stays selected, for Ctrl+C. #}
     function copyBySelection() {
       var selectionStart = textarea.selectionStart;
       var selectionEnd = textarea.selectionEnd;
