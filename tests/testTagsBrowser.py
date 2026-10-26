@@ -19,7 +19,10 @@ import threading
 import pytest
 from conftest import session_cookie_for
 from testTags import FAMILY_ID, SAMPLE_ID, TaggingCorpus, mcrit_tag_rule  # noqa: F401 - the rule is an autouse fixture
+from werkzeug.security import generate_password_hash
 from werkzeug.serving import make_server
+
+from mcritweb.db import UserInfo
 
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
 
@@ -128,3 +131,60 @@ def test_the_tag_line_does_not_shift_the_page(browser_page, live_server):
     })""")
     assert shifted is False
     assert browser_page.locator(".tag-badges a").count() == 2
+
+
+CONTRAST_PROBE = """(selector) => {
+  const rgb = (value) => value.match(/[\\d.]+/g).slice(0, 4).map(Number);
+  const channel = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const luminance = (c) => 0.2126 * channel(c[0]) + 0.7152 * channel(c[1]) + 0.0722 * channel(c[2]);
+  const background = (el) => {
+    for (; el; el = el.parentElement) {
+      const colour = rgb(getComputedStyle(el).backgroundColor);
+      if (colour.length < 4 || colour[3] > 0) return colour;
+    }
+    return [255, 255, 255];
+  };
+  return [...document.querySelectorAll(selector)].map((el) => {
+    const [a, b] = [luminance(rgb(getComputedStyle(el).color)), luminance(background(el))].sort((x, y) => y - x);
+    return Math.round((a + 0.05) / (b + 0.05) * 100) / 100;
+  });
+}"""
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_tags_are_readable_in_either_theme(app, live_server, tagging_mcrit, theme):
+    """A badge is white on Bootstrap's secondary grey and the label beside it muted text,
+    neither of which the dark theme repaints; each must keep 4.5:1, on hover too, as must the
+    statistics page's tag links."""
+    with app.app_context():
+        user_info = UserInfo()
+        user_info.username = f"{theme}-contributor"
+        user_info.password = generate_password_hash("password")
+        user_info.role = "contributor"
+        user_info.apitoken = f"apitoken-{theme}"
+        user_info.theme = theme
+        user_info.saveToDb()
+        user_id = UserInfo.fromDb(username=user_info.username).user_id
+    tagging_mcrit.stored_tags["family"][2] = ["apt"]
+    with sync_api.sync_playwright() as playwright:
+        try:
+            browser = playwright.chromium.launch(executable_path=os.environ.get("MCRITWEB_CHROMIUM") or None)
+        except sync_api.Error as error:
+            pytest.skip(f"no Chromium for playwright to drive: {error}")
+        try:
+            context = browser.new_context()
+            context.add_cookies([{"name": app.config["SESSION_COOKIE_NAME"], "value": session_cookie_for(app, user_id), "domain": "127.0.0.1", "path": "/"}])
+            page = context.new_page()
+            page.set_default_timeout(SCRIPT_TIMEOUT_MS)
+            page.goto(f"{live_server}/explore/families/{FAMILY_ID}")
+            assert page.evaluate("document.documentElement.dataset.theme") == theme
+            ratios = {"badge": page.evaluate(CONTRAST_PROBE, ".tag-badges a"), "label": page.evaluate(CONTRAST_PROBE, ".tag-badges .text-muted")}
+            page.hover(".tag-badges a")
+            ratios["badge, hovered"] = page.evaluate(CONTRAST_PROBE, ".tag-badges a:hover")
+            page.goto(f"{live_server}/explore/statistics")
+            ratios["statistics link"] = page.evaluate(CONTRAST_PROBE, "#tags ~ div table th a")
+            print(theme, ratios)
+            for where, values in ratios.items():
+                assert values and min(values) >= 4.5, (where, values)
+        finally:
+            browser.close()
