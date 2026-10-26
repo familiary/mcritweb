@@ -171,9 +171,6 @@
   <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='post_action.js')|tojson }})</script>
   <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='page_loading.js')|tojson }})</script>
   <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='status_message.js')|tojson }})</script>
-  {# focus for the dialogs and the arrow keys of tab lists, which Bootstrap 5.0.2 leaves
-     to the page; it only listens and sets tab stops, so it waits in the queue too #}
-  <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='keyboard.js')|tojson }})</script>
   <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='autocomplete.js')|tojson }})</script>
 
   {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
