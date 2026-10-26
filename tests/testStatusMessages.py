@@ -14,6 +14,7 @@ testStatusMessageBrowser.py makes the copies in Chromium. It skips where playwri
 installed, CI included, so these lints are what CI keeps.
 """
 
+import gzip
 import logging
 import pathlib
 import re
@@ -33,7 +34,7 @@ PACKAGE = pathlib.Path(__file__).resolve().parents[1] / "mcritweb"
 OWN_SCRIPTS = sorted(PACKAGE.joinpath("templates").rglob("*.html")) + [
     PACKAGE / "static" / name
     for name in ("post_action.js", "page_loading.js", "upload_form.js", "family_names.js", "live_search.js",
-                 "dropzone_attach.js", "function_compare.js", "hints.js", "status_message.js")
+                 "dropzone_attach.js", "function_compare.js", "hints.js", "status_message.js", "clipboard.js")
 ]
 
 #: The clipboard button the registration URL is copied with, and the URL it carries.
@@ -90,12 +91,41 @@ def test_the_clipboard_button_copies_without_a_secure_context(client, as_role):
     copies a selection when it cannot use it."""
     as_role("visitor")
     page = client.get("/explore/samples").get_data(as_text=True)
-    helper = re.search(r"function copy_to_clipboard\(btn\)\s*\{(.*?)\n\}", page, re.S)
-    assert helper, "the page carries no clipboard helper"
-    code = helper.group(1)
+    # the whole script, since there is no telling where the helper's own closing brace is
+    # once the page has lost its indentation
+    helpers = [body for body in re.findall(r"<script[^>]*>(.*?)</script>", page, re.S) if "function copy_to_clipboard(btn)" in body]
+    assert len(helpers) == 1, "the page carries no clipboard helper"
+    code = helpers[0]
     assert re.search(r"if \(window\.isSecureContext && navigator\.clipboard\)", code), "navigator.clipboard is used unasked"
     assert 'execCommand("copy")' in code, "there is no copy for a page without navigator.clipboard"
-    assert "mcritStatus(" in code, "the copy does not report in the status message"
+    assert "mcritCopied(" in code, "the copy does not report"
+    clipboard_js = (PACKAGE / "static" / "clipboard.js").read_text()
+    assert "mcritStatus(" in clipboard_js, "the copy does not report in the status message"
+
+
+def test_every_page_queues_the_script_that_reports_a_copy(client, as_role):
+    as_role("visitor")
+    page = client.get("/explore/samples").get_data(as_text=True)
+    assert re.search(r"<script( nonce=\"[^\"]*\")?>later\(\"/static/clipboard\.js(\?v=\w+)?\"\)</script>", page)
+
+
+#: what the helper in the page may weigh gzipped; it was 628 bytes with the report in it
+CLIPBOARD_HELPER_BUDGET = 460
+
+
+def test_the_page_carries_only_the_copy_not_the_report_of_it(client, as_role):
+    """The page's helper used to hold the tooltip set-up and the report of a copy as well,
+    which nothing needs before the scripts are in: 628 bytes gzipped, sent with every page.
+    What has to be in the page is what copies, so that a press right
+    after the first paint copies; the rest is clipboard.js, which is cached."""
+    as_role("visitor")
+    page = client.get("/explore/samples").get_data(as_text=True)
+    blocks = [body for body in re.findall(r"<script[^>]*>(.*?)</script>", page, re.S) if "function copy_to_clipboard" in body]
+    assert len(blocks) == 1, "the page carries no clipboard helper, or more than one"
+
+    assert "bootstrap.Tooltip" not in blocks[0] and "mcritStatus" not in blocks[0]
+    assert "tooltip()" not in blocks[0], "the tooltips are set up in clipboard.js"
+    assert len(gzip.compress(blocks[0].encode(), 6)) <= CLIPBOARD_HELPER_BUDGET
 
 
 if __name__ == "__main__":

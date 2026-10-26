@@ -370,9 +370,9 @@ def walk(tokens, pairs, start, end, at_once):
 
 #: What the queued scripts define, under the names a page's own script reaches them by:
 #: jQuery, Bootstrap, SortableJS (settings), the type-ahead widget, post_action.js,
-#: page_loading.js and status_message.js. None of it exists yet while an inline script
-#: runs. csrfToken() is not among them: base.html defines it in its first script.
-DEFERRED_GLOBALS = ("$", "jQuery", "bootstrap", "Sortable", "Autocomplete", "postTo", "mcritwebPageLoading", "mcritStatus")
+#: page_loading.js, status_message.js and clipboard.js. None of it exists yet while an inline
+#: script runs. csrfToken() is not among them: base.html defines it in its first script.
+DEFERRED_GLOBALS = ("$", "jQuery", "bootstrap", "Sortable", "Autocomplete", "postTo", "mcritwebPageLoading", "mcritStatus", "mcritCopied")
 
 
 def reaches(tokens, index, names=DEFERRED_GLOBALS, pairs=None):

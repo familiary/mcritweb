@@ -184,6 +184,10 @@ rather than reconstructing it from the commit log at release time.
   what a slow connection's first round trip, about 14.6 KB, can be the difference of for the
   page's first paint. It is drawn as before. `MCRITWEB_THIN_PAGES = False` in `instance/config.py`
   sends the page as the templates write it.
+- The clipboard buttons' tooltips and the report of a copy, which every page carried in an inline
+  script, are in `clipboard.js`, queued after the first paint like the status message they use. The
+  page keeps only the part that copies, so a press right after the first paint still copies, and
+  every page is about 190 bytes smaller gzipped.
 
 ### Fixed
 
