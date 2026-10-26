@@ -34,7 +34,7 @@ PACKAGE = pathlib.Path(__file__).resolve().parents[1] / "mcritweb"
 OWN_SCRIPTS = sorted(PACKAGE.joinpath("templates").rglob("*.html")) + [
     PACKAGE / "static" / name
     for name in ("post_action.js", "page_loading.js", "upload_form.js", "family_names.js", "live_search.js",
-                 "dropzone_attach.js", "function_compare.js", "hints.js", "status_message.js", "clipboard.js")
+                 "dropzone_attach.js", "function_compare.js", "hints.js", "status_message.js")
 ]
 
 #: The clipboard button the registration URL is copied with, and the URL it carries.
@@ -99,14 +99,19 @@ def test_the_clipboard_button_copies_without_a_secure_context(client, as_role):
     assert re.search(r"if \(window\.isSecureContext && navigator\.clipboard\)", code), "navigator.clipboard is used unasked"
     assert 'execCommand("copy")' in code, "there is no copy for a page without navigator.clipboard"
     assert "mcritCopied(" in code, "the copy does not report"
-    clipboard_js = (PACKAGE / "static" / "clipboard.js").read_text()
-    assert "mcritStatus(" in clipboard_js, "the copy does not report in the status message"
+    status_message_js = (PACKAGE / "static" / "status_message.js").read_text()
+    assert "function mcritCopied(" in status_message_js and "mcritStatus(" in status_message_js, "the copy does not report in the status message"
 
 
-def test_every_page_queues_the_script_that_reports_a_copy(client, as_role):
+def test_every_page_queues_the_script_that_reports_a_copy_and_no_file_for_it_alone(client, as_role):
+    """The report of a copy was a file of its own, clipboard.js, queued on every page. Each
+    file the queue adds costs a phone blocking time: Lighthouse's mobile run of the index
+    page went from about 17 ms to 56 ms with it. It rides in status_message.js, which it
+    uses and which every page queues already."""
     as_role("visitor")
     page = client.get("/explore/samples").get_data(as_text=True)
-    assert re.search(r"<script( nonce=\"[^\"]*\")?>later\(\"/static/clipboard\.js(\?v=\w+)?\"\)</script>", page)
+    assert re.search(r"<script( nonce=\"[^\"]*\")?>later\(\"/static/status_message\.js(\?v=\w+)?\"\)</script>", page)
+    assert "/static/clipboard.js" not in page
 
 
 #: what the helper in the page may weigh gzipped; it was 628 bytes with the report in it
@@ -117,14 +122,14 @@ def test_the_page_carries_only_the_copy_not_the_report_of_it(client, as_role):
     """The page's helper used to hold the tooltip set-up and the report of a copy as well,
     which nothing needs before the scripts are in: 628 bytes gzipped, sent with every page.
     What has to be in the page is what copies, so that a press right
-    after the first paint copies; the rest is clipboard.js, which is cached."""
+    after the first paint copies; the rest is in status_message.js, which is cached."""
     as_role("visitor")
     page = client.get("/explore/samples").get_data(as_text=True)
     blocks = [body for body in re.findall(r"<script[^>]*>(.*?)</script>", page, re.S) if "function copy_to_clipboard" in body]
     assert len(blocks) == 1, "the page carries no clipboard helper, or more than one"
 
     assert "bootstrap.Tooltip" not in blocks[0] and "mcritStatus" not in blocks[0]
-    assert "tooltip()" not in blocks[0], "the tooltips are set up in clipboard.js"
+    assert "tooltip()" not in blocks[0], "the tooltips are set up in status_message.js"
     assert len(gzip.compress(blocks[0].encode(), 6)) <= CLIPBOARD_HELPER_BUDGET
 
 

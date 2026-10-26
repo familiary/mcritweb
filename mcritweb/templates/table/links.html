@@ -83,7 +83,7 @@
 <script nonce="{{ csp_nonce() }}">
 function copy_to_clipboard(btn){
   var value = btn.getAttribute('data-clipboard-value') || "";
-  {# what the copy says comes from clipboard.js, which a click right after the page is
+  {# what the copy says comes from status_message.js, which a click right after the page is
      painted can come before; the copy itself needs none of it. The part that has to be
      here is the part that copies. Comments in Jinja, since this is in every page #}
   function report(copied) {
