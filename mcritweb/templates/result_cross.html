@@ -243,7 +243,7 @@ Results for Job: {{ job_info.job_id }}
 
 {% set cross_method_labels = {"unweighted": "Unweighted", "score_weighted": "Score Weighted", "frequency_weighted": "Frequency Weighted", "nonlib_unweighted": "Non-Library Unweighted", "nonlib_score_weighted": "Non-Library Score Weighted", "nonlib_frequency_weighted": "Non-Library Frequency Weighted"} %}
 {# each tab builds its matrix the first time it is shown, so an arrow key only moves to it
-   and Enter shows it (see static/keyboard.js) #}
+   and Enter shows it (see static/post_action.js) #}
 <ul class="nav nav-pills mb-3 justify-content-center" id="pills-tab" role="tablist" data-tab-activation="manual">
     {% for method in ["unweighted", "score_weighted", "frequency_weighted", "nonlib_unweighted", "nonlib_score_weighted", "nonlib_frequency_weighted"] %}
     <li class="nav-item" role="presentation">

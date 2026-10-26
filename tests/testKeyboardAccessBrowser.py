@@ -195,11 +195,11 @@ def test_rows_per_page_waits_for_enter_when_changed_with_the_keyboard(open_as, p
 
 
 def test_rows_per_page_chosen_before_the_keyboard_script_is_in_loads_once_it_is(open_as):
-    """The select's behaviour is keyboard.js's, queued after the first paint. A size chosen
+    """The select's behaviour is post_action.js's, queued after the first paint. A size chosen
     in the moment before it runs would otherwise be lost: the select would show 100 rows
     and the page would still hold 25."""
     held = []
-    page = open_as("visitor", "/explore/functions", before=lambda page: page.route("**/static/keyboard.js*", lambda route: held.append(route)))
+    page = open_as("visitor", "/explore/functions", before=lambda page: page.route("**/static/post_action.js*", lambda route: held.append(route)))
     page.wait_for_function("() => document.querySelector('select[data-pager-url]') !== null")
     while not held:
         page.wait_for_timeout(50)

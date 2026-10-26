@@ -208,7 +208,7 @@ def test_a_quote_in_the_query_string_stays_inside_the_handler_url(client, as_rol
     assert response.status_code == 200
     page = response.get_data(as_text=True)
     urls = [url for url in JS_LINK_LITERAL.findall(unescape(page)) if "zz=" in url]
-    # the page-size select hands its URL to static/keyboard.js in an attribute, not a script
+    # the page-size select hands its URL to static/post_action.js in an attribute, not a script
     urls += [unescape(url) for url in PAGER_URL_ATTRIBUTE.findall(page) if "zz=" in unescape(url)]
     assert urls, "no inline pagination handler to check"
     assert all("alert(1)" in url for url in urls), [url for url in urls if "alert(1)" not in url]

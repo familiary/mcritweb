@@ -373,7 +373,7 @@ def test_the_page_size_select_is_marked_up_for_the_script_not_scripted_in_the_pa
     """The select's key handling was four functions in an inline script and four handler
     attributes on every select, in every page with a pager: 380 bytes gzipped of the page,
     for something only a keyboard needs, and only once the page is painted. The select
-    says where it loads and with which parameter; static/keyboard.js does the rest."""
+    says where it loads and with which parameter; static/post_action.js does the rest."""
     page = render(client, as_role, path)
 
     selects = [attrs for tag, attrs, _ in start_tags(page) if tag == "select" and attrs.get("data-pager-url")]
@@ -385,3 +385,18 @@ def test_the_page_size_select_is_marked_up_for_the_script_not_scripted_in_the_pa
     helpers = [body for body in re.findall(r"<script[^>]*>(.*?)</script>", page, re.S) if "function pagination_js_helper" in body]
     assert len(helpers) == 1
     assert len(gzip.compress(helpers[0].encode(), 6)) <= PAGINATION_SCRIPT_BUDGET
+
+
+def test_the_keyboard_behaviour_has_no_file_of_its_own(client, as_role):
+    """The dialogs', tabs' and page size select's key handling was keyboard.js, a file of its
+    own queued on every page. Each file the queue adds is one more ordered request before the
+    page's scripts have run: on the build of all the pull requests the index page took 35 to
+    45 ms of blocking time in Lighthouse's mobile run against the base's 8 to 15, and folding
+    the every-page files into the ones the base already queued brought it back to 10. The
+    code rides in post_action.js, which every page queues already."""
+    page = render(client, as_role, "/explore/samples")
+
+    assert "/static/keyboard.js" not in page
+    static = pathlib.Path(__file__).resolve().parents[1] / "mcritweb" / "static"
+    assert not (static / "keyboard.js").exists()
+    assert "shown.bs.tab" in (static / "post_action.js").read_text()

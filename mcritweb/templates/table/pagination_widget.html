@@ -63,7 +63,7 @@
   {%- endmacro -%}
 
   {%- macro _get_limit_onchange(_js_argument_provider=none) -%}
-    {# static/keyboard.js loads the page at the size chosen, from these: where, which parameter
+    {# static/post_action.js loads the page at the size chosen, from these: where, which parameter
        and, for a page with other tables' state to carry, the function that returns it #}
     data-pager-url="{{ pagination.get_link(1, **kwargs) }}" data-pager-param="{{ pagination.limit_param }}"
     {%- if _js_argument_provider is not none %} data-pager-state="{{ _js_argument_provider }}"{% endif %}
