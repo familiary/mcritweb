@@ -13,9 +13,11 @@ import gzip
 import json
 import re
 from html import unescape
+from html.parser import HTMLParser
 
 import pytest
 from fixtureData import job_id_of
+from testAccessibility import ADMIN_PAGES, VISITOR_PAGES
 
 from mcritweb.csrf import ENABLED_KEY, FIELD_NAME, unmask
 
@@ -155,3 +157,28 @@ def test_the_overlay_has_the_options_the_query_page_writes_and_a_token_of_its_ow
     for options in (query, first, second):
         assert unmask(options["headers"]["X-CSRF-Token"], len(token)) == token
     assert first["headers"] != second["headers"], "the token is not masked afresh"
+
+
+class Ids(HTMLParser):
+    def __init__(self, markup):
+        super().__init__()
+        self.ids = []
+        self.feed(markup)
+
+    def handle_starttag(self, tag, attrs):
+        if dict(attrs).get("id"):
+            self.ids.append(dict(attrs)["id"])
+
+
+@pytest.mark.parametrize(("role", "path"), [("visitor", path) for path in VISITOR_PAGES] + [("admin", path) for path in ADMIN_PAGES])
+def test_no_page_has_an_id_the_overlay_brings(client, as_role, role, path):
+    """The overlay's form was checked with every page it was in. Put in the page now, its
+    ids - `family`, `version`, `query_form` and the rest - must still be ones the page
+    does not use, or a label or a lookup by id finds the wrong field."""
+    as_role(role)
+    page = client.get(path).get_data(as_text=True)
+    if "drop-overlay-slot" not in page:
+        return
+    overlay = Ids(client.get("/data/drop_overlay").get_data(as_text=True)).ids
+    assert len(overlay) == len(set(overlay))
+    assert set(Ids(page).ids) & set(overlay) == set()
