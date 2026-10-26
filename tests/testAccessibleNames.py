@@ -13,6 +13,7 @@ pager under each, and each one's nav and links are named after its table.
 """
 
 import collections
+import re
 import urllib.parse
 
 import pytest
@@ -152,3 +153,48 @@ def test_naming_a_pager_adds_no_parameter_to_its_urls(client, as_role, path, exp
     keys = {key for _, links in pagers for _, href in links if href
             for key in urllib.parse.parse_qs(urllib.parse.urlparse(href).query)}
     assert keys == expected
+
+
+def names_sent_twice(html):
+    """The icon-only links and buttons whose title says what their aria-label says. A
+    Bootstrap tooltip is left out: it is built from the title, which it needs."""
+    return [control.attrs["aria-label"] for control in Page(html).all("a", "button")
+            if control.attrs.get("title") and control.attrs.get("title") == control.attrs.get("aria-label")
+            and control.attrs.get("data-bs-toggle") != "tooltip"]
+
+
+@pytest.mark.parametrize("role, path", [("visitor", path) for path in VISITOR_PAGES]
+                         + [("contributor", path) for path in CONTRIBUTOR_PAGES]
+                         + [("admin", path) for path in ADMIN_PAGES])
+def test_no_control_sends_its_name_twice(client, as_role, role, path):
+    """A hundred-row match table named each row's filter link in an aria-label and again,
+    word for word, in a title that only a mouse reads. icon_titles.js gives the tooltip once
+    the page is painted, from the aria-label, so the markup says the name once."""
+    as_role(role)
+    response = client.get(path, follow_redirects=path == "/data/jobs")
+    assert response.status_code == 200
+
+    assert names_sent_twice(response.get_data(as_text=True)) == []
+
+
+def test_the_checker_sees_a_name_sent_twice():
+    """Without this, a page with no such control would pass the test above."""
+    page = ('<a aria-label="Filter by function 1" title="Filter by function 1" href="?funid=1"></a>'
+            '<button aria-label="Delete job 2" title="Delete job 2"></button>'
+            '<a aria-label="First page of matches" title="First page" href="?p=1"></a>'
+            '<a aria-label="Documentation" href="/help"></a>')
+
+    assert names_sent_twice(page) == ["Filter by function 1", "Delete job 2"]
+
+
+def test_the_checker_leaves_a_bootstrap_tooltip_its_title():
+    page = ('<button aria-label="Copy" title="Copy" data-bs-toggle="tooltip" data-clipboard-value="a"></button>'
+            '<a aria-label="Filter" title="Filter" href="?funid=1"></a>')
+
+    assert names_sent_twice(page) == ["Filter"]
+
+
+def test_the_page_queues_the_script_that_gives_icons_their_tooltips(client, as_role):
+    as_role("visitor")
+    page = client.get("/explore/samples").get_data(as_text=True)
+    assert re.search(r"<script( nonce=\"[^\"]*\")?>later\(\"/static/icon_titles\.js(\?v=\w+)?\"\)</script>", page)

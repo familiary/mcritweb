@@ -119,6 +119,10 @@ rather than reconstructing it from the commit log at release time.
 - Control flow graphs are laid out about three times faster on large functions, with the same
   result: 5.6 s instead of 21.7 s for a 971-block function. A patch to the vendored dagre builds the
   graph of each rank in one pass instead of walking the whole graph once per rank.
+- An icon-only link or button names itself once in the markup. Its tooltip, which repeated the
+  `aria-label` word for word in a `title` on each of a match table's hundred rows, is given by
+  `icon_titles.js` once the page has painted, so a result page is smaller by the text of those
+  titles and nothing changes on screen.
 
 ### Fixed
 
