@@ -277,6 +277,14 @@ def test_a_table_of_fields_keeps_its_labels_and_numbers_whole(open_page, live_se
         assert scroll_width <= client_width, f"{path} is {scroll_width}px wide in a {client_width}px window"
 
 
+def show_the_api_token(page):
+    """Where the settings page fetches the token on request (#330) rather than printing it,
+    ask for it, as a user does, before looking at it."""
+    if page.locator("[data-show-apitoken]").count():
+        page.click("[data-show-apitoken]")
+        page.wait_for_selector("#apitoken-copy:not([hidden])")
+
+
 def test_the_api_token_breaks_on_the_settings_page(app, open_page, live_server):
     """The settings page was 641px wide at 390px: the 64 characters of the token in one
     line of a two-column table."""
@@ -287,7 +295,8 @@ def test_the_api_token_breaks_on_the_settings_page(app, open_page, live_server):
         user.saveToDb()
     for width in [320, 390]:
         page = open_page(live_server + "/settings", width)
-        assert "0123456789abcdef" * 4 in page.content()
+        show_the_api_token(page)
+        assert "0123456789abcdef" * 4 in page.inner_text("body")
         scroll_width, client_width = page.evaluate(PAGE_WIDTH)
         assert scroll_width <= client_width, f"the settings page is {scroll_width}px wide in a {client_width}px window"
 
