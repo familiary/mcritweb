@@ -14,8 +14,8 @@ Unique Blocks
   var selected = [];
 
   whenReady(function(){
-    // a row's checkbox is what a keyboard and a screen reader reach: a click anywhere else
-    // on the row ticks it, and either way pick() follows it
+    {# a row's checkbox is what a keyboard and a screen reader reach: a click anywhere else
+       on the row ticks it, and either way pick() follows it #}
     function pick(box) {
       var row = box.closest("tr");
       var id = $(row).children("th.id").text().trim();
@@ -31,9 +31,9 @@ Unique Blocks
     $("tr.parent").click(function(event){
       var box = this.querySelector("input[type=checkbox]");
       var id = $(this).children("th.id").text().trim();
-      // a row the URL already selected is removed with the x in the table above, not by
-      // clicking it again - toggling here would only ever add a duplicate. Its box is
-      // ticked and disabled
+      {# a row the URL already selected is removed with the x in the table above, not by
+         clicking it again - toggling here would only ever add a duplicate. Its box is
+         ticked and disabled #}
       if (event.target === box || {{ selected_ids|tojson }}.map(String).indexOf(id) != -1) {
         return;
       }

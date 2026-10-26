@@ -303,7 +303,7 @@ Results for Job: {{ job_info.job_id }}
       var body = table.appendChild(rendered.tBodies[0].cloneNode(false));
       body.appendChild(rendered.rows[0].cloneNode(true));
       var indices = body.appendChild(rendered.rows[1].cloneNode(true));
-      // every column's header, shown or only read out (cross_table)
+      {# every column's header, shown or only read out (cross_table) #}
       indices.querySelectorAll("th.matrix-col").forEach(function(cell, k){
         (cell.firstElementChild || cell).textContent = data.order[k];
       });
@@ -324,7 +324,7 @@ Results for Job: {{ job_info.job_id }}
           span.setAttribute("data-hint", "MCRIT: " + score + " ");
           span.setAttribute("aria-label", score);
           span.style.backgroundColor = "#" + lazy.palette[data.color[i][j]];
-          // the one tab stop is the first score, wherever the clone it came from was
+          {# the one tab stop is the first score, wherever the clone it came from was #}
           span.tabIndex = i === 0 && j === 0 ? 0 : -1;
         });
         row.querySelector("[data-bs-target='#editSampleModal']").id = method + "_sample_" + sampleId + "_edit";

@@ -20,9 +20,9 @@ Cross Compare
   console.log(selected)
   whenReady(function(){
     // a row the URL already selected carries the class `row-selected` (row_decoration.html)
-    // and a ticked, disabled checkbox, and is skipped here; the others toggle `row-pending`.
-    // Both are painted from style.css. The checkbox is what a keyboard and a screen reader
-    // reach: a click anywhere else on the row ticks it, and either way pick() follows it
+    {# and a ticked, disabled checkbox, and is skipped here; the others toggle `row-pending`.
+       Both are painted from style.css. The checkbox is what a keyboard and a screen reader
+       reach: a click anywhere else on the row ticks it, and either way pick() follows it #}
     function pick(box) {
       var row = box.closest("tr");
       var id = $(row).children("th.id").text();

@@ -2,8 +2,8 @@
 
 {% macro job_row_std_js() %}
 <script nonce="{{ csp_nonce() }}">
-  // a click on the row is a pointer's shortcut to the link its number cell holds; a link or
-  // button in the row does its own thing
+  {# a click on the row is a pointer's shortcut to the link its number cell holds; a link or
+     button in the row does its own thing #}
   whenReady(function(){
     $("td.job-cell").click(function(e){
       if ($(e.target).closest("a, button").length) {

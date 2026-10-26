@@ -6,9 +6,9 @@
 {% macro function_row_std_js() %}
 <script nonce="{{ csp_nonce() }}">
   whenReady(function(){
-    // delegated, so rows a live search (live_search.js) swaps in follow too. A click on the
-    // row is a pointer's shortcut to the link its id cell holds; a link or button in the
-    // row, that one included, does its own thing
+    {# delegated, so rows a live search (live_search.js) swaps in follow too. A click on the
+       row is a pointer's shortcut to the link its id cell holds; a link or button in the
+       row, that one included, does its own thing #}
     $(document).on("click", "tr.function-row", function(e){
       if ($(e.target).closest("a, button").length) {
         return;
