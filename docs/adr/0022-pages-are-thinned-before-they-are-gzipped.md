@@ -22,7 +22,10 @@ largest page:
 - Between tags, a run of white space that holds a line break becomes the line break. A
   browser shows any run of white space as one space, so nothing moves; a run without a line
   break, which may be what separates two words, is left alone.
-- `pre`, `textarea`, `style`, comments and everything inside a tag are left as they are.
+- `pre`, `textarea`, `style` and `code`, comments and everything inside a tag are left as
+  they are. `code` is in the list because the unique-blocks page shows its YARA rules in a
+  `code` styled `white-space: pre`; a test fails if a template asks any other element to
+  keep its white space.
   An attribute may hold a line break of its own: hint.css prints the one in a score's
   `data-hint`, as it is.
 - In an inline script, the indentation, the blank lines and the lines that are only a `//`

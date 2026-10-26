@@ -10,6 +10,7 @@ breaks - as it was. testThinPagesBrowser.py compares the pages as drawn.
 """
 
 import gzip
+import pathlib
 import re
 from html.parser import HTMLParser
 
@@ -19,6 +20,8 @@ from testAccessibility import ADMIN_PAGES, CONTRIBUTOR_PAGES, VISITOR_PAGES
 
 from mcritweb import thin_pages
 from mcritweb.thin_pages import thin, thin_script
+
+TEMPLATES = pathlib.Path(thin_pages.__file__).parent / "templates"
 
 #: the pages the accessibility checks render, each shown to a role that may open it
 PAGES = [("visitor", path) for path in VISITOR_PAGES] + [("contributor", path) for path in CONTRIBUTOR_PAGES] \
@@ -119,6 +122,25 @@ def test_a_no_break_space_is_text_and_stays():
                                      '<script type="application/json" id="data">\n  {"a":\n\n   1}\n</script>'])
 def test_what_a_browser_shows_or_reads_as_written_is_kept(element):
     assert thin(f"<div>\n    {element}\n    </div>") == f"<div>\n{element}\n</div>"
+
+
+def test_code_is_kept_as_written():
+    """The unique-blocks page shows each block's YARA rule in `<code style="white-space:pre">`,
+    and the rule's comment lines start with a space that lines up their ` * `: collapsing
+    the white space after a line break moved every one of them a column to the left."""
+    code = '<code style="white-space:pre">/* picblockhash: 1 \n * 0x401000 | push ebp\n */\n{ 55 }</code>'
+    assert thin(f"<td>\n    {code}\n  </td>") == f"<td>\n{code}\n</td>"
+
+
+def test_no_template_preserves_white_space_outside_what_the_pass_keeps():
+    """The pass keeps `pre`, `textarea`, `style` and `code` as written. Any other element a
+    template asks to show its white space as written would lose its indentation."""
+    offenders = []
+    for template in sorted(TEMPLATES.rglob("*.html")):
+        for match in re.finditer(r"<([a-zA-Z0-9]+)\b[^>]*white-space\s*:\s*(?:pre|pre-wrap|break-spaces)\b", template.read_text()):
+            if match.group(1).lower() not in {"pre", "textarea", "code"}:
+                offenders.append(f"{template.name}: <{match.group(1)}>")
+    assert not offenders, offenders
 
 
 def test_a_line_break_inside_a_tag_is_kept():

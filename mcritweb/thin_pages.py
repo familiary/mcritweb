@@ -9,9 +9,10 @@ page can be painted from it (docs/adr/0022-pages-are-thinned-before-they-are-gzi
 - Between tags, a run of white space that holds a line break becomes the line break. A
   browser shows a run of white space as one space wherever it sits, so the page looks the
   same; a run without a line break, which may separate two words, is left as it is.
-- What is shown or run as written is not touched: `pre`, `textarea` and `style`, comments,
-  and everything inside a tag, where an attribute value may hold a line break of its own
-  (hint.css prints one).
+- What is shown or run as written is not touched: `pre`, `textarea`, `style` and `code`
+  (the unique-blocks page shows its YARA rules in a `code` styled `white-space: pre`),
+  comments, and everything inside a tag, where an attribute value may hold a line break
+  of its own (hint.css prints one).
 - In an inline script, the indentation, the blank lines and the lines that are only a `//`
   comment. A script with a line break inside a template literal, a block comment or a line
   continued by a backslash is left alone, since there a line's indent or its first
@@ -31,7 +32,7 @@ TAG = r"<[a-zA-Z/!](?:[^>\"']|\"[^\"]*\"|'[^']*')*>"
 BREAK = r"[ \t\r\f]*\n[ \t\r\n\f]*"
 PATTERN = re.compile(
     r"<script\b(?P<attributes>(?:[^>\"']|\"[^\"]*\"|'[^']*')*)>(?P<script>.*?)</script\s*>"
-    r"|<(?P<raw>pre|textarea|style)\b.*?</(?P=raw)\s*>"
+    r"|<(?P<raw>pre|textarea|style|code)\b.*?</(?P=raw)\s*>"
     r"|<!--.*?-->"
     rf"|{TAG}"
     rf"|(?P<break>{BREAK})",
