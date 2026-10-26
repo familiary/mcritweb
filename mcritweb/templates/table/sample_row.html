@@ -40,9 +40,9 @@
     }
     })
 
-    // delegated, so rows a live search swaps in follow too. A click on the row is a
-    // pointer's shortcut to the link its id cell holds; a link or button in the row,
-    // that one included, does its own thing
+    {# delegated, so rows a live search swaps in follow too. A click on the row is a
+       pointer's shortcut to the link its id cell holds; a link or button in the row,
+       that one included, does its own thing #}
     $(document).on("click", "tr.sample-row", function(e){
       if ($(e.target).closest("a, button, .buttons").length) {
         return;

@@ -36,11 +36,11 @@
     })
 
 
-    // delegated, so rows a live search swaps in follow too. A click on the row is a
-    // pointer's shortcut to the link its id cell holds
+    {# delegated, so rows a live search swaps in follow too. A click on the row is a
+       pointer's shortcut to the link its id cell holds #}
     $(document).on("click", "tr.family-row", function(e){
-      // links and buttons in the row (the id, edit, compare, export, Malpedia) do their own
-      // thing; closest() also catches a click on the icon inside them
+      {# links and buttons in the row (the id, edit, compare, export, Malpedia) do their own
+         thing; closest() also catches a click on the icon inside them #}
       if ($(e.target).closest("a, button").length) {
         return;
       }

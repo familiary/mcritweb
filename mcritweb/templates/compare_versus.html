@@ -34,10 +34,10 @@ whenReady(function(){
     }
   }
 
-  // the tint of a chosen row is the class `row-pending` (style.css), so the theme paints it;
-  // its radio button, one group per table, is the choice a keyboard and a screen reader
-  // reach. A click anywhere on the row checks it, and a radio checked from the keyboard
-  // chooses its row
+  {# the tint of a chosen row is the class `row-pending` (style.css), so the theme paints it;
+     its radio button, one group per table, is the choice a keyboard and a screen reader
+     reach. A click anywhere on the row checks it, and a radio checked from the keyboard
+     chooses its row #}
   function choose_a(row) {
     if (selected_column_a === null) {
       document.getElementById("button_match").style.display = "initial";
