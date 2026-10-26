@@ -38,7 +38,7 @@ Overview for Job: {{ job_info.job_id }}
             return;
           }
           const progress = document.getElementById("job-progress");
-          // the cell's progress bar, kept and moved along with the number
+          {# the cell's progress bar, kept and moved along with the number #}
           const bar = progress ? progress.querySelector("progress") : null;
           function showBar(fraction) {
             if (bar) {
