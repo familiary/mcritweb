@@ -179,6 +179,11 @@ rather than reconstructing it from the commit log at release time.
   page that halves the layout and style work before the page is first shown (2.7 s to 1.0 s of
   layout on a phone-speed processor), and the page is as long as before while the table waits, to
   within half a percent, so its scrollbar does not jump when the table is laid out.
+- A page is sent without the indentation and blank lines of its templates, and without the comment
+  lines of its inline scripts: a result page is 1.5 KB smaller gzipped, a tenth of it, which is
+  what a slow connection's first round trip, about 14.6 KB, can be the difference of for the
+  page's first paint. It is drawn as before. `MCRITWEB_THIN_PAGES = False` in `instance/config.py`
+  sends the page as the templates write it.
 
 ### Fixed
 
