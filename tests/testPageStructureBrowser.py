@@ -133,6 +133,33 @@ def test_the_page_loading_status_is_there_before_it_is_written_to(page, live_ser
     assert page.errors == []
 
 
+#: the elements added straight into <body> once the document has been parsed
+WATCH_THE_BODY = """
+window.mcritAddedToBody = [];
+document.addEventListener("DOMContentLoaded", () => new MutationObserver((records) => {
+    for (const record of records) {
+        for (const node of record.addedNodes) {
+            if (node.nodeType === 1) { window.mcritAddedToBody.push(node.tagName + "#" + node.id + "." + node.className); }
+        }
+    }
+}).observe(document.body, {childList: true}));
+"""
+
+
+@pytest.mark.parametrize("path", ["/explore/samples", f"/data/result/{job_id_of('cross_compare')}"])
+def test_the_page_loading_status_is_in_the_markup_not_added_to_the_body(page, live_server, path):
+    """page_loading.js added its empty status region to <body> when it ran, after the page
+    had loaded, and any element added there makes the browser restyle the whole page
+    (bootstrap's `legend + *`): a second full restyle of about 300 ms on a 100 by 100 cross
+    compare matrix. base.html carries the empty region and the script only writes to it."""
+    page.add_init_script(WATCH_THE_BODY)
+    open_page(page, f"{live_server}{path}")
+    page.evaluate("() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))")
+    assert page.evaluate("() => window.mcritAddedToBody") == []
+    assert page.locator("#mcritweb-page-loading-status").count() == 1
+    assert page.errors == []
+
+
 def test_an_upload_under_way_is_announced(page, live_server):
     """The upload button's spinner was the only sign, a status role hidden from assistive
     technology by its own aria-hidden."""
