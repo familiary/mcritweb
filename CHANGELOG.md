@@ -142,6 +142,12 @@ rather than reconstructing it from the commit log at release time.
   what a slow connection's first round trip, about 14.6 KB, can be the difference of for the
   page's first paint. It is drawn as before. `MCRITWEB_THIN_PAGES = False` in `instance/config.py`
   sends the page as the templates write it.
+- The drop-a-file overlay is fetched when a file is first dragged over the page, with Dropzone,
+  instead of being carried by every signed-in page: about 1.7 KB less of each page gzipped, 1.9 KB
+  of a result page, and the family type-ahead's script is no longer loaded on pages that have no
+  family field of their own. A file let go before the overlay is in is now kept and put in its
+  drop zone; the browser used to open it in place of the page, or drop it. The new
+  `/data/drop_overlay` answers the overlay to any signed-in user but a pending one.
 
 ### Fixed
 
