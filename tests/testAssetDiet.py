@@ -107,17 +107,19 @@ def test_the_minified_bootstrap_keeps_the_licence_and_the_rules():
 # --- Dropzone on demand ----------------------------------------------------------
 
 def test_a_listing_page_does_not_download_dropzone(client, as_role):
-    """The overlay's markup is on the page; the library is not, until a drag."""
+    """The overlay's slot is on the page; the library and the overlay are not, until a
+    drag (ADR-0023)."""
     as_role("visitor")
     page = client.get("/explore/samples").get_data(as_text=True)
     assert re.search(r'<script src="[^"]*dropzone[^"]*"', page) is None, "Dropzone is loaded up front"
     assert re.search(r'<link[^>]*dropzone\.min\.css', page) is None, "Dropzone's stylesheet is loaded up front"
     assert '/static/upload_form.js' in page, "the page does not queue the upload form's script, which holds the loader"
     assert re.search(r'data-dropzone-js="/static/dropzone-patched\.min\.js(\?v=\w+)?"', page), "the loader is not told where Dropzone is"
-    assert 'class="dropzone-pending"' in page, "the form must stay out of Dropzone's auto-discovery"
-    # the options flask-dropzone renders are parked in a plain variable until the
-    # library is there to receive them
-    assert "window.mcritDropzoneOptions = {" in page and "Dropzone.options.myDropzone = {" not in page
+    overlay = client.get("/data/drop_overlay").get_data(as_text=True)
+    assert 'class="dropzone-pending"' in overlay, "the form must stay out of Dropzone's auto-discovery"
+    # the options flask-dropzone renders for the other forms are data here, which the
+    # loader parks for the library once it is there to receive them
+    assert "data-dropzone-options='{" in overlay and "Dropzone.options.myDropzone" not in overlay
 
 
 @pytest.mark.parametrize(("role", "path"), [("visitor", "/explore/samples"), ("visitor", "/settings"), ("contributor", "/analyze/query"), ("contributor", "/data/submit")])
@@ -125,12 +127,17 @@ def test_the_upload_form_and_the_family_type_ahead_are_static_files(client, as_r
     """Their code was inline on every page, about 10 KB of it before compression: on the
     settings page, which is sent uncompressed for its API token, and on a larger result
     page that put the first paint a round trip later. The browser fetches each file
-    once now, queued after the first paint (ADR-0021)."""
+    once now, queued after the first paint (ADR-0021). The family type-ahead is queued by
+    the pages with a family field of their own; on the others the drop overlay names it,
+    and upload_form.js loads it when the overlay is built (ADR-0023)."""
     as_role(role)
     page = client.get(path).get_data(as_text=True)
     for code in ("function show_extended", "function mcritInitDropzone", "function mcritLoadDropzone", "attachFamilyAutocomplete", "showDropModal"):
         assert code not in page, f"{path} still carries {code}"
-    assert "/static/upload_form.js" in page and "/static/family_names.js" in page
+    assert "/static/upload_form.js" in page
+    if 'id="family"' not in page and "sample_family_name" not in page and "family_new_name" not in page:
+        page = client.get("/data/drop_overlay").get_data(as_text=True)
+    assert "/static/family_names.js" in page
 
 
 @pytest.mark.parametrize("path", ["/analyze/query", "/data/submit", "/data/import"])
@@ -191,7 +198,7 @@ def test_the_lazy_loader_attaches_by_hand_and_runs_the_handlers_once(client, as_
     options, then runs the handler block that waited for it - and a second caller
     while the script is in flight is queued rather than starting a second download."""
     as_role("visitor")
-    page = client.get("/explore/samples").get_data(as_text=True)
+    page = client.get("/data/drop_overlay").get_data(as_text=True)
     script = (STATIC / "upload_form.js").read_text()
     loader = script[script.index("function mcritLoadDropzone"):script.index("\n}\n", script.index("function mcritLoadDropzone"))]
     for needle in ("Dropzone.autoDiscover = false", "new Dropzone(element, window.mcritDropzoneOptions)", "mcritInitDropzone()", "mcritDropzoneLoading.push(done)", 'classList.add("dropzone")'):

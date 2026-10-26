@@ -173,8 +173,9 @@
   <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='status_message.js')|tojson }})</script>
   <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='autocomplete.js')|tojson }})</script>
 
+  {# the drop overlay's behaviour, and what builds it on the first drag: see the slot below #}
   {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
-    {{ submit_or_query_dropzone_js(select_form_type=True, lazy=True) }}
+  <script>later({{ url_for('static', filename='upload_form.js')|tojson }})</script>
   {% endif %}
   {{ clipboard_js() }}
   {% block style %}{% endblock %}
@@ -312,19 +313,11 @@
       {% block content %}{% endblock %}
 
       {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
-        <div class="modal fade" id="submitFileModal" tabindex="-1" aria-labelledby="submitFileModalLabel" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content">
-              <div class="modal-header">
-                <h2 class="modal-title h5" id="submitFileModalLabel">Submit File</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="close-submit-modal"></button>
-              </div>
-              <div class="modal-body">
-                {{ submit_or_query_dropzone(show_submit_fields=False, select_form_type=True, lazy=True) }}
-              </div>
-            </div>
-          </div>
-        </div>
+        {# The drop overlay, its dialog and upload form, was about 2 KB of every signed-in
+           page's gzipped weight, for the moment a file is dragged over it.
+           static/upload_form.js fetches it from data.drop_overlay on the first drag that
+           carries a file, with Dropzone's stylesheet and library, and puts it here. #}
+        <div id="drop-overlay-slot" hidden data-overlay="{{ url_for('data.drop_overlay') }}" data-dropzone-css="{{ url_for('static', filename='dropzone.min.css') }}" data-dropzone-js="{{ url_for('static', filename='dropzone-patched.min.js') }}"></div>
       {% endif %}
   </main>
 

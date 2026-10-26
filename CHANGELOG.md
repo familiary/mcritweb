@@ -199,6 +199,12 @@ rather than reconstructing it from the commit log at release time.
   `aria-label` word for word in a `title` on each of a match table's hundred rows, is given by
   `page_loading.js` once the page has painted, so a result page is smaller by the text of those
   titles and nothing changes on screen.
+- The drop-a-file overlay is fetched when a file is first dragged over the page, with Dropzone,
+  instead of being carried by every signed-in page: about 1.7 KB less of each page gzipped, 1.9 KB
+  of a result page, and the family type-ahead's script is no longer loaded on pages that have no
+  family field of their own. A file let go before the overlay is in is now kept and put in its
+  drop zone; the browser used to open it in place of the page, or drop it. The new
+  `/data/drop_overlay` answers the overlay to any signed-in user but a pending one.
 
 ### Fixed
 

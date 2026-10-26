@@ -209,6 +209,8 @@ ROUTE_POLICY = {
     # pages carry the session cookie, so gating it costs nothing. Still read-only:
     # what it writes is the local image cache, not the database or the backend.
     "data.diagram_file": (VISITOR, READ_ONLY),
+    # the drop overlay's form, which base.html shows every signed-in user but `pending`
+    "data.drop_overlay": (VISITOR, READ_ONLY),
 
     # --- contributor and above ---------------------------------------------------
     "data.submit": (CONTRIBUTOR, WRITES_ON_POST),

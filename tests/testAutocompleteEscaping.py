@@ -579,12 +579,13 @@ WIDGETS_PER_FIELD = """
 
 
 def test_the_drop_overlay_suggests_without_doubling_the_modal_widgets(app, poisoned_backend, live_url, make_user):
-    """`/explore/samples` includes `js/ac_family_names.html` twice since #192: once for
-    its edit modals, once through the drop overlay's dropzone macro. The overlay's field
-    has to get suggestions - it used to be built with none - and the modal fields must
-    still carry exactly one widget each, or every keystroke there would render two
-    dropdowns and fetch twice. later() runs static/family_names.js once, and the file's
-    own guard would keep a second run from attaching a second widget."""
+    """`/explore/samples` includes `js/ac_family_names.html` for its edit modals, and the
+    drop overlay, built on the first drag, has a family field of its own (#192). The
+    overlay's field has to get suggestions - it used to be built with none - and the
+    modal fields must still carry exactly one widget each, or every keystroke there would
+    render two dropdowns and fetch twice. static/family_names.js runs once, attaches to
+    the overlay's field on its first focus, and its own guard would keep a second run
+    from attaching a second widget."""
     sync_api = pytest.importorskip("playwright.sync_api")
     user_id = make_user("admin")
     with sync_api.sync_playwright() as playwright:
@@ -603,8 +604,13 @@ def test_the_drop_overlay_suggests_without_doubling_the_modal_widgets(app, poiso
             }])
             page = context.new_page()
             page.goto(live_url + "/explore/samples")
-            page.wait_for_selector("#family", state="attached", timeout=15000)
             page.evaluate("() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })")
+            # what the first drag does: build the overlay and show it
+            page.evaluate("() => new Promise((resolve) => mcritLoadDropzone(() => { $('#submitFileModal').modal('show'); resolve(); }))")
+            page.wait_for_selector("#submitFileModal.show")
+            page.check("#submit_form")
+            page.wait_for_selector("#family", state="visible")
+            page.focus("#family")
 
             page.evaluate(TYPE_INTO_FIELD, ["#family", LOOKUP])
             page.wait_for_function(HAS_SUGGESTION, arg=["#family", len(PAYLOADS)], timeout=10000)

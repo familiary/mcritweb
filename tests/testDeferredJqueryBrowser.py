@@ -589,7 +589,8 @@ def test_when_ready_after_the_queue_has_run_runs_at_once(open_as, live_server):
 def test_the_upload_form_is_set_without_a_slide_at_load(open_as, live_server, role, path):
     """The form's ready handler runs after the first paint now: a slide there would move
     the upload page's fields under the reader, and on every other page animate the closed
-    drop overlay's form for nobody. The fields end where the checked radios ask."""
+    drop overlay's form for nobody - the overlay built on the first drag, before it is
+    shown. The fields end where the checked radios ask."""
     page = open_as(role)
     # counts every jQuery animation from the moment jQuery arrives: slideDown and slideUp
     # go through .animate()
@@ -602,6 +603,10 @@ def test_the_upload_form_is_set_without_a_slide_at_load(open_as, live_server, ro
         }});
     """)
     ready(page, live_server + path)
+    if path != "/analyze/query":
+        page.evaluate("() => new Promise((resolve) => mcritLoadDropzone(resolve))")
+        # its ready handler, queued once it was in
+        page.evaluate(AFTER_THE_READY_HANDLERS)
     assert page.evaluate("() => window.animations") == 0
     extended = page.evaluate("() => getComputedStyle(document.getElementById('extendedFields')).display")
     asked = page.evaluate("() => document.getElementById('dumped').checked || document.getElementById('smda').checked")
@@ -661,13 +666,18 @@ def test_the_slider_label_follows_the_slider_moved_before_the_scripts_are_in(hel
 
 
 def test_a_page_that_includes_the_family_type_ahead_twice_fetches_it_once(open_as, live_server):
-    """A listing includes js/ac_family_names.html for its edit modals and again with the
-    drop overlay's form. later() queues static/family_names.js once, and it attaches to
-    the overlay's family field."""
+    """A listing includes js/ac_family_names.html for its edit modals, and the drop
+    overlay's form, built on the first drag, names it again. static/family_names.js is
+    fetched once, and it attaches to the overlay's family field when it is focused."""
     page = open_as("contributor")
     requested = []
     page.on("request", lambda request: requested.append(request.url) if request.url.split("?")[0].endswith("/static/family_names.js") else None)
     ready(page, f"{live_server}/explore/samples")
+    page.evaluate("() => new Promise((resolve) => mcritLoadDropzone(() => { $('#submitFileModal').modal('show'); resolve(); }))")
+    settled(page, "#submitFileModal")
+    page.check("#submit_form")
+    page.wait_for_selector("#family", state="visible")
+    page.focus("#family")
     assert len(requested) == 1, requested
     assert page.eval_on_selector("#family", "field => field.dataset.familyAutocomplete") == "attached"
     assert page.errors == []

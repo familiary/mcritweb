@@ -1,9 +1,12 @@
 
 {% set minhash_slider_mapping = ["Off", "Fast", "Standard", "Complete"] %} 
 
-{# `lazy`: the overlay of base.html uses it. The stylesheet and the library are then
-   fetched by mcritLoadDropzone() (static/upload_form.js) on the first drag instead of
-   with every page, and the form's handlers wait in mcritInitDropzone() until it has.
+{# `lazy`: the drop overlay uses it, in drop_overlay.html, which mcritLoadDropzone()
+   (static/upload_form.js) fetches on the first drag, together with Dropzone's stylesheet
+   and library, instead of every page carrying it. The form's handlers wait in
+   mcritInitDropzone() until the library is in. A script in fetched markup does not run,
+   so the overlay has none: its options and the type-ahead's URLs are data- attributes,
+   and upload_form.js, which every signed-in page queues, does what the scripts here do.
    Without it, on the query and submit pages, the library is queued with later() and
    static/dropzone_attach.js attaches the form once it is in. Issue #63. #}
 {% macro submit_or_query_dropzone_js(select_form_type=False, lazy=False) %}
@@ -18,9 +21,8 @@
 {# the library, after the first paint, and what attaches the form, right behind it #}
 <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='dropzone-patched.min.js')|tojson }})</script>
 <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='dropzone_attach.js')|tojson }})</script>
-{% endif %}
-{# the form's behaviour, and the drop overlay's: static/upload_form.js, queued (ADR-0021).
-   The slider's label stays here, so that it follows the slider before the file has run. #}
+{# the form's behaviour: static/upload_form.js, queued (ADR-0021). The slider's label stays
+   here, so that it follows the slider before the file has run. #}
 <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='upload_form.js')|tojson }})</script>
 <script nonce="{{ csp_nonce() }}">
 function handleSliderChange_dropzone(val) {
@@ -30,6 +32,7 @@ function handleSliderChange_dropzone(val) {
   document.getElementById("minhashBandRange_dropzone").setAttribute("aria-valuetext", mapping[val]);
 }
 </script>
+{% endif %}
 {% endmacro %}
 
 {% macro submit_or_query_dropzone(select_form_type=False, show_submit_fields=False, lazy=False) %}
@@ -50,7 +53,6 @@ function handleSliderChange_dropzone(val) {
   {# |safe on the needles: with autoescaping on, `replace` escapes them otherwise, and a
      quote turns into &#34; that matches nothing #}
   {{ dropzone.create(action=target_link)|replace('class="dropzone"'|safe, 'class="dropzone-pending"'|safe) }}
-  {{ dropzone.config(max_file_size=100000000, redirect_view=None, nonce=csp_nonce(), custom_options='autoProcessQueue: false')|replace('Dropzone.options.myDropzone ='|safe, 'window.mcritDropzoneOptions ='|safe) }}
 {% else %}
   {# the form keeps its class, so that it looks as it will from the first paint;
      static/dropzone_attach.js attaches it before auto-discovery can #}
@@ -58,10 +60,11 @@ function handleSliderChange_dropzone(val) {
   {{ dropzone.config(max_file_size=100000000, redirect_view=None, nonce=csp_nonce(), custom_options='autoProcessQueue: false')|replace('Dropzone.options.myDropzone ='|safe, 'window.mcritDropzoneOptions ='|safe) }}
 {% endif %}
   {# what static/upload_form.js needs from the template: where to ask about a dropped
-     file, and on the overlay, where Dropzone is fetched from on the first drag #}
+     file, and on the overlay, the options the other forms' script parks (as JSON, which
+     |tojson writes without a single quote) and where the family type-ahead is #}
   <form id="dropzone-additional-fields-form" data-filename-info="{{ url_for('data.request_filename_info') }}"
     {%- if show_submit_fields %} data-submit-fields{% endif %}
-    {%- if lazy %} data-lazy data-dropzone-css="{{ url_for('static', filename='dropzone.min.css') }}" data-dropzone-js="{{ url_for('static', filename='dropzone-patched.min.js') }}"{% endif %}>
+    {%- if lazy %} data-lazy data-dropzone-options='{{ dropzone_options|tojson }}' data-family-names="{{ url_for('explore.family_names') }}" data-family-names-js="{{ url_for('static', filename='family_names.js') }}"{% endif %}>
   {% if select_form_type %}
     <fieldset class="container-fluid">
       <legend class="visually-hidden">What to do with the file</legend>
@@ -122,7 +125,7 @@ function handleSliderChange_dropzone(val) {
       </div>
       <div class="col-sm-3" id="minhashBandRange-currentSelection_dropzone">&nbsp; {{ minhash_slider_mapping[2] }}</div>
       <div class="col-sm-6">
-        <input type="range" class="form-range" min="0" max="3" value="2" step="1" id="minhashBandRange_dropzone" name="minhashBandRange" aria-valuetext="{{ minhash_slider_mapping[2] }}" oninput="handleSliderChange_dropzone(this.value)"/>
+        <input type="range" class="form-range" min="0" max="3" value="2" step="1" id="minhashBandRange_dropzone" name="minhashBandRange"{% if lazy %} data-labels='{{ minhash_slider_mapping|tojson }}'{% endif %} aria-valuetext="{{ minhash_slider_mapping[2] }}" oninput="handleSliderChange_dropzone(this.value)"/>
       </div>
     </div>
     </div>
@@ -136,6 +139,8 @@ function handleSliderChange_dropzone(val) {
     <div id="upload-feedback" class="upload-feedback" aria-live="polite"></div>
 </form>
 </div>
+{% if not lazy %}
 {% include 'js/ac_family_names.html' %}
+{% endif %}
 {% endmacro %}
 
