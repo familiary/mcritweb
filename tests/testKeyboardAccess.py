@@ -9,7 +9,9 @@ keys then do is a browser question, answered in testKeyboardAccessBrowser.py.
 """
 
 import copy
+import gzip
 import logging
+import pathlib
 import re
 from html.parser import HTMLParser
 
@@ -325,6 +327,20 @@ def test_the_cross_compare_result_names_the_colours_of_its_matrix(client, as_rol
     assert "90–100%" in key and "under 10%" in key and "0%</span>" in key
 
 
+def test_the_matrix_s_arrow_keys_are_a_cached_script_not_part_of_the_page(client, as_role):
+    """The handlers that move between the scores, and the one that puts a tooltip together,
+    were an inline script of the cross compare result: 400 bytes gzipped in every copy of
+    the page, for keys that are only pressed once the page is painted. They are
+    static/cross_matrix.js, queued after jQuery."""
+    html = render(client, as_role, f"/data/result/{job_id_of('cross_compare')}")
+
+    inline = "".join(re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.S))
+    assert "ArrowLeft" not in inline and "data-hint-sample" not in inline
+    assert re.search(r"<script[^>]*>later\(\"/static/cross_matrix\.js(\?v=\w+)?\"\)</script>", html)
+    script = (pathlib.Path(__file__).resolve().parents[1] / "mcritweb" / "static" / "cross_matrix.js").read_text()
+    assert "ArrowLeft" in script and "data-hint-sample" in script
+
+
 def test_the_move_buttons_are_not_in_the_page_but_made_by_the_script(client, as_role):
     """Written into every item, the buttons took /settings from 42 KB to 100 KB, and the
     page is sent uncompressed because it carries the API token, so its size is what a
@@ -344,3 +360,28 @@ def test_the_move_buttons_are_not_in_the_page_but_made_by_the_script(client, as_
     cross = client.get(f"/data/result/{job_id_of('cross_compare')}").get_data(as_text=True)
     assert "data-reorder=" not in cross
     assert cross.count("data-reorder-item") > 0
+
+
+#: what the inline pagination helper may weigh gzipped; it weighed 681 bytes with the page-size
+#: select's key handling in it, and 299 without
+PAGINATION_SCRIPT_BUDGET = 330
+
+
+@pytest.mark.parametrize("path", ["/explore/functions", "/explore/samples", "/analyze/compare",
+                                  f"/data/result/{job_id_of('matches_for_sample')}"])
+def test_the_page_size_select_is_marked_up_for_the_script_not_scripted_in_the_page(client, as_role, path):
+    """The select's key handling was four functions in an inline script and four handler
+    attributes on every select, in every page with a pager: 380 bytes gzipped of the page,
+    for something only a keyboard needs, and only once the page is painted. The select
+    says where it loads and with which parameter; static/keyboard.js does the rest."""
+    page = render(client, as_role, path)
+
+    selects = [attrs for tag, attrs, _ in start_tags(page) if tag == "select" and attrs.get("data-pager-url")]
+    assert selects, "no page size select"
+    for attrs in selects:
+        assert attrs["data-pager-param"]
+        assert [name for name in attrs if name.startswith("on")] == []
+    assert "pagination_limit" not in page
+    helpers = [body for body in re.findall(r"<script[^>]*>(.*?)</script>", page, re.S) if "function pagination_js_helper" in body]
+    assert len(helpers) == 1
+    assert len(gzip.compress(helpers[0].encode(), 6)) <= PAGINATION_SCRIPT_BUDGET

@@ -111,6 +111,12 @@ rather than reconstructing it from the commit log at release time.
 - Control flow graphs are laid out about three times faster on large functions, with the same
   result: 5.6 s instead of 21.7 s for a 971-block function. A patch to the vendored dagre builds the
   graph of each rank in one pass instead of walking the whole graph once per rank.
+- What a keyboard needs from a page is sent once, in the cached scripts, instead of in every copy of
+  the page: the "Rows per page" select's wait for Enter is part of `keyboard.js` (the select only
+  says where it loads), and the cross compare matrix's arrow keys and score tooltips are
+  `cross_matrix.js`. A page with a pager is about 440 bytes smaller gzipped, the cross compare
+  result about as much. A size chosen in the moment before the script has loaded is applied
+  once it has.
 
 ### Fixed
 

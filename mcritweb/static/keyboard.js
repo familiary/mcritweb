@@ -17,6 +17,12 @@
  * compare result builds a matrix the first time its tab is shown, which for a large one
  * takes long enough to be in the way of a key held down. Bootstrap 5.3 does all this
  * itself; 5.0.2 does not.
+ *
+ * Rows per page. The select of a pager (data-pager-url, written by pagination_widget.html)
+ * loads the page at the size it is changed to. A select changes its value at every press of
+ * an arrow key, and loading at the first one left a keyboard no way to step through the
+ * sizes. So a change made with a key waits for Enter, or for focus to leave the select; one
+ * made with the pointer, or a touch screen's picker, loads at once.
  */
 (function () {
   "use strict";
@@ -123,4 +129,75 @@
       next.click();
     }
   });
+
+  var PAGER = "select[data-pager-url]";
+  var changedByKey = new WeakSet();
+  var waiting = new WeakSet();
+
+  function loadAtTheChosenSize(select) {
+    var changes = {};
+    changes[select.dataset.pagerParam] = select.value;
+    /* the other tables' state a page carries, from the function its template names */
+    var state = select.dataset.pagerState ? window[select.dataset.pagerState]() : {};
+    pagination_js_helper(select.dataset.pagerUrl, Object.assign(state, changes));
+  }
+
+  function applyTheChoice(select) {
+    if (waiting.delete(select)) {
+      changedByKey.delete(select);
+      loadAtTheChosenSize(select);
+    }
+  }
+
+  document.addEventListener("keydown", function (event) {
+    var select = event.target.closest ? event.target.closest(PAGER) : null;
+    if (select === null) {
+      return;
+    }
+    if (event.key === "Enter" && waiting.has(select)) {
+      event.preventDefault();
+      applyTheChoice(select);
+    } else if (event.key !== "Tab" && event.key !== "Shift") {
+      changedByKey.add(select);
+    }
+  });
+
+  document.addEventListener("pointerdown", function (event) {
+    var select = event.target.closest ? event.target.closest(PAGER) : null;
+    if (select !== null) {
+      changedByKey.delete(select);
+    }
+  });
+
+  document.addEventListener("change", function (event) {
+    var select = event.target.closest ? event.target.closest(PAGER) : null;
+    if (select !== null) {
+      waiting.add(select);
+      if (!changedByKey.has(select)) {
+        applyTheChoice(select);
+      }
+    }
+  });
+
+  document.addEventListener("focusout", function (event) {
+    var select = event.target.closest ? event.target.closest(PAGER) : null;
+    if (select !== null) {
+      applyTheChoice(select);
+    }
+  });
+
+  /* A size chosen before this file had loaded was missed. The browser restores a form
+   * control's value when it reloads or goes back to a page, with no one choosing, so only a
+   * page the browser opened fresh can say a size that is not the markup's was chosen. */
+  var opened = performance.getEntriesByType("navigation")[0];
+  if (opened && opened.type === "navigate") {
+    Array.prototype.some.call(document.querySelectorAll(PAGER), function (select) {
+      if (select.selectedOptions.length && !select.selectedOptions[0].defaultSelected) {
+        waiting.add(select);
+        applyTheChoice(select);
+        return true;
+      }
+      return false;
+    });
+  }
 })();
