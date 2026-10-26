@@ -98,10 +98,6 @@ def test_the_clipboard_button_copies_without_a_secure_context(client, as_role):
     assert "mcritStatus(" in code, "the copy does not report in the status message"
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 def test_the_empty_message_box_is_on_every_page_from_the_start(client, as_role):
     """status_message.js used to add its box to <body> once the page had loaded, and any
     element added there makes the browser restyle the whole page (bootstrap's `legend +
@@ -111,4 +107,8 @@ def test_the_empty_message_box_is_on_every_page_from_the_start(client, as_role):
     for path in ("/explore/samples", "/help"):
         page = client.get(path).get_data(as_text=True)
         assert page.count('<div class="status-message"></div>') == 1, path
-        assert page.index('<div class="status-message">') < page.index('<main class="content">'), path
+        assert page.index('<div class="status-message">') < page.index('<main class="content"'), path
+
+
+if __name__ == "__main__":
+    unittest.main()
