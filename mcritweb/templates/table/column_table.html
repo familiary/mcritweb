@@ -329,8 +329,8 @@
                 const clock = Math.floor(rest / 3600) + ":" + two(Math.floor(rest % 3600 / 60)) + ":" + two(rest % 60);
                 cell.textContent = days ? days + (days === 1 ? " day, " : " days, ") + clock : clock;
               }
-              // stopped while the tab is hidden, where nobody sees it count; it counts from
-              // the time it was loaded, so it is right again on the first tick once shown
+              {# stopped while the tab is hidden, where nobody sees it count; it counts from
+                 the time it was loaded, so it is right again on the first tick once shown #}
               let ticking = document.hidden ? null : window.setInterval(tick, 1000);
               document.addEventListener("visibilitychange", function () {
                 if (document.hidden) {

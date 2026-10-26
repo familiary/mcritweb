@@ -19,9 +19,9 @@ Overview for Job: {{ job_info.job_id }}
     // setTimeout reads a delay past 2^31-1 ms as no delay at all, which would turn an
     // oversized refresh parameter into polling as fast as the backend answers
     const interval = Math.min({{ (auto_refresh * 1000)|tojson }}, 2147483647);
-    // a tab nobody is looking at is not polled: a long job watched from a background tab
-    // cost the backend a status read every interval all the same. The next poll waits for
-    // the tab to be shown again, and is made at once then.
+    {# a tab nobody is looking at is not polled: a long job watched from a background tab
+       cost the backend a status read every interval all the same. The next poll waits for
+       the tab to be shown again, and is made at once then. #}
     let timer = null;
     let polling = false;
 
