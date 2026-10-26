@@ -319,3 +319,37 @@ def test_without_until_found_the_panels_are_as_they_were(page, live_server):
         assert panel_state(page, panel) == {"hidden": None, "open": False, "height": 0, "expanded": "false"}
         assert page.evaluate("(id) => getComputedStyle(document.getElementById(id)).display", panel) == "none"
     assert page.errors == []
+
+
+def test_an_icon_only_control_gets_its_tooltip_from_its_name(page, live_server):
+    """The markup carries a filter link's name once, in its aria-label (a title with the same
+    words cost a hundred-row table twice the text); icon_titles.js gives the mouse its
+    tooltip. Rows a script brings in later get theirs when the pointer reaches them."""
+    open_page(page, f"{live_server}/data/result/{job_id_of('matches_for_sample')}")
+
+    filters = page.locator('a[aria-label^="Filter by function "]')
+    assert filters.count() > 10
+    for index in (0, filters.count() - 1):
+        assert filters.nth(index).get_attribute("title") == filters.nth(index).get_attribute("aria-label")
+
+    page.evaluate("""() => {
+        const late = document.createElement("button");
+        late.id = "late-icon";
+        late.setAttribute("aria-label", "Added after the scripts ran");
+        late.innerHTML = '<i class="fa-solid fa-trash" aria-hidden="true"></i>';
+        document.querySelector("main").appendChild(late);
+    }""")
+    assert page.locator("#late-icon").get_attribute("title") is None
+    page.locator("#late-icon").hover()
+    assert page.locator("#late-icon").get_attribute("title") == "Added after the scripts ran"
+    assert page.errors == []
+
+
+def test_a_control_with_text_or_a_title_of_its_own_keeps_its_title(page, live_server):
+    """Only a control with nothing to read gets its name as a title. A pager's number is
+    its own label, and "First page" is shorter than the name "First page of sample matches"."""
+    open_page(page, f"{live_server}/data/result/{job_id_of('matches_for_sample')}")
+
+    assert page.locator('.pagination a[aria-label^="Page "]').first.get_attribute("title") is None
+    assert page.locator('.pagination a[aria-label^="First page"]').first.get_attribute("title") == "First page"
+    assert page.errors == []

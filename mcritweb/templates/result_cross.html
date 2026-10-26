@@ -42,7 +42,7 @@
         <td class="sha256" style="min-width: 100px;">{{ format_sha_short_clipboard(sample.sha256) }}</td>
         <td class="cross-label" style="padding: 0 5px">{{sample.family}}</td>
         <td class="cross-label" style="padding: 0 5px">{{sample.version}}</td>
-        <td><button type="button" aria-label="Edit sample {{ sample.sample_id }}" title="Edit sample {{ sample.sample_id }}" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></button></td>
+        <td><button type="button" aria-label="Edit sample {{ sample.sample_id }}" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></button></td>
         {# the row's sample, and a link to its own report: the cell itself was the link, which
            only a mouse could follow #}
         {% set row_job_id = sample_to_job_id.get(sample.sample_id|string) %}

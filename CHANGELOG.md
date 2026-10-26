@@ -194,6 +194,10 @@ rather than reconstructing it from the commit log at release time.
   `cross_matrix.js`. A page with a pager is about 440 bytes smaller gzipped, the cross compare
   result about as much. A size chosen in the moment before the script has loaded is applied
   once it has.
+- An icon-only link or button names itself once in the markup. Its tooltip, which repeated the
+  `aria-label` word for word in a `title` on each of a match table's hundred rows, is given by
+  `icon_titles.js` once the page has painted, so a result page is smaller by the text of those
+  titles and nothing changes on screen.
 
 ### Fixed
 

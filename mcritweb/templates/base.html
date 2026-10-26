@@ -169,6 +169,7 @@
      only listen for events, and every `new Autocomplete` waits in whenReady. #}
   <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='post_action.js')|tojson }})</script>
   <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='page_loading.js')|tojson }})</script>
+  <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='icon_titles.js')|tojson }})</script>
   <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='hints.js')|tojson }})</script>
   <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='status_message.js')|tojson }})</script>
   <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='clipboard.js')|tojson }})</script>
@@ -283,7 +284,7 @@
       {% endif %}
     </li>
     <li class="nav-item">
-      <a class="nav-link" href="{{ url_for('help') }}" aria-label="Documentation" title="Documentation"><i class="fas fa-question-circle" aria-hidden="true"></i></a>
+      <a class="nav-link" href="{{ url_for('help') }}" aria-label="Documentation"><i class="fas fa-question-circle" aria-hidden="true"></i></a>
     </li>
   </ul>
   </div>
