@@ -197,7 +197,7 @@ rather than reconstructing it from the commit log at release time.
   once it has.
 - An icon-only link or button names itself once in the markup. Its tooltip, which repeated the
   `aria-label` word for word in a `title` on each of a match table's hundred rows, is given by
-  `icon_titles.js` once the page has painted, so a result page is smaller by the text of those
+  `page_loading.js` once the page has painted, so a result page is smaller by the text of those
   titles and nothing changes on screen.
 
 ### Fixed

@@ -323,7 +323,7 @@ def test_without_until_found_the_panels_are_as_they_were(page, live_server):
 
 def test_an_icon_only_control_gets_its_tooltip_from_its_name(page, live_server):
     """The markup carries a filter link's name once, in its aria-label (a title with the same
-    words cost a hundred-row table twice the text); icon_titles.js gives the mouse its
+    words cost a hundred-row table twice the text); page_loading.js gives the mouse its
     tooltip. Rows a script brings in later get theirs when the pointer reaches them."""
     open_page(page, f"{live_server}/data/result/{job_id_of('matches_for_sample')}")
 
