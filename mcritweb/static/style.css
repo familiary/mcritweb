@@ -700,7 +700,7 @@ form.form-inline input {
   display: block;
 }
 
-/* Escape puts the tooltip that is showing away (static/hints.js) */
+/* Escape puts the tooltip that is showing away (static/status_message.js) */
 :root.hints-dismissed [data-hint]:hover::before,
 :root.hints-dismissed [data-hint]:hover::after,
 :root.hints-dismissed [data-hint]:focus-visible::before,

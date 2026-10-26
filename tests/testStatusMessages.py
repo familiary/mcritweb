@@ -34,7 +34,7 @@ PACKAGE = pathlib.Path(__file__).resolve().parents[1] / "mcritweb"
 OWN_SCRIPTS = sorted(PACKAGE.joinpath("templates").rglob("*.html")) + [
     PACKAGE / "static" / name
     for name in ("post_action.js", "page_loading.js", "upload_form.js", "family_names.js", "live_search.js",
-                 "dropzone_attach.js", "function_compare.js", "hints.js", "status_message.js")
+                 "dropzone_attach.js", "function_compare.js", "status_message.js")
 ]
 
 #: The clipboard button the registration URL is copied with, and the URL it carries.
@@ -112,6 +112,20 @@ def test_every_page_queues_the_script_that_reports_a_copy_and_no_file_for_it_alo
     page = client.get("/explore/samples").get_data(as_text=True)
     assert re.search(r"<script( nonce=\"[^\"]*\")?>later\(\"/static/status_message\.js(\?v=\w+)?\"\)</script>", page)
     assert "/static/clipboard.js" not in page
+
+
+def test_the_tooltips_escape_key_has_no_file_of_its_own(client, as_role):
+    """Escape for the hint tooltips was hints.js, a file of its own queued on every page.
+    Each file the queue adds is one more ordered request before the page's scripts have run:
+    on the build of all the pull requests the index page took 35 to 45 ms of blocking time in
+    Lighthouse's mobile run against the base's 8 to 15, and folding the every-page files into
+    the ones the base already queued brought it back to 10. The listener rides in
+    status_message.js, which every page queues already."""
+    as_role("visitor")
+    page = client.get("/explore/samples").get_data(as_text=True)
+    assert "/static/hints.js" not in page
+    assert not (PACKAGE / "static" / "hints.js").exists()
+    assert 'DISMISSED = "hints-dismissed"' in (PACKAGE / "static" / "status_message.js").read_text()
 
 
 #: what the helper in the page may weigh gzipped; it was 628 bytes with the report in it
