@@ -67,29 +67,13 @@
 
 {%- macro clipboard_js() -%}
 <script>
-whenReady(function () {
-  $('[data-bs-toggle="tooltip"], [data-toggle="tooltip"]').tooltip()
-})
 function copy_to_clipboard(btn){
   var value = btn.getAttribute('data-clipboard-value') || "";
-  {# what the copy says comes from status_message.js and Bootstrap, which a click right
-     after the page is painted can come before; the copy itself needs neither. Comments
-     in Jinja, since this is in every page #}
+  {# what the copy says comes from clipboard.js, which a click right after the page is
+     painted can come before; the copy itself needs none of it. The part that has to be
+     here is the part that copies. Comments in Jinja, since this is in every page #}
   function report(copied) {
-    whenReady(function () {
-      if (!copied) {
-        mcritStatus("Could not copy to the clipboard. It is selected here instead: press Ctrl+C to copy it.", {select: value});
-        return;
-      }
-      mcritStatus("Copied to the clipboard.");
-      var tooltip = bootstrap.Tooltip.getInstance(btn);
-      if (tooltip) {
-        var title = btn.getAttribute('data-bs-original-title');
-        btn.setAttribute('data-bs-original-title', "Copied!");
-        tooltip.show();
-        btn.setAttribute('data-bs-original-title', title);
-      }
-    });
+    whenReady(function () { mcritCopied(btn, value, copied); });
   }
   {# navigator.clipboard is only there in a secure context, and MCRITweb is served over
      plain HTTP often enough; a copy of a selection works without one #}

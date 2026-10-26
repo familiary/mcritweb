@@ -111,6 +111,10 @@ rather than reconstructing it from the commit log at release time.
 - Control flow graphs are laid out about three times faster on large functions, with the same
   result: 5.6 s instead of 21.7 s for a 971-block function. A patch to the vendored dagre builds the
   graph of each rank in one pass instead of walking the whole graph once per rank.
+- The clipboard buttons' tooltips and the report of a copy, which every page carried in an inline
+  script, are in `clipboard.js`, queued after the first paint like the status message they use. The
+  page keeps only the part that copies, so a press right after the first paint still copies, and
+  every page is about 190 bytes smaller gzipped.
 
 ### Fixed
 

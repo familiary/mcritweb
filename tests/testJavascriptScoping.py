@@ -11,7 +11,8 @@ it is a regression, not a note.
 
 Scope is deliberately this repository's own JavaScript - the inline blocks in
 `templates/`, and `static/post_action.js`, `static/upload_form.js`,
-`static/family_names.js`, `static/hints.js` and `static/status_message.js`. The vendored libraries under `static/`
+`static/family_names.js`, `static/hints.js`, `static/status_message.js` and
+`static/clipboard.js`. The vendored libraries under `static/`
 (jQuery, DataTables, Dropzone, ...) carry their own licences and are not ours to
 reformat; see AGENTS.md.
 """
@@ -53,7 +54,8 @@ def javascript_sources():
         if block:
             yield path, text, block
 
-    for name in ("post_action.js", "upload_form.js", "family_names.js", "hints.js", "status_message.js"):
+    for name in ("post_action.js", "upload_form.js", "family_names.js", "hints.js", "status_message.js",
+                 "clipboard.js"):
         path = ROOT / "static" / name
         text = path.read_text()
         yield path, text, list(enumerate(text.splitlines(), 1))
