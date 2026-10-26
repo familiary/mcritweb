@@ -2,7 +2,8 @@
 """The upload form beside the drop zone, in a browser: what it does with what was typed.
 
 The submit and query pages carry the form (`templates/table/submit_or_query_dropzone.html`,
-driven by `static/upload_form.js`), and so does the drop overlay of every other page.
+driven by `static/upload_form.js`), and so does the drop overlay of every other page, built on
+the first drag (ADR-0023).
 
 `playwright` is not a dependency of this project and CI does not install it, so this module
 skips there rather than failing.
@@ -245,6 +246,9 @@ def test_the_family_type_ahead_is_a_combobox_that_says_how_many_it_suggests(open
 def test_the_overlay_button_follows_the_chosen_mode(open_page):
     """Match against the database or add to it: the button names the one that is chosen."""
     page = open_page("/explore/samples")
+    # what the first drag does: build the overlay, and its form's ready handler runs
+    page.evaluate("() => new Promise((resolve) => mcritLoadDropzone(resolve))")
+    page.evaluate(WAIT_FOR_THE_QUEUE)
     label = "() => document.getElementById('submit-dropzone').textContent.trim()"
     choose = "(id) => { const radio = document.getElementById(id); radio.checked = true; radio.dispatchEvent(new Event('change')); }"
     assert page.evaluate(label) == "Query"
