@@ -3,7 +3,7 @@
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro sample_row_std_js() %}
-<script>
+<script nonce="{{ csp_nonce() }}">
   var button_clicked = false;
   
   whenReady(function(){

@@ -1,13 +1,13 @@
 import json
 import sqlite3
 
-from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.compression import uncompressed
+from mcritweb.compression import no_store, uncompressed
 from mcritweb.db import THEMES, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, is_legacy_apitoken
-from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
+from mcritweb.views.authentication import KNOWN_ROLES, SHOW_APITOKEN_NOW, admin_required, login_required, multi_user, visitor_required
 from mcritweb.views.client import backend_version, get_client
 from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
@@ -191,8 +191,27 @@ def regenerate_apitoken():
     user_info = g.user
     user_info.apitoken = generate_apitoken()
     user_info.saveToDb()
+    # the settings page this leads back to used to print the new token; it is not on the
+    # page any more, so the page asks for it as soon as it has loaded, this once
+    session[SHOW_APITOKEN_NOW] = True
     flash('A new API token was generated. Anything using the old one has to be updated.', category='success')
     return redirect(url_for('authentication.settings'))
+
+@bp.route('/show_apitoken', methods=('POST',))
+@visitor_required
+@uncompressed
+@no_store
+def show_apitoken():
+    """The caller's API token, for the settings page's "Show token" button.
+
+    The page used to print it, which kept the whole page uncompressed and out of every
+    cache for a value most visits never look at. Only this answer carries it now. POST
+    only, so it is never fetched by a link, an <img> or a prefetch, and it needs the CSRF
+    token, so another site cannot have a browser post here either. The user comes from
+    the session, so it only ever answers with the caller's own token. A visitor and up,
+    as the API is: a pending account has a token the API does not accept.
+    """
+    return jsonify(apitoken=g.user.apitoken)
 
 @bp.route('/regenerate_legacy_apitokens', methods=('POST',))
 @admin_required
@@ -288,6 +307,7 @@ def delete_user(user_id, tab = None):
 @bp.route('/server')
 @admin_required
 @uncompressed
+@no_store
 def server():
     server_info = db.get_server_info()
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
@@ -300,10 +320,16 @@ def server():
 @bp.route('/change_server' , methods=('POST',))
 @admin_required
 @uncompressed
+@no_store
 def change_server():
     server_info = db.get_server_info()
     new_url = request.form.get('mcrit_server_url', '')
-    new_token = request.form.get('mcrit_server_token', '')
+    # the page never shows the token (AGENTS.md), so its field comes back empty unless a
+    # new one was typed: empty keeps the stored token, and removing it is a button of its own
+    if request.form.get('remove_server_token'):
+        new_token = ''
+    else:
+        new_token = request.form.get('mcrit_server_token', '') or server_info.server_token
     if server_info.url != new_url or server_info.server_token != new_token:
         server_info.url = new_url
         server_info.server_token = new_token

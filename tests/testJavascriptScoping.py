@@ -53,7 +53,7 @@ def javascript_sources():
         if block:
             yield path, text, block
 
-    for name in ("post_action.js", "upload_form.js", "family_names.js"):
+    for name in ("post_action.js", "upload_form.js", "family_names.js", "show_apitoken.js"):
         path = ROOT / "static" / name
         text = path.read_text()
         yield path, text, list(enumerate(text.splitlines(), 1))

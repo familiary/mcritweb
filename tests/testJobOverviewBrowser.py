@@ -141,7 +141,7 @@ def test_progress_alone_is_updated_in_place(browser_page, live_server, solo_back
     answer = status(progress=0.5, unfinished_sub_jobs=0)
     browser_page.route(f"**/data/jobs/{PARENT_JOB_ID}/status", lambda route: route.fulfill(status=200, content_type="application/json", body=answer))
     traffic = open_overview(browser_page, live_server)
-    browser_page.wait_for_function("document.getElementById('job-progress').textContent.trim() === '50.00%'")
+    browser_page.wait_for_function("() => document.getElementById('job-progress').textContent.trim() === '50.00%'")
 
     assert traffic.loads == 1
 
@@ -153,7 +153,7 @@ def test_the_dependencies_average_is_updated_in_place(browser_page, live_server,
     browser_page.route(f"**/data/jobs/{PARENT_JOB_ID}/status", lambda route: route.fulfill(status=200, content_type="application/json", body=answer))
     traffic = open_overview(browser_page, live_server)
     assert progress_text(browser_page) == "62.50% (across 2 dependencies)"
-    browser_page.wait_for_function("document.getElementById('job-progress').textContent.includes('75.00%')")
+    browser_page.wait_for_function("() => document.getElementById('job-progress').textContent.includes('75.00%')")
 
     assert progress_text(browser_page) == "75.00% (across 2 dependencies)"
     assert traffic.loads == 1

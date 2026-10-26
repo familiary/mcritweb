@@ -10,7 +10,7 @@
 Compare
 {% endblock %}
 {% block style %}
-<script>
+<script nonce="{{ csp_nonce() }}">
 var selected_a = {{ (selected_a or "")|tojson }}
 var selected_b = {{ (selected_b or "")|tojson }}
 var selected_column_a = null;

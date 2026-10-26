@@ -11,7 +11,6 @@ from flask import Blueprint, abort, current_app, flash, g, redirect, render_temp
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.compression import uncompressed
 from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, is_legacy_apitoken, utc_now
 
 bp = Blueprint('authentication', __name__, url_prefix='/')
@@ -171,6 +170,8 @@ def _current_hash_method():
 #: does not work, or - the way it went wrong - hide one that does. `pending` gets
 #: nothing, as in the web UI.
 API_ROLES = ('visitor', 'contributor', 'admin')
+#: set by admin.regenerate_apitoken, so that the settings page shows the new token at once
+SHOW_APITOKEN_NOW = 'show_apitoken_now'
 
 
 @bp.before_app_request
@@ -408,7 +409,6 @@ def login_required(view):
 
 @bp.route('/settings')
 @login_required
-@uncompressed
 def settings():
     # login_required has settled that g.user holds this session's row
     user_info = g.user
@@ -422,7 +422,10 @@ def settings():
     if user_column_settings is None:
         user_column_settings = UserColumnSettings.fromDict(user_id, {})
         user_column_settings.saveToDb()
-    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken))
+    # the token is not printed: the page fetches it from admin.show_apitoken when asked,
+    # and at once, this one time, after a regenerate
+    show_apitoken_now = session.pop(SHOW_APITOKEN_NOW, False)
+    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken), show_apitoken_now=show_apitoken_now)
 
 def admin_required(view):
     @functools.wraps(view)

@@ -209,7 +209,7 @@ def test_the_display_controls_used_before_the_graphs_are_drawn_hold_once_they_ar
     assert len(held) == 2 and drawn_blocks(browser_page) == [0, 0]
     for route in held:
         route.continue_()
-    browser_page.wait_for_function("document.querySelectorAll('g.bgFill').length == 2")
+    browser_page.wait_for_function("() => document.querySelectorAll('g.bgFill').length == 2")
 
     assert browser_page.get_attribute(button, "value") == label
     for panel in ("a", "b"):
@@ -252,7 +252,7 @@ def test_combined_pressed_before_the_graphs_are_drawn_is_shown_once_they_are(bro
     assert len(held) == 2 and browser_page.is_disabled("#viewCombined")
     for route in held:
         route.continue_()
-    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    browser_page.wait_for_function("() => !document.getElementById('viewCombined').disabled")
 
     if then_side_by_side:
         # the replay is a timer set when the option was enabled; one set now runs after it
@@ -329,7 +329,7 @@ def test_what_is_pressed_before_the_viewer_is_in_holds_once_it_is(browser_page, 
     browser_page.check("#enableTooltip")
     assert browser_page.evaluate("typeof bindDisplayControls") == "undefined", "the viewer was in before the presses"
     release()
-    browser_page.wait_for_function("document.querySelectorAll('g.bgFill').length == 2")
+    browser_page.wait_for_function("() => document.querySelectorAll('g.bgFill').length == 2")
 
     assert browser_page.get_attribute(button, "value") == label
     for panel in ("a", "b"):
@@ -359,7 +359,7 @@ def test_combined_pressed_before_the_viewer_is_in_is_shown_once_the_graphs_are(b
         browser_page.click("#viewSideBySide")
     assert browser_page.evaluate("typeof FunctionCompare") == "undefined", "the viewer was in before the press"
     release()
-    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    browser_page.wait_for_function("() => !document.getElementById('viewCombined').disabled")
     if then_side_by_side:
         # the replay is a timer set when the option was enabled; one set now runs after it
         browser_page.evaluate("new Promise(resolve => setTimeout(resolve, 0))")
@@ -627,7 +627,7 @@ def open_and_draw(page, live_server, panels=("a", "b")):
     scroll_to_the_graphs(page)
     drawing = drawn_graphs(page, [p for p in panels if p != "c"])
     if "c" in panels:
-        page.wait_for_function("!document.getElementById('viewCombined').disabled")
+        page.wait_for_function("() => !document.getElementById('viewCombined').disabled")
         page.click("#viewCombined")
         drawing.update(drawn_graphs(page, ["c"]))
     return drawing
@@ -638,7 +638,7 @@ def test_each_graph_is_laid_out_in_a_worker(browser_page, live_server, thrown):
     open_and_draw(browser_page, live_server)
     assert [url.rsplit("/", 1)[1] for url in workers] == ["layout_worker.js"] * 2
 
-    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    browser_page.wait_for_function("() => !document.getElementById('viewCombined').disabled")
     browser_page.click("#viewCombined")
     browser_page.wait_for_selector("#graphContainer_c g.node", state="attached")
     assert len(workers) == 3
@@ -720,7 +720,7 @@ def test_a_combined_graph_that_comes_back_while_side_by_side_is_shown_is_drawn_w
             assert "layout-answer-released" in body
             route.fulfill(response=response, body=body)
     reference = open_and_draw(browser_page, live_server)
-    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    browser_page.wait_for_function("() => !document.getElementById('viewCombined').disabled")
     if comes_back == "laid-out":
         # the two graphs side by side are drawn; only the combined one's answer is held
         closed = []
@@ -745,7 +745,7 @@ def test_a_combined_graph_that_comes_back_while_side_by_side_is_shown_is_drawn_w
         browser_page.evaluate("""() => { const parse = graphlibDot.parse;
             graphlibDot.parse = function () { window.mcritCombinedParsed = true; return parse.apply(this, arguments); }; }""")
         held[0].continue_()
-        browser_page.wait_for_function("window.mcritCombinedParsed === true")
+        browser_page.wait_for_function("() => window.mcritCombinedParsed === true")
     assert browser_page.evaluate("document.querySelectorAll('#graphContainer_c g.node').length") == 0
     assert drawn_graphs(browser_page, ["a", "b"]) == reference
 
@@ -781,9 +781,9 @@ def test_a_combined_load_that_fails_says_so_and_the_next_press_loads_it_again(br
             route.fulfill(status=200, content_type="text/html", body="<html><body>Log in</body></html>")
     browser_page.route("**/explore/fetchCombinedDotGraph/**", first_fails)
     open_and_draw(browser_page, live_server)
-    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    browser_page.wait_for_function("() => !document.getElementById('viewCombined').disabled")
     browser_page.click("#viewCombined")
-    browser_page.wait_for_function("document.getElementById('loading_c').classList.contains('hidden')")
+    browser_page.wait_for_function("() => document.getElementById('loading_c').classList.contains('hidden')")
     assert browser_page.is_visible("#combined_error")
     assert len(answered) == 1
 
@@ -806,7 +806,7 @@ def test_the_combined_graph_is_drawn_where_its_pane_showed_it_loading(browser_pa
     counted as a layout shift (0.26 for 549/2356 on the live corpus); the note is now out of the
     flow, and the graph is drawn where its pane was while the note showed."""
     open_and_draw(browser_page, live_server)
-    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    browser_page.wait_for_function("() => !document.getElementById('viewCombined').disabled")
 
     def late(route):
         response = route.fetch()
@@ -819,7 +819,7 @@ def test_the_combined_graph_is_drawn_where_its_pane_showed_it_loading(browser_pa
     browser_page.wait_for_selector("#loading_c", state="visible")
     while_loading = browser_page.evaluate(top)
     browser_page.wait_for_selector("#graphContainer_c g.node", state="attached")
-    browser_page.wait_for_function("document.getElementById('loading_c').classList.contains('hidden')")
+    browser_page.wait_for_function("() => document.getElementById('loading_c').classList.contains('hidden')")
     assert browser_page.evaluate(top) == while_loading
     assert thrown == []
 
@@ -834,7 +834,7 @@ def test_without_a_working_worker_the_page_lays_the_graphs_out_itself(browser_pa
             body="self.onmessage = function () { self.postMessage({ error: 'injected layout failure' }); };"))
     drawing = open_and_draw(browser_page, live_server)
     assert all(drawing[panel] != "[[],[]]" for panel in ("a", "b"))
-    browser_page.wait_for_function("!document.getElementById('viewCombined').disabled")
+    browser_page.wait_for_function("() => !document.getElementById('viewCombined').disabled")
     browser_page.click("#viewCombined")
     browser_page.wait_for_selector("#graphContainer_c g.node", state="attached")
     # Chromium logs the missing worker script itself as an error

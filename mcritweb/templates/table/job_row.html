@@ -1,7 +1,7 @@
 {% from 'table/links.html' import format_family_name, format_family_id, format_sample_id, format_monospace %}
 
 {% macro job_row_std_js() %}
-<script>
+<script nonce="{{ csp_nonce() }}">
   whenReady(function(){
     $("td.job-cell").click(function(){
       var job_id = $(this)[0].getAttribute('job_id')

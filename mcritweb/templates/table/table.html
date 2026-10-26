@@ -117,7 +117,7 @@
     </div>
   </div>
 </div>
-  <script>
+  <script nonce="{{ csp_nonce() }}">
     function toggle_delete_family(cb) {
     var deleteFamilyButton = document.getElementById('button_delete_family');
     var keepSamplesForFamilyDiv = document.getElementById('div_family_keeping_samples');
@@ -193,7 +193,7 @@
     </div>
   </div>
 </div>
-  <script>
+  <script nonce="{{ csp_nonce() }}">
     function toggle_delete_sample(cb) {
     var deleteSampleButton = document.getElementById('button_delete_sample');
     if (cb.checked) {
