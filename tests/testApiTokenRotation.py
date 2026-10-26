@@ -130,13 +130,16 @@ def test_everyone_whose_token_works_can_see_and_replace_it(client, app, role):
     """token_required admits visitor, contributor and admin. The settings page used to
     show the token to the last two only, so a visitor whose token leaked - and it works
     against every read route - had no way to retire it short of deleting the account,
-    which is exactly what this PR exists to stop being the only option."""
+    which is exactly what this PR exists to stop being the only option. The page no
+    longer prints the token: its Show token button fetches it from admin.show_apitoken."""
     user = _user(app, username=f"{role}user", role=role)
     log_in_as(client, user.user_id)
 
     page = client.get("/settings").get_data(as_text=True)
 
-    assert user.apitoken in page, f"a {role} cannot see the token the API accepts"
+    assert "data-show-apitoken=" in page, f"a {role} cannot ask for the token the API accepts"
+    assert client.post("/admin/show_apitoken").get_json() == {"apitoken": user.apitoken}, \
+        f"a {role} cannot see the token the API accepts"
     assert "regenerate_apitoken" in page, f"a {role} cannot replace it"
 
 
@@ -149,6 +152,7 @@ def test_a_pending_user_is_shown_no_token(client, app):
 
     assert user.apitoken not in page
     assert "regenerate_apitoken" not in page
+    assert "data-show-apitoken=" not in page
 
 
 def test_a_get_cannot_rotate_a_token(client, app):

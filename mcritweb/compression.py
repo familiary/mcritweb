@@ -14,9 +14,10 @@ response's length. The one such secret every page carries, the CSRF token, is ma
 afresh on every render (`mcritweb.csrf.mask`), so it is never the same twice.
 
 Left alone:
-- A page that shows any other secret: a view marked `@uncompressed`. The settings page
-  shows the user's API token, and the server page, before and after a change, the
-  registration token (both are also `@no_store`). The username is printed on every page, next to a search term on
+- A page that shows any other secret: a view marked `@uncompressed`. The server page,
+  before and after a change, shows the registration token, and admin.show_apitoken
+  answers with the user's API token, which the settings page fetches when asked rather
+  than printing it (all three are also `@no_store`). The username is printed on every page, next to a search term on
   some; it is not a secret, and is compressed.
 - Downloads (`Content-Disposition: attachment`) and the API passthrough. The exports and
   the cached result download are streamed so that they never sit in memory whole, and

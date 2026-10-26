@@ -307,6 +307,17 @@ def test_the_column_settings_drag_and_save(admin, live_server):
     admin.assert_clean()
 
 
+def test_the_api_token_is_shown_and_copied(admin, live_server):
+    """show_apitoken.js is queued with later() and fetches the token from the same origin."""
+    page = admin.page
+    admin.open(live_server + "/settings")
+    page.click("button[data-show-apitoken]")
+    page.wait_for_function("() => document.querySelector('#apitoken-value').textContent === 'apitoken-admin'")
+    page.click("#apitoken-copy .btn-clipboard")
+    page.wait_for_selector(".tooltip")
+    admin.assert_clean()
+
+
 def test_a_running_jobs_page_polls_its_status(browser, app, live_server, make_user):
     """The overview of an unfinished job asks data.job_status on a timer (#183)."""
     jobs = CountingJobs(running(job_data(PARENT_JOB_ID, 10, params='{"0": 7}')), [])
