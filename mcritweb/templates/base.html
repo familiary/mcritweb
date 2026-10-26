@@ -162,6 +162,7 @@
      only listen for events, and every `new Autocomplete` waits in whenReady. #}
   <script>later({{ url_for('static', filename='post_action.js')|tojson }})</script>
   <script>later({{ url_for('static', filename='page_loading.js')|tojson }})</script>
+  <script>later({{ url_for('static', filename='status_message.js')|tojson }})</script>
   <script>later({{ url_for('static', filename='autocomplete.js')|tojson }})</script>
 
   {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
@@ -271,6 +272,11 @@
 </nav>
 
   </header>
+  {# The box of static/status_message.js, empty: it is filled in when that script has run. It is
+     here rather than added by the script because bootstrap's `legend + *` makes the browser
+     restyle the whole page for any element added to <body> or <main> after it loaded, which
+     on a 100 by 100 cross compare matrix took 300 ms. #}
+  <div class="status-message"></div>
   <main class="content">
       {% for category, message in get_flashed_messages(with_categories=true) %}
         {% if category == 'error' %}

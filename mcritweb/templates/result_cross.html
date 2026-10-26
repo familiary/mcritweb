@@ -236,7 +236,7 @@ Results for Job: {{ job_info.job_id }}
               ("clustered", "clustered", "The order MCRIT's hierarchical clustering produced"),
               ("sample_id", "sample ID", "Ascending sample ID"),
               ("family", "family", "Family name, then version")] %}
-          <button onclick="window.location.href='{{ url_for('data.result', job_id=job_info.job_id, order=ordering) }}'" type="button" aria-pressed="{{ 'true' if active_order == ordering else 'false' }}" class="btn {{ 'btn-primary' if active_order == ordering else 'btn-outline-primary' }} hint--top" data-hint="{{ hint }}">{{ label }}</button>
+          <button onclick="window.location.href='{{ url_for('data.result', job_id=job_info.job_id, order=ordering) }}'" type="button" aria-pressed="{{ 'true' if active_order == ordering else 'false' }}" class="btn {{ 'btn-primary' if active_order == ordering else 'btn-outline-primary' }} hint--top" data-hint="{{ hint }}" aria-describedby="{{ ordering }}-order-explained">{{ label }}<span hidden id="{{ ordering }}-order-explained">{{ hint }}</span></button>
           {% endfor %}
         </div>
       </div>

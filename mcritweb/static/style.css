@@ -391,3 +391,165 @@ form.form-inline input {
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }
+
+/* hint.css tooltips: the data-hint attribute, drawn by the element's ::after with a ::before
+   arrow. hint.css is vendored and linked after this file, so the rules that change one of
+   its declarations start at :root to out-rank it.
+
+   A tooltip is laid out only while it is shown. hint.css merely hides the others, and a hidden
+   box still takes its room: one long hint on one line made the cross compare pages 1120px
+   wide in any window narrower than that, and the two boxes behind each square of a cross
+   compare matrix were most of the time a large one took to draw.
+
+   The rules are written for the matrix, where tens of thousands of elements carry a hint and
+   every selector that mentions their pseudo-elements is matched against each of them: the
+   idle state is one plain selector, and the rules for a shown tooltip start with :hover or
+   :focus-visible, which fail at once on all but one element. A :not() chain or an ancestor
+   in front of a pseudo-element cost more at load than the boxes it saved. */
+[data-hint]::before,
+[data-hint]::after {
+  display: none;
+}
+
+[data-hint]:hover::before,
+[data-hint]:hover::after,
+[data-hint]:focus-visible::before,
+[data-hint]:focus-visible::after {
+  display: block;
+}
+
+/* Escape puts the tooltip that is showing away (static/status_message.js) */
+:root.hints-dismissed [data-hint]:hover::before,
+:root.hints-dismissed [data-hint]:hover::after,
+:root.hints-dismissed [data-hint]:focus-visible::before,
+:root.hints-dismissed [data-hint]:focus-visible::after {
+  display: none;
+}
+
+/* a hint is marked as one, as <abbr> is. Not the matrix squares, which lead to their pair */
+span[data-hint]:not(.score-swatch) {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 0.2em;
+}
+
+/* the text wraps, at a width that fits a phone; pre-wrap keeps the line breaks and the
+   padding the templates write into it */
+:root [data-hint]:hover::after,
+:root [data-hint]:focus-visible::after {
+  white-space: pre-wrap;
+  width: max-content;
+  max-width: min(32rem, calc(100vw - 2rem));
+  overflow-wrap: anywhere;
+}
+
+/* a shown tooltip is not filtered with its element: the dark theme dims the matrix squares
+   with a filter, which dimmed their tooltips too, and which would make the square the box
+   a fixed tooltip is placed in */
+:root [data-hint]:hover,
+:root [data-hint]:focus-visible {
+  filter: none;
+}
+
+/* Where the browser can anchor one box to another, the tooltip is placed against the
+   window instead of inside its element: above the element, or below it, or to its other
+   side, wherever it fits, and never cut off by a pane that scrolls, as the cross compare
+   matrix is. Above or below rather than beside it, so that it does not cover the cells
+   next to it in the same row. Elsewhere it opens where hint.css puts it. The arrow is left
+   out here, since it cannot follow the tooltip to another side. */
+@supports (anchor-scope: all) {
+  @position-try --hint-above {
+    position-area: top;
+    margin: 0.5rem 0.5rem 0;
+  }
+  @position-try --hint-below {
+    position-area: bottom;
+    margin: 0 0.5rem 0.5rem;
+  }
+  :root [data-hint]:hover,
+  :root [data-hint]:focus-visible {
+    anchor-name: --hint;
+    anchor-scope: --hint;
+  }
+  :root [data-hint]:hover::after,
+  :root [data-hint]:focus-visible::after {
+    position: fixed;
+    position-anchor: --hint;
+    position-area: top span-right;
+    position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline, --hint-above, --hint-below;
+    inset: auto;
+    margin: 0.5rem 0.5rem 0 0;
+    transform: none;
+    /* it touches its element, so the pointer can move onto it, to read it under a
+       magnifier for instance, without it closing (WCAG 1.4.13) */
+    pointer-events: auto;
+  }
+  :root .hint--left:hover::after,
+  :root .hint--left:focus-visible::after {
+    position-area: top span-left;
+    margin: 0.5rem 0 0 0.5rem;
+  }
+  :root .hint--bottom:hover::after,
+  :root .hint--bottom:focus-visible::after {
+    position-area: bottom span-right;
+    margin: 0 0.5rem 0.5rem 0;
+  }
+  :root [data-hint]:hover::before,
+  :root [data-hint]:focus-visible::before {
+    display: none;
+  }
+}
+
+/* a phone without anchor positioning shows the tooltip across the foot of the window, where
+   it fits wherever its element is (the modern-web-guidance tooltip guides' fallback) */
+@supports not (anchor-scope: all) {
+  @media (max-width: 575.98px) {
+    :root [data-hint]:hover::after,
+    :root [data-hint]:focus-visible::after {
+      position: fixed;
+      inset: auto 0.5rem 0.5rem;
+      width: auto;
+      margin: 0;
+      transform: none;
+    }
+    :root [data-hint]:hover::before,
+    :root [data-hint]:focus-visible::before {
+      display: none;
+    }
+  }
+}
+
+/* the status message of static/status_message.js, at the foot of the window. It is on the
+   page from the start, so that a screen reader is listening to it, and has no size while it
+   is empty. Where the browser has popovers it is one, which these rules restyle from the
+   browser's own: the top layer keeps it above an open dialog's backdrop */
+.status-message {
+  position: fixed;
+  inset: auto 1rem 1rem auto;
+  z-index: 1090;
+  max-width: calc(100vw - 2rem);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  color: var(--text-body);
+  background: none;
+}
+.status-message.status-message-shown {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.25rem;
+  background-color: var(--surface-info);
+}
+/* what to copy by hand when the copy could not be made */
+.status-message-value:not(:empty) {
+  font-family: monospace;
+  overflow-wrap: anywhere;
+}
+.status-message .btn-close {
+  margin: 0 0 0 auto;
+}
