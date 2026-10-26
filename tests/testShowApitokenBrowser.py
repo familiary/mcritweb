@@ -110,7 +110,7 @@ def test_a_press_before_the_script_is_in_is_answered_once_it_is(signed_in, live_
     base.html holds one on a data-post button, and made again once they have run."""
     page, token, _user_id = signed_in
     held = []
-    page.route("**/static/show_apitoken.js", lambda route: held.append(route))
+    page.route("**/static/show_apitoken.js*", lambda route: held.append(route))
     page.goto(f"{live_server}/settings", wait_until="commit")
     page.wait_for_selector(SHOW)
     page.click(SHOW)
