@@ -540,6 +540,35 @@ def test_the_move_buttons_are_added_by_the_script_and_move_nothing(open_as, widt
         assert full == empty, path
 
 
+#: the pairs of move buttons whose boxes overlap, as "name / name"
+OVERLAPPING_BUTTONS = """() => {
+    const boxes = Array.from(document.querySelectorAll('[data-reorder]'), (button) => [button.getAttribute('aria-label'), button.getBoundingClientRect()]);
+    const overlaps = [];
+    boxes.forEach(([name, box], at) => boxes.slice(at + 1).forEach(([other, next]) => {
+        if (box.left < next.right && next.left < box.right && box.top < next.bottom && next.top < box.bottom) { overlaps.push(name + ' / ' + other); }
+    }));
+    return overlaps;
+}"""
+
+
+@pytest.mark.parametrize("width", [1280, 390])
+def test_the_move_buttons_of_one_item_keep_clear_of_the_next(open_as, width):
+    """The buttons sit out of the flow, 24px tall, so the item no longer grows to hold
+    them. The cross compare order's items are a line of small text, 21.6px, and each
+    item's buttons ran 2.4px over the next one's: they covered each other, and
+    Lighthouse's target-size audit failed the page. Every item is at least as tall as its
+    buttons."""
+    for path, role in [("/settings", "contributor"), (f"/data/result/{job_id_of('cross_compare')}", "visitor")]:
+        page = open_as(role, path, viewport={"width": width, "height": 900})
+        page.wait_for_selector("[data-reorder-item] [data-reorder]", state="attached")
+        if path == "/settings":
+            page.click("#pills-column-settings-tab")
+            page.wait_for_selector("#samples_table_active [data-reorder]", state="visible")
+        heights = page.evaluate("() => Array.from(document.querySelectorAll('[data-reorder-item]'), (item) => item.getBoundingClientRect().height).filter((height) => height > 0)")
+        assert heights and min(heights) >= 24, (path, min(heights))
+        assert page.evaluate(OVERLAPPING_BUTTONS) == [], path
+
+
 FOCUSED_SCORE = """() => {
     const score = document.activeElement;
     return score.classList.contains('score-swatch') ? [score.closest('tr').querySelector('th.id').textContent.trim(),
