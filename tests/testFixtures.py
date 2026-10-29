@@ -9,6 +9,7 @@ import logging
 import unittest
 
 import pytest
+from conftest import log_in_as
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -70,8 +71,8 @@ def test_index_spares_the_backend_for_callers_it_shows_nothing(client, as_role, 
     user_id = as_role("admin" if role == "anonymous" else role, username=f"idx{role}")
     with client.session_transaction() as test_session:
         test_session.clear()
-        if role != "anonymous":
-            test_session["user_id"] = user_id
+    if role != "anonymous":
+        log_in_as(client, user_id)
     fake_mcrit.calls.clear()
 
     response = client.get("/")

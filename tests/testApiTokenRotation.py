@@ -15,6 +15,7 @@ import re
 import unittest
 
 import pytest
+from conftest import log_in_as
 from werkzeug.security import generate_password_hash
 
 from mcritweb.db import APITOKEN_BYTES, UserInfo, generate_apitoken, get_user_by_apitoken
@@ -73,8 +74,7 @@ def test_a_registration_issues_a_token_of_the_new_shape(client, app):
 
 def test_rotating_replaces_the_callers_token(client, app):
     before = _user(app)
-    with client.session_transaction() as session:
-        session["user_id"] = before.user_id
+    log_in_as(client, before.user_id)
 
     response = client.post("/admin/regenerate_apitoken")
 
@@ -88,8 +88,7 @@ def test_rotating_replaces_the_callers_token(client, app):
 def test_the_old_token_stops_authenticating(client, app):
     """Rotation that leaves the old token working is not rotation."""
     before = _user(app)
-    with client.session_transaction() as session:
-        session["user_id"] = before.user_id
+    log_in_as(client, before.user_id)
     client.post("/admin/regenerate_apitoken")
 
     with app.app_context():
@@ -110,8 +109,7 @@ def test_rotating_does_not_touch_anybody_else(client, app):
     """
     mine = _user(app, username="mine")
     theirs = _user(app, username="theirs")
-    with client.session_transaction() as session:
-        session["user_id"] = mine.user_id
+    log_in_as(client, mine.user_id)
 
     client.post("/admin/regenerate_apitoken", data={
         "user_id": theirs.user_id,
@@ -134,8 +132,7 @@ def test_everyone_whose_token_works_can_see_and_replace_it(client, app, role):
     against every read route - had no way to retire it short of deleting the account,
     which is exactly what this PR exists to stop being the only option."""
     user = _user(app, username=f"{role}user", role=role)
-    with client.session_transaction() as session:
-        session["user_id"] = user.user_id
+    log_in_as(client, user.user_id)
 
     page = client.get("/settings").get_data(as_text=True)
 
@@ -146,8 +143,7 @@ def test_everyone_whose_token_works_can_see_and_replace_it(client, app, role):
 def test_a_pending_user_is_shown_no_token(client, app):
     """The other side: token_required refuses pending, so there is nothing to show."""
     user = _user(app, username="pendinguser", role="pending")
-    with client.session_transaction() as session:
-        session["user_id"] = user.user_id
+    log_in_as(client, user.user_id)
 
     page = client.get("/settings").get_data(as_text=True)
 
@@ -158,8 +154,7 @@ def test_a_pending_user_is_shown_no_token(client, app):
 def test_a_get_cannot_rotate_a_token(client, app):
     """POST-only, per AGENTS.md: a GET that writes can be fired by an <img> tag."""
     before = _user(app)
-    with client.session_transaction() as session:
-        session["user_id"] = before.user_id
+    log_in_as(client, before.user_id)
 
     response = client.get("/admin/regenerate_apitoken")
 
@@ -197,8 +192,7 @@ def test_a_token_issued_by_an_older_version_still_authenticates(app):
 
 def test_the_settings_page_offers_the_button(client, app):
     before = _user(app)
-    with client.session_transaction() as session:
-        session["user_id"] = before.user_id
+    log_in_as(client, before.user_id)
 
     page = client.get("/settings").get_data(as_text=True)
 

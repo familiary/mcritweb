@@ -14,6 +14,7 @@ import logging
 import re
 
 import pytest
+from conftest import log_in_as
 from werkzeug.security import generate_password_hash
 
 from mcritweb.db import APITOKEN_BYTES, UserInfo, generate_apitoken, is_legacy_apitoken
@@ -43,8 +44,7 @@ def _token_of(app, username):
 
 
 def _login(client, user_id):
-    with client.session_transaction() as session:
-        session["user_id"] = user_id
+    log_in_as(client, user_id)
 
 
 # --- the discriminator -----------------------------------------------------------

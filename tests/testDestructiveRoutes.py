@@ -21,6 +21,7 @@ import sqlite3
 import unittest
 
 import pytest
+from conftest import log_in_as
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -74,14 +75,12 @@ def test_deleting_a_user_takes_their_settings_with_them(app, client, as_role, ma
     as_role("admin", username="theadmin")
     victim = make_user("visitor", username="victim")
     client.get("/settings")   # nothing creates these rows until a page asks for them
-    with client.session_transaction() as test_session:
-        test_session["user_id"] = victim
+    log_in_as(client, victim)
     client.get("/settings")
 
     assert _rows(app, "SELECT user_id FROM user_filters WHERE user_id = ?", (victim,))
 
-    with client.session_transaction() as test_session:
-        test_session["user_id"] = _rows(app, "SELECT id FROM user WHERE username = 'theadmin'")[0][0]
+    log_in_as(client, _rows(app, "SELECT id FROM user WHERE username = 'theadmin'")[0][0])
     client.post(f"/admin/delete_user/{victim}/all")
 
     assert _rows(app, "SELECT user_id FROM user_filters WHERE user_id = ?", (victim,)) == []

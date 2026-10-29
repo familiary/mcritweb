@@ -116,7 +116,9 @@ ROUTE_POLICY = {
     "dropzone.static": (PUBLIC, READ_ONLY),
 
     # --- authenticated, any role including 'pending' -----------------------------
-    "authentication.logout": (LOGGED_IN, WRITES_ON_GET),   # session teardown, by design
+    # session teardown. It moves the account's session generation on, which ends its
+    # sessions everywhere (#284), so a GET only shows the button that posts it
+    "authentication.logout": (LOGGED_IN, WRITES_ON_POST),
     "authentication.settings": (LOGGED_IN, READ_ONLY),
     "admin.change_username": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_password": (LOGGED_IN, WRITES_ON_POST),

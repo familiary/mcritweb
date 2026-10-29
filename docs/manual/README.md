@@ -438,6 +438,8 @@ A token issued before MCRITweb 1.5.0 has only 32 characters; the settings page m
 ![An example for the user information](images/user_info.png "An example for the user information")
 
 Additionally, users with level contributor and above can also change their username and password.
+Changing the password logs the account out in every other browser; logging out logs it out everywhere, this browser included.
+Logging out leaves the API token as it is, so a token that may have been copied has to be replaced with the button next to it.
 
 All users with level visitor or above can also set a number of filter preferences, that are automatically applied to all matching results.
 

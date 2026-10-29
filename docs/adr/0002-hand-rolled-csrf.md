@@ -41,6 +41,11 @@ test changes.** The last row is what makes Flask-Dropzone work — it refuses to
 a token unless it finds a protector under `app.extensions["csrf"]`, and it will find
 either one.
 
+One later addition has no counterpart: `header_only()` (#284), which keeps the check
+out of `analyze.query`'s form, so an upload over the caller's cap is refused before it
+is parsed. flask-wtf reads the form before the headers, so under it the same takes
+exempting that view and calling `csrf.protect()` from it once the cap is checked.
+
 ## Consequences
 
 What the extension provides and this does not, none of it the primary defence:

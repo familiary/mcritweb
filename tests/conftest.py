@@ -5,12 +5,15 @@ a fake MCRIT backend substituted through the MCRIT_CLIENT_FACTORY config key, so
 test needs a running mcrit-server. See issue #88.
 """
 
+import threading
+
 import pytest
 from mcrit.storage.SampleEntry import SampleEntry
 from werkzeug.security import generate_password_hash
 
-from mcritweb import create_app
+from mcritweb import create_app, db
 from mcritweb.db import ServerInfo, UserInfo, init_db
+from mcritweb.views.authentication import PASSWORD_MARK, password_mark
 
 #: The MinHash-relevant configuration this fake instance claims. `MinHashIndex.addImportData`
 #: compares an export's `config.shingler` / `config.minhash` against the receiving instance's
@@ -378,7 +381,59 @@ def as_role(client, make_user):
     """
     def _as_role(role="admin", username=None):
         user_id = make_user(role=role, username=username)
-        with client.session_transaction() as test_session:
-            test_session["user_id"] = user_id
+        log_in_as(client, user_id)
         return user_id
     return _as_role
+
+
+def log_in_as(client, user_id, **session_kwargs):
+    """Give `client` the session /login would have given `user_id`, without the password.
+
+    That is the account's id and the mark of the account as it is now: a session without
+    the mark is ended on its next request, as one from before marks existed would be.
+    `session_kwargs` go to `session_transaction`, e.g. `base_url`.
+    """
+    with client.application.app_context():
+        mark = password_mark(UserInfo.fromDb(user_id=user_id))
+    with client.session_transaction(**session_kwargs) as test_session:
+        test_session["user_id"] = user_id
+        test_session[PASSWORD_MARK] = mark
+
+
+def session_cookie_for(app, user_id):
+    """A signed session cookie for a browser, holding what `log_in_as` puts in a test
+    client's session."""
+    with app.app_context():
+        mark = password_mark(UserInfo.fromDb(user_id=user_id))
+    return app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id, PASSWORD_MARK: mark})
+
+
+def hold_each_write_for_the_other(monkeypatch, *statements):
+    """Hold a request's SQL statement that starts with one of `statements` until a second
+    request has reached one of its own, for up to a second - so that both have made the
+    checks that come before their write.
+
+    A write that is checked first and then made without a lock lets both requests pass
+    the check before either has written. One that takes the write lock before its check
+    keeps the other out of its own, so the wait times out and the first goes on alone.
+    The statements are matched as sqlite3's trace callback reports them, with their
+    parameters filled in.
+    """
+    both_here = threading.Barrier(2, timeout=1)
+
+    def hold(statement):
+        if statement.startswith(statements):
+            try:
+                both_here.wait()
+            except threading.BrokenBarrierError:
+                # the other is kept out by a lock, or already gave up waiting here
+                pass
+
+    get_db = db.get_db
+
+    def get_held_db():
+        connection = get_db()
+        connection.set_trace_callback(hold)
+        return connection
+
+    monkeypatch.setattr(db, "get_db", get_held_db)

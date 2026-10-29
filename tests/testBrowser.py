@@ -22,6 +22,7 @@ import threading
 import time
 
 import pytest
+from conftest import session_cookie_for
 from fixtureData import job_id_of
 from werkzeug.serving import make_server
 
@@ -88,7 +89,7 @@ def browser_page(app, live_server, make_user):
     change to the login markup instead.
     """
     user_id = make_user(role="visitor")
-    cookie = app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id})
+    cookie = session_cookie_for(app, user_id)
 
     with sync_api.sync_playwright() as playwright:
         try:

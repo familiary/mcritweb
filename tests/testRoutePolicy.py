@@ -28,6 +28,7 @@ import sqlite3
 import unittest
 
 import pytest
+from conftest import log_in_as
 from routePolicy import (
     ADMIN,
     APITOKEN,
@@ -114,8 +115,8 @@ def _target(app, endpoint):
 def _use_session(client, user_id):
     with client.session_transaction() as test_session:
         test_session.clear()
-        if user_id is not None:
-            test_session["user_id"] = user_id
+    if user_id is not None:
+        log_in_as(client, user_id)
 
 
 def _is_rejection(endpoint, response):
