@@ -103,26 +103,15 @@
   {% endif %}
   {% endfor %}
 
-  {% if job.arguments[0]|length > 1 %}
-    {{ job.method|job_name }} | {{ job.arguments[0] | length }} samples<br />
-  {% else %}
-    {{ job.method|job_name }} | {{ job.arguments[0] | length }} sample<br />
-  {% endif %}
+  {# the samples as the job's Task row names them, ranges and all, rather than every id
+     after the count; the title still lists each one (issue #300) #}
+  {{ job.method|job_name }} | <span title="{{ job.arguments[0]|join(', ') }}">{{ job.arguments[0]|unique_blocks_samples }}</span><br />
 
-  {% if job.arguments|length > 1 %}
-    {% if reference_sample %}
-     <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(reference_sample.family, reference_sample.family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> 
-    {% else %}
-     <i class="fa-solid fa-bug " title="Family ID"></i> - | <i class="fa-solid fa-virus " title="Sample ID"></i> 
-   {% endif %}
-   {% else %}
-   {% if reference_sample %}
-   <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(reference_sample.family, reference_sample.family_id) }} | <i class="fa-solid fa-virus " title="Sample ID"></i> 
-   {% else %}
-   <i class="fa-solid fa-bug " title="Family ID"></i> - | <i class="fa-solid fa-virus " title="Sample ID"></i> 
-   {% endif %}
-   {% endif %}
-  {{ job.arguments[0]|join(', ') }}
+  {% if reference_sample %}
+  <i class="fa-solid fa-bug " title="Family ID"></i> {{ format_family_name(reference_sample.family, reference_sample.family_id) }}
+  {% else %}
+  <i class="fa-solid fa-bug " title="Family ID"></i> -
+  {% endif %}
 
 {% elif job.method == "updateMinHashesForSample" %}
   {% set sample_entry = samples_by_id.get(job.sample_id) %}
@@ -210,7 +199,7 @@
     <th style="text-align: right;" scope="col">Started</th>
     <th style="text-align: right;" scope="col">Finished</th>
     <th style="text-align: right;" scope="col">Progress</th>
-    <th style="min-width: 90px;" scope="col"></th>
+    <th style="min-width: 90px;" scope="col"><span class="visually-hidden">Actions</span></th>
   </tr> 
 {% endmacro %}  
   
@@ -256,7 +245,7 @@
   <tr>
     <th style="min-width: 150px; text-align: right;" scope="col">Finished</th>
     <th style="width: 99%" scope="col">Type</th>
-    <th style="min-width: 90px;" scope="col"></th>
+    <th style="min-width: 90px;" scope="col"><span class="visually-hidden">Actions</span></th>
   </tr> 
 {% endmacro %}  
   

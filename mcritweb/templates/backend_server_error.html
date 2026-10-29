@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title%}
+MCRIT server failed
+{% endblock %}
+{% block style %}
+{% endblock %}
+{% block content %}
+<h1>The MCRIT server could not handle the request</h1>
+<p role="alert">The MCRIT server answered {{ status_code }}{% if message %}: {{ message }}{% endif %}</p>
+{# This is the other half of issue #43: the client raised because the server reported a
+   failure of its own (a 500, a status it does not send, or a "failed" answer), which is
+   a different thing from "what you asked for is not there" - that case still answers
+   None and renders backend_no_result.html. #}
+<p>The request reached the server, and the server could not carry it out. That is a
+   problem on the server, not with what was asked for.</p>
+{% if request.method in ('POST', 'PUT', 'PATCH', 'DELETE') %}
+<p>Whether the request went through is unknown: the server may have carried it out
+   before failing to report back. Check before submitting it again.</p>
+{% endif %}
+{% if g.user and g.user.role == 'admin' %}
+<p>The backend's log holds the traceback. Its address is in
+   <a href="{{ url_for('admin.server') }}">server settings</a>.</p>
+{% else %}
+<p>Try again in a moment, or ask an administrator to check the server's log.</p>
+{% endif %}
+{% endblock %}
