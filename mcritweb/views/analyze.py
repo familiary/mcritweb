@@ -181,7 +181,7 @@ def start_unique_blocks():
 @bp.route('/compare_submit_query')
 @visitor_required
 def compare_submit_query():
-    return render_template("compare_submit_query.html")
+    return redirect(url_for('analyze.query'))
 
 @bp.route('/cross_compare_from_hash_list', methods=['GET', 'POST'])
 @visitor_required
