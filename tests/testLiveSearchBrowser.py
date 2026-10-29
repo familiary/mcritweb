@@ -16,6 +16,7 @@ import os
 import threading
 
 import pytest
+from conftest import session_cookie_for
 from werkzeug.serving import make_server
 
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
@@ -45,7 +46,7 @@ def live_server(app):
 def page(app, live_server, make_user):
     """A Chromium page logged in as an admin, who sees the edit buttons."""
     user_id = make_user(role="admin")
-    cookie = app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id})
+    cookie = session_cookie_for(app, user_id)
     with sync_api.sync_playwright() as playwright:
         try:
             # a Chromium that playwright did not install itself is named through MCRITWEB_CHROMIUM

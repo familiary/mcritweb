@@ -15,6 +15,7 @@ import os
 import threading
 
 import pytest
+from conftest import session_cookie_for
 from testJobNames import TASK_JOB_ID, serve_unique_blocks_job
 from werkzeug.serving import make_server
 
@@ -55,7 +56,7 @@ def live_server(app):
 def browser_page(app, live_server, make_user):
     """A Chromium page with touch, logged in as a visitor - see testFunctionVsBrowser.py."""
     user_id = make_user(role="visitor")
-    cookie = app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id})
+    cookie = session_cookie_for(app, user_id)
 
     with sync_api.sync_playwright() as playwright:
         try:
