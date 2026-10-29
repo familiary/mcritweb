@@ -10,8 +10,9 @@ from mcrit.storage.SampleEntry import SampleEntry
 
 import mcritweb.views.cfg_explorer_detector as cfg_explorer_detector
 from mcritweb.autocomplete import autocomplete_items
+from mcritweb.statistics import statistics_page
 from mcritweb.views.authentication import contributor_required, visitor_required
-from mcritweb.views.client import get_client, get_sample_entries, remember_samples
+from mcritweb.views.client import backend_version, get_client, get_sample_entries, remember_samples
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.data import JOB_ID_PATTERN
 from mcritweb.views.functiondiff import get_combined_dot_graph
@@ -873,8 +874,14 @@ def getPicBlockMatches(picblockhash):
 @mcrit_server_required
 def statistics():
     client = get_client()
-    stats = client.getStatus()
-    return render_template("statistics.html", stats=stats)
+    # with_pichash stays on (the client's default): the distinct PicHash count is one of
+    # the corpus figures, and mcrit can answer it from its pichash_counts collection
+    page = statistics_page(
+        client.getStatus(),
+        mcritweb_version=current_app.config.get("MCRITWEB_VERSION"),
+        mcrit_version=backend_version(client),
+    )
+    return render_template("statistics.html", page=page)
 
 
 @bp.route('/search')
