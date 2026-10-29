@@ -1,6 +1,7 @@
 {% from 'table/table.html' import sample_table %}
 {% from 'table/sample_row.html' import sample_row_std_js %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
+{% from 'table/links.html' import tag_badges %}
 {% extends 'base.html' %}
 
 {% block title%}
@@ -14,6 +15,7 @@ Family: {{ family.family }}
 
 {% block content %}
 <h1>Family: {{ family.family }}</h1>
+{{ tag_badges(family) }}
 
   <form style="width:100%" method="GET" required action="#" data-live-search="family-samples">
     <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" aria-label="Search this family's samples" aria-controls="family-samples" autofocus autocomplete="on">
@@ -22,7 +24,7 @@ Family: {{ family.family }}
   <p id="family-samples-status" class="visually-hidden" role="status"></p>
   <div id="family-samples">
 
-{{ sample_table(samples, job_collection=job_collection, show_edit=True, no_family=True, sort_pagination=pagination, column_setup=user_column_setup,
+{{ sample_table(samples, job_collection=job_collection, show_edit=True, no_family=True, sort_pagination=pagination, column_setup=user_column_setup, tags_editable=tags_editable,
                 empty_message=("No samples in this family match \"" ~ query ~ "\".") if query else "This family has no samples.", highlight_terms=query|search_terms) }}
 {% if samples %}
 {{ pagination_widget(pagination) }}

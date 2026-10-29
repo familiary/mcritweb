@@ -97,6 +97,14 @@
             &nbsp;&nbsp;
             <label for="family_is_library" class="col-form-label">Family is Library?</label>
           </div>
+          {% if kwargs.get('tags_editable') %}
+          {# only where the view found tags editable: a form without the field changes no tags #}
+          <div class="form-group mb-3">
+            <label for="family_tags" class="col-form-label">Tags:</label>
+            <input type="text" class="form-control" name="family_tags" id="family_tags" aria-describedby="family_tags_help">
+            <div class="form-text" id="family_tags_help">Separated by commas. Emptying the field removes them all.</div>
+          </div>
+          {% endif %}
           <div class="form-group mb-3">
             <input type="checkbox" value="" name="family_delete" id="family_delete" onclick='toggle_delete_family(this);'>
             &nbsp;&nbsp;
@@ -171,6 +179,14 @@
             &nbsp;&nbsp;
             <label for="sample_is_library" class="col-form-label">Sample is Library?</label>
           </div>
+          {% if kwargs.get('tags_editable') %}
+          {# only where the view found tags editable: a form without the field changes no tags #}
+          <div class="form-group mb-3">
+            <label for="sample_tags" class="col-form-label">Tags:</label>
+            <input type="text" class="form-control" name="sample_tags" id="sample_tags" aria-describedby="sample_tags_help">
+            <div class="form-text" id="sample_tags_help">Separated by commas. Emptying the field removes them all.</div>
+          </div>
+          {% endif %}
           <div class="form-group mb-3">
             <input type="checkbox" value="" name="sample_delete" id="sample_delete" onclick='toggle_delete_sample(this);'>
             &nbsp;&nbsp;

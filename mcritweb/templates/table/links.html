@@ -74,3 +74,19 @@ function copy_to_clipboard(btn){
 {%- macro format_sha_short_clipboard(sha256) -%}
   {{ format_monospace(sha256[:8]) }} {{ clipboard_btn(sha256) }}
 {%- endmacro -%}
+
+{#- An entry's tags, each a link to the search for everything that carries it
+    (familiary/mcrit#53). Tags come from the corpus and are written as text, so autoescaping
+    covers them. Read through getattr: entries of an mcrit package without tags have no such
+    attribute, and then nothing is shown. -#}
+{%- macro tag_badges(entry) -%}
+  {%- set tags = entry|getattr('tags', none) -%}
+  {%- if tags %}
+  <p class="tag-badges"><span class="text-muted">Tags:</span>
+    {% for tag in tags -%}
+    {#- text-white, not the badge's own colour: a link's hover colour would win over that one -#}
+    <a class="badge rounded-pill bg-secondary text-white text-decoration-none" href="{{ url_for('explore.search', query=tag_search_query(tag), type='family,sample,function') }}">{{ tag }}</a>
+    {% endfor -%}
+  </p>
+  {%- endif -%}
+{%- endmacro -%}

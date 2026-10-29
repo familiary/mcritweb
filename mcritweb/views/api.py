@@ -6,10 +6,15 @@ from flask import Blueprint, Response, abort, current_app, g, request
 from mcritweb import backend_errors
 from mcritweb.views.authentication import token_required
 from mcritweb.views.client import get_client
+from mcritweb.views.tags import client_has_tags
 from mcritweb.views.utility import get_username, mcrit_server_required, read_smda_report
 
 bp = Blueprint('api', __name__, url_prefix='/api')
 
+# an entity's tags (familiary/mcrit#53): POST adds and DELETE removes those a JSON body
+# {"tags": [...]} names, as mcrit's own routes of the same path do
+TAGS_PATH = re.compile(r"(?P<collection>families|samples|functions)/(?P<entity_id>\d+)/tags$")
+TAG_ENTITY_OF_COLLECTION = {"families": "family", "samples": "sample", "functions": "function"}
 
 @bp.errorhandler(requests.RequestException)
 def backend_unreachable(error):
@@ -26,6 +31,9 @@ def backend_unreachable(error):
 CONTRIBUTOR_ONLY = [
     (re.compile("samples$"), "POST"),   # addReport
     (re.compile(r"functions/\d+$"), "PUT"),   # modifyFunction (explore.modifyFunction is contributor_required)
+    # addTags, removeTags: tags are edited only by contributors in the UI as well
+    (TAGS_PATH, "POST"),
+    (TAGS_PATH, "DELETE"),
 ]
 
 
@@ -90,7 +98,7 @@ def handle_raw_response(response):
     return Response(status=response.status_code)
 
 
-@bp.route('/<path:api_path>', methods=['GET','POST','PUT'])
+@bp.route('/<path:api_path>', methods=['GET','POST','PUT','DELETE'])
 @token_required
 @mcrit_server_required
 def api_router(api_path):
@@ -99,6 +107,9 @@ def api_router(api_path):
     # submits and ignores the method, so a PUT to it would be answered as a GET
     if request.method == "PUT" and not re.match(r"functions/\d+$", api_path):
         abort(405)
+    # and DELETE for removeTags only, for the same reason
+    if request.method == "DELETE" and not TAGS_PATH.match(api_path):
+        abort(405)
     if requires_contributor(api_path, request.method) and g.api_user.role not in ('contributor', 'admin'):
         abort(403)
     username = get_username(request)
@@ -106,6 +117,28 @@ def api_router(api_path):
     current_app.logger.debug("api_router - %s - %s", api_path, username)
     if re.match(r"status$", api_path):
         return handle_raw_response(client.getStatus())
+    # addTags by POST, removeTags by DELETE (familiary/mcrit#53)
+    elif re_match := TAGS_PATH.match(api_path):
+        if request.method not in ("POST", "DELETE"):
+            abort(405)
+        if not client_has_tags(client):
+            abort(501)
+        body = request.get_json(silent=True)
+        tags = body.get("tags") if isinstance(body, dict) else None
+        # what each tag may be is the backend's to judge; only the shape is checked here
+        if not isinstance(tags, (list, str)):
+            abort(400)
+        change = client.addTags if request.method == "POST" else client.removeTags
+        entity = TAG_ENTITY_OF_COLLECTION[re_match.group("collection")]
+        return handle_raw_response(change(entity, int(re_match.group("entity_id")), tags))
+    # getTags
+    elif re_match := re.match(r"tags$", api_path):
+        if not client_has_tags(client):
+            abort(501)
+        entity = request.args.get("entity")
+        if entity not in TAG_ENTITY_OF_COLLECTION.values():
+            abort(400)
+        return handle_raw_response(client.getTags(entity))
     # getFunctionsBySampleId
     elif re_match := re.match(r"samples/(?P<sample_id>\d+)/functions$", api_path):
         sample_id = int(re_match.group("sample_id"))

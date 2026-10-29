@@ -38,6 +38,7 @@ The currently supported fields per category are:
 * families:
     * family_id
     * family_name
+    * tags
 * samples:
     * family_id
     * sample_id
@@ -46,6 +47,7 @@ The currently supported fields per category are:
     * family
     * version
     * component
+    * tags
 * functions:
     * family_id
     * sample_id
@@ -54,6 +56,7 @@ The currently supported fields per category are:
     * pichash
     * function_name
     * num_instructions
+    * tags
 
 Additionally, you can also use operands to further limit the term:
 
@@ -167,6 +170,18 @@ The API usage lists the requests that fetch the same data through the API passth
 ![The API usage of a function](images/function_api_usage.png "The API usage of a function")
 
 
+#### Tags
+
+Families, samples and functions can carry tags, short labels such as `packed`, `reviewed` or `source:vt`, if the MCRIT backend stores them (a release with tags, which MCRITweb asks the backend about; against an older one, or with an older `mcrit` package installed, nothing about tags is shown).
+A family's, sample's or function's tags are shown under the heading of its page, and each tag links to a search for everything that carries it, `tags:"<tag>"` across families, samples and functions.
+`tags:` matches a whole tag, ignoring case; `tags:?pack` finds tags containing `pack`, and `tags:!=packed` the records without that tag.
+
+Contributors edit the tags where they edit the record: in the *Edit* dialog of a family or a sample, and with the tags button beside *Rename* on a function's page.
+Tags are separated by commas, and emptying the field removes them all.
+MCRIT stores them lower-cased; a tag is 1-64 letters, digits, spaces, dots, colons, underscores or dashes and starts with a letter or digit, and anything else is refused with the form left unapplied.
+Saving adds and removes only what you changed, so a tag someone else added meanwhile is kept.
+API tokens with the contributor role can do the same with `POST` (add) and `DELETE` (remove) on `/api/<families|samples|functions>/<id>/tags` and a JSON body `{"tags": [...]}`; `GET /api/tags?entity=family|sample|function` counts the tags in use.
+
 #### Statistics
 
 Provides a short summary of the MCRIT installation and its database contents:
@@ -178,6 +193,8 @@ Provides a short summary of the MCRIT installation and its database contents:
 * **Escaper fingerprints**: per architecture, how the backend escapes instructions before hashing them. MinHashes are only comparable between functions escaped the same way.
 
 A value the backend reports that the page has no label for is listed under *Other*.
+
+Where the backend stores tags, the page also lists every tag in use with the number of families, samples and functions carrying it.
 
 ### Analyze
 
