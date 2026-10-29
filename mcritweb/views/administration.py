@@ -6,13 +6,36 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
 from mcritweb.db import UserColumnSettings, UserFilters, UserInfo, generate_apitoken, is_legacy_apitoken
-from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
+from mcritweb.views.authentication import (
+    KNOWN_ROLES,
+    TOO_MANY_ATTEMPTS,
+    _throttled,
+    admin_required,
+    login_required,
+    multi_user,
+)
 from mcritweb.views.client import backend_version, get_client
 from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
 from mcritweb.views.utility import forget_server_probe, get_session_user_id, mcrit_server_required
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
+
+
+def _password_checks_out(user_info, password):
+    """Check the signed-in caller's current password, metered as a login is.
+
+    A settings form that asks for the password is a password guess like one at /login:
+    whoever holds a stolen or copied session could otherwise try password after password
+    here, unthrottled, and learn one that may open other accounts too. So a wrong one is
+    recorded against the same per-address budget, and a right one clears this account's
+    failures, as a successful login does.
+    """
+    if check_password_hash(user_info.password, password):
+        db.clear_login_failures(request.remote_addr, user_info.username)
+        return True
+    db.record_failed_login(request.remote_addr, user_info.username)
+    return False
 
 @bp.route('/change_username' , methods=('POST',))
 @login_required
@@ -28,7 +51,9 @@ def change_username():
         error_msg = "Username has invalid format."
     elif db.is_reserved_username(new_username):
         error_msg = "Username is reserved."
-    elif not check_password_hash(user_info.password, password):
+    elif _throttled(user_info.username):
+        error_msg = TOO_MANY_ATTEMPTS
+    elif not _password_checks_out(user_info, password):
         error_msg = 'Incorrect Password!'
     elif UserInfo.fromDb(username=new_username) is not None:
         error_msg = 'Username is already taken!'
@@ -63,7 +88,9 @@ def change_password():
         error_msg = 'Password is required.'
     elif not new_password == request.form['inputPassword4']:
         error_msg = 'The entered passwords do not match!'
-    elif not check_password_hash(user_info.password, old_password):
+    elif _throttled(user_info.username):
+        error_msg = TOO_MANY_ATTEMPTS
+    elif not _password_checks_out(user_info, old_password):
         error_msg = 'Incorrect password!'
     if error_msg is None:
         user_info.password = generate_password_hash(new_password)
