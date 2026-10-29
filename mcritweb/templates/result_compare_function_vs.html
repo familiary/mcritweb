@@ -3,11 +3,6 @@
 {% from 'table/function_details.html' import api_usage_modal, api_usage_button, cfg_legend %}
 {% extends 'base.html' %}
 {% block style %}
-<script src="{{ url_for('static', filename='trace_CFG/lib/d3.min.js') }}"></script>
-<script src="{{ url_for('static', filename='trace_CFG/lib/graphlib.min.js') }}"></script>
-<script src="{{ url_for('static', filename='trace_CFG/lib/graphlib-dot.min.js') }}"></script>
-<script src="{{ url_for('static', filename='trace_CFG/lib/dagre-d3.min.js') }}"></script>
-<script src="{{ url_for('static', filename='trace_CFG/lib/convexhull.js') }}"></script>
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='trace_CFG/cfg_style.css') }}">
 {% endblock %}
 
@@ -50,12 +45,102 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
         var js_function_id_a = {{ function_id_a }};
         var js_function_id_b = {{ function_id_b }};
         var js_node_colors = {{ node_colors|tojson }};
-        FunctionCompare.init({
-            nodeMatches: {{ node_matches|tojson }},
-            combinedUrl: {{ url_for('explore.fetchCombinedDotGraph', function_id_a=function_id_a, function_id_b=function_id_b)|tojson }}
+        // The graph viewer: d3, dagre and the scripts built on them, in the order they build
+        // on each other: 698 KB of script, 178 KB gzipped, that only the graphs use.
+        var viewer = [
+            {{ url_for('static', filename='trace_CFG/lib/d3.min.js')|tojson }},
+            {{ url_for('static', filename='trace_CFG/lib/graphlib.min.js')|tojson }},
+            {{ url_for('static', filename='trace_CFG/lib/graphlib-dot.min.js')|tojson }},
+            {{ url_for('static', filename='trace_CFG/lib/dagre-d3.min.js')|tojson }},
+            {{ url_for('static', filename='trace_CFG/lib/convexhull.js')|tojson }},
+            {{ url_for('static', filename='trace_CFG/main_duo.js')|tojson }},
+            {{ url_for('static', filename='trace_CFG/fnManip.js')|tojson }},
+            {{ url_for('static', filename='trace_CFG/loopCollapser.js')|tojson }},
+            {{ url_for('static', filename='trace_CFG/loopify_dagre.js')|tojson }},
+            {{ url_for('static', filename='function_compare.js')|tojson }}
+        ];
+        // Loading the viewer, and laying out and drawing the two graphs, holds the page's
+        // main thread for seconds on a large function, and the graphs start below the first
+        // screen. All of it happens once the graphs come into view, or a control above them
+        // is used, rather than on load.
+        var started = false;
+        function drawGraphs() {
+            if (started) {
+                return;
+            }
+            started = true;
+            var left = viewer.length;
+            function settled() {
+                left -= 1;
+                if (left === 0) {
+                    startViewer();
+                }
+            }
+            viewer.forEach(function (url) {
+                var script = document.createElement("script");
+                script.src = url;
+                // added by a script, they would run as each arrives; this runs them in order
+                script.async = false;
+                script.onload = settled;
+                // the viewer still starts, as it did when these were plain script tags: without
+                // d3 or main_duo.js nothing is drawn, without loopCollapser.js the graphs are
+                script.onerror = function () {
+                    document.getElementById("viewer_error").hidden = false;
+                    settled();
+                };
+                document.body.appendChild(script);
+            });
+        }
+        // What is pressed above the graphs before the viewer is in, replayed in order once it
+        // is: a highlight button, Reset view, or the view mode (Combined is offered only once
+        // both graphs are drawn, and a press on the disabled radio sends only a pointerdown).
+        // The checkboxes keep their own state, which the viewer reads as it starts.
+        var pressed = [];
+        var controls = document.getElementById("xcfg_top");
+        controls.addEventListener("click", function (event) {
+            if (pressed && event.target.matches('input[type="button"]')) {
+                pressed.push({type: "click", target: event.target});
+            }
+        }, true);
+        controls.addEventListener("pointerdown", function (event) {
+            var label = event.target.closest("label");
+            if (pressed && label && label.querySelector('input[name="viewMode"]')) {
+                pressed.push({type: "pointerdown", target: label});
+            }
+        }, true);
+        function startViewer() {
+            FunctionCompare.init({
+                nodeMatches: {{ node_matches|tojson }},
+                combinedUrl: {{ url_for('explore.fetchCombinedDotGraph', function_id_a=function_id_a, function_id_b=function_id_b)|tojson }}
+            });
+            bindDisplayControls();
+            var early = pressed;
+            pressed = null;
+            early.forEach(function (press) {
+                if (press.type === "click") {
+                    press.target.click();
+                } else {
+                    press.target.dispatchEvent(new PointerEvent("pointerdown", {bubbles: true}));
+                }
+            });
+            loadWithDotGraphAndFunctionIdA(js_function_id_a, js_node_colors)
+            loadWithDotGraphAndFunctionIdB(js_function_id_b, js_node_colors)
+        }
+        ["pointerdown", "focusin", "keydown"].forEach(function (type) {
+            controls.addEventListener(type, drawGraphs, true);
         });
-        loadWithDotGraphAndFunctionIdA(js_function_id_a, js_node_colors)
-        loadWithDotGraphAndFunctionIdB(js_function_id_b, js_node_colors)
+        if (!("IntersectionObserver" in window)) {
+            drawGraphs();
+            return;
+        }
+        // in view: any part of the graphs inside the upper three quarters of the window
+        var observer = new IntersectionObserver(function (entries) {
+            if (entries.some(function (entry) { return entry.isIntersecting; })) {
+                observer.disconnect();
+                drawGraphs();
+            }
+        }, { rootMargin: "0px 0px -25% 0px" });
+        observer.observe(document.getElementById("xcfg_container"));
     };
     </script>
     {% endif %}
@@ -83,6 +168,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
         <div class="mb-1">{{ cfg_legend(combined=True) }}</div>
         <div style="font-size: 0.85em; color: #6c757d;">Hover a block to outline its matches, click to centre the other graph on the first match. In the combined view, hovering a block that differs shows B's code.</div>
     </div>
+    <div id="viewer_error" role="alert" hidden style="margin: 20px; color: darkred;">Part of the graph viewer could not be loaded. Reload the page to try again.</div>
     <div id="xcfg_container">
         <div id="xcfg_left">
             <div id="tooltip_a" class="hidden">
@@ -121,11 +207,6 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
         <g/>
         </svg>
     </div>
-    <script src="{{ url_for('static', filename='trace_CFG/main_duo.js') }}"></script>
-    <script src="{{ url_for('static', filename='trace_CFG/fnManip.js') }}"></script>
-    <script src="{{ url_for('static', filename='trace_CFG/loopCollapser.js') }}"></script>
-    <script src="{{ url_for('static', filename='trace_CFG/loopify_dagre.js') }}"></script>
-    <script src="{{ url_for('static', filename='function_compare.js') }}"></script>
     <!--
     -->
 </div>
