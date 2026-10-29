@@ -57,9 +57,12 @@ Statistics
   </div>
   {# the tags in use (familiary/mcrit#53); None where the client or the backend has no tags #}
   {% if tag_counts is not none %}
-  <h2 class="h3" id="tags">Tags</h2>
+  <h2 class="h4" id="tags">Tags</h2>
   {% if tag_counts %}
-  <table class="table table-sm" style="width:50%;">
+  <div class="row">
+  <div class="col-lg-6">
+  <table class="table table-sm">
+    <caption class="visually-hidden">Tags in use</caption>
     <thead>
       <tr>
         <th scope="col">Tag</th>
@@ -79,6 +82,8 @@ Statistics
       {% endfor %}
     </tbody>
   </table>
+  </div>
+  </div>
   {% else %}
   <p class="text-muted">No family, sample or function carries a tag yet.</p>
   {% endif %}
