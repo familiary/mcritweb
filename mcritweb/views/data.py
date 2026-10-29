@@ -18,6 +18,7 @@ from mcrit.storage.UniqueBlocksResult import UniqueBlocksResult, wrap_string
 from smda.common.SmdaReport import SmdaReport
 from werkzeug.exceptions import NotFound
 
+from mcritweb.backend_errors import require_result, with_server_errors
 from mcritweb.db import UserColumnSettings, UserFilters, get_query_filename, utc_now
 from mcritweb.views.analyze import query as analyze_query
 from mcritweb.views.authentication import contributor_required, visitor_required
@@ -34,12 +35,15 @@ from mcritweb.views.MatchReportRenderer import (
 from mcritweb.views.memo import app_memo
 from mcritweb.views.pagination import Pagination
 from mcritweb.views.params import (
+    parse_base_addr_form_param,
+    parse_bitness_form_param,
     parse_checkbox_query_param,
     parse_choice_query_param,
     parse_integer_list_query_param,
     parse_integer_query_param,
     parse_str_query_param,
     parseBaseAddrAndBitnessFromFilename,
+    parseIsDumpFromFilename,
 )
 from mcritweb.views.ScoreColorProvider import ScoreColorProvider
 from mcritweb.views.utility import (
@@ -681,8 +685,8 @@ def specific_export(type, item_id):
 @mcrit_server_required
 def match_functions(function_id_a, function_id_b):
     client = get_client()
-    # the backend checks both ids itself; None is an unknown id (or a failed request)
-    match_info = client.getMatchFunctionVs(function_id_a, function_id_b)
+    # the backend checks both ids itself; None is an unknown id, a failure raises
+    match_info = with_server_errors(client).getMatchFunctionVs(function_id_a, function_id_b)
     if match_info is not None:
         function_entry = FunctionEntry.fromDict(match_info["function_entry_a"])
         pichash_matches_a = client.getMatchesForPicHash(function_entry.pichash, summary=True)
@@ -735,7 +739,7 @@ def download_result(job_id):
     client = get_client()
     job_info = None
     if JOB_ID_PATTERN.fullmatch(job_id):
-        job_info = client.getJobData(job_id)
+        job_info = with_server_errors(client).getJobData(job_id)
     if job_info is None:
         return render_template("result_invalid.html", job_id=job_id)
     cached_filename = find_cached_result_filename(current_app, job_id)
@@ -787,7 +791,7 @@ def result(job_id):
     client = get_client()
     # check if we have the respective report already locally cached
     result_json = load_cached_result(current_app, job_id)
-    job_info = client.getJobData(job_id)
+    job_info = with_server_errors(client).getJobData(job_id)
     # kept separate from result_json because the tail of this view needs to tell an
     # empty report ({}) from one that could not be fetched (None), and truthiness
     # cannot. load_cached_result answers {} on a miss, and cache_result only ever
@@ -796,7 +800,7 @@ def result(job_id):
     if not result_json:
         # otherwise obtain result report from remote
         result_json = fetched = client.getResultForJob(job_id)
-        if result_json:
+        if result_json and job_info is not None:
             cache_result(current_app, job_info, result_json)
     if result_json:
         # TODO validation - only parse to matching_result if this data type is appropriate 
@@ -1051,6 +1055,11 @@ def result_unique_blocks(job_info, blocks_result: dict):
     # memoized cover would depend on which of the two happened to compute it (issue #184)
     blocks_result["unique_blocks"] = dict(sorted(blocks_result["unique_blocks"].items()))
     sample_versions = get_sample_versions(family_entry, [entry["sample_id"] for entry in blocks_statistics["by_sample_id"].values()])
+    # the families the requested samples are listed under. For a job without a family,
+    # get_sample_versions has just fetched these entries for the report's samples, which
+    # are the requested ones, so this asks the backend nothing more; a family job lists
+    # its family instead
+    samples_by_id = get_sample_entries(sample_ids) if family_entry is None else {}
     yara_params = parse_yara_rule_params(request)
     yara_rule, yara_cover = build_yara_rule(job_info.job_id, blocks_result, yara_params)
     # only what the caller actually changed, so the forms can carry the rule parameters
@@ -1100,7 +1109,7 @@ def result_unique_blocks(job_info, blocks_result: dict):
                 paginated_blocks.append(paginated_block)
             index += 1
     # TODO pass the new result objects as single arguments and then render them in page tabs on the template
-    return render_template("result_unique_blocks.html", job_info=job_info, family_entry=family_entry, sample_id=sample_id, sample_ids=sample_ids, yara_rule=yara_rule, yara_cover=yara_cover, yara_params=yara_params, yara_query=yara_query, statistics=blocks_statistics, sample_versions=sample_versions, results=paginated_blocks, blkp=block_pagination, active_tab=active_tab)
+    return render_template("result_unique_blocks.html", job_info=job_info, family_entry=family_entry, sample_id=sample_id, sample_ids=sample_ids, yara_rule=yara_rule, yara_cover=yara_cover, yara_params=yara_params, yara_query=yara_query, statistics=blocks_statistics, sample_versions=sample_versions, samples_by_id=samples_by_id, results=paginated_blocks, blkp=block_pagination, active_tab=active_tab)
 
 #: Shown when a stored result names something the backend can no longer resolve. The
 #: cross-compare path has said this about samples for a long time; issue #96 is the
@@ -1491,11 +1500,11 @@ def linkhunt(job_id):
     client = get_client()
     # check if we have the respective report already locally cached
     result_json = load_cached_result(current_app, job_id)
-    job_info = client.getJobData(job_id)
+    job_info = with_server_errors(client).getJobData(job_id)
     if not result_json:
         # otherwise obtain result report from remote
             result_json = client.getResultForJob(job_id)
-            if result_json:
+            if result_json and job_info is not None:
                 cache_result(current_app, job_info, result_json)
     if job_info is None:
         # nothing in the queue under this id. A result without a job would be the same
@@ -1607,7 +1616,9 @@ def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
     cluster_key = (job_info.job_id,) + tuple((tuple(sorted(set(arg))) or None) if isinstance(arg, list) else arg for arg in link_hunt_args)
 
     def cluster_link_hunt_result():
-        function_entries = client.getFunctionsBySampleId(matching_result.reference_sample_entry.sample_id)
+        function_entries = require_result(
+            with_server_errors(client).getFunctionsBySampleId(matching_result.reference_sample_entry.sample_id),
+            "the functions of the reference sample")
         # TODO: probably need to paginate them as well
         link_clusters = matching_result.clusterLinkHuntResult(function_entries, link_hunt_result)
         return sorted([cluster for cluster in link_clusters if len(cluster["links"]) > 1], key=lambda x: x["score"], reverse=True)
@@ -1845,7 +1856,7 @@ def job_by_id(job_id):
     auto_refresh = parse_integer_query_param(request, "refresh") or 0
     auto_forward = parse_integer_query_param(request, "forward") or 0
 
-    job_info = client.getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
+    job_info = with_server_errors(client).getJobData(job_id) if JOB_ID_PATTERN.fullmatch(job_id) else None
     if auto_refresh and job_info and job_info.is_failed:
         auto_refresh = 0
         suppress_processing_message = True
@@ -2045,7 +2056,7 @@ def request_filename_info():
         match_baseaddr = re.search(r'"base_addr": (?P<base_addr>\d{1,20})(?!\d)', file_header)
         if match_baseaddr:
             result['base_addr'] = hex(int(match_baseaddr.group('base_addr')))
-    elif 'dump' in filename:
+    elif parseIsDumpFromFilename(filename):
         result['dump'] = True
         base_address, result['bitness'] = parseBaseAddrAndBitnessFromFilename(filename)
         result['base_addr'] = "" if not base_address else hex(base_address)
@@ -2093,15 +2104,31 @@ def submit():
         base_address = None
         form_options = request.form['options']
         is_dump = form_options == "dumped"
-        is_dump_or_smda = form_options in ['dumped', 'smda']
-        if is_dump_or_smda:
-            bitness = int(request.form['bitness'])
-            base_address = int(request.form['base_addr'], 16)
+        # only a memory dump needs these two: an SMDA report carries its own base address
+        # and bitness, and addReport() - where the smda branch below ends - takes neither
+        if is_dump:
+            bitness = parse_bitness_form_param(request)
+            if bitness is None:
+                flash("Please select the bitness of the sample.", category='error')
+                return "", 400 # Bad Request
+            base_address = parse_base_addr_form_param(request)
+            if base_address is None:
+                flash("Please enter the base address of the sample as a hexadecimal number, e.g. 0x400000.", category='error')
+                return "", 400 # Bad Request
 
         binary_content = f.read()
         if form_options == "smda":
-            content_as_dict = json.loads(binary_content)
-            smda_report = SmdaReport.fromDict(content_as_dict)
+            # the file is whatever was dropped on the page, so a body that is not a
+            # readable SMDA report is ordinary user input and has to become a message.
+            # It used to be covered by accident: the base address was demanded first,
+            # and an empty one answered 400 before anything was parsed. That check is
+            # now correctly limited to a dump, so this needs its own.
+            try:
+                smda_report = SmdaReport.fromDict(json.loads(binary_content))
+            except Exception:
+                current_app.logger.warning("data.submit - the uploaded file is not a readable SMDA report")
+                flash('That file could not be read as an SMDA report.', category='error')
+                return "", 400 # Bad Request
             upload_sha256 = smda_report.sha256
             if not isinstance(upload_sha256, str) or not SMDA_SHA256.match(upload_sha256):
                 flash("The SMDA report does not carry a valid sha256.", category='error')
@@ -2114,7 +2141,7 @@ def submit():
         sample_entry = client.getSampleBySha256(upload_sha256)
         if sample_entry is None:
             if form_options == "smda" and smda_report:
-                new_sample_entry, job_id = client.addReport(smda_report)
+                new_sample_entry, job_id = require_result(with_server_errors(client).addReport(smda_report), "the sample for the submitted report")
                 return url_for('explore.sample_by_id', sample_id=new_sample_entry.sample_id), 202 # Accepted
             else:
                 # These three ride in the query string McritClient builds by hand, so
@@ -2123,11 +2150,11 @@ def submit():
                 # have raised a 400 before here. The cost is length: a 255-character
                 # non-ASCII filename encodes to ~2.3 kB of request line, against
                 # gunicorn's 4094-byte default for the whole line.
-                job_id = client.addBinarySample(binary_content,
+                job_id = require_result(with_server_errors(client).addBinarySample(binary_content,
                     filename=quote_backend_query_value(f.filename),
                     family=quote_backend_query_value(family),
                     version=quote_backend_query_value(version),
-                    is_dump=is_dump, base_addr=base_address, bitness=bitness)
+                    is_dump=is_dump, base_addr=base_address, bitness=bitness), "a job for the submitted sample")
                 return url_for('data.job_by_id', job_id=job_id, refresh=3, forward=1), 202 # Accepted
         else:
             flash('Sample was already in database', category='warning')

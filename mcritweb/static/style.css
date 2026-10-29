@@ -90,236 +90,118 @@
 html {
     font-family: 'Roboto', sans-serif;
     background: var(--surface-page);
-    padding: 1rem;
-  }
+}
   
-  body {
-    min-width: 900px;
+body {
     max-width: 1824px;
     font-size: 0.9em;
     margin: 0 auto;
     background: var(--surface-page);
-  }
+}
   
-  h1, h2, h3, h4, h5, h6 {
+h1, h2, h3, h4, h5, h6 {
     color: var(--accent);
     margin: 1rem 0;
-  }
+}
 
-  /* headings moved to h2/h3 for a correct outline keep their old look through Bootstrap's
-     .h3/.h4 classes, but those also reset the margin; restore the one above */
-  h2.h3, h2.h4, h3.h4 {
-    margin: 1rem 0;
-  }
+/* headings moved to h2/h3 for a correct outline keep their old look through Bootstrap's
+   .h3/.h4 classes, but those also reset the margin; restore the one above */
+h2.h3, h2.h4, h3.h4 {
+  margin: 1rem 0;
+}
   
-  a {
+a {
     color: var(--link);
-  }
+}
 
-  a:hover {
+a:hover {
     color: var(--link-hover);
-  }
+}
 
-  /* Settings' "Match my system" says which way the system leans right now, so it follows
-     the operating system's preference rather than the theme the page is in */
-  .system-scheme-dark {
+/* Settings' "Match my system" says which way the system leans right now, so it follows
+   the operating system's preference rather than the theme the page is in */
+.system-scheme-dark {
     display: none;
-  }
+}
 
-  @media (prefers-color-scheme: dark) {
+@media (prefers-color-scheme: dark) {
     .system-scheme-light {
-      display: none;
+        display: none;
     }
 
     .system-scheme-dark {
-      display: inline;
+        display: inline;
     }
-  }
+}
 
-  /* rows tinted inline by score, and picker rows in a state (see tr.row-selected), see
-     --link-on-tint */
-  tr[style*="background-color"] a,
-  tr.row-selected a,
-  tr.row-pending a {
+/* rows tinted inline by score, and picker rows in a state (see tr.row-selected), see
+   --link-on-tint: --link falls below 4.5:1 on the palest of the 40% score tints */
+tr[style*="background-color"] a,
+tr.row-selected a,
+tr.row-pending a {
     color: var(--link-on-tint);
-  }
+}
 
-  /* a table link is often one digit or one icon; 24x24 is the WCAG 2.5.8 minimum target */
-  td > a:not(.btn) {
-    display: inline-block;
-    min-width: 24px;
-  }
+/* a table link is often one digit or one icon; 24x24 is the WCAG 2.5.8 minimum target */
+td > a:not(.btn) {
+  display: inline-block;
+  min-width: 24px;
+}
 
-  /* the link hunt's cluster cell stacks four matches to a line, so its links sit one
-     21.6px line apart - closer than the 24px WCAG 2.5.8 asks - and the "N more" toggle
-     sits right under them; give that one cell 24px lines instead of every table */
-  .linkhunt-links a {
-    display: inline-block;
-    min-height: 24px;
-    line-height: 24px;
-  }
-  /* a summary keeps display: list-item, which is what draws its disclosure triangle */
-  .linkhunt-links summary {
-    line-height: 24px;
-  }
+/* the link hunt's cluster cell stacks four matches to a line, so its links sit one
+   21.6px line apart - closer than the 24px WCAG 2.5.8 asks - and the "N more" toggle
+   sits right under them; give that one cell 24px lines instead of every table */
+.linkhunt-links a {
+  display: inline-block;
+  min-height: 24px;
+  line-height: 24px;
+}
+/* a summary keeps display: list-item, which is what draws its disclosure triangle */
+.linkhunt-links summary {
+  line-height: 24px;
+}
   
-  hr {
+hr {
     border: none;
     border-top: 1px solid var(--accent);
-  }
-  
+}
 
-
-  nav {
-    background: var(--surface-chrome);
-    display: flex;
-    align-items: center;
-    padding: 0 0.5rem;
-  }
-  
-  nav h1 {
-    flex: auto;
-    margin: 0;
-  }
-  
-  nav h1 a {
-    text-decoration: none;
-    padding: 0.25rem 0.5rem;
-  }
-  
-  nav ul  {
-    display: flex;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  
-  nav ul li a, nav ul li span, header .action {
-    display: block;
-    padding: 0.5rem;
-  }
-  
-  .content {
+.content {
     padding: 0 1rem 1rem;
-  }
-  
-  .content > header {
-    border-bottom: 1px solid var(--rule-subtle);
-    display: flex;
-    align-items: flex-end;
-  }
-  
-  .content > header h1 {
-    flex: auto;
-    margin: 1rem 0 0.25rem 0;
-  }
-  
-  .flash {
-    margin: 1em 0;
-    padding: 1em;
-    background: var(--surface-info);
-    border: 1px solid var(--accent);
-  }
-  
-  .post > header {
-    display: flex;
-    align-items: flex-end;
-    font-size: 0.85em;
-  }
-  
-  .post > header > div:first-of-type {
-    flex: auto;
-  }
-  
-  .post > header h1 {
-    font-size: 1.5em;
+}
+
+.content:last-child {
     margin-bottom: 0;
-  }
-  
-  .post .about {
-    color: var(--text-subtle);
-    font-style: italic;
-  }
-  
-  .post .body {
-    white-space: pre-line;
-  }
-  
-  .content:last-child {
-    margin-bottom: 0;
-  }
-  
-  .content form {
-    margin: 1em 0;
-    display: flex;
-    flex-direction: column;
-    width: 50%;
-  }
-  
-  .content label {
-    font-weight: bold;
-    margin-bottom: 0.5em;
-  }
-  
-  .content input, .content textarea {
-    margin-bottom: 1em;
-  }
-  
-  .content textarea {
-    min-height: 12em;
-    resize: vertical;
-  }
-  
-  input.danger {
-    color: var(--text-danger);
-  }
-  
-  input[type=submit] {
-    align-self: start;
-    min-width: 10em;
-  }
-  .nav-pills .nav-link.active { background-color: var(--surface-chrome); color: var(--text-strong)}
-  .nav-pills .nav-link{color: var(--text-strong)}
-  .thead-light { background-color: var(--surface-chrome); color: var(--text-strong)}
+}
 
-  /* A row of a sample picker (compare, 1 vs 1, cross compare, unique blocks) says which
-     state it is in with one of these classes, and the page's script toggles and tests the
-     class. A colour written into the style attribute could not follow the theme, and a
-     script that read it back to find the state was tied to it. Bootstrap leaves
-     --bs-table-bg transparent, so the row's background shows through its cells. #70 */
-  tr.row-selected { background-color: var(--row-selected); }
-  tr.row-pending { background-color: var(--row-pending); }
- a > * {
-    pointer-events: none;
-  }
-
-  .accordion-button:link, .accordion-button:visited, .accordion-button:hover, .accordion-button:active  {
-    background-color: var(--surface-chrome)!important;
-      color: var(--text-strong) !important;
-      text-decoration: none !important;
-         border-color: var(--surface-chrome) !important;
-      box-shadow: 0px !important;   
-  }
-
-  .accordion-button:focus {
-    z-index: 3;
-    border-color: var(--surface-chrome)!important;
-    outline: 0;
-    box-shadow: 0 0 0 .25rem var(--accordion-focus-ring) !important;
-  }
-  .accordion-button:not(.collapsed) {
-    color: var(--text-strong)  !important;
-    background-color: var(--surface-chrome)!important;
-    border-color: var(--surface-chrome)!important;
-  }
-
-  .page-link {
+.thead-light, .table-light {
+    background-color: var(--surface-chrome);
     color: var(--text-strong);
-  }
-  .page-item.active .page-link{ 
+}
+
+.btn-clipboard {
+    max-height: 24px;
+    max-width: 24px;
+    padding: 0;
+    line-height: 1;
+}
+
+/* A row of a sample picker (compare, 1 vs 1, cross compare, unique blocks) says which
+   state it is in with one of these classes, and the page's script toggles and tests the
+   class. A colour written into the style attribute could not follow the theme, and a
+   script that read it back to find the state was tied to it. Bootstrap leaves
+   --bs-table-bg transparent, so the row's background shows through its cells. #70 */
+tr.row-selected { background-color: var(--row-selected); }
+tr.row-pending { background-color: var(--row-pending); }
+
+.page-link {
+    color: var(--text-strong);
+}
+.page-item.active .page-link {
     color: var(--text-strong);
     background-color: var(--surface-chrome);
-    border-color: var(--surface-chrome)}
+    border-color: var(--surface-chrome);
+}
 
   .fa-sort {
     color: var(--sort-idle);
@@ -439,6 +321,22 @@ table.table thead th {
 
 table.table td.buttons {
   white-space: nowrap;
+}
+
+/* the result pages put two links in an id or family cell, the value and its filter icon.
+   Stacked by a narrow column, they are 21.6px lines apart, closer than the 24px WCAG 2.5.8
+   asks; side by side, the &nbsp; between them keeps both 24px targets clear of each other */
+table.table td.id, table.table td.family {
+  white-space: nowrap;
+}
+
+/* The result pages' filter forms set a checkbox under each row of fields, less than 24px
+   tall at desktop width: under what WCAG 2.5.8 asks of a target unless it keeps 12px clear
+   of the next one. The 1em gap below every field that `.content input` gave them kept it
+   clear; without it, a checkbox sits flush against the field above and the Filter button
+   below. */
+form.form-inline input {
+  margin-bottom: 1em;
 }
 
 /* function comparison page (data.match_functions), issue #74 */

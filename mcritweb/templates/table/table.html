@@ -19,20 +19,20 @@
 {% set CONTRIBUTOR_ONLY_LINKS = [url_for("data.submit"), url_for("data.submit_or_query")] %}
 
 {% macro empty_state(message, link=None) %}
-  <center>
+  <div class="text-center my-3">
     {%- if link and not (link in CONTRIBUTOR_ONLY_LINKS and g.user.role not in ["admin", "contributor"]) -%}
-      <a href="{{ link }}" style="color: var(--link-plain); text-decoration: underline;">{{ message }}</a>
+      <a href="{{ link }}" class="text-primary text-decoration-underline">{{ message }}</a>
     {%- else -%}
       <span class="text-muted">{{ message }}</span>
     {%- endif -%}
-  </center>
+  </div>
 {% endmacro %}
 
 {# `highlight_terms` is named rather than left in kwargs so it reaches the row macros
    only - a header has no search hit to mark, and half of them do not accept kwargs. #}
 {% macro _table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table", highlight_terms=None) %}
   <table class="table table-hover" id="{{table_id}}">
-    <thead class="thead-light">
+    <thead class="table-light">
       {{ header_macro(**kwargs) }}
     </thead>
     <tbody>
@@ -46,7 +46,7 @@
 {% macro _half_table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table") %}
 
   <table class="table table-hover" style="width: 66%;" id="{{table_id}}">
-    <thead class="thead-light">
+    <thead class="table-light">
       {{ header_macro(**kwargs) }}
     </thead>
     <tbody>
@@ -82,9 +82,10 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="editFamilyModalLabel">Modify Family</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-          <form action='{{ url_for("explore.modifyFamily") }}'' method="POST" style="width: 80%">
+          <form action="{{ url_for('explore.modifyFamily') }}" method="POST" style="width: 80%">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" class="form-control" name="family_id" id="family_id" hidden value="">
           <div class="form-group mb-3">
@@ -151,9 +152,10 @@
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="editSampleModalLabel">Modify Sample</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-          <form action='{{ url_for("explore.modifySample") }}'' method="POST" style="width: 80%">
+          <form action="{{ url_for('explore.modifySample') }}" method="POST" style="width: 80%">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" class="form-control" name="sample_id" id="sample_id" hidden value="">
           <div class="form-group mb-3">

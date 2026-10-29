@@ -13,7 +13,7 @@
     {% if name_and_sample[1].sample_id is not none and name_and_sample[1].sample_id >= 0 %}{% set identity.is_stored = true %}{% endif %}
   {% endfor %}
   <table class="table table-hover">
-    <thead class="thead-light">
+    <thead class="table-light">
       <tr>
         <th scope="col">Field</th>
         {% for name_and_sample in varargs %}
@@ -89,7 +89,7 @@
 
 {% macro function_column_table()%}
   <table class="table table-hover">
-    <thead class="thead-light">
+    <thead class="table-light">
       <tr>
         <th scope="col">Field</th>
         {% for name_fe_se_ph in varargs %}
@@ -209,7 +209,18 @@
         {# the readable form; the RPC call the queue recorded stays reachable as the tooltip (issue #40).
            It reaches the job overview and every result page through this macro, and a long one
            widens the page the way the raw string did, so it keeps the wrapping class (issue #41). #}
-        <td valign="middle" class="job-description" title="{{ job_info.parameters }}">{{ job_info|job_task }}</td>
+        {% set folded_ids = job_info|folded_sample_ids %}
+        <td valign="middle" class="job-description" title="{{ job_info.parameters }}">
+          {%- if folded_ids -%}
+            {#- a unique blocks job's samples, folded into ranges or a count: the line opens into
+                every one of them, since touch and the keyboard cannot reach a title (issue #300) -#}
+            <details><summary>{{ job_info|job_task }}</summary>
+              {%- for sample_id in folded_ids %}{% if sample_id is integer %}{{ format_sample_id(sample_id) }}{% else %}{{ sample_id }}{% endif %}{{ ", " if not loop.last }}{% endfor -%}
+            </details>
+          {%- else -%}
+            {{ job_info|job_task }}
+          {%- endif -%}
+        </td>
       </tr>
       {# the band setting is already in the Task row above, but only as an unlabelled
          trailing number - getMatchesForSample(0, 2) reads like a second sample id.
@@ -263,7 +274,7 @@
             {% if job_info.finished_at %}
               {{ job_info.finished_at|date_time }}
             {% elif job_info.is_failed %}
-              Failed</td>
+              Failed
             {% else %}
               This job hasn't finished yet
             {% endif %}

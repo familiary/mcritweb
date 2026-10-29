@@ -2,17 +2,57 @@
 {% block title%}
 Statistics
 {% endblock %}
+{% macro rows_table(rows, caption) %}
+  <table class="table table-sm table-borderless">
+    <caption class="visually-hidden">{{ caption }}</caption>
+    {% for label, value in rows %}
+    <tr>
+      <th scope="row">{{ label }}</th>
+      <td class="text-end">{{ value }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endmacro %}
 {% block content %}
   <h1>Statistics</h1>
-  <table class="table table-sm table-borderless" style="width:50%;">
-    {% for key in stats['status'] %}
-    {% if loop.index <= 12 %}
-    <tr>
-      <th valign="middle">{{ key }}</td>
-      <td align="right" valign="middle">{{ stats['status'][key] }}</td>
-    </tr>
-    {% endif %}
-    {% endfor %}
-
-  </table>
+  {% if not page.has_status %}
+  <p class="text-muted">The MCRIT backend did not answer with its status, so only the versions are shown.</p>
+  {% endif %}
+  <div class="row">
+    <div class="col-lg-6">
+      <h2 class="h4">Versions</h2>
+      {{ rows_table(page.versions, "Versions") }}
+      {% if page.corpus %}
+      <h2 class="h4">Corpus</h2>
+      {{ rows_table(page.corpus, "Corpus") }}
+      {% endif %}
+      {% if page.index %}
+      <h2 class="h4">Index</h2>
+      {{ rows_table(page.index, "Index") }}
+      {% endif %}
+    </div>
+    <div class="col-lg-6">
+      {% if page.has_status %}
+      <h2 class="h4">Maintenance</h2>
+      {% if page.maintenance %}
+      <ul class="list-unstyled">
+        {% for meaning, action in page.maintenance %}
+        <li class="mb-2"><i class="fa-solid fa-triangle-exclamation text-warning" aria-hidden="true"></i> {{ meaning }} <span class="text-muted">{{ action }}</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-muted">The backend reports nothing that needs a maintenance job.</p>
+      {% endif %}
+      {% endif %}
+      {% if page.escapers %}
+      <h2 class="h4">Escaper fingerprints</h2>
+      <p class="text-muted small">MinHashes are only comparable between functions escaped the same way, so these show which escaping the backend applies to new samples.</p>
+      {{ rows_table(page.escapers, "Escaper fingerprints per architecture") }}
+      {% endif %}
+      {% if page.other %}
+      <h2 class="h4">Other</h2>
+      {{ rows_table(page.other, "Other values the backend reports") }}
+      {% endif %}
+    </div>
+  </div>
 {% endblock %}

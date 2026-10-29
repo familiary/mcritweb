@@ -46,7 +46,7 @@
     table that passes tints alone would grow an empty column. Header and row ask the
     same question of the same mapping, so they cannot disagree on the column count. -#}
 {%- macro badge_column_header(row_decorations) -%}
-  {%- if (row_decorations or {}).values()|selectattr("badges")|list %}<th scope="col"></th>{% endif -%}
+  {%- if (row_decorations or {}).values()|selectattr("badges")|list %}<th scope="col"><span class="visually-hidden">Match</span></th>{% endif -%}
 {%- endmacro -%}
 
 

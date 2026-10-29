@@ -23,18 +23,18 @@ Results for Job: {{ job_info.job_id }}
 
 <h2 class="h3">Similarity Scores</h2>
 <table class="table table-hover">
-  <thead class="thead-light">
+  <thead class="table-light">
     <tr>
       {% if ucs_famlib is none %}
         {% set ucs_famlib = ["family_name", "version", "sample_id", "sha256", "filename", "bitness", "num_functions", "num_minhash", "num_pichash", "num_library", "direct_score", "direct_nonlib_score", "frequency_score", "frequency_nonlib_score", "uniq_score"] %}
       {% endif %}
       {% for column_type in ucs_famlib %}
         {% if column_type == "family_name" %}
-        <th scope="col"><i class="fa-solid fa-bug " title="Family ID"></th>
+        <th scope="col"><i class="fa-solid fa-bug " title="Family" aria-hidden="true"></i><span class="visually-hidden">Family</span></th>
         {% elif column_type == "version" %}
           <th scope="col">Version</th>
         {% elif column_type == "sample_id" %}
-        <th style="text-align: right;" scope="col"><i class="fa-solid fa-virus" title="Sample ID"></th>
+        <th style="text-align: right;" scope="col"><i class="fa-solid fa-virus" title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample ID</span></th>
         {% elif column_type == "sha256" %}
           <th style="text-align: right;" scope="col">SHA256</th>
         {% elif column_type == "filename" %}
@@ -64,7 +64,7 @@ Results for Job: {{ job_info.job_id }}
       <tr style="background-color: {{ scp.getMatchTintFromResult(matched_sample, 'matched_percent_score_weighted') }}">
         {% for column_type in ucs_famlib %}
           {% if column_type == "family_name" %}
-            <td valign="middle">{{ format_family_name(matched_sample.family, matched_sample.family_id) }}&nbsp;<a aria-label="Filter by this family" title="Filter by this family" href="{{ url_for(request.endpoint, famid=matched_sample.family_id, samp=1, funp=1, **request.view_args) }}#sample-matches"><i class="fa-solid fa-filter"></i></a></td>
+            <td valign="middle" class="family">{{ format_family_name(matched_sample.family, matched_sample.family_id) }}&nbsp;<a aria-label="Filter by this family" title="Filter by this family" href="{{ url_for(request.endpoint, famid=matched_sample.family_id, samp=1, funp=1, **request.view_args) }}#sample-matches"><i class="fa-solid fa-filter"></i></a></td>
           {% elif column_type == "version" %}
             <td valign="middle">{{ matched_sample.version }}</td>
           {% elif column_type == "sample_id" %}
@@ -105,17 +105,17 @@ Results for Job: {{ job_info.job_id }}
 <form class="form-inline" action ="{{ url_for(request.endpoint, **request.view_args) }}#function-matches" method='GET'>
   <div class="form-group row">
     <label class="col-4">Filter results to</label>
-    <input class="col-4" type="text" name='filter_function_min_score' id="filter_function_min_score" aria-describedby="filter_function_min_score" placeholder="min score (0-100)" {% if matching_result.getFilterValue("filter_function_min_score") is not none %}value={{matching_result.getFilterValue("filter_function_min_score")}}{% endif %}>
-    <input class="col-4" type="text" name='filter_function_max_score' id="filter_function_max_score" aria-describedby="filter_function_max_score" placeholder="max score (0-100)" {% if matching_result.getFilterValue("filter_function_max_score") is not none %}value={{matching_result.getFilterValue("filter_function_max_score")}}{% endif %}>
-    <input class="col-1" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" aria-describedby="filter_exclude_library" {% if matching_result.getFilterValue("filter_exclude_library") %}checked{% endif %}>
+    <input class="col-4" type="text" name='filter_function_min_score' id="filter_function_min_score" placeholder="min score (0-100)" {% if matching_result.getFilterValue("filter_function_min_score") is not none %}value={{matching_result.getFilterValue("filter_function_min_score")}}{% endif %}>
+    <input class="col-4" type="text" name='filter_function_max_score' id="filter_function_max_score" placeholder="max score (0-100)" {% if matching_result.getFilterValue("filter_function_max_score") is not none %}value={{matching_result.getFilterValue("filter_function_max_score")}}{% endif %}>
+    <input class="col-1" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" {% if matching_result.getFilterValue("filter_exclude_library") %}checked{% endif %}>
     <label class="col-3" for="filter_exclude_library">exclude functions with library hits</label>
-    <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" aria-describedby="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>
+    <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>
     <label class="col-3" for="filter_exclude_pic">exclude PIC hits</label>
-    <button type="submit" class="btn btn-primary">filter</button>
+    <button type="submit" class="btn btn-primary">Filter</button>
   </div>
 </form>
 <table class="table table-hover">
-  <thead class="thead-light">
+  <thead class="table-light">
     <tr>
     {% if ucs_functions is none %}
       {% set ucs_functions = ["function_id_a", "offset_a", "offset_b", "function_id_b", "num_bytes", "best_score", "is_minhash_match", "is_pichash_match", "is_library_match"] %}
