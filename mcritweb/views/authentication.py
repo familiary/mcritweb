@@ -11,7 +11,7 @@ from flask import Blueprint, abort, current_app, flash, g, redirect, render_temp
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, utc_now
+from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, is_legacy_apitoken, utc_now
 
 bp = Blueprint('authentication', __name__, url_prefix='/')
 
@@ -56,6 +56,20 @@ def registration_token_attempt(username):
     return "register:" + (username or "")
 
 
+#: Longer than any account name can be (3 to 20 characters, see register() and
+#: change_username), so a real one is always logged whole.
+LOGGED_NAME_LENGTH = 32
+
+
+def _name_for_log(username):
+    """The typed name for the throttle's log line. It comes from the form as typed, up
+    to the form field limit, and a refused attempt is cheap to send: logged whole, every
+    one of them could add half a megabyte to the log."""
+    if len(username) <= LOGGED_NAME_LENGTH:
+        return repr(username)
+    return f"{username[:LOGGED_NAME_LENGTH]!r}... ({len(username)} characters)"
+
+
 def _throttled(username=None):
     """True if this caller has spent their attempts, having logged the fact.
 
@@ -70,8 +84,8 @@ def _throttled(username=None):
     if username:
         against = db.count_recent_login_failures(remote_addr, username)
         current_app.logger.warning(
-            "throttled %s after %d recent failures, %d of them against %r",
-            remote_addr, db.count_recent_login_failures(remote_addr), against, username)
+            "throttled %s after %d recent failures, %d of them against %s",
+            remote_addr, db.count_recent_login_failures(remote_addr), against, _name_for_log(username))
     else:
         current_app.logger.warning(
             "throttled %s after %d recent failures", remote_addr,
@@ -403,7 +417,7 @@ def settings():
     if user_column_settings is None:
         user_column_settings = UserColumnSettings.fromDict(user_id, {})
         user_column_settings.saveToDb()
-    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES)
+    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken))
 
 def admin_required(view):
     @functools.wraps(view)
@@ -457,6 +471,16 @@ def token_required(view):
         g.api_user = UserInfo.fromDb(user_id=user_id)
         if g.api_user is None or g.api_user.role not in API_ROLES:
             abort(403)
+        # a token that authenticates can still be one the deployment has retired. The
+        # pre-1.5.0 (32-character) tokens were left valid by 1.5.0 and would have stayed
+        # valid forever; the switch lets an operator pick the cutover moment once their
+        # users have regenerated. Issue #250.
+        if is_legacy_apitoken(provided_token) and not current_app.config.get("ACCEPT_LEGACY_APITOKENS", True):
+            return {
+                "error": "This API token has the pre-1.5.0 (32-character) form, which this "
+                         "deployment no longer accepts. Regenerate the token on your user "
+                         "settings page and update whatever uses it."
+            }, 403
         return view(**kwargs)
     return wrapped_view
 
