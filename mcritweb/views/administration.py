@@ -58,7 +58,10 @@ def change_password():
     old_password = request.form['inputPassword2']
     user_info = g.user
     error_msg = None
-    if not new_password == request.form['inputPassword4']:
+    # as registration asks: an empty password would sign in with an empty password field
+    if not new_password:
+        error_msg = 'Password is required.'
+    elif not new_password == request.form['inputPassword4']:
         error_msg = 'The entered passwords do not match!'
     elif not check_password_hash(user_info.password, old_password):
         error_msg = 'Incorrect password!'
