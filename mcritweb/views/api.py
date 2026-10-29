@@ -1,7 +1,9 @@
 import re
 
+import requests
 from flask import Blueprint, Response, abort, current_app, g, request
 
+from mcritweb import backend_errors
 from mcritweb.views.authentication import token_required
 from mcritweb.views.client import get_client
 from mcritweb.views.tags import client_has_tags
@@ -13,6 +15,14 @@ bp = Blueprint('api', __name__, url_prefix='/api')
 # {"tags": [...]} names, as mcrit's own routes of the same path do
 TAGS_PATH = re.compile(r"(?P<collection>families|samples|functions)/(?P<entity_id>\d+)/tags$")
 TAG_ENTITY_OF_COLLECTION = {"families": "family", "samples": "sample", "functions": "function"}
+
+@bp.errorhandler(requests.RequestException)
+def backend_unreachable(error):
+    """A backend call that never completed, answered as a gateway: 502, or 504 for a
+    timeout. Body-less, as handle_raw_response is for a failure without a JSON body: a caller
+    of the API cannot read the page the app-wide handler renders (#43)."""
+    current_app.logger.warning("MCRIT backend call failed on the API: %r", error)
+    return Response(status=backend_errors.status_for(error))
 
 # Paths that add to the corpus rather than read from it or queue a job against it.
 # The web UI puts the same operation behind contributor_required (data.submit), and

@@ -39,7 +39,7 @@ def test_the_query_sample_page_leaves_a_missing_timestamp_blank(client, as_role,
 
     page = client.get("/explore/samples/-1").get_data(as_text=True)
 
-    cell = re.search(r"Timestamp</td>\s*<td[^>]*>(.*?)</td>", page, re.S)
+    cell = re.search(r"Timestamp</t[hd]>\s*<td[^>]*>(.*?)</td>", page, re.S)
     assert cell is not None, "the query sample page has no timestamp row"
     assert cell.group(1).strip() == ""
 

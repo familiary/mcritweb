@@ -3,14 +3,14 @@
 Export
 {% endblock %}
 {% block content %}
-<center>
+<div class="container my-4" style="max-width: 600px;">
     <form action = "{{ url_for('data.export_view') }}" method='post'>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="form-group">
-            <label for="samples">Enter comma seperated sample_ids to export or export all samples</label>
-            <input type="text" name='samples' class="form-control" id="samples" aria-describedby="export" placeholder="Export all samples">
+        <div class="form-group mb-3">
+            <label for="samples" class="form-label">Enter comma-separated sample IDs to export, or leave blank to export all samples</label>
+            <input type="text" name='samples' class="form-control" id="samples" aria-label="Sample IDs to export" placeholder="Export all samples">
         </div>
         <button type="submit" class="btn btn-primary">Export</button>
     </form>
-</center>
+</div>
 {% endblock %}
