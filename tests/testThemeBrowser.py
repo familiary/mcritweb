@@ -545,8 +545,8 @@ def test_the_probe_is_not_blind_to_a_light_page(walker):
 
     wheres = [item["where"] for item in report["light"]]
     assert "html" in wheres and "" in wheres, f"the light canvas and body are not found light: {wheres[:5]}"  # "" is <body>: describe() stops short of it
-    assert any(where.endswith("nav.navbar.navbar-expand-lg") for where in wheres), "the light navbar is not found light"
-    assert any(where.endswith("thead.thead-light") for where in wheres), "the light table head is not found light"
+    # the navbar paints nothing of its own since #253, so it is not among them
+    assert any(where.endswith("thead.table-light") for where in wheres), "the light table head is not found light"
     assert len(report["light"]) >= 10
 
 
@@ -585,8 +585,7 @@ def test_the_canvas_the_navbar_the_table_head_and_the_fields_are_the_palettes_co
     for what, selector, token in (
         ("the canvas (html)", "html", "--surface-page"),
         ("the page (body)", "body", "--surface-page"),
-        ("the navbar", "nav.navbar", "--surface-chrome"),
-        ("a table head", "thead.thead-light", "--surface-chrome"),
+        ("a table head", "thead.table-light", "--surface-chrome"),
         ("the search field", "input.form-control", "--surface-input"),
         ("the page's pager", ".pagination .page-link", "--surface-page"),
     ):
@@ -594,7 +593,9 @@ def test_the_canvas_the_navbar_the_table_head_and_the_fields_are_the_palettes_co
         assert found is not None, f"no {what} on the page"
         assert_colour(found[0], token, what)
     assert_colour(computed(page, "body", "color")[0], "--text-body", "the body text")
-    assert_colour(computed(page, "thead.thead-light", "color")[0], "--text-strong", "the table head text")
+    # since #253 the navbar paints nothing of its own: it shows the page
+    assert computed(page, "nav.navbar", "background-color")[0] == "rgba(0, 0, 0, 0)", "the navbar paints a colour of its own"
+    assert_colour(computed(page, "thead.table-light", "color")[0], "--text-strong", "the table head text")
     assert_colour(computed(page, "h1", "color")[0], "--accent", "a heading")
     assert_colour(computed(page, "table.table td a", "color")[0], "--link", "a link in a table")
 
@@ -799,7 +800,8 @@ def test_the_system_theme_applies_the_dark_palette_when_the_browser_prefers_dark
 
     assert page.get_attribute("html", "data-theme") == "system"
     assert page.evaluate("getComputedStyle(document.documentElement).backgroundColor") == (DARK_PAGE if dark else LIGHT_PAGE)
-    assert page.evaluate("getComputedStyle(document.querySelector('nav.navbar')).backgroundColor") == ("rgb(28, 36, 46)" if dark else "rgb(240, 240, 240)")
+    # since #253 the navbar paints nothing of its own: it shows the page
+    assert page.evaluate("getComputedStyle(document.querySelector('nav.navbar')).backgroundColor") == "rgba(0, 0, 0, 0)"
     assert logo_files(page) == (["d20_mcrit_cabaret_dark.png"] * 2 + ["fkie_190x52_dark.png"] if dark else ["d20_mcrit_cabaret.png"] * 2 + ["fkie_190x52.gif"])
     if dark:
         assert report_clean(run_probe(page)), "the system theme's dark page has what the dark theme's has not"
@@ -840,7 +842,6 @@ def test_the_system_theme_follows_a_change_of_the_browsers_preference_without_a_
     page.wait_for_function(f"getComputedStyle(document.documentElement).backgroundColor === '{DARK_PAGE}'")
     page.wait_for_function("[...document.querySelectorAll('nav picture img')].every((image) => image.currentSrc.endsWith('_dark.png'))")
     calm(page)
-    assert page.evaluate("getComputedStyle(document.querySelector('nav.navbar')).backgroundColor") == "rgb(28, 36, 46)"
     assert logo_files(page) == ["d20_mcrit_cabaret_dark.png"] * 2 + ["fkie_190x52_dark.png"]
     assert report_clean(run_probe(page)), "after the switch the page is not the dark theme's"
 

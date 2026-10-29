@@ -108,10 +108,12 @@ def test_base_html_accessibility_and_semantics():
     base_path = os.path.join(TEMPLATE_ROOT, "base.html")
     with open(base_path, encoding="utf-8") as f:
         content = f.read()
-    assert '<html lang="en">' in content, "base.html is missing <html lang='en'>"
+    # #160 adds data-theme to the tag
+    assert re.search(r'<html lang="en"[ >]', content), "base.html is missing <html lang='en'>"
     assert '<main class="content">' in content, "base.html is missing <main class='content'>"
-    assert 'width="459" height="150"' in content, "base.html brand logo is missing explicit dimensions"
-    assert 'width="187" height="52"' in content, "base.html FKIE logo is missing explicit dimensions"
+    # attributes, or the keyword arguments of #160's themed_img() that become them
+    assert re.search(r'width="459",? height="150"', content), "base.html brand logo is missing explicit dimensions"
+    assert re.search(r'width="187",? height="52"', content), "base.html FKIE logo is missing explicit dimensions"
 
 
 def test_family_row_click_skips_links_and_buttons():
