@@ -9,13 +9,16 @@ anywhere in that - inside another id, or inside the timestamp - answered with
 somebody else's report. See issue #68.
 """
 
+import datetime
 import json
 import logging
 import os
 import unittest
 
 import pytest
+from fixtureData import job_id_of, load
 
+import mcritweb.views.data as data_views
 from mcritweb.views.data import cache_result, load_cached_result
 
 LOG = logging.getLogger(__name__)
@@ -120,6 +123,110 @@ def test_an_unreadable_cache_file_does_not_need_an_app_context(app):
     reach for `current_app`."""
     write_cached(app, f"20260806-104636-{JOB_ID}.json", '{"report": "truncat')
     assert load_cached_result(app, JOB_ID) == {}
+
+
+def fetches_of(corpus_mcrit, job_id):
+    return [call for call in corpus_mcrit.calls if call[0] == "getResultForJob" and call[1][0] == job_id]
+
+
+def test_a_download_does_not_serve_a_report_cut_short(client, as_role, app, corpus_mcrit):
+    """The page skips a cached report that does not parse, and the download streamed it
+    as it was. This one is what the writer before atomic writes - json.dump with
+    indent=1, straight into the cache - leaves behind when the process dies halfway."""
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+    pretty = json.dumps(load("cross_compare.result"), indent=1)
+    write_cached(app, f"20250101-000000-{job_id}.json", pretty[:len(pretty) // 2])
+
+    response = client.get(f"/data/result/{job_id}/download")
+
+    assert response.status_code == 200
+    assert json.loads(response.data) == load("cross_compare.result")
+    assert len(fetches_of(corpus_mcrit, job_id)) == 1
+
+
+def test_a_pretty_printed_report_is_downloaded_from_the_cache_and_kept_compact(client, as_role, app, corpus_mcrit):
+    """A whole one costs a parse rather than a fetch, and only once: it is cached again
+    compact, and that copy is what the next download streams."""
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+    write_cached(app, f"20250101-000000-{job_id}.json", json.dumps(load("cross_compare.result"), indent=1))
+
+    first = client.get(f"/data/result/{job_id}/download")
+    second = client.get(f"/data/result/{job_id}/download")
+
+    assert json.loads(first.data) == load("cross_compare.result")
+    assert fetches_of(corpus_mcrit, job_id) == []
+    assert len(os.listdir(results_dir(app))) == 2
+    assert second.data == first.data and b"\n" not in second.data
+
+
+def test_a_compact_report_is_downloaded_without_being_parsed(client, as_role, app, monkeypatch):
+    """What checking for a report cut short must not cost: one this version cached is
+    complete by construction, and is streamed as it lies."""
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+    client.get(f"/data/result/{job_id}")
+    [filename] = os.listdir(results_dir(app))
+    with open(os.sep.join([results_dir(app), filename]), "rb") as fin:
+        on_disk = fin.read()
+
+    def parsed(*args, **kwargs):
+        raise AssertionError("the cached report was parsed to be downloaded")
+
+    monkeypatch.setattr(data_views, "load_cached_result", parsed)
+    monkeypatch.setattr(data_views.json, "load", parsed)
+    response = client.get(f"/data/result/{job_id}/download")
+
+    assert response.status_code == 200
+    assert response.data == on_disk
+
+
+def test_a_compact_report_that_does_not_end_like_it_begins_is_not_streamed(client, as_role, app, corpus_mcrit):
+    """Compact files are renamed into place whole, but #229's branch wrote them in place
+    for a while, and before writes were synced a power loss could keep the name of a
+    file whose data never got there. The last byte says which."""
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+    compact = json.dumps(load("cross_compare.result"), separators=(",", ":"))
+    write_cached(app, f"20250101-000000-{job_id}.json", compact[:len(compact) // 2])
+
+    response = client.get(f"/data/result/{job_id}/download")
+
+    assert response.status_code == 200
+    assert json.loads(response.data) == load("cross_compare.result")
+    assert len(fetches_of(corpus_mcrit, job_id)) == 1
+
+
+@pytest.mark.parametrize("payload", ["true", "5321", "[1,2]"])
+def test_a_result_that_is_not_an_object_is_streamed_from_the_cache(client, as_role, app, corpus_mcrit, monkeypatch, payload):
+    """A finished deleteSample answers true and a minhash update a count. Both are
+    downloadable, and taken for a damaged report they were cached again on every
+    download, each copy pushing a real report closer to eviction."""
+    as_role("visitor")
+    job_id = job_id_of("cross_compare")
+    write_cached(app, f"20250101-000000-{job_id}.json", payload)
+    seconds = iter(range(60))
+    monkeypatch.setattr(data_views, "utc_now", lambda: datetime.datetime(2026, 1, 1, 0, 0, next(seconds)))
+
+    downloads = [client.get(f"/data/result/{job_id}/download") for _ in range(3)]
+
+    assert [download.data for download in downloads] == [payload.encode()] * 3
+    assert len(os.listdir(results_dir(app))) == 1
+    assert fetches_of(corpus_mcrit, job_id) == []
+
+
+def test_a_cached_report_is_synced_before_it_is_renamed_into_place(app, monkeypatch):
+    """Renamed first, the new name can outlive its data across a power loss, and the
+    download would stream what is left without reading it."""
+    events = []
+    real_fsync, real_replace = os.fsync, os.replace
+    monkeypatch.setattr(data_views.os, "fsync", lambda fd: (events.append("fsync"), real_fsync(fd))[1])
+    monkeypatch.setattr(data_views.os, "replace", lambda *args: (events.append("replace"), real_replace(*args))[1])
+    with app.app_context():
+        cache_result(app, JobStub(JOB_ID), {"some": "report"})
+
+    assert events[:2] == ["fsync", "replace"]
 
 
 def test_only_the_report_for_this_job_is_read(app, monkeypatch):
