@@ -1,6 +1,8 @@
-{% from 'table/links.html' import format_pichash, format_function_id, format_family_name, format_family_id, format_sample_id, format_sha_short_clipboard, clipboard_btn %}
+{% from 'table/links.html' import format_pichash, format_function_id, format_family_name, format_family_id, format_sample_id, format_sha_short_clipboard, sha256_provenance, clipboard_btn %}
 
 {% macro sample_column_table()%}
+  {# `show_sha256_provenance=true` adds where each sample's sha256 comes from to its SHA256 cell
+     (familiary/mcrit#270). Off by default: only the sample page asks for it. #}
   {# A query is matched without being stored, so it has no family, version, component
      or library flag - the backend sends those back empty and rendering them anyway
      presented the queried binary as a member of family 0, captioned "Unnamed" (#40).
@@ -51,7 +53,7 @@
       <tr>
         <td valign="middle">SHA256 | Filename: </td>
         {% for name_and_sample in varargs %}
-          <td valign="middle">{{ format_sha_short_clipboard(name_and_sample[1].sha256) }} | {{ name_and_sample[1].getShortFilename() or "-" }} {{ clipboard_btn(name_and_sample[1].filename) }}</td>
+          <td valign="middle">{{ format_sha_short_clipboard(name_and_sample[1].sha256) }} | {{ name_and_sample[1].getShortFilename() or "-" }} {{ clipboard_btn(name_and_sample[1].filename) }}{% if kwargs.show_sha256_provenance %}{{ sha256_provenance(name_and_sample[1]|getattr("sha256_verified", none)) }}{% endif %}</td>
         {% endfor %}
       </tr>
       <tr>

@@ -133,7 +133,7 @@ Sample: {{ entry.sample_id }}
 </div>
 <p></p>
 <div>
-  {{ sample_column_table(("Sample Info", entry)) }}
+  {{ sample_column_table(("Sample Info", entry), show_sha256_provenance=true) }}
   {% if job_collection.count %}
       <p>
         Sample has <a href="#jobs">{{ job_collection.count }} {% if job_collection.count == 1 %}Job{% else %}Jobs{% endif %}</a>.
