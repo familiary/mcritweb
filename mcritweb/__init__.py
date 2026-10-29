@@ -90,7 +90,7 @@ def create_app(test_config=None, instance_path=None):
 
     from . import db, manual
     from .csrf import CsrfProtect
-    from .jobnames import job_method_name, job_task
+    from .jobnames import folded_sample_ids, job_method_name, job_task, unique_blocks_samples
     from .search_highlighting import get_highlight_terms, split_search_matches
     from .secret_key import INSECURE_DEFAULT, load_or_create_secret_key
     from .views import administration, analyze, api, authentication, data, explore
@@ -313,6 +313,12 @@ def create_app(test_config=None, instance_path=None):
     @app.template_filter('job_task')
     def job_task_filter(job):
         return job_task(job)
+
+    # the jobs list and the result page name a unique blocks job's samples the way its
+    # Task row does (issue #300)
+    app.add_template_filter(unique_blocks_samples, 'unique_blocks_samples')
+    # and the ids that line folds, which the Task row lists under it
+    app.add_template_filter(folded_sample_ids, 'folded_sample_ids')
 
     @app.template_filter('date')
     def date(input):

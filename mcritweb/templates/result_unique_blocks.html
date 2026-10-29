@@ -93,7 +93,19 @@ Unique Blocks for {{ sample_ids|length }} Samples
     {% else %}
     <tr>
       <td valign="middle">Requested Samples</td>
-      <td valign="middle">{% for id in sample_ids %}{{ format_sample_id(id) }} {% endfor %}</td>
+      {# the line the job's Task row gives, folded the way linkhunt.html folds a long
+         cluster: open, it links every sample under its family, in the order the job names
+         them, and an id the backend has no sample for under "-" (issue #300) #}
+      <td valign="middle"><details><summary>{{ sample_ids|unique_blocks_samples }}</summary>
+        {% set requested_by_family = {} %}
+        {% for id in sample_ids -%}
+          {%- set sample_entry = samples_by_id.get(id) -%}
+          {%- set _ = requested_by_family.setdefault(sample_entry.family_id if sample_entry else none, []).append(id) -%}
+        {%- endfor %}
+        {% for family_id, family_sample_ids in requested_by_family.items() %}
+          <i class="fa-solid fa-bug " title="Family ID"></i> {% if family_id is none %}-{% else %}{{ format_family_name(samples_by_id[family_sample_ids[0]].family, family_id) }}{% endif %} | <i class="fa-solid fa-virus " title="Sample ID"></i> {% for id in family_sample_ids %}{{ format_sample_id(id) }} {% endfor %}<br />
+        {% endfor %}
+      </details></td>
     </tr>
     {% endif %}
     <tr>
