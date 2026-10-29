@@ -68,43 +68,45 @@ def test_the_fake_reports_version_in_the_shape_the_real_client_returns(corpus_mc
 
 # --- the statistics page actually renders the statistics --------------------------
 
-#: `statistics.html` renders `{% if loop.index <= 12 %}`, so it shows at most this many
-#: statistics. Restated here because the tests below have to agree with the page rather
-#: than with the fixture: the captured status carries 8 fields today, but these fixtures
-#: are regenerated from a live backend, and one that reported more would have broken CI
-#: without anything about the page changing.
-STATISTICS_ROW_LIMIT = 12
+#: The labels statistics.html shows for the captured status's keys (mcrit/statistics.py).
+CAPTURED_LABELS = {
+    "num_families": "Families",
+    "num_samples": "Samples",
+    "num_functions": "Functions",
+    "num_pichashes": "Unique PicHashes",
+    "storage_type": "Storage",
+    "num_bands": "MinHash bands",
+    "db_state": "Database revision",
+    "db_timestamp": "Last change (UTC)",
+}
 
 
 def test_the_statistics_page_renders_the_numbers_it_was_given(client, as_role):
     """This is the test that could not have passed before: the page rendered an empty
-    table, and its 200 said nothing."""
+    table, and its 200 said nothing. Counts come with thousands separators."""
     as_role("visitor")
     expected = load("status")["status"]
-    rendered = list(expected)[:STATISTICS_ROW_LIMIT]
 
     page = client.get("/explore/statistics").get_data(as_text=True)
 
-    # one value cell per statistic; the key goes in a <th>
-    assert page.count("<td") >= len(rendered), "the statistics table came out empty"
-    for key in rendered:
-        assert cell_after(page, key) == str(expected[key]), f"{key} is not on the page"
+    assert set(CAPTURED_LABELS) == set(expected), "the captured status grew a key this test does not know"
+    for key, label in CAPTURED_LABELS.items():
+        value = expected[key]
+        shown = f"{value:,}" if isinstance(value, int) else str(value).replace("T", " ")
+        assert cell_after(page, label) == shown, f"{key} is not on the page as {label}"
 
 
-def test_the_statistics_page_stops_at_its_row_limit(client, as_role, app, corpus_mcrit):
-    """The cap is the page's, not the fixture's, so it is pinned independently of how
-    many fields the captured status happens to carry. Without this, the limit is only
-    visible in a Jinja conditional and the test above silently stops covering the tail
-    of a larger status."""
+def test_the_statistics_page_shows_every_key_however_many_there_are(client, as_role, app, corpus_mcrit):
+    """The page used to stop after the first twelve keys, which on mcrit 1.13 cut off
+    the stale-hash counts. Keys it has no label for go under Other, all of them."""
     as_role("visitor")
-    many = {f"stat_{index:02d}": index for index in range(STATISTICS_ROW_LIMIT + 3)}
+    many = {f"stat_{index:02d}": index for index in range(15)}
     corpus_mcrit.getStatus = lambda *args, **kwargs: {"status": many}
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: corpus_mcrit
 
     page = client.get("/explore/statistics").get_data(as_text=True)
 
-    shown = [key for key in many if f">{key}</td>" in page or cell_after(page, key) is not None]
-    assert shown == list(many)[:STATISTICS_ROW_LIMIT], f"the page rendered {len(shown)} rows"
+    assert [key for key in many if cell_after(page, key) == str(many[key])] == list(many)
 
 
 # --- the admin page shows a version, not a dict -----------------------------------
@@ -138,7 +140,7 @@ def test_the_admin_page_shows_the_backend_version_as_a_version(client, as_role):
 def test_a_version_that_cannot_be_read_says_so_rather_than_rendering_a_shape(app, answer, expected):
     """The row must never show a Python repr. `None` is the case that matters: it is
     what the client answers for a backend that could not be reached."""
-    from mcritweb.views.administration import backend_version
+    from mcritweb.views.client import backend_version
 
     class Answering:
         def getVersion(self):

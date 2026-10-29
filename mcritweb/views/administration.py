@@ -1,14 +1,13 @@
 import json
 import sqlite3
 
-import requests
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.db import UserColumnSettings, UserFilters, UserInfo, generate_apitoken
+from mcritweb.db import UserColumnSettings, UserFilters, UserInfo, generate_apitoken, is_legacy_apitoken
 from mcritweb.views.authentication import KNOWN_ROLES, admin_required, login_required, multi_user
-from mcritweb.views.client import get_client
+from mcritweb.views.client import backend_version, get_client
 from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
 from mcritweb.views.utility import forget_server_probe, get_session_user_id, mcrit_server_required
@@ -179,6 +178,28 @@ def regenerate_apitoken():
     flash('A new API token was generated. Anything using the old one has to be updated.', category='success')
     return redirect(url_for('authentication.settings'))
 
+@bp.route('/regenerate_legacy_apitokens', methods=('POST',))
+@admin_required
+def regenerate_legacy_apitokens():
+    """Replace every pre-1.5.0 (32-character) API token with a fresh one.
+
+    The pre-1.5.0 tokens stay valid until their owner happens to regenerate, and
+    nothing used to move them on - issue #250. This is the admin-side bulk answer for
+    the cutover moment: it rotates all of them at once. That breaks whatever uses the
+    tokens, which is why the button that leads here asks for confirmation first.
+    """
+    rotated = 0
+    for user_info in db.get_all_user_info():
+        if is_legacy_apitoken(user_info.apitoken):
+            user_info.apitoken = generate_apitoken()
+            user_info.saveToDb()
+            rotated += 1
+    if rotated:
+        flash(f'{rotated} pre-1.5.0 API token(s) were regenerated. Anything using them has to be updated.', category='success')
+    else:
+        flash('No account holds a pre-1.5.0 API token.', category='info')
+    return redirect(url_for('admin.users'))
+
 @bp.route('/users/')
 @bp.route('/users/<tab>')
 @admin_required
@@ -186,9 +207,13 @@ def regenerate_apitoken():
 def users(tab = None):
     g.all_users = get_users()
     g.users_by_role = group_users_by_role(g.all_users)
+    # pre-1.5.0 (32-character) API tokens stay valid until their owner regenerates, and
+    # nothing used to tell anyone about them - issue #250. The template marks the rows
+    # and offers a regenerate-all action for the ones nobody has moved on yet.
+    legacy_token_user_ids = {user_info.user_id for user_info in g.all_users if is_legacy_apitoken(user_info.apitoken)}
     if tab is None:
-        return render_template("users.html", active='all')    
-    return render_template("users.html", active=tab)
+        return render_template("users.html", active='all', legacy_token_user_ids=legacy_token_user_ids)
+    return render_template("users.html", active=tab, legacy_token_user_ids=legacy_token_user_ids)
 
 
 def get_users():
@@ -242,28 +267,6 @@ def delete_user(user_id, tab = None):
     database.execute("DELETE FROM user WHERE id = ?;", (user_id,))
     database.commit()
     return redirect(url_for('admin.users', tab=tab))
-
-
-def backend_version(client):
-    """The MCRIT backend's version as a string, or "unknown".
-
-    `McritClient.getVersion()` answers with the dict mcrit's own
-    `MinHashIndex.getVersion` builds - `{"version": "1.4.3"}` - not a bare string, so
-    rendering it directly put `{'version': '1.4.3'}` on the page. It answers None when
-    the backend could not be reached or refused, which is not a version either.
-    """
-    try:
-        version = client.getVersion()
-    except requests.RequestException:
-        # An unreachable backend is exactly when an admin needs this page: it carries the
-        # form for correcting the server URL, and `backend_unavailable.html` sends them
-        # here to do it. Letting the transport failure out turns that instruction into a
-        # dead end - the one page that can fix the outage is the one the outage breaks.
-        # Only the transport family is caught; anything else here is our own bug.
-        return "unknown"
-    if isinstance(version, dict):
-        version = version.get("version")
-    return version if isinstance(version, str) and version else "unknown"
 
 
 @bp.route('/server')
