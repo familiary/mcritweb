@@ -45,9 +45,10 @@ def fake_mcrit(corpus_mcrit):
 #: that defines the clipboard helper, so an unrelated script is never the offender.
 SCRIPT_BLOCK = re.compile(r"<script\b[^>]*>(.*?)</script\s*>", re.IGNORECASE | re.DOTALL)
 
-#: The copy icon and the textarea it copies, tied together: a helper wired to the
-#: wrong id is as broken as no helper.
-COPY_ICON = re.compile(r"<i\b[^>]*onclick=\"copyTextAreaToClipboard\('#yara_text'\)\"")
+#: The copy control and the textarea it copies, tied together: a helper wired to the
+#: wrong id is as broken as no helper. The control is a button holding the copy icon
+#: (#253); a click on the icon bubbles to it.
+COPY_ICON = re.compile(r"<(?:i|button)\b[^>]*onclick=\"copyTextAreaToClipboard\('#yara_text'\)\"")
 
 #: `// ...` to end of line. The helper's own comment names the old implementation on
 #: purpose, so the lint below reads the code with the comments taken out.
@@ -1329,8 +1330,8 @@ def test_raw_result_download_prefers_the_cache_over_a_second_fetch(client, as_ro
 
 def test_raw_result_download_serves_the_job_that_was_asked_for(client, as_role):
     """Two reports in the cache, each download its own. The cache is a flat directory
-    that `load_cached_result` searches by substring, so selecting the wrong file in
-    it is a real way to hand one caller another caller's report."""
+    searched by filename, so selecting the wrong file in it is a real way to hand one
+    caller another caller's report."""
     as_role("visitor")
     for report in ("matches_for_sample", "cross_compare"):
         client.get(f"/data/result/{job_id_of(report)}")
@@ -1367,8 +1368,8 @@ def test_raw_result_download_of_an_unknown_job_is_reported_not_served(client, as
 @pytest.mark.parametrize(
     "crafted",
     [
-        # substrings of a real job id: `load_cached_result` matches cache filenames by
-        # substring, so a partial id must not be able to select the report it names
+        # substrings of a real job id: cache filenames contain the id, so a partial
+        # id must not be able to select the report it names
         "f8b8d2c6f836649a",
         "6a74",
         # none of these may reach the cache directory or the response headers
@@ -1444,6 +1445,91 @@ def test_cached_result_lookup_matches_whole_job_ids_only(app):
     assert find_cached_result_filename(app, uuid_job_id) == f"20260808-104636-{uuid_job_id}.json"
     assert find_cached_result_filename(app, "0305e82c3301") is None
     assert find_cached_result_filename(app, "9a0c-0305e82c3301") is None
+
+
+#: Not job ids. The backend client puts the id into its request path unquoted, so
+#: ".." asks for the backend's root, and its answer was read as a job (a 500 on the
+#: live testbed for each route below); "?" and "#" cut the path short the same way.
+CRAFTED_JOB_IDS = ["%2E%2E", "%2E%2E%3Fx%3D1", "6a74%23", "-"]
+
+
+def _job_calls(corpus_mcrit):
+    return [call for call in corpus_mcrit.calls if call[0] in ("getJobData", "getResultForJob")]
+
+
+@pytest.mark.parametrize("crafted", CRAFTED_JOB_IDS)
+@pytest.mark.parametrize("route", ["/data/result/{}", "/data/linkhunt/{}", "/data/jobs/{}"])
+def test_a_job_id_that_is_not_one_never_reaches_the_backend(client, as_role, corpus_mcrit, route, crafted):
+    as_role("visitor")
+
+    response = client.get(route.format(crafted))
+
+    assert response.status_code == 200
+    assert b"not found" in response.data
+    assert _job_calls(corpus_mcrit) == []
+
+
+@pytest.mark.parametrize("crafted", CRAFTED_JOB_IDS)
+def test_the_job_status_of_a_crafted_id_never_reaches_the_backend(client, as_role, corpus_mcrit, crafted):
+    as_role("visitor")
+
+    response = client.get(f"/data/jobs/{crafted}/status")
+
+    assert response.status_code == 404
+    assert response.get_json() == {"error": "unknown job"}
+    assert _job_calls(corpus_mcrit) == []
+
+
+def test_the_job_status_of_a_real_id_is_still_answered(client, as_role, corpus_mcrit):
+    as_role("visitor")
+
+    response = client.get(f"/data/jobs/{job_id_of('cross_compare')}/status")
+
+    assert response.status_code == 200
+    assert ("getJobData", (job_id_of("cross_compare"),)) in [call[:2] for call in _job_calls(corpus_mcrit)]
+
+
+@pytest.mark.parametrize("crafted", CRAFTED_JOB_IDS)
+def test_a_crafted_job_id_deletes_nothing(client, as_role, corpus_mcrit, monkeypatch, crafted):
+    as_role("contributor")
+    deleted = []
+    monkeypatch.setattr(corpus_mcrit, "deleteJob", deleted.append, raising=False)
+
+    response = client.post(f"/data/jobs/{crafted}/delete")
+
+    assert response.status_code == 302
+    assert deleted == []
+
+
+def test_a_job_is_still_deleted_by_its_id(client, as_role, corpus_mcrit, monkeypatch):
+    as_role("contributor")
+    deleted = []
+    monkeypatch.setattr(corpus_mcrit, "deleteJob", deleted.append, raising=False)
+
+    client.post(f"/data/jobs/{job_id_of('cross_compare')}/delete")
+
+    assert deleted == [job_id_of("cross_compare")]
+
+
+@pytest.mark.parametrize("crafted", CRAFTED_JOB_IDS)
+def test_a_crafted_job_id_promotes_nothing(client, as_role, corpus_mcrit, crafted):
+    as_role("contributor")
+
+    response = client.post(f"/data/promote_query/{crafted}", data={"family": "f", "version": "1"})
+
+    assert response.status_code == 302
+    assert _job_calls(corpus_mcrit) == []
+
+
+@pytest.mark.parametrize("crafted", ["..", "..?x=1", "6a74#", ""])
+def test_a_sample_edit_does_not_look_up_a_crafted_redirect_job(client, as_role, corpus_mcrit, crafted):
+    as_role("contributor")
+
+    response = client.post("/explore/modifySample", data={"sample_id": "1", "redirection_job_id": crafted})
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/explore/samples")
+    assert _job_calls(corpus_mcrit) == []
 
 #: One function from each reference sample - the only pool that keeps a control flow
 #: graph, so the only one the comparison page can build its two panels from.

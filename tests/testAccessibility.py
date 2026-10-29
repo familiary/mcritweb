@@ -4,8 +4,8 @@
 Each page is rendered offline against the captured corpus and checked for what can be
 decided from the markup alone: a `lang` on <html>, one <main> landmark, a meta
 description, an `alt` and intrinsic size on every image, an accessible name on every
-link and button, a label on every form control, and no skipped heading level.
-Colour contrast and anything else that needs layout is not checked here.
+link and button, text in every table header, a label on every form control, and no skipped
+heading level. Colour contrast and anything else that needs layout is not checked here.
 
 Headings inside a modal or a dropdown menu are left out of the order check: they are
 hidden when the page loads, which is when the audit reads the page.
@@ -35,6 +35,8 @@ VISITOR_PAGES = [
     "/explore/samples",
     "/explore/functions",
     "/explore/search?query=a",
+    # an exact ID hit adds the badge column to each table
+    "/explore/search?query=1",
     "/data/jobs",
     "/explore/families/0",
     "/explore/samples/0",
@@ -54,7 +56,13 @@ VISITOR_PAGES = [
     f"/data/jobs/{job_id_of('matches_for_sample')}",
     f"/data/linkhunt/{job_id_of('matches_for_sample')}",
 ] + [f"/data/result/{job_id_of(report)}" for report in
-     ["matches_for_sample", "matches_for_sample_vs", "matches_for_query", "cross_compare", "unique_blocks"]]
+     ["matches_for_sample", "matches_for_sample_vs", "matches_for_query", "cross_compare", "unique_blocks"]] + [
+    # one family's, one sample's and one function's matches, the result pages the plain
+    # URL does not reach (function 2 is matched in that report)
+    f"/data/result/{job_id_of('matches_for_sample')}?famid=1",
+    f"/data/result/{job_id_of('matches_for_sample_vs')}?samid=3",
+    f"/data/result/{job_id_of('matches_for_sample')}?funid=2",
+]
 CONTRIBUTOR_PAGES = ["/data/submit"]
 ADMIN_PAGES = ["/admin/server", "/admin/users/", "/data/import", f"/data/result/{job_id_of('maintenance_rebuild_index')}"]
 
@@ -82,6 +90,30 @@ class Element:
                 return True
             node = node.parent
         return False
+
+    def text_content(self):
+        # what a screen reader can reach: aria-hidden content is skipped, a title is not text
+        if self.attrs.get("aria-hidden") == "true":
+            return ""
+        return "".join([self.text] + [child.text_content() for child in self.children])
+
+    def titles(self):
+        found = [self.attrs["title"]] if self.attrs.get("title") else []
+        return found + [title for child in self.children for title in child.titles()]
+
+    def visible_words(self):
+        """The words the element shows, its text and its children's, as a set of lowercase
+        words without punctuation: what is visually hidden or hidden from assistive
+        technology is left out, and so is a lone symbol like the x of a close button.
+        A word check, so it does not see the order of the words."""
+        hidden_style = re.sub(r"\s", "", self.attrs.get("style") or "").lower()
+        if (self.classes() & {"visually-hidden", "visually-hidden-focusable", "sr-only", "d-none"}
+                or self.attrs.get("aria-hidden") == "true" or "hidden" in self.attrs or "display:none" in hidden_style):
+            return []
+        words = re.findall(r"\w+", self.text.lower())
+        for child in self.children:
+            words += child.visible_words()
+        return words
 
     def accessible_name(self):
         # axe's button-name documents title as a name, its link-name does not
@@ -132,6 +164,15 @@ class Page(HTMLParser):
         return [element for element in self.elements if element.tag in tags]
 
 
+def descendants(element, tag):
+    found = []
+    for child in element.children:
+        if child.tag == tag:
+            found.append(child)
+        found.extend(descendants(child, tag))
+    return found
+
+
 def problems_of(html):
     page = Page(html)
     problems = []
@@ -140,9 +181,13 @@ def problems_of(html):
         problems.append("<html> has no lang")
     if len(page.all("main")) != 1:
         problems.append(f"{len(page.all('main'))} <main> landmarks, expected one")
-    if not any(meta.attrs.get("name") == "description" and (meta.attrs.get("content") or "").strip()
-               for meta in page.all("meta")):
+    descriptions = [meta for meta in page.all("meta") if meta.attrs.get("name") == "description"]
+    if not any((meta.attrs.get("content") or "").strip() for meta in descriptions):
         problems.append("no meta description")
+    # a second one is not a fallback: crawlers take either, and a page's own description
+    # (the {% block description %} in base.html) must be the only one
+    if len(descriptions) > 1:
+        problems.append(f"{len(descriptions)} meta descriptions, expected one")
     for img in page.all("img"):
         if "alt" not in img.attrs:
             problems.append(f"<img src={img.attrs.get('src')}> has no alt")
@@ -159,6 +204,37 @@ def problems_of(html):
             continue
         if not element.accessible_name():
             problems.append(f"<{element.tag} {element.attrs}> has no accessible name")
+        # WCAG 2.5.3, Lighthouse's label-content-name-mismatch: an aria-label replaces the
+        # text, so a word the control shows but its label leaves out is one a voice user
+        # says and the control does not answer to
+        label = re.findall(r"\w+", (element.attrs.get("aria-label") or "").lower())
+        missing = [word for word in element.visible_words() if label and word not in label]
+        if missing:
+            problems.append(f"<{element.tag} {element.attrs}> shows {missing} but its aria-label leaves it out")
+
+    for header in page.all("th"):
+        # td-has-header reads a column's header as text. An icon's title is its tooltip, which
+        # assistive technology may skip, so only text inside the cell counts; a visually-hidden
+        # span is text, unless it sits inside the aria-hidden icon.
+        if not header.text_content().strip():
+            titles = [title for child in header.children for title in child.titles()]
+            problems.append(f"<th {header.attrs}> has no text" + (f", only an icon titled {titles}" if titles else ""))
+    for cell in page.all("td"):
+        # a value with its filter icon is two 24px targets: stacked, they sit a 21.6px line
+        # apart, which WCAG 2.5.8 refuses. style.css keeps .id and .family cells on one line
+        links = [child for child in cell.children if child.tag == "a"]
+        filters = [link for link in links if (link.attrs.get("aria-label") or "").startswith("Filter by this")]
+        classes = (cell.attrs.get("class") or "").split()
+        if len(links) > 1 and filters and not {"id", "family"} & set(classes):
+            problems.append(f"<td {cell.attrs}> holds a link and its filter link but may wrap them")
+    for table in page.all("table"):
+        # and a table whose header row is made of <td> leaves every cell without one. axe
+        # applies td-has-header from three rows and three columns up and checks each cell;
+        # this catches the plainest case, such a table with no header cell at all
+        rows = descendants(table, "tr")
+        if len(rows) >= 3 and max(len(descendants(row, "td")) for row in rows) >= 3 \
+                and not descendants(table, "th"):
+            problems.append(f"<table {table.attrs}> of {len(rows)} rows has no header cell")
     ids_labelled = {label.attrs.get("for") for label in page.all("label")}
     for control in page.all("input", "select", "textarea"):
         attrs = control.attrs
@@ -225,12 +301,56 @@ def test_the_checker_catches_what_it_claims_to():
     bad = ('<!doctype html><html><head></head><body><img src="/static/x.png">'
            '<a href="/r"><i class="fa-solid fa-trash"></i></a><input name="q">'
            '<a onclick="go()">x</a><a aria-label="Last page"></a>'
-           '<h1>a</h1><h3>b</h3></body></html>')
+           '<h1>a</h1><h3>b</h3>'
+           '<table><tr><th id="empty"></th>'
+           '<th id="icon"><i class="fa-solid fa-bug" title="Family ID"></i></th>'
+           # an unclosed icon swallows the span after it, and aria-hidden hides the span with it
+           '<th id="swallowed"><i class="fa-solid fa-bug" title="Family ID" aria-hidden="true">'
+           '<span class="visually-hidden">Family ID</span></th>'
+           '<th id="named"><i class="fa-solid fa-virus" aria-hidden="true"></i>'
+           '<span class="visually-hidden">Sample ID</span></th>'
+           '<th id="text">Name</th></tr></table></body></html>')
     problems = "\n".join(problems_of(bad))
     for expected in ("no lang", "0 <main>", "no meta description", "has no alt", "no width/height",
                      "<a ", "<input ", "<h1> is followed by <h3>",
                      "not crawlable", "aria-label but no href or role"):
         assert expected in problems, expected
+    shown = ('<!doctype html><html lang="en"><body><main><button aria-label="Analyze sample">'
+             '<i aria-hidden="true">x</i>&nbsp;3</button><button aria-label="Edit sample 3">'
+             '<i aria-hidden="true">x</i><span class="visually-hidden">Edit</span></button>'
+             '<a href="/s" aria-label="Open sample 3">3,</a><button aria-label="Close">&times;</button>'
+             '<button aria-label="Open"><span class="d-none">hidden</span>Open</button></main></body></html>')
+    mismatches = [problem for problem in problems_of(shown) if "aria-label leaves it out" in problem]
+    assert len(mismatches) == 1 and "Analyze sample" in mismatches[0], mismatches
+    twice = ('<!doctype html><html lang="en"><head><meta name="description" content="a">'
+             '<meta name="description" content="b"></head><body><main></main></body></html>')
+    assert "2 meta descriptions, expected one" in problems_of(twice)
+
+
+    headers = [problem for problem in problems_of(bad) if problem.startswith("<th ")]
+    for caught in ("empty", "icon", "swallowed"):
+        assert [problem for problem in headers if f"'id': '{caught}'" in problem], caught
+    for passed in ("named", "text"):
+        assert not [problem for problem in headers if f"'id': '{passed}'" in problem], passed
+    assert "only an icon titled ['Family ID']" in "\n".join(headers)
+    grid = ('<!doctype html><html lang="en"><body><main><table id="grid">'
+            + '<tr><td>#</td><td>family</td><td>ID</td></tr>' * 3 + '</table></main></body></html>')
+    assert [problem for problem in problems_of(grid) if "has no header cell" in problem]
+    stacked = ('<!doctype html><html lang="en"><body><main><table><tr><td><a href="/f/1">a</a>&nbsp;'
+               '<a aria-label="Filter by this family" href="?famid=1"><i></i></a></td></tr></table></main></body></html>')
+    assert [problem for problem in problems_of(stacked) if "may wrap them" in problem]
+    assert not [problem for problem in problems_of(stacked.replace("<td>", '<td class="family">'))
+                if "may wrap them" in problem]
+    assert not [problem for problem in problems_of(grid.replace("<td>#</td>", "<th>#</th>", 1))
+                if "has no header cell" in problem]
+
+
+def test_an_id_hit_brings_the_badge_column(client, as_role):
+    """/explore/search?query=1 is in the page list for the "Match" column an exact ID hit
+    adds; if the fixture stops producing the hit, that column's header goes unchecked."""
+    as_role("visitor")
+    page = Page(client.get("/explore/search?query=1").get_data(as_text=True))
+    assert "Match" in [header.text_content().strip() for header in page.all("th")]
 
 
 def test_the_static_images_declare_their_own_size():
