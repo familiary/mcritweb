@@ -52,6 +52,15 @@ def test_the_stylesheet_keeps_headings_and_action_cells_on_one_line():
     assert re.search(r"table\.table td\.buttons\s*\{[^}]*white-space:\s*nowrap", css)
 
 
+def test_the_stylesheet_keeps_a_value_and_its_filter_icon_on_one_line():
+    """A result page's id and family cells hold two links, the value and the icon that
+    filters by it; wrapped onto two 21.6px lines they are closer than the 24px targets of
+    WCAG 2.5.8. tests/testAccessibility.py checks the cells carry the classes."""
+    css = STYLESHEET.read_text()
+
+    assert re.search(r"table\.table td\.id,\s*table\.table td\.family\s*\{[^}]*white-space:\s*nowrap", css)
+
+
 def test_the_rule_stays_scoped_to_the_application_tables():
     """`nowrap` on every <th> in the document would reach anything a future page
     renders - the manual's markdown tables among them, whose headings are prose and

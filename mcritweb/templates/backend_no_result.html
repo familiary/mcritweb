@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title%}
+MCRIT server returned no data
+{% endblock %}
+{% block style %}
+{% endblock %}
+{% block content %}
+<h1>MCRIT server returned no data</h1>
+<p role="alert">The MCRIT server did not return {{ what }}.</p>
+{# Only reached through backend_errors.require_result, on a client that raises for a
+   failure on the server's side, so this None is a refused request or something that
+   is not there. A failure of the server is backend_server_error.html. See issue #43. #}
+<p>What was asked for is not there - it may have been deleted - or the server refused
+   the request as invalid.</p>
+{% if request.method in ('POST', 'PUT', 'PATCH', 'DELETE') %}
+<p>Nothing was changed: the server answered that it would not carry the request out.</p>
+{% endif %}
+{% if g.user and g.user.role == 'admin' %}
+<p>The backend's log will say why. Its address is in
+   <a href="{{ url_for('admin.server') }}">server settings</a>.</p>
+{% else %}
+<p>If it should be there, ask an administrator to check the server.</p>
+{% endif %}
+{% endblock %}
