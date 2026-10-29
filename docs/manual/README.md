@@ -74,6 +74,14 @@ on the search page and on the family, sample and function listings. An exact hit
 listed once, at the top of the first page of results; paging onwards shows the text hits
 alone.
 
+On a sample's page, the family list, the sample list and a family's page, the table
+follows the search box as you type: it updates once you pause, without reloading the
+page, and Enter still loads the page as before. On a sample's page a term that is only a
+hex number, such as `0x6840`, finds the function at that offset, as `offset:0x6840` does;
+any other term is searched as typed, so a part of a name finds the functions with that
+name. The function list and the combined search page wait for Enter, for the reason
+below.
+
 The result tables can be sorted by clicking a column header.
 The sort order you last chose is remembered separately for families, samples, and functions, and stays in effect for the rest of your browser session - a new search or a return to one of the lists keeps it, while logging out clears it.
 A link that already carries sort parameters always wins over the remembered order, so a shared URL shows everyone the same table.
@@ -161,7 +169,15 @@ The API usage lists the requests that fetch the same data through the API passth
 
 #### Statistics
 
-Provides a short numerical summary of the MCRIT database contents.
+Provides a short summary of the MCRIT installation and its database contents:
+
+* **Versions**: MCRITweb, the MCRIT backend, the mcrit client library MCRITweb talks to the backend with, and the SMDA version the backend disassembles with.
+* **Corpus**: how many families, samples, functions and unique PicHashes the database holds.
+* **Index**: the storage, the number of MinHash bands, the oldest SMDA whose MinHashes are still comparable, and the database revision with the time of its last change.
+* **Maintenance**: samples whose hashes an older SMDA produced and that a maintenance job under *Server Management* can redo, or a storage migration still to run on the backend. When nothing is due, it says so.
+* **Escaper fingerprints**: per architecture, how the backend escapes instructions before hashing them. MinHashes are only comparable between functions escaped the same way.
+
+A value the backend reports that the page has no label for is listed under *Other*.
 
 ### Analyze
 
@@ -417,6 +433,7 @@ The user settings page allows user to edit their preferences.
 On the home screen, name and registration date for the user are shown.
 If the user has access level contributor or administrator, it further shows an apitoken.
 This token can be used for API passthrough, using the MCRIT Web front-end as a relay when using the MCRIT python client to interact with (normally not exposed) MCRIT server.
+A token issued before MCRITweb 1.5.0 has only 32 characters; the settings page marks it as deprecated and asks you to regenerate it, since a deployment may be configured to refuse such tokens.
 
 ![An example for the user information](images/user_info.png "An example for the user information")
 

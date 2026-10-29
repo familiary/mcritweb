@@ -39,3 +39,24 @@ def test_every_user_is_listed_under_its_own_role_and_under_all(client, as_role, 
     assert panes["all"] == sorted(role_of)
     for pane, role in PANE_ROLE.items():
         assert panes[pane] == [user_id for user_id, user_role in sorted(role_of.items()) if user_role == role]
+
+
+@pytest.mark.parametrize("path, active", [("/admin/users/", "all"), *((f"/admin/users/{pane}", pane) for pane in [*PANE_ROLE, "all"])])
+def test_the_tab_url_shows_its_pane_and_every_pane_fades(client, as_role, path, active):
+    """The "all" pane rendered its classes as `fadeshow active`, losing both `fade` and
+    `show`, and two others ran their class attribute into `id` with no space between.
+    The "all" tab also said `aria-selected="true"` whichever tab the URL opened."""
+    as_role("admin")
+    response = client.get(path)
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    panes = re.findall(r'<div class="(tab-pane[^"]*)"(\s*)id="pills-(\w+)"', html)
+    assert sorted(pane for _, _, pane in panes) == sorted([*PANE_ROLE, "all"])
+    for classes, gap, pane in panes:
+        assert gap, f'the class attribute of pane {pane} runs into its id'
+        expected = {"tab-pane", "fade", "show", "active"} if pane == active else {"tab-pane", "fade"}
+        assert set(classes.split()) == expected, pane
+    tabs = re.findall(r'<button class="([^"]*)" id="pills-(\w+)-tab"[^>]*aria-selected="(\w+)"', html)
+    assert sorted(tab for _, tab, _ in tabs) == sorted([*PANE_ROLE, "all"])
+    for classes, tab, selected in tabs:
+        assert ("active" in classes.split(), selected) == ((True, "true") if tab == active else (False, "false")), tab
