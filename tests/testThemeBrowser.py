@@ -38,6 +38,7 @@ import threading
 
 import pytest
 import themeCss
+from conftest import session_cookie_for
 from fixtureData import job_id_of
 from testResultPages import CorpusWithEveryMatchedFunction
 from werkzeug.security import generate_password_hash
@@ -109,7 +110,7 @@ def served(tmp_path_factory):
             user_id = UserInfo.fromDb(username=user_info.username).user_id
             cookies[theme] = {
                 "name": app.config["SESSION_COOKIE_NAME"],
-                "value": app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id}),
+                "value": session_cookie_for(app, user_id),
                 "domain": "127.0.0.1",
                 "path": "/",
             }
@@ -376,8 +377,13 @@ def settle(page, ready=None):
     script draws (the graphs, the lazily filled panes) there, and the colours at rest."""
     page.wait_for_load_state("networkidle")
     if ready:
+        if "graphContainer" in ready:
+            # the graphs are drawn once they come into view (#308, #310, #312)
+            page.evaluate("document.querySelector('[id^=graphContainer]').scrollIntoView()")
         page.wait_for_selector(ready, state="attached")
-    page.wait_for_function("[...document.images].every((image) => image.complete)")
+        page.evaluate("window.scrollTo(0, 0)")
+    # an image below the fold that loads lazily (#245) is not fetched until it is scrolled to
+    page.wait_for_function("[...document.images].every((image) => image.complete || (image.loading === 'lazy' && image.getBoundingClientRect().top >= innerHeight))")
     calm(page)
 
 
@@ -616,6 +622,8 @@ def test_the_menus_and_the_dialog_are_raised_dark_surfaces(visit):
     page.click("body", position={"x": 5, "y": 400})
 
     # the drop zone's dialog
+    # Dropzone is fetched on the first drag (#126); the dialog's zone is one only after that
+    page.evaluate("new Promise((resolve) => mcritLoadDropzone(resolve))")
     page.evaluate("$('#submitFileModal').modal('show')")
     page.wait_for_selector("#submitFileModal.show")
     page.wait_for_function("getComputedStyle(document.querySelector('#submitFileModal')).opacity === '1'")
@@ -639,6 +647,8 @@ def test_the_drop_zone_outline_holds_3_to_1_in_the_dialog(visit):
     the fill inside it and the dialog around it (the dialog is what every page shows it in)."""
     page = visit("dark").goto("/explore/samples")
     settle(page, "table.table tbody tr")
+    # Dropzone is fetched on the first drag (#126); the dialog's zone is one only after that
+    page.evaluate("new Promise((resolve) => mcritLoadDropzone(resolve))")
     page.evaluate("$('#submitFileModal').modal('show')")
     page.wait_for_selector("#submitFileModal.show")
     page.wait_for_function("getComputedStyle(document.querySelector('#submitFileModal')).opacity === '1'")
@@ -920,7 +930,7 @@ def test_the_probe_catches_a_light_background_unreadable_text_a_faint_icon_and_a
             plant('<div id="planted-light" style="background: #eee; width: 80px; height: 30px">x</div>');
             plant('<p id="planted-faint" style="color: #3a4654">planted faint text</p>');
             plant('<p id="planted-over" style="color: #cfd7e0; background: #e8eef4">planted text on a light background</p>');
-            plant('<i id="planted-icon" class="fa-solid fa-check" style="color: #1c242e; font-size: 20px"></i>');
+            plant('<i id="planted-icon" class="fa-solid fa-square-check" style="color: #1c242e; font-size: 20px"></i>');
             plant('<input id="planted-field" value="planted field" style="color: #151c24">');
             plant('<style>#planted-placeholder::placeholder { color: #3a4654 }</style><input id="planted-placeholder" placeholder="planted placeholder">');
             plant('<span class="score-swatch" id="planted-swatch" style="display:inline-block; width: 25px; height: 25px; background: #ffff00"></span>');

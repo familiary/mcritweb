@@ -21,6 +21,7 @@ import os
 import threading
 
 import pytest
+from conftest import session_cookie_for
 from werkzeug.serving import make_server
 
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
@@ -58,7 +59,7 @@ def live_server(app):
 def browser_page(app, live_server, make_user):
     """A Chromium page logged in as a visitor - see testJobOverviewBrowser.py."""
     user_id = make_user(role="visitor")
-    cookie = app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id})
+    cookie = session_cookie_for(app, user_id)
 
     with sync_api.sync_playwright() as playwright:
         try:
@@ -119,6 +120,8 @@ def test_compare_moves_the_chosen_row_by_class(browser_page, live_server):
     rows = page.locator("tr.parent_table_sample")
     assert rows.count() >= 3
 
+    # the page script runs from whenReady, which since #313 is after the first paint
+    page.wait_for_selector("tr.parent_table_sample.row-pending", state="attached")
     assert "row-pending" in classes(rows.nth(0)), "the first row is chosen when nothing else is"
     click(rows.nth(2))
 

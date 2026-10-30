@@ -34,6 +34,7 @@ from html.parser import HTMLParser
 import pytest
 import themeCss
 from cfgColors import LIGHT_CFG_COLORS
+from conftest import log_in_as
 from testMigrations import SCHEMA_V0_10_6, SCHEMA_V1_4_8, _columns, _legacy_database, _query, _run_migration
 from themeCss import PACKAGE, ROOT, STATIC, TEMPLATES, contrast, parse_colour
 
@@ -150,8 +151,7 @@ def add_user_before_the_theme(app, username, role="visitor"):
 
 
 def sign_in(client, user_id):
-    with client.session_transaction() as test_session:
-        test_session["user_id"] = user_id
+    log_in_as(client, user_id)
 
 
 def trace(connection):
@@ -689,7 +689,9 @@ def test_logged_out_a_post_goes_to_the_login_and_changes_nothing(client, app):
 def test_logged_out_with_a_stale_session_the_post_still_goes_to_the_login(client, app):
     add_user(app, "somebody", theme="dark")
     token = csrf_token(client, "/login")
-    sign_in(client, 424242)
+    # a session for an account that is gone: there is no mark to give it
+    with client.session_transaction() as test_session:
+        test_session["user_id"] = 424242
 
     response = post_theme(client, "light", token)
 
@@ -921,7 +923,8 @@ def test_signing_out_ends_the_theme_with_the_session(client, app):
     sign_in(client, add_user(app, "leaver", theme="dark"))
     assert theme_of_page(client.get("/settings")) == "dark"
 
-    client.get("/logout")
+    # logging out is a POST since #284, with the CSRF token like every other
+    client.post("/logout", data={FIELD_NAME: csrf_token(client)})
 
     check_theme_on_the_page(client.get("/login").data.decode(), "light")
 
@@ -1588,8 +1591,8 @@ def test_the_light_theme_is_no_worse_than_master_on_any_of_these_pairs():
 #: Scripts and stylesheets in static/ that the project did not write (AGENTS.md lists them).
 #: Everything else in the top level of static/ is project code and is scanned; a new file
 #: therefore fails the classification test below until someone says what it is.
-VENDORED_SCRIPTS = {"autocomplete.js", "dropzone.js", "dropzone.min.js", "jquery.js", "jquery-ui.js", "jquery.dataTables.min.js", "dataTables.bootstrap5.min.js"}
-VENDORED_STYLESHEETS = {"dropzone.min.css", "dataTables.bootstrap5.min.css", "hint.css", "jquery-ui.css"}
+VENDORED_SCRIPTS = {"autocomplete.js", "dropzone.js", "dropzone.min.js", "jquery.js", "jquery-ui.js"}
+VENDORED_STYLESHEETS = {"dropzone.min.css", "hint.css", "jquery-ui.css"}
 VENDORED_DIRECTORIES = {"bootstrap-5.0.2-dist", "css", "images", "sortablejs", "trace_CFG", "webfonts"}
 #: the dark palette itself is where the dark colours are written
 DARK_STYLESHEET_FILE = "theme-dark.css"
