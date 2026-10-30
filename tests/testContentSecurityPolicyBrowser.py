@@ -270,7 +270,7 @@ def test_the_modals_and_the_sortable_headers_work(admin, live_server):
     page.check("#family_delete")
     page.keyboard.press("Escape")
     with page.expect_navigation():
-        page.locator("th[role=button]").first.click()
+        page.locator("th a.table-sort").first.click()
     admin.assert_clean()
     admin.open(live_server + "/data/jobs?active=getMatchesForSample")
     page.locator(".confirm-delete").first.click()
