@@ -1123,6 +1123,14 @@ table.table:not(.table-scroll > table) :is(td, th) {
   .table-deferred {
     content-visibility: auto;
   }
+  /* content-visibility also contains its box's paint, which makes the box the containing
+     block of a fixed descendant: the anchored tooltip of a cell (the tooltip block above)
+     was placed and cut off inside the table instead of against the window. A table with a
+     tooltip showing is on screen, so laying it out as usual costs nothing */
+  .table-deferred:has([data-hint]:hover),
+  .table-deferred:has([data-hint]:focus-visible) {
+    content-visibility: visible;
+  }
 }
 
 /* The panes of the control flow graph viewer. trace_CFG/cfg_style.css floats the graph and
