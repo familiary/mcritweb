@@ -41,7 +41,7 @@
     else {
       modalBodyLibrary.checked = false;
     }
-    // present only where tags are editable, see sample_table
+    {# present only where tags are editable, see sample_table #}
     var modalBodyTags = editSampleModal.querySelector('.modal-body #sample_tags');
     if (modalBodyTags) {
       modalBodyTags.value = button.getAttribute('data-bs-tags') || '';

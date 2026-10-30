@@ -107,7 +107,7 @@
           {# only where the view found tags editable: a form without the field changes no tags #}
           <div class="form-group mb-3">
             <label for="family_tags" class="col-form-label">Tags:</label>
-            <input type="text" class="form-control" name="family_tags" id="family_tags" aria-describedby="family_tags_help">
+            <input type="text" class="form-control" name="family_tags" id="family_tags" aria-describedby="family_tags_help" autocapitalize="off" autocorrect="off">
             <div class="form-text" id="family_tags_help">Separated by commas. Emptying the field removes them all.</div>
           </div>
           {% endif %}
@@ -199,7 +199,7 @@
           {# only where the view found tags editable: a form without the field changes no tags #}
           <div class="form-group mb-3">
             <label for="sample_tags" class="col-form-label">Tags:</label>
-            <input type="text" class="form-control" name="sample_tags" id="sample_tags" aria-describedby="sample_tags_help">
+            <input type="text" class="form-control" name="sample_tags" id="sample_tags" aria-describedby="sample_tags_help" autocapitalize="off" autocorrect="off">
             <div class="form-text" id="sample_tags_help">Separated by commas. Emptying the field removes them all.</div>
           </div>
           {% endif %}

@@ -45,7 +45,7 @@ Sample: {{ entry.sample_id }}
     else {
       modalBodyLibrary.checked = false;
     }
-    // present only where tags are editable, see the modal below
+    {# present only where tags are editable, see the modal below #}
     var modalBodyTags = editSampleModal.querySelector('.modal-body #sample_tags');
     if (modalBodyTags) {
       modalBodyTags.value = button.getAttribute('data-bs-tags') || '';
@@ -82,7 +82,7 @@ Sample: {{ entry.sample_id }}
           {# as in sample_table: a form without the field changes no tags #}
           <div class="form-group mb-3">
             <label for="sample_tags" class="col-form-label">Tags:</label>
-            <input type="text" class="form-control" name="sample_tags" id="sample_tags" aria-describedby="sample_tags_help">
+            <input type="text" class="form-control" name="sample_tags" id="sample_tags" aria-describedby="sample_tags_help" autocapitalize="off" autocorrect="off">
             <div class="form-text" id="sample_tags_help">Separated by commas. Emptying the field removes them all.</div>
           </div>
           {% endif %}
