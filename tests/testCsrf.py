@@ -189,7 +189,7 @@ def post_forms():
             yield pytest.param(source[match.start():end], id=f"{relative}:{source.count(chr(10), 0, match.start()) + 1}")
 
 
-@pytest.mark.parametrize("form_source", post_forms())
+@pytest.mark.parametrize("form_source", list(post_forms()))
 def test_every_post_form_carries_the_token(form_source):
     """A lint, not a render: a form added without a token fails here rather than in
     a browser, and names the file and line it is missing from."""
