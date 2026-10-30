@@ -178,9 +178,10 @@ def test_no_part_of_the_stored_name_comes_from_the_request(app, client, as_role)
 ])
 def test_a_job_id_that_is_not_one_names_no_path(app, job_id):
     """The name is a job id off the wire or out of a URL, so it becomes part of a path
-    only once it is one: an ObjectId as MongoQueue answers, or the uuid4 LocalQueue
-    answers. Anything else is refused rather than sanitised, because a job id that does
-    not look like a job id is a backend that is not working, not a name to repair."""
+    only once it is one: an ObjectId as both queues answer, or the uuid4 LocalQueue
+    answered before mcrit 1.14. Anything else is refused rather than sanitised,
+    because a job id that does not look like a job id is a backend that is not
+    working, not a name to repair."""
     assert query_upload_path(app, job_id) is None
 
 
@@ -188,7 +189,7 @@ def test_a_job_id_that_is_not_one_names_no_path(app, job_id):
     "0123456789abcdef01234567",              # MongoQueue: str(ObjectId)
     "6a7464faf8b8d2c6f836649a",              # one out of tests/fixtures
     "0123456789ABCDEF01234567",              # pymongo lower-cases, but do not assume it
-    "3f2504e0-4f89-41d3-9a0c-0305e82c3301",  # LocalQueue: str(uuid.uuid4())
+    "3f2504e0-4f89-41d3-9a0c-0305e82c3301",  # LocalQueue before mcrit 1.14: str(uuid.uuid4())
 ])
 def test_a_real_job_id_names_a_path_inside_the_uploads_folder(app, job_id):
     """The other half, so the guard cannot be satisfied by refusing everything. Both

@@ -200,6 +200,8 @@ Function: {{ function_id }}
               <!-- <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableNodeDrag" value="enableNodeDrag">Enable Node Dragging</label> -->
               <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableTooltip" class="cfg-graph-control" value="enableTooltip">Enable Tooltip</label>
           </div>
+          {# main.js says here when loop analysis was skipped; empty, it takes no space #}
+          <div id="loopAnalysisNote" role="status"></div>
           <div id="xcfg_container">
               <div id="xcfg_left">
                   <div id="tooltip" class="hidden">

@@ -1,15 +1,17 @@
 {% macro cross_table(method, samples, matching_percent, matching_matches, fifth_indices, job_info) %}
 
   <table>
+    {# header cells, so every cell below has one (axe's td-has-header); normal weight,
+       because they looked like the rest of the table when they were <td> #}
     <tr>
-      <td style="font-size: 13px;color: black">#</td>
-      <td style="font-size: 13px;color: black">family</td>
-      <td style="font-size: 13px;color: black">version</td>
-      <td></td>
-        <td style="font-size: 13px;color: black">ID</td>
-        <td style="font-size: 13px;color: black">Bit</td>
-        <td style="font-size: 13px;color: black">FNs</td>
-        <td style="font-size: 13px;color: black" colspan="{{ samples|length }}">Matrix</td>
+      <th scope="col" style="font-size: 13px;color: black;font-weight: normal">#</th>
+      <th scope="col" style="font-size: 13px;color: black;font-weight: normal">family</th>
+      <th scope="col" style="font-size: 13px;color: black;font-weight: normal">version</th>
+      <th scope="col"><span class="visually-hidden">Actions</span></th>
+        <th scope="col" style="font-size: 13px;color: black;font-weight: normal">ID</th>
+        <th scope="col" style="font-size: 13px;color: black;font-weight: normal">Bit</th>
+        <th scope="col" style="font-size: 13px;color: black;font-weight: normal">FNs</th>
+        <th scope="col" style="font-size: 13px;color: black;font-weight: normal" colspan="{{ samples|length }}">Matrix</th>
     </tr>
     
     <tr>
@@ -42,7 +44,11 @@
         <td class="" style="padding: 0 5px; font-size: 13px;color: black">{{sample.statistics['num_functions']}}</td>
       {# a pane filled in the browser writes its own score line into data-hint, see the script at the end #}
       {% for sample2 in samples %}
-        <td><span onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}'";" class="hint--top" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
+        {# a pair without matches links nowhere: the row's report has no entry for the column's
+           sample, so its page would list nothing and its diagram would 404, as
+           data.render_missing_match_diagram draws none for it. The diagonal is always such a
+           pair, since mcrit counts a sample's matches with itself apart #}
+        <td><span{% if matching_matches[sample.sample_id|string][sample2.sample_id|string] %} onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}';"{% endif %} class="hint--top" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
             style="background-color: #{{ score_to_color(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }}; width: 25px; height: 25px; "></span>
         </td>
       {% endfor %}
@@ -65,7 +71,7 @@ Results for Job: {{ job_info.job_id }}
     // delegated, so that it also reaches the rows of a pane filled after load
     $(document).on("click", "td.clickable", function(){
       var result = $(this).parent().children("td.result").text();
-      window.location.href="/data/result/"+result;
+      window.location.href = "{{ url_for('data.result', job_id='') }}" + result;
     });
   });
   $( function() {
@@ -76,9 +82,7 @@ Results for Job: {{ job_info.job_id }}
     var array2 = []
     for (let i = 0; i < array1.length; i++) {
         array2.push(array1[i].innerHTML.split(' ')[0]);} 
-    var result = {{ job_info.job_id|tojson }};
-    window.location.href="/data/result/"+result+"?custom="+array2;
-
+    window.location.href = "{{ url_for('data.result', job_id=job_info.job_id) }}" + "?custom=" + array2;
   }
 </script>
 <script>
@@ -144,9 +148,10 @@ Results for Job: {{ job_info.job_id }}
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="editSampleModalLabel">Modify Sample</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-          <form action='{{ url_for("explore.modifySample") }}'' method="POST" style="width: 80%">
+          <form action="{{ url_for('explore.modifySample') }}" method="POST" style="width: 80%">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="text" class="form-control" name="sample_id" id="sample_id" hidden value="">
             <input type="text" class="form-control" name="redirection_job_id" id="redirection_job_id" hidden value="{{ job_info.job_id }}">
@@ -187,6 +192,13 @@ Results for Job: {{ job_info.job_id }}
       deleteSampleButton.hidden = true;
     }
   }
+    // every opening starts disarmed: Delete ticked and the dialog closed would otherwise
+    // come back ticked for the next sample, and its plain Submit would delete that one
+    document.getElementById('editSampleModal').addEventListener('show.bs.modal', function () {
+      var deleteBox = document.getElementById('sample_delete');
+      deleteBox.checked = false;
+      toggle_delete_sample(deleteBox);
+    });
   </script>
 
 
@@ -222,10 +234,11 @@ Results for Job: {{ job_info.job_id }}
     </div>
   </div>
 
+{% set cross_method_labels = {"unweighted": "Unweighted", "score_weighted": "Score Weighted", "frequency_weighted": "Frequency Weighted", "nonlib_unweighted": "Non-Library Unweighted", "nonlib_score_weighted": "Non-Library Score Weighted", "nonlib_frequency_weighted": "Non-Library Frequency Weighted"} %}
 <ul class="nav nav-pills mb-3 justify-content-center" id="pills-tab" role="tablist">
     {% for method in ["unweighted", "score_weighted", "frequency_weighted", "nonlib_unweighted", "nonlib_score_weighted", "nonlib_frequency_weighted"] %}
     <li class="nav-item" role="presentation">
-      <button class="nav-link{% if method == rendered_method %} show active{% endif %}" id="pills-{{ method }}-tab" data-bs-toggle="pill" data-bs-target="#pills-{{ method }}" type="button" role="tab" aria-controls="pills-{{ method }}" aria-selected="{{ 'true' if method == rendered_method else 'false' }}">{{ method }}</button>
+      <button class="nav-link{% if method == rendered_method %} show active{% endif %}" id="pills-{{ method }}-tab" data-bs-toggle="pill" data-bs-target="#pills-{{ method }}" type="button" role="tab" aria-controls="pills-{{ method }}" aria-selected="{{ 'true' if method == rendered_method else 'false' }}">{{ cross_method_labels[method] }}</button>
     </li>
     {% endfor %}
   </ul>
@@ -236,13 +249,13 @@ Results for Job: {{ job_info.job_id }}
     {% for method in matching_percent.keys() %}
       {% if method == rendered_method %}
       <div class="tab-pane fade show active" id="pills-{{ method }}" role="tabpanel" aria-labelledby="pills-{{ method }}-tab">
-          <center> 
+          <div class="d-flex justify-content-center overflow-auto cross-pane-body">
             {{ cross_table(method, samples[method], matching_percent[method], matching_matches[method], sample_indices[method], job_info) }}
-          </center>
+          </div>
       </div>
       {% else %}
       <div class="tab-pane fade" id="pills-{{ method }}" role="tabpanel" aria-labelledby="pills-{{ method }}-tab" data-lazy-method="{{ method }}">
-          <center></center>
+          <div class="d-flex justify-content-center overflow-auto cross-pane-body"></div>
       </div>
       {% endif %}
     {% endfor %}
@@ -301,7 +314,7 @@ Results for Job: {{ job_info.job_id }}
       });
       // the tooltips of the clipboard buttons are set up once, on load - see clipboard_js
       $(table).find('[data-toggle="tooltip"]').removeAttr("aria-describedby").tooltip();
-      pane.querySelector("center").appendChild(table);
+      pane.querySelector(".cross-pane-body").appendChild(table);
     }
 
     document.querySelectorAll("#pills-tab button").forEach(function(button){
