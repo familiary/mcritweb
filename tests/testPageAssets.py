@@ -166,13 +166,23 @@ def test_nothing_touches_bootstrap_while_the_page_parses():
             assert "DOMContentLoaded" in before or "$(document).ready" in before, f"{path.name} builds an Autocomplete while parsing"
 
 
-def test_jquery_and_autocomplete_are_still_plain_scripts():
-    """Inline blocks call `$` and `new Autocomplete` while the page parses, so neither
-    library can be deferred without rewriting every one of them."""
-    for asset in ("jquery.js", "autocomplete.js"):
+def test_jquery_is_still_a_plain_script():
+    """Inline blocks call `$` while the page parses - `$(document).ready(...)` is itself
+    such a call - so jQuery cannot be deferred without rewriting every one of them."""
+    tag = re.search(r"<script[^>]*jquery\.js[^>]*>", code_of(BASE))
+    assert tag is not None, "base.html no longer loads jquery.js"
+    assert "defer" not in tag.group(0) and "async" not in tag.group(0), tag.group(0)
+
+
+def test_the_listener_only_scripts_are_deferred():
+    """Nothing calls these while the page parses: page_loading.js and post_action.js only
+    register event listeners, and every `new Autocomplete` waits for DOMContentLoaded
+    (test_nothing_touches_bootstrap_while_the_page_parses), which fires after every
+    deferred script has run. As plain scripts in `<head>` they only delayed first paint."""
+    for asset in ("autocomplete.js", "page_loading.js", "post_action.js"):
         tag = re.search(r"<script[^>]*" + re.escape(asset) + r"[^>]*>", code_of(BASE))
         assert tag is not None, f"base.html no longer loads {asset}"
-        assert "defer" not in tag.group(0) and "async" not in tag.group(0), tag.group(0)
+        assert "defer" in tag.group(0) and "async" not in tag.group(0), tag.group(0)
 
 
 def test_the_pages_that_lost_a_library_still_render(client, as_role):
@@ -257,3 +267,15 @@ class TestTheCrossComparePage:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@pytest.mark.parametrize("name", ["single_function.html", "result_compare_function_vs.html"])
+def test_the_graph_libraries_stay_out_of_the_head(name):
+    """d3, dagre-d3 and graphlib are only used by the CFG scripts at the end of the page
+    and by window.onload; loaded from the style block they blocked the first paint."""
+    code = code_of(TEMPLATE_ROOT / name)
+    style = re.search(r"{%\s*block style\s*%}(.*?){%\s*endblock\s*%}", code, re.S).group(1)
+    assert "trace_CFG/lib/" not in style
+    first_graph_script = code.index("trace_CFG/main")
+    for lib in ("d3.min.js", "graphlib.min.js", "graphlib-dot.min.js", "dagre-d3.min.js", "convexhull.js"):
+        assert -1 < code.find("trace_CFG/lib/" + lib) < first_graph_script, lib
