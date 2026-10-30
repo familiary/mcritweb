@@ -111,7 +111,8 @@ def test_the_lazily_fetched_stylesheet_leaves_the_zones_own_look_alone(app, live
         browser, page = open_samples_page(playwright, app, live_url, user_id)
         try:
             page.goto(live_url + "/explore/samples")
-            page.wait_for_load_state("load")
+            # the page's scripts load after its first paint, which can come after load
+            page.evaluate("() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })")
             page.evaluate("() => new Promise((resolve) => mcritLoadDropzone(resolve))")
             page.wait_for_function("() => [...document.styleSheets].some((sheet) => (sheet.href || '').endsWith('dropzone.min.css'))")
             zone = page.evaluate(
