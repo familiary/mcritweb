@@ -240,7 +240,7 @@ def test_the_cross_compare_tabs_fill_and_its_controls_navigate(admin, live_serve
         page.wait_for_selector(".tab-pane.active.show span.score-swatch")
     # the last tab's pane was filled by cloning the first one's cells
     with page.expect_navigation():
-        page.locator(".tab-pane.active span.score-swatch[data-href]").first.click()
+        page.locator(".tab-pane.active a.score-swatch[href]").first.click()
     assert re.search(r"/data/result/[0-9a-f]{24}\?samid=\d+$", page.url), page.url
     admin.assert_clean()
     admin.open(url)
@@ -250,14 +250,14 @@ def test_the_cross_compare_tabs_fill_and_its_controls_navigate(admin, live_serve
 
 
 def test_a_matrix_cell_leads_to_its_matches_before_the_queued_scripts_are_in(admin, live_server):
-    """The cell's link is followed by a listener the page binds while it parses, as its
-    onclick used to be, so a click does not wait for jQuery."""
+    """A cell with matches is a link, which needs no script at all, so a click does not
+    wait for jQuery."""
     page = admin.page
     page.route("**/static/jquery.js", lambda route: None)
     # not "load": the held script can keep the page from ever reaching it
     page.goto(live_server + f"/data/result/{job_id_of('cross_compare')}", wait_until="domcontentloaded")
     with page.expect_navigation():
-        page.locator("span.score-swatch[data-href]").first.click()
+        page.locator("a.score-swatch[href]").first.click()
     assert re.search(r"/data/result/[0-9a-f]{24}\?samid=\d+$", page.url), page.url
     assert admin.violations() == [] and admin.problems == []
 
