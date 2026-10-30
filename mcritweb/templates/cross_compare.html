@@ -13,7 +13,9 @@ Compare
 
 {% block style %}
 <script>
-  var selected = {{ cached|tojson }};
+  // the ids the URL carried arrive as numbers and a clicked row's as the text of its id
+  // cell, and indexOf compares strictly: kept as strings, a row the URL tinted clicks off
+  var selected = {{ cached|tojson }}.map(String);
   console.log(selected)
   whenReady(function(){
     $("tr.parent").click(function(){
@@ -131,16 +133,16 @@ function handleSliderChange(val) {
 <h1>Cross Compare</h1>
 <div>
   <table class="table table-hover">
-    <thead class="thead-light">
+    <thead class="table-light">
       <tr>
-        <th scope="col"><i class="fa-solid fa-virus" title="Sample ID"></th>
+        <th scope="col"><i class="fa-solid fa-virus" title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample ID</span></th>
         <th scope="col">SHA256</th>
         <th scope="col">Family</th>
         <th scope="col">Version</th>
         <th scope="col">Filename</th>
         <th scope="col">Bitness</th>
         <th scope="col">Functions</th>
-        <th scope="col"></th>
+        <th scope="col"><span class="visually-hidden">Actions</span></th>
       </tr>
     </thead>
     {% if selected_samples %}
@@ -162,9 +164,9 @@ function handleSliderChange(val) {
     {% endif %}
   </table>
   {% if not selected_ids %}
-  <center>
+  <div class="text-center">
   <h2 class="h4">Selected samples will show here</h2>
-  </center>
+  </div>
   {% else %}
   {{ pagination_widget(pagination_selected, _js_argument_provider="fetchState") }}
   {% endif %}
@@ -177,7 +179,7 @@ function handleSliderChange(val) {
   {% if samples %}
   {{ set_pagination_params(pagination, _anchor="Search", _js_argument_provider="fetchState") }}
   <table class="table table-hover">
-      <thead class="thead-light">
+      <thead class="table-light">
         {{ sample_header(show_analyze=False, sort_pagination=pagination) }}
       </thead>
       <tbody>
@@ -196,7 +198,7 @@ function handleSliderChange(val) {
       </tbody>
     </table>
     {{ pagination_widget(pagination) }}
-    <center>
+    <div class="text-center">
     <div class="form-group">
       <div class="col-sm-6 d-inline-flex justify-content-center">
         <div class="col-sm-4 d-inline-flex justify-content-center">
@@ -215,7 +217,7 @@ function handleSliderChange(val) {
       <div class="col-sm-8 d-inline-flex justify-content-center">
         <div class="col-sm-2">
           <label class="form-check-label" for="minhashBandRange">
-            Minhash Matching:
+            MinHash Matching:
           </label>
         </div>
         <div class="col-sm-2" id="minhashBandRange-currentSelection">&nbsp;{{ minhash_slider_mapping[request.args.get('minhashBandRange', '2')|int] }}</div>
@@ -225,12 +227,12 @@ function handleSliderChange(val) {
       </div>
 </div>
       <br>
-      <button type="button"  onclick="goInitCrossFromHashlist()" id="button2" class="btn btn-outline-primary">Initialize from hash list</button>
-      <button type="button"  onclick="setSelected()" id="button2" class="btn btn-outline-primary">Add</button>
+      <button type="button" onclick="goInitCrossFromHashlist()" id="btn-hashlist" class="btn btn-outline-primary">Initialize from hash list</button>
+      <button type="button" onclick="setSelected()" id="btn-add-samples" class="btn btn-outline-primary">Add</button>
       {% if selected_ids %}
-      <button type="button"  onclick="createJob()" id="button2" class="btn btn-primary">Compare</button>
+      <button type="button" onclick="createJob()" id="btn-compare" class="btn btn-primary">Compare</button>
       {% endif %}
-  </center>
+  </div>
   {% else %}
   {# a search box sits directly above this table, so "upload your first sample" is
      almost never what happened - the collection is full and the term missed. Routed

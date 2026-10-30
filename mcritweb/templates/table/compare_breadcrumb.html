@@ -1,0 +1,27 @@
+{% macro compare_breadcrumb(job_id, current_level, famid=none, family_name=none, samid=none, funid=none) %}
+<nav aria-label="Compare navigation breadcrumb" class="my-2">
+  <ol class="breadcrumb mb-0">
+    {% if current_level == 'all' %}
+      <li class="breadcrumb-item active" aria-current="page">All Matches</li>
+    {% else %}
+      <li class="breadcrumb-item"><a href="{{ url_for('data.result', job_id=job_id) }}">All Matches</a></li>
+    {% endif %}
+
+    {% if current_level == 'family' %}
+      <li class="breadcrumb-item active" aria-current="page">Family: {{ family_name or famid }}</li>
+    {% elif famid is not none %}
+      <li class="breadcrumb-item"><a href="{{ url_for('data.result', job_id=job_id, famid=famid) }}">Family: {{ family_name or famid }}</a></li>
+    {% endif %}
+
+    {% if current_level == 'sample' %}
+      <li class="breadcrumb-item active" aria-current="page">Sample: {{ samid }}</li>
+    {% elif samid is not none %}
+      <li class="breadcrumb-item"><a href="{{ url_for('data.result', job_id=job_id, samid=samid) }}">Sample: {{ samid }}</a></li>
+    {% endif %}
+
+    {% if current_level == 'function' %}
+      <li class="breadcrumb-item active" aria-current="page">Function: {{ funid }}</li>
+    {% endif %}
+  </ol>
+</nav>
+{% endmacro %}
