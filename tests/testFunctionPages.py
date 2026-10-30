@@ -704,26 +704,32 @@ def test_the_function_page_carries_the_deferred_graph_prompt(client, as_role):
 
 
 def test_a_large_graph_is_offered_rather_than_laid_out_on_load():
-    """dagre's layout froze the page for seconds on large functions (#267): above the
-    threshold the code panel is shown at once and the graph waits for a click."""
+    """dagre's layout froze the page for seconds on large functions (#267): above
+    CFG_CODE_FIRST_BLOCKS the code panel is shown at once and the graph follows from the
+    layout worker; above CFG_DEFERRED_LAYOUT_BLOCKS it waits for a click."""
     load = _main_js_function("loadWithDotGraphAndFunctionId")
-    branch = re.search(r"if\s*\(\s*num_blocks\s*>\s*CFG_DEFERRED_LAYOUT_BLOCKS\s*\)", load)
+    branch = re.search(r"if\s*\(\s*num_blocks\s*>\s*CFG_CODE_FIRST_BLOCKS\s*\|\|\s*num_blocks\s*>\s*CFG_DEFERRED_LAYOUT_BLOCKS\s*\)", load)
     otherwise = re.search(r"\}\s*else\s*\{", load[branch.end():])
-    deferred, eager = load[branch.end():branch.end() + otherwise.start()], load[branch.end() + otherwise.end():]
-    assert _calls(deferred, "getCodefromGraph") and _calls(deferred, "offerDeferredGraph")
-    assert not _calls(deferred, "findLoopsAndShowGraph") and _calls(eager, "findLoopsAndShowGraph")
+    large, small = load[branch.end():branch.end() + otherwise.start()], load[branch.end() + otherwise.end():]
+    assert _calls(large, "getCodefromGraph") and _calls(large, "offerDeferredGraph")
+    assert re.search(r"if\s*\(\s*num_blocks\s*<=\s*CFG_DEFERRED_LAYOUT_BLOCKS\s*\)\s*\{\s*drawDeferredGraph\(", large)
+    assert not _calls(large, "findLoopsAndShowGraph") and _calls(small, "findLoopsAndShowGraph")
 
 
 def test_every_failure_to_draw_the_graph_is_reported():
-    """A failed loop request, an answer that is not loop data, or a layout that throws
-    must bring the prompt and its button back rather than leave a page waiting (#267)."""
+    """A failed loop request, an answer that is not loop data, a graph that cannot be
+    measured or laid out, or a drawing that throws must bring the prompt and its button
+    back rather than leave a page waiting (#267)."""
     draw = _main_js_function("findLoopsAndShowGraph")
     assert re.search(r"if\s*\(\s*err\s*\|\|\s*!result\s*\)\s*\{\s*graphNotDrawn\(", draw)
-    # parsing the answer and laying the graph out each fail into graphNotDrawn()
+    # parsing the answer, measuring the graph and drawing it each fail into graphNotDrawn()
     attempts = re.findall(r"try\s*\{(.*?)\}\s*catch\s*\(error\)\s*\{(.*?)\}", draw, re.S)
-    assert [bool(_calls(t, "JSON.parse")) for t, _ in attempts] == [True, False]
-    assert [bool(_calls(t, "showGraph")) for t, _ in attempts] == [False, True]
+    assert [bool(_calls(t, "JSON.parse")) for t, _ in attempts] == [True, False, False]
+    assert [bool(_calls(t, "measureGraph")) for t, _ in attempts] == [False, True, False]
+    assert [bool(_calls(t, "showGraph")) for t, _ in attempts] == [False, False, True]
     assert all(_calls(c, "graphNotDrawn") for _, c in attempts)
+    # and a layout the worker could not make
+    assert re.search(r"layOutInWorker\(.*function\s*\(reason,\s*error\)\s*\{\s*graphNotDrawn\(reason", draw, re.S)
     failed = _main_js_function("graphNotDrawn")
     assert re.search(r'd3\.select\("#drawGraph"\)\.property\("disabled",\s*false\)', failed)
     assert re.search(r'd3\.select\("#cfgDeferred"\)\.classed\("hidden",\s*false\)', failed)
