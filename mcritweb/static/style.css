@@ -462,3 +462,25 @@ li[data-reorder-item] {
   padding: 0;
   line-height: 22px;
 }
+
+/* The score key above the cross compare tabs. Its swatches are empty spans, and an empty
+   inline span is 0px wide, so the key showed its labels and no colours. A frame in the
+   swatch border colour keeps the palest steps visible on a white page. In forced colours the
+   scale is the information, so the swatches keep their colours (the labels name every step)
+   and take the text colour for their frame. */
+.score-key-entry {
+  white-space: nowrap;
+}
+.score-key {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 1px solid var(--border-swatch);
+  vertical-align: text-bottom;
+}
+@media (forced-colors: active) {
+  .score-key {
+    forced-color-adjust: none;
+    border-color: CanvasText;
+  }
+}

@@ -648,3 +648,17 @@ def test_a_matrix_filled_on_its_tab_is_named_and_one_tab_stop_too(open_as):
     assert [tab_index for tab_index, _, _ in scores].count(0) == 1 and scores[0][0] == 0
     assert all(hint.startswith("MCRIT: " + label) for _, label, hint in scores)
     assert page.locator("#pills-score_weighted caption").count() == 1
+
+
+@pytest.mark.parametrize("color_scheme", ["light", "dark"])
+@pytest.mark.parametrize("width", [390, 1280])
+def test_the_score_key_swatches_have_a_size_and_are_all_in_view(open_as, width, color_scheme):
+    """The colour key above the cross compare tabs is eleven empty spans. An empty inline span
+    is 0px wide, so the key listed its ranges and showed no colour at all. Each swatch is a
+    visible square inside the window."""
+    page = open_as("visitor", f"/data/result/{job_id_of('cross_compare')}", viewport={"width": width, "height": 900}, color_scheme=color_scheme)
+    swatches = page.eval_on_selector_all(".score-key", "els => els.map(el => { const r = el.getBoundingClientRect(); return [r.width, r.height, r.right, getComputedStyle(el).backgroundColor]; })")
+    assert len(swatches) == 11
+    assert all(w >= 12 and h >= 12 for w, h, _, _ in swatches), swatches
+    assert all(right <= width for _, _, right, _ in swatches), swatches
+    assert len({color for _, _, _, color in swatches}) == 11, "the swatches are not eleven different colours"
