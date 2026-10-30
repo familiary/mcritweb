@@ -132,6 +132,9 @@ ROUTE_POLICY = {
     "admin.regenerate_legacy_apitokens": (ADMIN, WRITES_ON_POST),  # rotates every pre-1.5.0 (32-char) token - issue #250
 
     # --- visitor and above -------------------------------------------------------
+    # POST only, and only ever the caller's own token: to whom the API admits, as
+    # settings.html showed it
+    "admin.show_apitoken": (VISITOR, READ_ONLY),
     "explore.families": (VISITOR, READ_ONLY),
     # the family type-ahead behind the edit modals (#77), and since #192 behind the
     # submit form and the drop overlay too. Visitors already read every family name

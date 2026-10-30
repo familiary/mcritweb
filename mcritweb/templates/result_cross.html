@@ -48,7 +48,7 @@
            sample, so its page would list nothing and its diagram would 404, as
            data.render_missing_match_diagram draws none for it. The diagonal is always such a
            pair, since mcrit counts a sample's matches with itself apart #}
-        <td><span{% if matching_matches[sample.sample_id|string][sample2.sample_id|string] %} onclick="window.location.href='{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}';"{% endif %} class="hint--top score-swatch" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
+        <td><span{% if matching_matches[sample.sample_id|string][sample2.sample_id|string] %} data-href="{{ sample_to_job_id[sample.sample_id|string] }}?samid={{ sample2.sample_id }}"{% endif %} class="hint--top score-swatch" data-hint="MCRIT: {{ '%.2f%%'|format(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }} ({{ matching_matches[sample.sample_id|string][sample2.sample_id|string] }} matches) "
             style="background-color: #{{ score_to_color(matching_percent[sample.sample_id|string][sample2.sample_id|string]) }}; width: 25px; height: 25px; "></span>
         </td>
       {% endfor %}
@@ -71,9 +71,9 @@ Results for Job: {{ job_info.job_id }}
    jquery-ui-sortable.js is jQuery UI cut down to the sortable widget and what it is built
    on (scripts/subset_jquery_ui.py), 76 KB of the full build's 529. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='jquery-ui.css') }}">
-<script>later({{ url_for('static', filename='jquery-ui-sortable.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='jquery-ui-sortable.js')|tojson }})</script>
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   whenReady(function(){
     // delegated, so that it also reaches the rows of a pane filled after load
     $(document).on("click", "td.clickable", function(){
@@ -84,6 +84,15 @@ Results for Job: {{ job_info.job_id }}
   whenReady( function() {
     $( "#sortable" ).sortable();
   } );
+  // a matrix cell with matches leads to its row sample's matches with the column's; its
+  // data-href is relative to this page, as the onclick it replaces was. Bound now rather
+  // than in whenReady, so that a cell works as soon as it is drawn, as that one did
+  document.addEventListener("click", function (event) {
+    var cell = event.target.closest && event.target.closest("span.score-swatch[data-href]");
+    if (cell) {
+      window.location.href = cell.getAttribute("data-href");
+    }
+  });
   function changeorder() {
     var array1 = document.getElementById('sortable').children;
     var array2 = []
@@ -92,7 +101,7 @@ Results for Job: {{ job_info.job_id }}
     window.location.href = "{{ url_for('data.result', job_id=job_info.job_id) }}" + "?custom=" + array2;
   }
 </script>
-<script>
+<script nonce="{{ csp_nonce() }}">
   // A matrix cell's tooltip names both of its samples. That part is the same along a whole
   // row and down a whole column, so it is no longer written into every cell of every matrix
   // (issue #198): a cell carries its score line, a row the line naming its sample, and the
@@ -118,7 +127,7 @@ Results for Job: {{ job_info.job_id }}
 {% block content %}
 
 
-<script>
+<script nonce="{{ csp_nonce() }}">
   var button_clicked = false;
   whenReady(function(){
     var editSampleModal = document.getElementById('editSampleModal');
@@ -192,7 +201,7 @@ Results for Job: {{ job_info.job_id }}
     </div>
   </div>
 </div>
-  <script>
+  <script nonce="{{ csp_nonce() }}">
     function toggle_delete_sample(cb) {
     var deleteSampleButton = document.getElementById('button_delete_sample');
     if (cb.checked) {
@@ -272,7 +281,7 @@ Results for Job: {{ job_info.job_id }}
   </div>
 
 <script type="application/json" id="cross-lazy-panes">{{ lazy_panes|tojson }}</script>
-<script>
+<script nonce="{{ csp_nonce() }}">
   // Only the pane shown on load is rendered (issue #182). Any other is built the first time
   // its tab is shown, by cloning the rows and cells of the rendered one - they already carry
   // everything a pair of samples has in common across the methods: links, edit buttons and

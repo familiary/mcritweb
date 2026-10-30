@@ -7,7 +7,10 @@ Settings
 {% block style %}
 {# queued with later(): in <head> it held back the first paint, and the lists below are
    only made sortable from whenReady, once it has run (issue #63) #}
-<script>later({{ url_for('static', filename='sortablejs/Sortable.min.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='sortablejs/Sortable.min.js')|tojson }})</script>
+{% if can_use_api %}
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='show_apitoken.js')|tojson }})</script>
+{% endif %}
 <style>
     .list-group.col {
         min-height: 50px;
@@ -72,7 +75,13 @@ Settings
       <tr>
         <td>apitoken:</td>
         <td>
-          {{user_info.apitoken}} {{ clipboard_btn(user_info.apitoken) }}
+          {# not printed: a secret that is the same on every visit kept the whole page
+             uncompressed (BREACH) and out of every cache. static/show_apitoken.js fetches
+             it into apitoken-value when asked, and at once after a regenerate #}
+          <span id="apitoken-value"></span>
+          <span id="apitoken-copy" hidden>{{ clipboard_btn("") }}</span>
+          <button type="button" class="btn btn-outline-dark btn-sm"
+                  data-show-apitoken="{{ url_for('admin.show_apitoken') }}"{% if show_apitoken_now %} data-show-now{% endif %}>Show token</button>
           {# a write, so it is a button that POSTs rather than a link - see post_action.js #}
           <button type="button" class="btn {% if legacy_apitoken %}btn-danger{% else %}btn-outline-dark{% endif %} btn-sm"
                   data-post="{{ url_for('admin.regenerate_apitoken') }}"
@@ -88,6 +97,7 @@ Settings
             Please regenerate it and update whatever uses the old one.
           </div>
           {% endif %}
+          <div id="apitoken-status" role="status" class="small mt-1"></div>
         </td>
       </tr>
       {% endif %}
@@ -330,7 +340,7 @@ Settings
 </div>
 
 
-    <script type="text/javascript">
+    <script nonce="{{ csp_nonce() }}" type="text/javascript">
       whenReady(function () {
         // Family Table
         var familyTableActive = document.getElementById('family_table_active');

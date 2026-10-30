@@ -16,13 +16,13 @@
 {{ dropzone.style('border: 2px dashed var(--dropzone-border); margin: 20px auto; width: 100%; max-width: 600px; min-height: 200px; border-radius: 25px; background: var(--surface-chrome);') }}
 {% if not lazy %}
 {# the library, after the first paint, and what attaches the form, right behind it #}
-<script>later({{ url_for('static', filename='dropzone-patched.min.js')|tojson }})</script>
-<script>later({{ url_for('static', filename='dropzone_attach.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='dropzone-patched.min.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='dropzone_attach.js')|tojson }})</script>
 {% endif %}
 {# the form's behaviour, and the drop overlay's: static/upload_form.js, queued (ADR-0021).
    The slider's label stays here, so that it follows the slider before the file has run. #}
-<script>later({{ url_for('static', filename='upload_form.js')|tojson }})</script>
-<script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='upload_form.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">
 function handleSliderChange_dropzone(val) {
   const mapping = {{ minhash_slider_mapping|tojson }};
   document.getElementById("minhashBandRange-currentSelection_dropzone").innerHTML = "&nbsp;"+mapping[val];
@@ -48,12 +48,12 @@ function handleSliderChange_dropzone(val) {
   {# |safe on the needles: with autoescaping on, `replace` escapes them otherwise, and a
      quote turns into &#34; that matches nothing #}
   {{ dropzone.create(action=target_link)|replace('class="dropzone"'|safe, 'class="dropzone-pending"'|safe) }}
-  {{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_options='autoProcessQueue: false')|replace('Dropzone.options.myDropzone ='|safe, 'window.mcritDropzoneOptions ='|safe) }}
+  {{ dropzone.config(max_file_size=100000000, redirect_view=None, nonce=csp_nonce(), custom_options='autoProcessQueue: false')|replace('Dropzone.options.myDropzone ='|safe, 'window.mcritDropzoneOptions ='|safe) }}
 {% else %}
   {# the form keeps its class, so that it looks as it will from the first paint;
      static/dropzone_attach.js attaches it before auto-discovery can #}
   {{ dropzone.create(action=target_link) }}
-  {{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_options='autoProcessQueue: false')|replace('Dropzone.options.myDropzone ='|safe, 'window.mcritDropzoneOptions ='|safe) }}
+  {{ dropzone.config(max_file_size=100000000, redirect_view=None, nonce=csp_nonce(), custom_options='autoProcessQueue: false')|replace('Dropzone.options.myDropzone ='|safe, 'window.mcritDropzoneOptions ='|safe) }}
 {% endif %}
   {# what static/upload_form.js needs from the template: where to ask about a dropped
      file, and on the overlay, where Dropzone is fetched from on the first drag #}

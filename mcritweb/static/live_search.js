@@ -49,11 +49,16 @@
   }
 
   // The fresh content, ready to go in. A script in it runs, as it would have on a page
-  // load (one parsed by DOMParser never does): the edit modals carry their own.
+  // load (one parsed by DOMParser never does): the edit modals carry their own. It gets
+  // this page's nonce: the Content-Security-Policy admits an inline script by its nonce,
+  // even one a script of ours made ('strict-dynamic' covers only scripts it fetches,
+  // though Chromium is laxer), and the nonce in the fetched page was its own response's.
   function adopt(fresh) {
+    var nonce = (document.querySelector("script[nonce]") || {}).nonce || "";
     return Array.prototype.map.call(fresh.childNodes, function (node) {
       if (node.nodeName === "SCRIPT") {
         var script = document.createElement("script");
+        script.nonce = nonce;
         script.textContent = node.textContent;
         return script;
       }

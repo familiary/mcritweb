@@ -33,13 +33,15 @@ def fake_mcrit(corpus_mcrit):
 #: the reports whose result page draws the aggregated function table
 AGGREGATED_REPORTS = ["matches_for_sample", "matches_for_query"]
 
-#: the CSRF token a page carries, masked afresh on every render (mcritweb/csrf.py), so the
-#: one thing that differs between two renders of the same page
+#: the CSRF token a page carries, masked afresh on every render (mcritweb/csrf.py), and the
+#: CSP nonce of its scripts, fresh per response: the two things that differ between two
+#: renders of the same page
 CSRF_TOKEN = re.compile(rb'(name="csrf_token" value="|<meta name="csrf-token" content="|"X-CSRF-Token": ")[^"]*"')
+CSP_NONCE = re.compile(rb'(<script[^>]*? nonce=)"[^"]*"')
 
 
 def without_csrf(page):
-    return CSRF_TOKEN.sub(rb'\1"', page)
+    return CSP_NONCE.sub(rb'\1""', CSRF_TOKEN.sub(rb'\1"', page))
 
 
 def filtered_results(report):

@@ -27,7 +27,7 @@ def test_hovering_every_node_throws_nothing_and_brings_its_block_into_view(brows
     # the page loads its graph viewer once the graph comes into view (#312)
     browser_page.evaluate("document.getElementById('xcfg_top').scrollIntoView()")
     browser_page.wait_for_selector("#graphContainer g.node", state="attached")
-    browser_page.wait_for_function("document.querySelectorAll('#text_code p').length > 0")
+    browser_page.wait_for_function("() => document.querySelectorAll('#text_code p').length > 0")
 
     nodes = browser_page.locator("#graphContainer g.node")
     highlighted = 0

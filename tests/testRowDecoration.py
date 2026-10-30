@@ -72,8 +72,10 @@ def cells_per_row(rendered):
 
 def without_csrf(rendered):
     """The family and sample tables embed an edit form, whose token is fresh per
-    render - the one thing that legitimately differs between two renders."""
-    return re.sub(r'(name="csrf_token" value=)"[^"]*"', r"", rendered)
+    render, and a script, whose CSP nonce is fresh per response - the two things that
+    legitimately differ between two renders."""
+    rendered = re.sub(r'(name="csrf_token" value=)"[^"]*"', r"", rendered)
+    return re.sub(r'<script nonce="[^"]*"', "<script", rendered)
 
 
 def row_tags(rendered):

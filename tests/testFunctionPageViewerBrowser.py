@@ -53,7 +53,7 @@ def scroll_to_the_graph(page):
 
 def drawn(page):
     page.wait_for_selector("#graphContainer g.node", state="attached")
-    page.wait_for_function("!document.getElementById('showCycles').disabled")
+    page.wait_for_function("() => !document.getElementById('showCycles').disabled")
 
 
 @pytest.mark.parametrize("viewport", VIEWPORTS, ids=["mobile", "desktop"])

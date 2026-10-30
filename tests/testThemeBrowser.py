@@ -113,6 +113,8 @@ def served(tmp_path_factory):
                 "value": session_cookie_for(app, user_id),
                 "domain": "127.0.0.1",
                 "path": "/",
+                # as the app sets it, which a __Host- name requires
+                "secure": app.config["SESSION_COOKIE_SECURE"],
             }
     server = make_server("127.0.0.1", 0, app, threaded=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -368,7 +370,7 @@ def calm(page):
     """Wait for every colour transition to have run out. Bootstrap eases the colour of a link, a
     pager and a button over 0.15s, so a page that has just changed theme, or been hovered, shows
     the colours half way for a moment: a probe that reads them then judges a colour no one sees."""
-    page.wait_for_function("document.getAnimations().every((animation) => !(animation instanceof CSSTransition) || animation.playState !== 'running')")
+    page.wait_for_function("() => document.getAnimations().every((animation) => !(animation instanceof CSSTransition) || animation.playState !== 'running')")
     page.wait_for_timeout(50)
 
 
@@ -383,7 +385,7 @@ def settle(page, ready=None):
         page.wait_for_selector(ready, state="attached")
         page.evaluate("window.scrollTo(0, 0)")
     # an image below the fold that loads lazily (#245) is not fetched until it is scrolled to
-    page.wait_for_function("[...document.images].every((image) => image.complete || (image.loading === 'lazy' && image.getBoundingClientRect().top >= innerHeight))")
+    page.wait_for_function("() => [...document.images].every((image) => image.complete || (image.loading === 'lazy' && image.getBoundingClientRect().top >= innerHeight))")
     calm(page)
 
 
@@ -391,7 +393,7 @@ def show_tab(page, tab):
     page.click(f"#pills-{tab}-tab")
     page.wait_for_selector(f"#pills-{tab}.tab-pane.show.active")
     # the pane fades in; a text node mid-fade is skipped by the probe, so let it finish
-    page.wait_for_function(f"getComputedStyle(document.querySelector('#pills-{tab}')).opacity === '1'")
+    page.wait_for_function(f"() => getComputedStyle(document.querySelector('#pills-{tab}')).opacity === '1'")
     calm(page)
 
 
@@ -626,7 +628,7 @@ def test_the_menus_and_the_dialog_are_raised_dark_surfaces(visit):
     page.evaluate("new Promise((resolve) => mcritLoadDropzone(resolve))")
     page.evaluate("$('#submitFileModal').modal('show')")
     page.wait_for_selector("#submitFileModal.show")
-    page.wait_for_function("getComputedStyle(document.querySelector('#submitFileModal')).opacity === '1'")
+    page.wait_for_function("() => getComputedStyle(document.querySelector('#submitFileModal')).opacity === '1'")
     modal = computed(page, "#submitFileModal .modal-content", "background-color", "border-top-color", "color")
     assert_colour(modal[0], "--surface-raised", "the dialog")
     assert_colour(modal[1], "--border", "the dialog's border")
@@ -651,7 +653,7 @@ def test_the_drop_zone_outline_holds_3_to_1_in_the_dialog(visit):
     page.evaluate("new Promise((resolve) => mcritLoadDropzone(resolve))")
     page.evaluate("$('#submitFileModal').modal('show')")
     page.wait_for_selector("#submitFileModal.show")
-    page.wait_for_function("getComputedStyle(document.querySelector('#submitFileModal')).opacity === '1'")
+    page.wait_for_function("() => getComputedStyle(document.querySelector('#submitFileModal')).opacity === '1'")
 
     border = as_rgb(computed(page, "#submitFileModal .dropzone", "border-top-color")[0])
     inside = as_rgb(computed(page, "#submitFileModal .dropzone", "background-color")[0])
@@ -849,15 +851,15 @@ def test_the_system_theme_follows_a_change_of_the_browsers_preference_without_a_
     assert page.evaluate("getComputedStyle(document.documentElement).backgroundColor") == LIGHT_PAGE
 
     page.emulate_media(color_scheme="dark")
-    page.wait_for_function(f"getComputedStyle(document.documentElement).backgroundColor === '{DARK_PAGE}'")
-    page.wait_for_function("[...document.querySelectorAll('nav picture img')].every((image) => image.currentSrc.endsWith('_dark.png'))")
+    page.wait_for_function(f"() => getComputedStyle(document.documentElement).backgroundColor === '{DARK_PAGE}'")
+    page.wait_for_function("() => [...document.querySelectorAll('nav picture img')].every((image) => image.currentSrc.endsWith('_dark.png'))")
     calm(page)
     assert logo_files(page) == ["d20_mcrit_cabaret_dark.png"] * 2 + ["fkie_190x52_dark.png"]
     assert report_clean(run_probe(page)), "after the switch the page is not the dark theme's"
 
     page.emulate_media(color_scheme="light")
-    page.wait_for_function(f"getComputedStyle(document.documentElement).backgroundColor === '{LIGHT_PAGE}'")
-    page.wait_for_function("[...document.querySelectorAll('nav picture img')].every((image) => !image.currentSrc.includes('_dark'))")
+    page.wait_for_function(f"() => getComputedStyle(document.documentElement).backgroundColor === '{LIGHT_PAGE}'")
+    page.wait_for_function("() => [...document.querySelectorAll('nav picture img')].every((image) => !image.currentSrc.includes('_dark'))")
     assert logo_files(page) == ["d20_mcrit_cabaret.png"] * 2 + ["fkie_190x52.gif"]
     assert page.evaluate("window.__sameDocument") is True, "the page reloaded: the switch was not live"
 

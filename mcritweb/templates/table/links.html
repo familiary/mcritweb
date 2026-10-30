@@ -58,7 +58,7 @@
 {%- endmacro -%}
 
 {%- macro clipboard_js() -%}
-<script>
+<script nonce="{{ csp_nonce() }}">
 whenReady(function () {
   $('[data-bs-toggle="tooltip"], [data-toggle="tooltip"]').tooltip()
 })

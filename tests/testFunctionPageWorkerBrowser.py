@@ -46,7 +46,7 @@ def _open(page, live_server, function_id, errors):
     scroll_to_the_graph(page)
     page.wait_for_selector("#graphContainer g.node", state="attached")
     # the controls are enabled once everything after the drawing has run
-    page.wait_for_function("!document.getElementById('showCycles').disabled")
+    page.wait_for_function("() => !document.getElementById('showCycles').disabled")
 
 
 def _workers(page):
@@ -145,21 +145,21 @@ def test_a_large_graph_shows_its_code_first_and_follows_without_a_click(browser_
     browser_page.on("pageerror", lambda error: errors.append(str(error)))
     browser_page.goto(f"{live_server}/explore/functions/{harness.FUNCTION_A}")
     scroll_to_the_graph(browser_page)
-    browser_page.wait_for_function("document.querySelectorAll('#text_code p').length > 0")
-    browser_page.wait_for_function("document.getElementById('drawGraph').disabled")
+    browser_page.wait_for_function("() => document.querySelectorAll('#text_code p').length > 0")
+    browser_page.wait_for_function("() => document.getElementById('drawGraph').disabled")
 
     assert browser_page.locator("#graphContainer g.node").count() == 0
     assert browser_page.is_visible("#cfgDeferred")
     assert browser_page.inner_text("#cfgDeferredNote").startswith("Laying out ")
     assert browser_page.evaluate("document.activeElement.id") != "cfgDeferredNote"
     # the code panel's lookups have all been answered; the loop request is still held
-    browser_page.wait_for_function("document.querySelectorAll('#text_code p').length > 0")
+    browser_page.wait_for_function("() => document.querySelectorAll('#text_code p').length > 0")
     browser_page.wait_for_timeout(1000)
     lookups_before = len(lookups)
 
     held[0].continue_()
     browser_page.wait_for_selector("#graphContainer g.node", state="attached")
-    browser_page.wait_for_function("!document.getElementById('showCycles').disabled")
+    browser_page.wait_for_function("() => !document.getElementById('showCycles').disabled")
     browser_page.wait_for_load_state("networkidle")
 
     assert not browser_page.is_visible("#cfgDeferred")

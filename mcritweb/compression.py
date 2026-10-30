@@ -14,19 +14,21 @@ response's length. The one such secret every page carries, the CSRF token, is ma
 afresh on every render (`mcritweb.csrf.mask`), so it is never the same twice.
 
 Left alone:
-- A page that shows any other secret: a view marked `@uncompressed`. The settings page
-  shows the user's API token, and the server page, before and after a change, the
-  registration token and the backend's token. The username is printed on every page,
-  next to a search term on some; it is not a secret, and is compressed.
+- A page that shows any other secret: a view marked `@uncompressed`. The server page,
+  before and after a change, shows the registration token, and admin.show_apitoken
+  answers with the user's API token, which the settings page fetches when asked rather
+  than printing it (all three are also `@no_store`). The username is printed on every page, next to a search term on
+  some; it is not a secret, and is compressed.
 - Downloads (`Content-Disposition: attachment`) and the API passthrough. The exports and
   the cached result download are streamed so that they never sit in memory whole, and
   gzipping them here would read them in.
 - A body of unknown length, or one above MAX_SIZE, for the same reason.
 """
 
+import functools
 import gzip
 
-from flask import current_app, request
+from flask import current_app, make_response, request
 
 COMPRESSIBLE_TYPES = ("text/", "application/json", "application/javascript", "application/xml", "image/svg+xml")
 #: the views marked @uncompressed, as "module.name" - see uncompressed()
@@ -42,6 +44,23 @@ def uncompressed(view):
     which an attacker could otherwise read out of the response's length (BREACH)."""
     _UNCOMPRESSED_VIEWS.add(f"{view.__module__}.{view.__name__}")
     return view
+
+
+def no_store(view):
+    """Answer with `Cache-Control: no-store`, for a view that shows a secret.
+
+    Without it a browser keeps the page in its back/forward cache, and Back after logout
+    restores it, token and all, without asking the server. no-store keeps it out of that
+    cache and the HTTP cache alike. It is the view's own header: no other page gets it, and
+    they keep the caching they have. Used with @uncompressed, which is the same set of pages.
+    """
+    @functools.wraps(view)
+    def stored_nowhere(*args, **kwargs):
+        response = make_response(view(*args, **kwargs))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    stored_nowhere.no_store = True
+    return stored_nowhere
 
 
 def shows_a_secret():

@@ -103,6 +103,51 @@ rather than reconstructing it from the commit log at release time.
   `Eve` and `eve` (#284). The case-insensitive lookup that refuses such a name and the write after
   it are now one transaction under SQLite's write lock, as first-user registration already was.
   Pairs already stored are left alone, as before.
+- Every response's `Content-Security-Policy` now says what a page may load and send, not only who
+  may frame it: no plugin (`object-src 'none'`), no `<base>` (`base-uri 'none'`), forms posted only
+  back to MCRITweb (`form-action 'self'`), fetches, fonts, images, workers and manifests from
+  MCRITweb's own origin only, and no audio or video. Everything MCRITweb loads already comes from
+  its own origin, so no page changes; markup injected past autoescaping can no longer load an
+  object, re-point the page's relative links or post a form to another site. A reverse proxy that
+  adds a policy of its own should stop doing so: browsers enforce both.
+- Pages run only the scripts MCRITweb wrote. The `Content-Security-Policy` now runs a script element
+  only when it carries the nonce drawn for that response, which every page writes on its own scripts
+  and injected markup cannot know, plus what those scripts load themselves (`'strict-dynamic'`):
+  the queued page scripts, the graph viewer and its worker, Dropzone. A `<script>` that slipped past
+  autoescaping, as family names once could before #85, no longer runs, and neither does `eval`.
+  Handler attributes such as `onclick` still run for now (`script-src-attr 'unsafe-inline'`), until
+  they become listeners. Every page was walked in Chromium as each role and signed out under the
+  new policy, with uploads, live search, the graphs, the comparison view, tabs, dialogs, sorting,
+  the copy buttons and a running job's polling exercised, without a violation.
+- Every response refuses the camera, the microphone, the location, payments and USB
+  (`Permissions-Policy`), none of which MCRITweb uses, so script injected into a page cannot ask
+  for them. Served over HTTPS, responses also carry `Strict-Transport-Security: max-age=31536000;
+  includeSubDomains`, so a browser that has reached the instance once is not talked into plain HTTP
+  again, and `Cross-Origin-Opener-Policy: same-origin-allow-popups`, so a site that opens MCRITweb
+  in a window gets no handle on it. Neither is sent over plain HTTP. **Upgrading:** behind a proxy
+  that terminates TLS, MCRITweb knows a request was secure only with `TRUSTED_PROXY_COUNT` set.
+  docker-mcrit's TLS site already adds the same HSTS value; a browser acts on the first such header,
+  MCRITweb's, so change it with `STRICT_TRANSPORT_SECURITY` in `instance/config.py` rather than in
+  the proxy, or set that to `None` to leave the header to the proxy. See "HTTPS" in `README.md`.
+- **The session cookie is now `__Host-session`, and everyone has to log in once more after
+  upgrading**, as the session generation change above asks of them anyway. A browser takes a cookie
+  of that name only from the instance's own host, over HTTPS, so a sibling subdomain, or someone in
+  the middle of a plain-HTTP request before the user signs in, can no longer slip them a validly
+  signed session of the attacker's own account, or log them out. **Upgrading:** an instance whose
+  cookie cannot carry the prefix keeps the name `session`: one served over plain HTTP with
+  `SESSION_COOKIE_SECURE = False`, one sharing the cookie across subdomains through
+  `SESSION_COOKIE_DOMAIN`, one under a `SESSION_COOKIE_PATH` or `APPLICATION_ROOT` other than `/`,
+  and one that sets `SESSION_COOKIE_NAME` itself.
+- Every value a page writes into a script now goes through `|tojson`, and the lint that already
+  refused `|safe` there refuses a bare one too. The admin server page's copied registration link
+  keeps a token with a quote or a trailing backslash intact instead of breaking the page's script, a
+  family name with `?`, `#` or a space links to that family on Malpedia rather than to a query of
+  its own, and a cross compare cell carries its link as data instead of a job id inside an
+  `onclick` script.
+- The admin server page no longer writes the backend server token into its form, where it sat in
+  clear in the page source, the browser's cache and on screen. The field starts empty and the page
+  says whether a token is set: an empty field keeps the stored token, a typed one replaces it, and
+  the new "Remove Token" button removes it, which an empty field used to do.
 - **Logging out ends every session of the account, in every browser, and everyone has to log in once
   more after upgrading** (#284). The session is a signed cookie, so logging out cleared only the
   browser's own copy, and a copy taken from it - a shared machine, a proxy log, a browser profile -
@@ -115,6 +160,15 @@ rather than reconstructing it from the commit log at release time.
   password change used to survive it - and since the mark now covers the generation, the sessions
   v1.6.0 marked end too. **BREAKS DB -> the `user` table gains a `session_generation` column**,
   added on first start by an idempotent migration that starts every account at 0.
+- The settings page no longer prints the API token. "Show token" fetches it, with the CSRF token,
+  from a new `POST /admin/show_apitoken` that answers only the signed-in account's own token, as
+  JSON, uncompressed and with `Cache-Control: no-store`; a regenerated token is still shown at once.
+  With no secret left on it, the settings page is gzipped and may be cached like every other page,
+  which takes it from about 42 KB on the wire to about 9 KB, and the token is taken off it when it
+  is left, so Back does not bring it back from the back/forward cache.
+- The server page (registration token) is sent with `Cache-Control: no-store`. Without it, Back
+  after logout restored the page from the browser's back/forward cache with the token on it,
+  without asking the server. Every other page keeps its caching.
 
 ## [1.7.0] - 2026-10-29
 

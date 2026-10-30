@@ -241,7 +241,7 @@ Jobs
         </div>
     </div>
 </div>
-  <script>
+  <script nonce="{{ csp_nonce() }}">
   whenReady(function(){
     $('.confirm-delete').on('click', function(e) {
         // preven form submit

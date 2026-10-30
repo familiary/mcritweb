@@ -1,6 +1,7 @@
 import datetime
 import mimetypes
 import os
+import secrets
 
 from flask import Flask, g, redirect, render_template, request, send_from_directory, url_for
 
@@ -11,6 +12,40 @@ from flask import Flask, g, redirect, render_template, request, send_from_direct
 #: address - the whole-instance login lockout this setting exists to prevent, restored
 #: with nothing in the log to point at it.
 MAX_TRUSTED_PROXY_COUNT = 16
+
+#: What a page may load and send, scripts apart. Everything MCRITweb serves comes from its
+#: own origin - no CDN, font service or analytics - so an injection that gets past
+#: autoescaping finds nowhere else to fetch from, post a form to or send data to, no plugin
+#: to load and no <base> to re-point every relative link with. img-src takes data: for
+#: Bootstrap's SVG icons and Dropzone's file previews, and blob:, which can only name what
+#: a script on the page made itself. The links to FKIE and Malpedia are navigations, which
+#: none of this governs.
+RESOURCE_POLICY = "; ".join([
+    "frame-ancestors 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "connect-src 'self'",
+    "font-src 'self'",
+    "img-src 'self' data: blob:",
+    "worker-src 'self'",
+    "media-src 'none'",
+    "manifest-src 'self'",
+])
+
+#: Which scripts a page runs: only a script element carrying the response's nonce, which
+#: every template writes on its own and which injected markup cannot know, and whatever
+#: such a script adds to the page itself ('strict-dynamic'): base.html's later() queue,
+#: the CFG viewer's libraries, Dropzone fetched on the first drag. 'self' would be
+#: ignored next to 'strict-dynamic', so the scripts under static/ load only that way.
+#: The onclick= and other handler attributes still run, until they are listeners, but
+#: an injected <script> does not.
+SCRIPT_POLICY = "script-src 'nonce-{nonce}' 'strict-dynamic' 'report-sample'; script-src-attr 'unsafe-inline'"
+
+#: Browser features no page of MCRITweb uses, refused to every page and to anything a page
+#: embeds, so that script injected into one cannot ask the user for them either. The
+#: clipboard, which the copy buttons write to, is not among them.
+PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 
 
 def _trusted_proxy_count(configured, logger):
@@ -135,6 +170,8 @@ def create_app(test_config=None, instance_path=None):
         # is never sent back and login fails with nothing to point at. Set it explicitly
         # in instance/config.py to override either way.
         SESSION_COOKIE_SECURE=not app.debug,
+        # named once the config has loaded, from what the cookie can carry - see below
+        SESSION_COOKIE_NAME=None,
         # Werkzeug rejects a larger body with 413 before buffering it. This is a ceiling
         # on absurdity rather than a tuned limit: it applies to every route uniformly,
         # and /data/import takes whole-corpus exports, so it has to clear those. The
@@ -177,6 +214,13 @@ def create_app(test_config=None, instance_path=None):
         # MCRITweb's own error page rather than a 504 from the proxy. None waits forever.
         # Honoured by mcrit releases whose McritClient has a `timeout`; older ones ignore it.
         MCRIT_CLIENT_TIMEOUT=(10, 280),
+        # The Strict-Transport-Security header, which tells a browser that reached
+        # MCRITweb over HTTPS to use nothing else for it from then on; None sends none. It
+        # goes only on a request that came over HTTPS - through a proxy that terminates
+        # TLS, that takes TRUSTED_PROXY_COUNT. The default is what docker-mcrit's TLS site
+        # already adds in NGINX: a browser acts on the first such header of a response
+        # only, which is this one, so anything else would change what that site says.
+        STRICT_TRANSPORT_SECURITY='max-age=31536000; includeSubDomains',
     )
 
     if test_config is None:
@@ -275,6 +319,19 @@ def create_app(test_config=None, instance_path=None):
     if app.config['SECRET_KEY'] == INSECURE_DEFAULT:
         app.config['SECRET_KEY'] = load_or_create_secret_key(app.instance_path)
 
+    # The session cookie is __Host-session where it can be, which a browser takes only from
+    # this host, over HTTPS, for the whole site. Under a plain name, a sibling subdomain -
+    # or anyone in the middle of a plain-HTTP request to this host before the user signs
+    # in - can set a session cookie of their own, validly signed for their own account,
+    # that the browser then sends in place of ours, or one that logs the user out. The
+    # prefix demands Secure, Path=/ and no Domain, so a cookie without all three - plain
+    # HTTP with SESSION_COOKIE_SECURE = False, shared across subdomains, under a path -
+    # keeps "session", as does a name set in instance/config.py.
+    if app.config['SESSION_COOKIE_NAME'] is None:
+        cookie_path = app.config['SESSION_COOKIE_PATH'] or app.config['APPLICATION_ROOT']
+        host_only = app.config['SESSION_COOKIE_SECURE'] and not app.config['SESSION_COOKIE_DOMAIN'] and cookie_path == '/'
+        app.config['SESSION_COOKIE_NAME'] = '__Host-session' if host_only else 'session'
+
     csrf = CsrfProtect(app)
     # authenticates by `apitoken` header, never by the session cookie, so a
     # cross-site request has nothing to ride on. See mcritweb/csrf.py.
@@ -311,13 +368,23 @@ def create_app(test_config=None, instance_path=None):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         return response
 
+    @app.template_global()
+    def csp_nonce():
+        # drawn for each response, never reused: a nonce one page showed would let markup
+        # injected into the next run as if it were ours. See SCRIPT_POLICY
+        if "csp_nonce" not in g:
+            g.csp_nonce = secrets.token_urlsafe(16)
+        return g.csp_nonce
+
     @app.after_request
     def no_framing_by_other_sites(response):
         # a page of ours inside another site's frame can be dressed up to make a logged-in
         # user click something they cannot see. SameSite=Lax already keeps the session
         # cookie out of a cross-site frame in current browsers; these say it outright, the
-        # CSP for browsers that read it and X-Frame-Options for those that do not
-        response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'self'")
+        # CSP for browsers that read it and X-Frame-Options for those that do not. The CSP
+        # carries SCRIPT_POLICY and the rest of RESOURCE_POLICY with it
+        response.headers.setdefault(
+            "Content-Security-Policy", SCRIPT_POLICY.format(nonce=csp_nonce()) + "; " + RESOURCE_POLICY)
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         return response
 
@@ -328,6 +395,24 @@ def create_app(test_config=None, instance_path=None):
         # may be internal, and an older browser sends the whole URL. Requests within
         # MCRITweb keep their Referer
         response.headers.setdefault("Referrer-Policy", "same-origin")
+        return response
+
+    @app.after_request
+    def no_features_nothing_uses(response):
+        response.headers.setdefault("Permissions-Policy", PERMISSIONS_POLICY)
+        return response
+
+    @app.after_request
+    def https_stays_https(response):
+        # both only over HTTPS: a browser ignores HSTS on a plain-HTTP response, and
+        # Chromium logs an error for COOP on every plain-HTTP page off the loopback
+        # address, which a deployment served that way would otherwise carry on all of them
+        if request.is_secure:
+            # a site that opens MCRITweb gets no handle on its window to navigate it or
+            # count its frames with; a window MCRITweb opens keeps its own
+            response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
+            if app.config['STRICT_TRANSPORT_SECURITY']:
+                response.headers.setdefault("Strict-Transport-Security", app.config['STRICT_TRANSPORT_SECURITY'])
         return response
 
     @app.template_filter('silent')
