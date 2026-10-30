@@ -55,13 +55,33 @@ def left_out(control):
     return False
 
 
+def qualified_by_headers(control):
+    """A score of the cross compare matrix. Its row header names one sample and its
+    column header (th.matrix-col) the other, and a screen reader reads both with the cell,
+    so "0.12% (4 matches)" in one cell and in its mirror across the diagonal say which pair
+    each is, as the id links' column header does for them. Other tables' row controls
+    still need a name of their own: their headers say which row, not what the control does."""
+    node = control.parent
+    while node is not None and node.tag != "td":
+        node = node.parent
+    if node is None or node.parent is None or node.parent.tag != "tr":
+        return False
+    row = node.parent
+    table = row.parent
+    while table is not None and table.tag != "table":
+        table = table.parent
+    return (table is not None
+            and any(cell.tag == "th" and cell.attrs.get("scope") == "row" for cell in row.children)
+            and any("matrix-col" in cell.classes() for cell in descendants(table, "th")))
+
+
 def shared_names(html):
     """{name: number of different targets} for the labelled controls whose name repeats."""
     targets = collections.defaultdict(set)
     for control in Page(html).all("a", "button"):
         # a closed modal's controls are not reachable while another's are; a menu's items
         # are named by their text, which the menu's own toggle qualifies
-        if control.in_hidden_container() or left_out(control):
+        if control.in_hidden_container() or left_out(control) or qualified_by_headers(control):
             continue
         name = (control.attrs.get("aria-label") or "").strip()
         if not name and control.tag == "button" and not control.text_content().strip():
