@@ -41,8 +41,8 @@ Results for Job: {{ job_info.job_id }}
     <input type="hidden" id="funid" name="funid" value="{{ funid }}">
     <input type="hidden" id="funp" name="funp" value="{{ funp.page }}">
     <label class="col-6">Filter results to</label>
-    <input class="col-3" type="text" name='filter_function_min_score' id="filter_function_min_score" placeholder="min score (0-100)" {% if matching_result.getFilterValue("filter_function_min_score") is not none %}value={{matching_result.getFilterValue("filter_function_min_score")}}{% endif %}>
-    <input class="col-3" type="text" name='filter_function_max_score' id="filter_function_max_score" placeholder="max score (0-100)" {% if matching_result.getFilterValue("filter_function_max_score") is not none %}value={{matching_result.getFilterValue("filter_function_max_score")}}{% endif %}>
+    <input class="col-3" type="text" name='filter_function_min_score' id="filter_function_min_score" placeholder="min score (0-100)" {% if matching_result.getFilterValue("filter_function_min_score") is not none %}value="{{matching_result.getFilterValue("filter_function_min_score")}}"{% endif %}>
+    <input class="col-3" type="text" name='filter_function_max_score' id="filter_function_max_score" placeholder="max score (0-100)" {% if matching_result.getFilterValue("filter_function_max_score") is not none %}value="{{matching_result.getFilterValue("filter_function_max_score")}}"{% endif %}>
     <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>
     <label class="col-3" for="filter_exclude_pic">exclude PIC hits</label>
     <button type="submit" class="btn btn-primary">Filter</button>
