@@ -1255,6 +1255,18 @@ function highlightUERs(UERtype){
         }
       );
 
+  // mcritweb: findLoops answers a graph past the bounds of its loop analysis with no
+  // loops and an X-Loop-Analysis header (views/explore.py), and the graph is drawn
+  // without them; this says why, above the graph.
+  function noteSkippedLoopAnalysis(result) {
+    var analysis = result && result.getResponseHeader ? result.getResponseHeader("X-Loop-Analysis") : null;
+    if (!analysis || analysis.indexOf("skipped") !== 0) {
+      return;
+    }
+    d3.select("#loopAnalysisNote").text("This function is too large for loop analysis ("
+      + g.nodes().length + " blocks); loops are not highlighted.");
+  }
+
   function loadWithDotGraphAndFunctionId(function_id) {
     isTraceSupplied = false;
     // Send request for loop information; load when ready
@@ -1298,6 +1310,7 @@ function highlightUERs(UERtype){
             graphNotDrawn("the loop detection did not answer with loop data", error, isDeferred);
             return;
           }
+          noteSkippedLoopAnalysis(result);  // mcritweb
           try {
             loopify_dagre.init();
             var modifiedDotFile = loopify_dagre.modifiedDotFile;
