@@ -1,19 +1,19 @@
 {% macro compare_nav(active) %}
 <ul class="nav nav-pills justify-content-end">
   <li class="nav-item">
-    <a class="nav-link {% if active=='1vsN' %}active{% endif %}" href="{{ url_for('analyze.compare') }}">1vsN</a>
+    <a class="nav-link {% if active=='1vsN' %}active{% endif %}"{% if active=='1vsN' %} aria-current="page"{% endif %} href="{{ url_for('analyze.compare') }}">1vsN</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link {% if active=='1vs1' %}active{% endif %}" href="{{ url_for('analyze.compare_versus') }}">1vs1</a>
+    <a class="nav-link {% if active=='1vs1' %}active{% endif %}"{% if active=='1vs1' %} aria-current="page"{% endif %} href="{{ url_for('analyze.compare_versus') }}">1vs1</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link {% if active=='cross' %}active{% endif %}" href="{{ url_for('analyze.cross_compare') }}">Cross</a>
+    <a class="nav-link {% if active=='cross' %}active{% endif %}"{% if active=='cross' %} aria-current="page"{% endif %} href="{{ url_for('analyze.cross_compare') }}">Cross</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link {% if active=='blocks' %}active{% endif %}" href="{{ url_for('analyze.unique_blocks') }}">Blocks</a>
+    <a class="nav-link {% if active=='blocks' %}active{% endif %}"{% if active=='blocks' %} aria-current="page"{% endif %} href="{{ url_for('analyze.unique_blocks') }}">Blocks</a>
   </li>
   <li class="nav-item">
-    <a class="nav-link {% if active=='query' %}active{% endif %}"  href="{{ url_for('analyze.query') }}">Query</a>
+    <a class="nav-link {% if active=='query' %}active{% endif %}"{% if active=='query' %} aria-current="page"{% endif %}  href="{{ url_for('analyze.query') }}">Query</a>
   </li>
 </ul>
 {% endmacro %}

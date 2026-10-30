@@ -9,32 +9,33 @@ Server settings
 <h2 class="h3">Server Parameters:</h2>
 
 <table class="table table-sm table-borderless" style="max-width: 600px;">
+  <caption class="visually-hidden">Server parameters</caption>
     <tr>
         <th>Parameter</th>
         <th>Value</th>
     </tr>
     <tr>
-        <td>Server UUID:</td>
+        <th scope="row">Server UUID:</th>
         <td>{{ server_info.server_uuid }}</td>
     </tr>
     <tr>
-        <td>Registration Token: </td>
+        <th scope="row">Registration Token: </th>
         <td>{{ server_info.registration_token }}&nbsp;{{ clipboard_btn(url_for('authentication.register', token=server_info.registration_token, _external=True), label="Copy registration URL") }}</td>
     </tr>
     <tr>
-        <td>Operation Mode: </td>
+        <th scope="row">Operation Mode: </th>
         <td>{{ operation_mode }}</td>
     </tr>
     <tr>
-        <td>DB MCRIT Web Version: </td>
+        <th scope="row">DB MCRIT Web Version: </th>
         <td>{{ server_info.server_version }}</td>
     </tr>
     <tr>
-        <td>Running MCRIT Web Version: </td>
+        <th scope="row">Running MCRIT Web Version: </th>
         <td>{{ running_version }}</td>
     </tr>
     <tr>
-        <td>Running MCRIT Backend Version: </td>
+        <th scope="row">Running MCRIT Backend Version: </th>
         <td>{{ mcrit_version }}</td>
     </tr>
 </table>

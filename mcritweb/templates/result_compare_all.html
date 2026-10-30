@@ -75,6 +75,7 @@ Results for Job: {{ job_info.job_id }}
 </form>
 {{ set_pagination_params(famp, _anchor="family-matches") }}
 <table class="table table-hover">
+  <caption class="visually-hidden">Best family matches</caption>
   <thead class="table-light">
     <tr>
       {{ famlib_header(ucs_famlib, sort_pagination=famp) }}
@@ -89,12 +90,13 @@ Results for Job: {{ job_info.job_id }}
   </tbody>
   </table>
 
-  {{ pagination_widget(famp, _anchor="family-matches")}}
+  {{ pagination_widget(famp, _label="family matches", _anchor="family-matches")}}
 
   <h2 class="h3" id="library-matches">Best Library Matches</h2>
 <p>total: {{ libp.max_value }}{% if libp.max_value > 0 %}, showing: {{ 1 + libp.start_index }} - {{ libp.end_index }}{% endif %} (filtered: {{ matching_result.num_original_library_matches - libp.max_value}})</p>
 {{ set_pagination_params(libp, _anchor="library-matches") }}
 <table class="table table-hover">
+  <caption class="visually-hidden">Best library matches</caption>
   <thead class="table-light">
     <tr>
       {{ famlib_header(ucs_famlib, sort_pagination=libp) }}
@@ -109,7 +111,7 @@ Results for Job: {{ job_info.job_id }}
   </tbody>
 </table>
 
-{{ pagination_widget(libp, _anchor="library-matches")}}
+{{ pagination_widget(libp, _label="library matches", _anchor="library-matches")}}
 
 <h2 class="h3">MCRIT Diagram</h2>
 <p>Showing: foreign family match frequency, library matches, best foreign family match scores.</p>
@@ -138,6 +140,7 @@ Results for Job: {{ job_info.job_id }}
 </form>
 {{ set_pagination_params(funp, _anchor="function-matches") }}
 <table class="table table-hover">
+  <caption class="visually-hidden">Function matches</caption>
   <thead class="table-light">
     <tr>
       {{ aggregated_function_header(ucs_functions, sort_pagination=funp) }}
@@ -151,7 +154,7 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
   </table>
-  {{ pagination_widget(funp, _anchor="function-matches")}}
+  {{ pagination_widget(funp, _label="function matches", _anchor="function-matches")}}
 
 <h2 class="h3">Matching Method Statistics </h2>
 {{ matching_statistics_table(matching_statistics(matching_result)) }}

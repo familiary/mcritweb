@@ -14,6 +14,7 @@ Families
 
 {% block content %}
 <h1>Overview of Families</h1>
+  <search>
   <div class="d-flex align-items-center" style="width:100%">
     <form class="flex-grow-1 me-3" method="GET" action="#" data-live-search="family-list">
       <label for="query" class="visually-hidden">Search families</label>
@@ -21,16 +22,17 @@ Families
       <input type='submit' hidden>
     </form>
     <div class="d-flex align-items-center">
-      <a href="{{ url_for('help') }}#search"><i class="fas fa-book"></i> Search Syntax</a>
+      <a href="{{ url_for('help') }}#search"><i class="fas fa-book" aria-hidden="true"></i> Search Syntax</a>
     </div>
   </div>
+  </search>
   <p id="family-list-status" class="visually-hidden" role="status"></p>
   <div id="family-list">
 
 {{ family_table(families, show_export=True, show_edit=True, sort_pagination=pagination, column_setup=user_column_setup, row_decorations=row_decorations,
    empty_message=("No families match \"" ~ query ~ "\".") if query else None, highlight_terms=query|search_terms) }}
 {% if families %}
-{{ pagination_widget(pagination) }}
+{{ pagination_widget(pagination, _label="families") }}
 {% endif %}
   </div>
 <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='live_search.js')|tojson }})</script>

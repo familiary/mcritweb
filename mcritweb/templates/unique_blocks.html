@@ -1,6 +1,7 @@
 {% from 'table/compare_nav.html' import compare_nav %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% from 'table/sample_row.html' import sample_header, pick_cell %}
+{% from 'table/links.html' import status_icon %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -116,6 +117,7 @@ Unique Blocks
 </p>
 <div>
   <table class="table table-hover">
+    <caption class="visually-hidden">Selected samples</caption>
     <thead class="table-light">
       <tr>
         <th scope="col"><i class="fa-solid fa-virus" title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample ID</span></th>
@@ -147,7 +149,7 @@ Unique Blocks
         <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
         <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
         {% endif %}
-        <td valign="middle"><button type="button" class="btn btn-link p-0 text-dark" aria-label="Remove sample" title="Remove sample" onclick="deleteSample(this)"><i class="fa-solid fa-xmark"></i></button></td>
+        <td valign="middle"><button type="button" class="btn btn-link p-0 text-dark" aria-label="Remove sample {{ sample.sample_id }}" onclick="deleteSample(this)"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -158,18 +160,21 @@ Unique Blocks
   <h2 class="h4">Selected samples will show here</h2>
   </div>
   {% else %}
-  {{ pagination_widget(pagination_selected, _js_argument_provider="fetchState") }}
+  {{ pagination_widget(pagination_selected, _label="selected samples", _js_argument_provider="fetchState") }}
   {% endif %}
   <br>
+  <search>
   <form style="width:100%" id="unique_blocks_search_form">
       <label for="Search" class="visually-hidden">Search samples</label>
       <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query }}" id="Search" placeholder="Search" autofocus autocomplete="on">
       <input type='submit' hidden>
   </form>
+  </search>
 
   {% if samples %}
   {{ set_pagination_params(pagination, _anchor="Search", _js_argument_provider="fetchState") }}
   <table class="table table-hover">
+    <caption class="visually-hidden">Samples to select</caption>
       <thead class="table-light">
         {{ sample_header(show_analyze=False, sort_pagination=pagination, pick="checkbox") }}
       </thead>
@@ -184,12 +189,12 @@ Unique Blocks
           <td valign="middle">{{ sample.getShortFilename() }}</td>
           <td align="right" valign="middle">{{ "%d"|format(sample.bitness) }}</td>
           <td align="right" valign="middle">{{ "%d"|format(sample.statistics['num_functions']) }}</td>
-          <td align="center" valign="middle"><i {% if sample.is_library %} class="fa-solid fa-square-check" {% else %} class="fa-solid fa-times-circle" {% endif %}></i></td>
+          <td align="center" valign="middle">{{ status_icon(sample.is_library, coloured=false) }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
-    {{ pagination_widget(pagination) }}
+    {{ pagination_widget(pagination, _label="samples") }}
     <div class="text-center">
       <button type="button" onclick="setSelected()" class="btn btn-outline-primary">Add</button>
       {% if selected_ids %}

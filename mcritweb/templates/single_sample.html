@@ -54,7 +54,7 @@ Sample: {{ entry.sample_id }}
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="editSampleModalLabel">Modify Sample</h5>
+        <h2 class="modal-title h5" id="editSampleModalLabel">Modify Sample</h2>
       </div>
       <div class="modal-body">
           <form action='{{ url_for("explore.modifySample") }}' method="POST" style="width: 80%">
@@ -132,9 +132,9 @@ Sample: {{ entry.sample_id }}
             {% endif %}
           </div>
         </div>
-          <a aria-label="Unique blocks" title="Unique blocks" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_family_blocks" href="{{ url_for('analyze.blocks_sample', sample_id=entry.sample_id) }}" target="_self"><i class="fa-solid fa-cubes-stacked"></i></a>
-          <a aria-label="Export" title="Export" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=entry.sample_id) }}" target="_self"><i class="fa-solid fa-file-export"></i></a>
-          <button type="button" aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_edit" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ entry.is_library }}"  data-bs-version="{{ entry.version }}"  data-bs-sampleid="{{ entry.sample_id }}" data-bs-familyname="{{ entry.family }}"><i class="fa-solid fa-pen-to-square"></i></button>
+          <a aria-label="Unique blocks" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_family_blocks" href="{{ url_for('analyze.blocks_sample', sample_id=entry.sample_id) }}" target="_self"><i class="fa-solid fa-cubes-stacked" aria-hidden="true"></i></a>
+          <a aria-label="Export" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=entry.sample_id) }}" target="_self"><i class="fa-solid fa-file-export" aria-hidden="true"></i></a>
+          <button type="button" aria-label="Edit sample" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_edit" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ entry.is_library }}"  data-bs-version="{{ entry.version }}"  data-bs-sampleid="{{ entry.sample_id }}" data-bs-familyname="{{ entry.family }}"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></button>
       </div>
     </div>
 </div>
@@ -148,24 +148,26 @@ Sample: {{ entry.sample_id }}
   {% endif %}
 </div>
 <h2 class="h3">Search</h2>
+  <search>
   <form style="width:100%" method="GET" action="#" data-live-search="sample-functions">
     <label for="query" class="visually-hidden">Search this sample's functions by name or offset</label>
     <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search by function name or offset (0x...)" aria-controls="sample-functions" autofocus autocomplete="on">
     <input type='submit' hidden>
   </form>
+  </search>
   <p id="sample-functions-status" class="visually-hidden" role="status"></p>
   <div id="sample-functions">
   <h2 class="h3">Functions</h2>
-{{ function_table(functions, for_sample_view=True, sort_pagination=pagination, column_setup=user_column_setup,
+{{ function_table(functions, for_sample_view=True, caption="Functions of sample " ~ entry.sample_id, sort_pagination=pagination, column_setup=user_column_setup,
                   empty_message=("No functions in this sample match \"" ~ query ~ "\".") if query else "This sample has no functions on record.", highlight_terms=query|search_terms) }}
 {% if functions %}
-{{ pagination_widget(pagination) }}
+{{ pagination_widget(pagination, _label="functions") }}
 {% endif %}
   </div>
 <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='live_search.js')|tojson }})</script>
 {% if job_collection.count %}
 <h2 class="h3" id="jobs">Jobs</h2>
-{{ job_table(job_collection.getJobs(), samples_by_id=samples) }}
+{{ job_table(job_collection.getJobs(), samples_by_id=samples, caption="Jobs for sample " ~ entry.sample_id) }}
 {% endif %}
 {% include 'js/ac_family_names.html' %}
 {% endblock %}

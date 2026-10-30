@@ -14,6 +14,7 @@ Samples
 
 {% block content %}
 <h1>Overview of Samples</h1>
+  <search>
   <div class="d-flex align-items-center" style="width:100%">
     <form class="flex-grow-1 me-3" method="GET" action="#" data-live-search="sample-list">
     <label for="query" class="visually-hidden">Search samples</label>
@@ -21,9 +22,10 @@ Samples
     <input type='submit' hidden>
   </form>
     <div class="d-flex align-items-center">
-      <a href="{{ url_for('help') }}#search"><i class="fas fa-book"></i> Search Syntax</a>
+      <a href="{{ url_for('help') }}#search"><i class="fas fa-book" aria-hidden="true"></i> Search Syntax</a>
     </div>
   </div>
+  </search>
   <p id="sample-list-status" class="visually-hidden" role="status"></p>
   <div id="sample-list">
 
@@ -31,7 +33,7 @@ Samples
 {{ sample_table(samples, job_collection=job_collection, show_export=True, show_edit=True, sort_pagination=pagination, column_setup=user_column_setup, row_decorations=row_decorations,
    empty_message=("No samples match \"" ~ query ~ "\".") if query else None, highlight_terms=query|search_terms) }}
 {% if samples %}
-{{ pagination_widget(pagination) }}
+{{ pagination_widget(pagination, _label="samples") }}
 {% endif %}
   </div>
 <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='live_search.js')|tojson }})</script>

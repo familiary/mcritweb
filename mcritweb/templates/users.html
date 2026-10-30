@@ -3,7 +3,7 @@
 Users
 {% endblock %}
 {% block content %}
-
+<h1 class="visually-hidden">Users</h1>
 <ul class="nav nav-pills mb-3 justify-content-center" id="pills-tab" role="tablist">
   <li class="nav-item" role="presentation">
     <button class="nav-link {% if active == 'all' %}show active{% endif %}" id="pills-all-tab" data-bs-toggle="pill" data-bs-target="#pills-all" type="button" role="tab" aria-controls="pills-all" aria-selected="{{ 'true' if active == 'all' else 'false' }}">All users</button>
@@ -36,6 +36,7 @@ Users
 <div class="tab-content" id="pills-tabContent">
   <div class="tab-pane fade {% if active == 'pending' %}show active{% endif %}" id="pills-pending" role="tabpanel" aria-labelledby="pills-pending-tab">
     <table class="table table-hover">
+      <caption class="visually-hidden">Pending users</caption>
       <thead class="table-light">
         <tr>
           <th scope="col">User ID</th>
@@ -50,12 +51,12 @@ Users
         {% for user in g.users_by_role['pending'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
+          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-hidden="true"></i><span class="visually-hidden">(still holds a pre-1.5.0 API token)</span>{% endif %}</td>
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
           <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
+            <i class="fas fa-user-cog fa-xs" aria-hidden="true"></i>
           </button>
           <div class="dropdown-menu">
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='pending') }}">Change role to admin</button>
@@ -71,6 +72,7 @@ Users
   </div>
   <div class="tab-pane fade {% if active == 'contributors' %}show active{% endif %}" id="pills-contributors" role="tabpanel" aria-labelledby="pills-contributors-tab">
     <table class="table table-hover">
+      <caption class="visually-hidden">Contributors</caption>
       <thead class="table-light">
         <tr>
           <th scope="col">User ID</th>
@@ -85,12 +87,12 @@ Users
         {% for user in g.users_by_role['contributor'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
+          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-hidden="true"></i><span class="visually-hidden">(still holds a pre-1.5.0 API token)</span>{% endif %}</td>
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
           <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
+            <i class="fas fa-user-cog fa-xs" aria-hidden="true"></i>
           </button>
           <div class="dropdown-menu">
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='contributors') }}">Change role to admin</button>
@@ -105,6 +107,7 @@ Users
   </div>
   <div class="tab-pane fade {% if active == 'admins' %}show active{% endif %}" id="pills-admins" role="tabpanel" aria-labelledby="pills-admins-tab">
     <table class="table table-hover">
+      <caption class="visually-hidden">Admins</caption>
       <thead class="table-light">
         <tr>
           <th scope="col">User ID</th>
@@ -119,12 +122,12 @@ Users
         {% for user in g.users_by_role['admin'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
+          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-hidden="true"></i><span class="visually-hidden">(still holds a pre-1.5.0 API token)</span>{% endif %}</td>
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
           <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
+            <i class="fas fa-user-cog fa-xs" aria-hidden="true"></i>
           </button>
           <div class="dropdown-menu">
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='admins') }}">Change role to contributor</button>
@@ -139,6 +142,7 @@ Users
   </div>
   <div class="tab-pane fade {% if active == 'all' %}show active{% endif %}" id="pills-all" role="tabpanel" aria-labelledby="pills-all-tab">
     <table class="table table-hover">
+      <caption class="visually-hidden">All users</caption>
       <thead class="table-light">
         <tr>
           <th scope="col">User ID</th>
@@ -153,12 +157,12 @@ Users
         {% for user in g.all_users %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
+          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-hidden="true"></i><span class="visually-hidden">(still holds a pre-1.5.0 API token)</span>{% endif %}</td>
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
           <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
+            <i class="fas fa-user-cog fa-xs" aria-hidden="true"></i>
           </button>
           <div class="dropdown-menu">
             {% if user.role == 'pending' %}
@@ -188,6 +192,7 @@ Users
   </div>
   <div class="tab-pane fade {% if active == 'visitors' %}show active{% endif %}" id="pills-visitors" role="tabpanel" aria-labelledby="pills-visitors-tab">
     <table class="table table-hover">
+      <caption class="visually-hidden">Visitors</caption>
       <thead class="table-light">
         <tr>
           <th scope="col">User ID</th>
@@ -202,12 +207,12 @@ Users
         {% for user in g.users_by_role['visitor'] %}
         <tr>
           <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
+          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-hidden="true"></i><span class="visually-hidden">(still holds a pre-1.5.0 API token)</span>{% endif %}</td>
           <td valign="middle">{{ user.role }}</td>
           <td valign="middle">{{ user.registered|date }}</td>
           <td valign="middle">{{ user.last_login|date }}</td>
           <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
+            <i class="fas fa-user-cog fa-xs" aria-hidden="true"></i>
           </button>
           <div class="dropdown-menu">
             <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='visitors') }}">Change role to admin</button>

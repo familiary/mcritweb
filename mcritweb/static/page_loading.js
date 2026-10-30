@@ -15,6 +15,7 @@ var mcritwebPageLoading = (function () {
   "use strict";
 
   var OVERLAY_ID = "mcritweb-page-loading";
+  var STATUS_ID = "mcritweb-page-loading-status";
   /* below the threshold where a delay reads as a delay, a spinner is just a flash */
   var SHOW_DELAY_MS = 150;
   /* the DOM has no "navigation aborted" event (stop button, a scheme the browser
@@ -25,6 +26,24 @@ var mcritwebPageLoading = (function () {
   var showTimer = null;
   var hideTimer = null;
 
+  /* A screen reader reads out a live region when its text changes, and only one it
+   * already knew of: a region made with its text in it, as the overlay was, is often
+   * not read at all. So the region is on the page empty, long before a click can need
+   * it, and the overlay itself is only the picture. base.html carries it, since an
+   * element added to <body> once the page has loaded makes the browser restyle all of
+   * it (bootstrap's `legend + *`); only a page without it makes its own. */
+  function statusElement() {
+    var element = document.getElementById(STATUS_ID);
+    if (element === null) {
+      element = document.createElement("div");
+      element.id = STATUS_ID;
+      element.className = "visually-hidden";
+      element.setAttribute("role", "status");
+      document.body.appendChild(element);
+    }
+    return element;
+  }
+
   function overlayElement() {
     var element = document.getElementById(OVERLAY_ID);
     if (element !== null) {
@@ -32,8 +51,6 @@ var mcritwebPageLoading = (function () {
     }
     element = document.createElement("div");
     element.id = OVERLAY_ID;
-    element.setAttribute("role", "status");
-    element.setAttribute("aria-live", "polite");
     element.style.cssText = [
       "position:fixed", "top:0", "right:0", "bottom:0", "left:0",
       /* over the Bootstrap modal layer, which ends at 1055 */
@@ -42,11 +59,10 @@ var mcritwebPageLoading = (function () {
       /* the page ground at 60%, from the palette in style.css (#70) */
       "background:var(--surface-veil)"
     ].join(";");
-    /* .spinner-border and .visually-hidden are Bootstrap 5; the vendored
-     * stylesheet already slows the animation under prefers-reduced-motion */
+    /* .spinner-border is Bootstrap 5; the vendored stylesheet already slows the
+     * animation under prefers-reduced-motion */
     element.innerHTML =
-      '<div class="spinner-border text-primary" style="width:3rem;height:3rem;"></div>' +
-      '<span class="visually-hidden">Loading, please wait.</span>';
+      '<div class="spinner-border text-primary" style="width:3rem;height:3rem;"></div>';
     document.body.appendChild(element);
     return element;
   }
@@ -64,6 +80,7 @@ var mcritwebPageLoading = (function () {
     if (element !== null && element.parentNode !== null) {
       element.parentNode.removeChild(element);
     }
+    statusElement().textContent = "";
   }
 
   /* Idempotent: a second click while a navigation is already pending must not
@@ -75,6 +92,7 @@ var mcritwebPageLoading = (function () {
     showTimer = window.setTimeout(function () {
       showTimer = null;
       overlayElement();
+      statusElement().textContent = "Loading, please wait.";
       hideTimer = window.setTimeout(hide, MAX_VISIBLE_MS);
     }, SHOW_DELAY_MS);
   }
@@ -150,5 +168,38 @@ var mcritwebPageLoading = (function () {
     }
   });
 
+  statusElement();
+
   return { show: show, showFor: showFor, hide: hide };
+})();
+
+
+/* The tooltip of an icon-only link or button: its name, which its aria-label already says.
+ * A title with the same words as the aria-label beside it gave a table of a hundred rows
+ * the text twice per row, in every page that sent it. Only a mouse reads a title (the
+ * aria-label names the control for everything else), so it is set here once the page is
+ * painted, and the markup carries the name once. A title the markup does set, and the
+ * Bootstrap tooltips that take theirs over (data-bs-toggle="tooltip"), are left alone.
+ * It changes an attribute, which moves nothing. It is here rather than in a file of its
+ * own because each file the queue adds costs every page on a slow phone. */
+
+(function () {
+    var ICON_ONLY = 'a[aria-label]:not([title]):not([data-bs-toggle="tooltip"]), '
+        + 'button[aria-label]:not([title]):not([data-bs-toggle="tooltip"])';
+
+    function titleIt(control) {
+        if (control.textContent.trim() === "") {
+            control.title = control.getAttribute("aria-label");
+        }
+    }
+
+    document.querySelectorAll(ICON_ONLY).forEach(titleIt);
+    // what a script adds after this one has run (the rows a search or a lazy pane brings
+    // in) gets its title when the pointer first reaches it
+    document.addEventListener("mouseover", function (event) {
+        var control = event.target.closest ? event.target.closest(ICON_ONLY) : null;
+        if (control) {
+            titleIt(control);
+        }
+    });
 })();

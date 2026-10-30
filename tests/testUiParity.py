@@ -110,7 +110,8 @@ def test_base_html_accessibility_and_semantics():
         content = f.read()
     # #160 adds data-theme to the tag
     assert re.search(r'<html lang="en"[ >]', content), "base.html is missing <html lang='en'>"
-    assert '<main class="content">' in content, "base.html is missing <main class='content'>"
+    # the skip link's target, so it carries an id and can take focus
+    assert re.search(r'<main class="content"[ >]', content), "base.html is missing <main class='content'>"
     # attributes, or the keyword arguments of #160's themed_img() that become them
     assert re.search(r'width="459",? height="150"', content), "base.html brand logo is missing explicit dimensions"
     assert re.search(r'width="187",? height="52"', content), "base.html FKIE logo is missing explicit dimensions"

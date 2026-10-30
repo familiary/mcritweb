@@ -104,3 +104,23 @@ def test_row_clicks_reach_rows_swapped_in_later(template, row):
 
     assert f'$(document).on("click", "tr.{row}"' in js
     assert f'$("tr.{row}").click(' not in js
+
+
+def test_the_script_finds_the_flashed_messages_where_the_layout_puts_them(client, as_role, fake_mcrit, monkeypatch):
+    """A failed search comes back as a flashed error, which the script moves into the
+    page. It looked for them in a `section.content`, which no template renders, so the
+    error was dropped and the status read "No results" for a search that had not run.
+    tests/testLiveSearchBrowser.py drives that in a browser; this keeps CI on the selector."""
+    with open(os.path.join(TEMPLATES, os.pardir, "static", "live_search.js")) as source:
+        script = source.read()
+    selectors = set(re.findall(r'querySelector\("([^"]*\.content)"\)', script))
+    assert selectors, "live_search.js no longer looks the messages up by class"
+    as_role("visitor")
+    monkeypatch.setattr(fake_mcrit, "search_samples", lambda *args, **kwargs: None)
+    page = client.get("/explore/samples?query=x").get_data(as_text=True)
+
+    for selector in selectors:
+        tag, cls = selector.split(".")
+        container = re.search(r"<" + tag + r' class="' + cls + r'"[^>]*>\s*(<div class="alert [^"]*"[^>]*>)', page)
+        assert container, f"the flashed messages are not the first children of a <{tag} class=\"{cls}\">"
+        assert "alert-danger" in container.group(1)

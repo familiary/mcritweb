@@ -320,10 +320,10 @@ def test_an_early_remove_click_drops_the_sample(held_back, live_server, picker):
     and did nothing when clicked before jQuery had run."""
     page, _ = held_back("visitor")
     page.goto(f"{live_server}/analyze/{picker}?samples=0,1", wait_until="commit")
-    page.wait_for_selector("button[aria-label='Remove sample']")
+    page.wait_for_selector("button[aria-label^='Remove sample']")
 
     with page.expect_navigation(wait_until="commit"):
-        page.locator("button[aria-label='Remove sample']").first.click()
+        page.locator("button[aria-label^='Remove sample']").first.click()
     assert "samples=1" in page.url and "samples=0" not in page.url, page.url
     assert page.errors == []
 

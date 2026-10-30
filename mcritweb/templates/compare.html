@@ -4,7 +4,7 @@
 {% from 'table/tabs.html' import add_tab, finalize_tabs %}
 {% extends 'base.html' %}
 {% block title%}
-Compare
+Compare 1vsN
 {% endblock %}
 
 {% set minhash_slider_mapping = ["Off", "Fast", "Standard", "Complete"] %} 
@@ -109,18 +109,20 @@ function handleSliderChange(val) {
 
 {{ compare_nav("1vsN") }}
 <h1>Compare Samples 1vsN</h1>
+<search>
 <form style="width:100%" id="compare_search_form" action="#Search" method="GET">
   <label for="Search" class="visually-hidden">Search samples</label>
   <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" id="Search" value="{{ query }}" placeholder="Search" autofocus autocomplete="on">
 </form>
+</search>
 {{ set_pagination_params(pagination, _js_argument_provider="fetchState", _anchor="Search") }}
 {# a search box sits directly above this table, so "upload your first sample" is
    almost never what happened - the collection is full and the term missed #}
-{{ sample_table(samples, table_id="table_sample", show_analyze=False, show_hint=True, sort_pagination=pagination, pick="radio",
+{{ sample_table(samples, table_id="table_sample", caption="Samples to compare", show_analyze=False, show_hint=True, sort_pagination=pagination, pick="radio",
                 empty_message="No sample matches \"" ~ query ~ "\"." if query else "No samples available. Click here to upload your first sample",
                 empty_link=none if query else url_for("data.submit")) }}
 {% if samples %}
-  {{ pagination_widget(pagination)}}
+  {{ pagination_widget(pagination, _label="samples")}}
 {% endif %}
 <div class="text-center">
   <div class="form-group">

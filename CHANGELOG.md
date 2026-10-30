@@ -44,6 +44,14 @@ rather than reconstructing it from the commit log at release time.
   too. A role with a query upload cap - by default a visitor - reruns only its own queries, since a
   stored query may be larger than that role could have uploaded. With an older one it is offered on
   the 1vsN, 1vs1 and cross compare jobs it can rebuild from their parameters.
+- A "Skip to main content" link is the first stop of the Tab key on every page, shown only while it
+  has focus, so keyboard users no longer cross the logos and menus to reach a page's content. The
+  navbar, the jobs page's category bar and every pager are named navigation landmarks, the search
+  boxes are search landmarks, and the current page of a pager, the current compare picker and the
+  current job category are announced as current rather than shown by colour alone.
+- Find in page (Ctrl+F) finds text in the closed panels of a function's page, such as a PicBlockHash
+  or the MinHash, and opens the panel it lands in, in browsers that support `hidden="until-found"`
+  (Chromium and Firefox). Elsewhere the panels behave as before.
 - The password fields of the sign-in, registration and settings forms have a Show button, which shows
   what was typed and hides it again, so a password typed on a phone keyboard can be checked without
   typing it twice. A shown password is hidden again as the form is sent.
@@ -72,6 +80,10 @@ rather than reconstructing it from the commit log at release time.
 - Control flow graphs are laid out about three times faster on large functions, with the same
   result: 5.6 s instead of 21.7 s for a 971-block function. A patch to the vendored dagre builds the
   graph of each rank in one pass instead of walking the whole graph once per rank.
+- An icon-only link or button names itself once in the markup. Its tooltip, which repeated the
+  `aria-label` word for word in a `title` on each of a match table's hundred rows, is given by
+  `page_loading.js` once the page has painted, so a result page is smaller by the text of those
+  titles and nothing changes on screen.
 - What a keyboard needs from a page is sent once, in the cached scripts, instead of in every copy of
   the page: the "Rows per page" select's wait for Enter is part of `post_action.js` (the select only
   says where it loads), and the cross compare matrix's arrow keys and score tooltips are
@@ -129,6 +141,46 @@ rather than reconstructing it from the commit log at release time.
   its longest instruction and stays inside its pane and the window; it was sized from the drawn
   block, so most instructions ran out of the box, and the combined view's "B's code" tooltip was not
   held inside the pane at all.
+- A live search that the backend fails to answer says so. The table's search box showed "No results"
+  and dropped the error the page reported, because the script looked for the messages in an element
+  the layout does not have; the error is now shown above the table and the screen-reader status says
+  the search failed.
+- Screen readers hear "Yes" or "No" for the tick and cross icons that are a table cell's whole value
+  (library, MinHash, PicHash, unique), where they heard nothing or "unknown character"; the link
+  hunt's family-unique matches say "(unique)" beside the bold that marks them.
+- Icon buttons and links say which row they act on, for screen readers and voice control: "Filter by
+  function 84", "Compare function 84 with function 943", "Delete job 12", "Show result of job 12",
+  "Remove sample 3", "Copy SHA256 634df40e" and so on. A result page read out a hundred identical
+  "Filter by this function" links that each went somewhere else. Likewise each table's pager is named
+  after its table, "Library matches pages" with "Next page of library matches" and "Page 2 of
+  library matches", where every pager on a result page was "Pagination" with the same links.
+- Every data table has a name screen readers announce and list (a visually hidden caption), and the
+  label column of the job, sample, function, statistics, settings and server tables is the header of
+  its row, so each value is read with its label. The label cells take the bold of a header cell.
+- Screen readers no longer read a control flow graph as the code of all its blocks run together. On
+  a function's page the graph is hidden from them, since the code panel beside it is its text, and
+  the panel can be scrolled from the keyboard in every browser; on the comparison page each graph is
+  one image named after its function.
+- Screen readers are told when a page is loading, a file is uploading or an import moves on: each of
+  these says so in a status region that is on the page before it is written to, where the loading
+  overlay and the import box used to be created or shown together with their text, which a screen
+  reader often does not read. A running job's progress is also shown as a progress bar, which
+  assistive technology reports as one.
+- Screen readers no longer read out the match diagram's "rendering diagram..." placeholder, which
+  stayed in the page after the diagram covered it, nor a "slash" between the items of the result
+  pages' breadcrumb. Browsers that predate alternative text for generated content show and read them
+  as before.
+- Every page has one top-level heading, visually hidden where the page shows none (settings, users,
+  submit, import, export, register, and search before anything is searched), and its sections and
+  dialogs follow it without skipping a level. The 1vsN, 1vs1 and cross compare pages, all titled
+  "Compare", and a link hunt, titled as its result page, have titles of their own.
+- The navbar, the jobs page's menu and the family table's header row close the elements they open,
+  and the jobs page no longer closes a paragraph it never opened; browsers had repaired each, by
+  rules nobody reading the templates could see.
+- Screen readers no longer read the icons as "unknown character": every Font Awesome icon is hidden
+  from them, the icon-only buttons that were named only by a tooltip (analyze and rename a function,
+  regenerate the API token) have names of their own, and the icons that say what a value is, the
+  family and sample of a job's description and the kinds of match of a PicHash, are spelled out.
 - The tooltips of scores, matrix squares and "Total (since queued)" wrap and stay inside the
   window. They were one line long, so on a phone or tablet they ran off the screen, and the matrix
   pane cut off the top of those on its first rows at any width. Where the browser can anchor a box

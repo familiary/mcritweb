@@ -69,7 +69,7 @@ def rule_of(response):
 
 def block_rows(response):
     """The pichashes of the block table, in the order they were rendered."""
-    return re.findall(r'<td valign="middle" scope="row" class="id">(0x[0-9a-f]+)</td>', response.data.decode())
+    return re.findall(r'<td valign="middle" class="id">(0x[0-9a-f]+)</td>', response.data.decode())
 
 
 def test_paging_and_reloading_build_the_cover_once(client, covers, result_url):

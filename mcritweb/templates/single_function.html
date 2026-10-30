@@ -5,6 +5,8 @@
 {% block style %}
 
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='trace_CFG/cfg_style.css') }}">
+{# lets find in page search the closed panels below #}
+<script>later({{ url_for('static', filename='collapsed_find.js')|tojson }})</script>
 
 {% endblock %}
 
@@ -20,7 +22,7 @@ Function: {{ function_id }}
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="compareFunctionModalLabel">Compare function {{ function_id }} with another function</h5>
+        <h2 class="modal-title h5" id="compareFunctionModalLabel">Compare function {{ function_id }} with another function</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form id="compare_function_form">
@@ -43,7 +45,7 @@ Function: {{ function_id }}
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="renameFunctionModalLabel">Rename function {{ function_id }}</h5>
+        <h2 class="modal-title h5" id="renameFunctionModalLabel">Rename function {{ function_id }}</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form method="POST" action="{{ url_for('explore.modifyFunction') }}" id="rename_function_form">
@@ -93,8 +95,8 @@ Function: {{ function_id }}
     </div>
     <div align="right" class="col">
       <div class="btn-group dropdown">
-        <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="button_function_analyze" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Analyze">
-          <i class="fa-solid fa-flask"></i>
+        <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="button_function_analyze" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Analyze" aria-label="Analyze function {{ function_id }}">
+          <i class="fa-solid fa-flask" aria-hidden="true"></i>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
           <li><h6 class="dropdown-header">This function</h6></li>
@@ -113,19 +115,19 @@ Function: {{ function_id }}
           <li><a class="dropdown-item" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id, _anchor='jobs') }}">Previous Jobs</a></li>
         </ul>
       </div>
-      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_sample" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id) }}" aria-label="Go to sample {{ entry.sample_id }}" title="Go to sample {{ entry.sample_id }}"><i class="fa-solid fa-virus"></i></a>
+      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_sample" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id) }}" aria-label="Go to sample {{ entry.sample_id }}"><i class="fa-solid fa-virus" aria-hidden="true"></i></a>
       {% if sample_entry.family_id is not none %}
-      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_family" href="{{ url_for('explore.family_by_id', family_id=sample_entry.family_id) }}" aria-label="Go to family {{ sample_entry.family }}" title="Go to family {{ sample_entry.family }}"><i class="fa-solid fa-bug"></i></a>
+      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_family" href="{{ url_for('explore.family_by_id', family_id=sample_entry.family_id) }}" aria-label="Go to family {{ sample_entry.family }}"><i class="fa-solid fa-bug" aria-hidden="true"></i></a>
       {% endif %}
       {% if g.user.role in ('admin', 'contributor') %}
         {% if can_modify_function %}
-        <button type="button" class="btn btn-outline-dark btn-sm" id="button_function_rename" data-bs-toggle="modal" data-bs-target="#renameFunctionModal" title="Rename function"><i class="fa-solid fa-pen"></i></button>
+        <button type="button" class="btn btn-outline-dark btn-sm" id="button_function_rename" data-bs-toggle="modal" data-bs-target="#renameFunctionModal" title="Rename function" aria-label="Rename function {{ function_id }}"><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
         {% else %}
-        <button type="button" class="btn btn-outline-dark btn-sm disabled" id="button_function_rename" aria-disabled="true" title="Renaming functions needs an MCRIT backend of version 1.10.0 or newer"><i class="fa-solid fa-pen"></i></button>
+        <button type="button" class="btn btn-outline-dark btn-sm disabled" id="button_function_rename" aria-disabled="true" title="Renaming functions needs an MCRIT backend of version 1.10.0 or newer" aria-label="Rename function {{ function_id }}"><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
         {% endif %}
       {% endif %}
       {{ api_usage_button("apiUsageModal") }}
-      <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" aria-label="Go to the control flow graph" title="Go to the control flow graph"><i class="fa-solid fa-diagram-project"></i></a>
+      <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" aria-label="Go to the control flow graph"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i></a>
     </div>
   </div>
 </div>
@@ -268,11 +270,11 @@ Function: {{ function_id }}
                     <p id="cfgDeferredNote" role="status" aria-live="polite" tabindex="-1">This function has <span id="cfgDeferredBlocks"></span> blocks. Its code is on the right; its graph is drawn when asked, since laying out and drawing this many blocks takes a while.</p>
                     <button type="button" class="btn btn-primary" id="drawGraph">Draw the graph</button>
                   </div>
-                  <svg id="graphContainer" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
+                  <svg id="graphContainer" aria-hidden="true" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
                   <g/>
                   </svg>
               </div>
-              <div id="xcfg_text_right">
+              <div id="xcfg_text_right" role="region" aria-label="Code of function {{ function_id }}" tabindex="0">
                   <pre id="text_code"></pre>
               </div>
           </div>
