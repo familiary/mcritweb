@@ -18,7 +18,7 @@ import os
 import threading
 
 import pytest
-from testJobOverview import CountingJobs, job_data, running
+from testJobOverview import PARENT_JOB_ID, CountingJobs, job_data, running
 from werkzeug.serving import make_server
 
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
@@ -41,7 +41,7 @@ THREE_TICKS_MS = 3 * REFRESH * 1000 + 700
 def backend(app):
     """A running cross compare, one of its two sub-jobs still unfinished."""
     children = [job_data("child-7", 7, params='{"0": 7}'), running(job_data("child-8", 8, params='{"0": 8}'))]
-    parent = running(job_data("parent", 10, "combineMatchesToCross", ["child-7", "child-8"]))
+    parent = running(job_data(PARENT_JOB_ID, 10, "combineMatchesToCross", ["child-7", "child-8"]))
     parent["unfinished_dependencies"] = ["child-8"]
     jobs = CountingJobs(parent, children)
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: jobs
@@ -97,15 +97,15 @@ class Traffic:
         page.on("request", self._count)
 
     def _count(self, request):
-        if request.url.split("?")[0].endswith("/data/jobs/parent"):
+        if request.url.split("?")[0].endswith(f"/data/jobs/{PARENT_JOB_ID}"):
             self.loads += 1
-        elif request.url.endswith("/data/jobs/parent/status"):
+        elif request.url.endswith(f"/data/jobs/{PARENT_JOB_ID}/status"):
             self.polls += 1
 
 
 def open_overview(page, live_server):
     traffic = Traffic(page)
-    page.goto(f"{live_server}/data/jobs/parent?refresh={REFRESH}")
+    page.goto(f"{live_server}/data/jobs/{PARENT_JOB_ID}?refresh={REFRESH}")
     return traffic
 
 
@@ -125,7 +125,7 @@ def test_an_idle_tick_does_not_reload(browser_page, live_server, backend):
 
 
 def test_progress_alone_is_updated_in_place(browser_page, live_server, backend):
-    browser_page.route("**/data/jobs/parent/status", lambda route: route.fulfill(status=200, content_type="application/json", body=status(progress=0.5)))
+    browser_page.route(f"**/data/jobs/{PARENT_JOB_ID}/status", lambda route: route.fulfill(status=200, content_type="application/json", body=status(progress=0.5)))
     traffic = open_overview(browser_page, live_server)
     browser_page.wait_for_function("document.getElementById('job-progress').textContent.trim() === '50.00%'")
 
@@ -144,7 +144,7 @@ def test_a_changed_state_reloads_once(browser_page, live_server, backend):
             answered.append(True)
             route.fulfill(status=200, content_type="application/json", body=status(unfinished_sub_jobs=0))
 
-    browser_page.route("**/data/jobs/parent/status", first_poll_changed)
+    browser_page.route(f"**/data/jobs/{PARENT_JOB_ID}/status", first_poll_changed)
     traffic = open_overview(browser_page, live_server)
     browser_page.wait_for_timeout(THREE_TICKS_MS)
 
@@ -156,9 +156,9 @@ def test_a_job_that_is_gone_reloads_once_and_stops(browser_page, live_server, ba
     """The poll's 404 reloads the page, which then renders the job as invalid - a page
     with no script - rather than retrying the poll forever."""
     traffic = open_overview(browser_page, live_server)
-    del backend._jobs["parent"]
+    del backend._jobs[PARENT_JOB_ID]
     browser_page.wait_for_timeout(THREE_TICKS_MS)
 
     assert traffic.polls == 1
     assert traffic.loads == 2
-    assert "/data/jobs/parent/status" not in browser_page.content()
+    assert f"/data/jobs/{PARENT_JOB_ID}/status" not in browser_page.content()

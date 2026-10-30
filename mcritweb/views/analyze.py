@@ -3,12 +3,13 @@ import re
 from flask import Blueprint, current_app, flash, g, json, redirect, render_template, request, url_for
 from smda.common.SmdaReport import SmdaReport
 
+from mcritweb.backend_errors import require_result, with_server_errors
 from mcritweb.db import remember_query_filename
 from mcritweb.views.authentication import visitor_required
 from mcritweb.views.client import get_client, get_sample_entries, remember_samples
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.pagination import Pagination
-from mcritweb.views.params import parse_band_range, parse_checkbox_query_param, parse_integer_list_query_param
+from mcritweb.views.params import parse_band_range, parse_base_addr_form_param, parse_checkbox_query_param, parse_integer_list_query_param
 from mcritweb.views.search import search_page
 from mcritweb.views.utility import mcrit_server_required, query_upload_path
 
@@ -21,6 +22,18 @@ bp = Blueprint('analyze', __name__, url_prefix='/analyze')
 #: Isolating the blocks unique to hundreds of samples is a family question anyway, and
 #: `blocks_family` already asks that one by id.
 MAX_SELECTED_SAMPLES = 250
+
+#: The hash list costs one backend request per hash (there is no batch lookup by
+#: sha256), so it is bounded like the selections above.
+MAX_HASH_LIST_LENGTH = MAX_SELECTED_SAMPLES
+#: How many of the ignored lines a warning names. One flash per line went into the
+#: cookie session, which outgrew what a browser stores at about 70 lines.
+MAX_NAMED_IN_FLASH = 5
+
+
+def _some_of(lines):
+    named = ", ".join(f"'{line[:64]}'" for line in lines[:MAX_NAMED_IN_FLASH])
+    return named + (", ..." if len(lines) > MAX_NAMED_IN_FLASH else "")
 
 
 def get_unique_samples_from_search_result(search_result):
@@ -38,7 +51,7 @@ def blocks_family(family_id):
     client = get_client()
     family_samples = client.getSamplesByFamilyId(family_id)
     if family_samples:
-        job_id = client.requestUniqueBlocksForFamily(family_id)
+        job_id = require_result(with_server_errors(client).requestUniqueBlocksForFamily(family_id), "a job for the unique blocks of this family")
         return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
     else:
         flash("Can't locate unique blocks for a family without samples", category="error")
@@ -50,7 +63,7 @@ def blocks_family(family_id):
 @mcrit_server_required
 def blocks_sample(sample_id):
     client = get_client()
-    job_id = client.requestUniqueBlocksForSamples([sample_id])
+    job_id = require_result(with_server_errors(client).requestUniqueBlocksForSamples([sample_id]), "a job for the unique blocks of this sample")
     return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
 
 
@@ -169,7 +182,7 @@ def start_unique_blocks():
 @bp.route('/compare_submit_query')
 @visitor_required
 def compare_submit_query():
-    return render_template("compare_submit_query.html")
+    return redirect(url_for('analyze.query'))
 
 @bp.route('/cross_compare_from_hash_list', methods=['GET', 'POST'])
 @visitor_required
@@ -183,26 +196,35 @@ def cross_compare_from_hash_list():
     is_forcing_rematch = True if request.args.get('rematch', 'false').lower() == "true" else False
     is_only_selected = True if request.args.get('onlySelected', 'false').lower() == "true" else False
     if request.method == 'POST':
-        hash_list = request.form.get('hashlist', '').strip().splitlines()
-        # sanitize to sha256 hashes
-        sanitized_hashes = []
+        hash_list = [line.strip() for line in request.form.get('hashlist', '').splitlines()]
+        # sanitize to sha256 hashes, each once: the corpus stores them in lowercase
+        valid_hashes = []
+        invalid_lines = []
         for h in hash_list:
-            h = h.strip()
-            if re.match(r'^[a-fA-F0-9]{64}$', h):
-                sanitized_hashes.append(h)
-            else:
-                flash(f"Hash '{h}' is not a valid SHA256 hash and was ignored", category="warning")
+            if re.fullmatch(r'[a-fA-F0-9]{64}', h):
+                valid_hashes.append(h.lower())
+            elif h:
+                invalid_lines.append(h)
+        sanitized_hashes = list(dict.fromkeys(valid_hashes))
+        if invalid_lines:
+            flash(f"{len(invalid_lines)} line(s) are not SHA256 hashes and were ignored: {_some_of(invalid_lines)}", category="warning")
         if not sanitized_hashes:
             flash("No valid hashes provided", category="error")
             return redirect(url_for('analyze.cross_compare_from_hash_list'))
+        if len(sanitized_hashes) > MAX_HASH_LIST_LENGTH:
+            flash(f"A hash list can name at most {MAX_HASH_LIST_LENGTH} samples, the {len(sanitized_hashes) - MAX_HASH_LIST_LENGTH} after that were ignored.", category="warning")
+            sanitized_hashes = sanitized_hashes[:MAX_HASH_LIST_LENGTH]
         # get sample ids from hashes
         selected_samples = []
+        unknown_hashes = []
         for h in sanitized_hashes:
             sample_entry = client.getSampleBySha256(h)
             if sample_entry is not None:
                 selected_samples.append(sample_entry)
             else:
-                flash(f"Hash '{h}' does not correspond to any sample in the database and was ignored", category="warning")
+                unknown_hashes.append(h)
+        if unknown_hashes:
+            flash(f"{len(unknown_hashes)} hash(es) do not correspond to any sample in the database and were ignored: {_some_of(unknown_hashes)}", category="warning")
         if not selected_samples:
             flash("No valid samples found for the provided hashes", category="error")
             return redirect(url_for('analyze.cross_compare_from_hash_list'))
@@ -220,7 +242,7 @@ def cross_compare_from_hash_list():
             onlySelected = "true" if is_only_selected else "false",
         ))
     else:
-        return render_template("cross_compare_from_hash_list.html")
+        return render_template("cross_compare_from_hash_list.html", max_hashes=MAX_HASH_LIST_LENGTH)
 
 @bp.route('/cross_compare', methods=['GET','POST'])
 @visitor_required
@@ -319,7 +341,9 @@ def start_cross_compare():
         else:
             flash('Please select at least one sample to cross compare.', category='error')
         return redirect(url_for('analyze.cross_compare'))
-    job_id = client.requestMatchesCross(selected_list, force_recalculation=rematch, sample_group_only=only_selected, band_matches_required=minhash_band_range)
+    job_id = require_result(
+        with_server_errors(client).requestMatchesCross(selected_list, force_recalculation=rematch, sample_group_only=only_selected, band_matches_required=minhash_band_range),
+        "a job for this cross comparison")
     return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
 
 
@@ -387,7 +411,9 @@ def compare_all(sample_id_a):
     # queued a fresh job on every visit. See issue #97.
     rematch = parse_checkbox_query_param(request, 'rematch')
     minhash_band_range = parse_band_range(request)
-    job_id = client.requestMatchesForSample(sample_id_a, force_recalculation=rematch, band_matches_required=minhash_band_range)
+    job_id = require_result(
+        with_server_errors(client).requestMatchesForSample(sample_id_a, force_recalculation=rematch, band_matches_required=minhash_band_range),
+        "a job for this comparison")
     return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
 
 @bp.route('/compare_function/<int:function_id>')
@@ -409,7 +435,8 @@ def compare_function(function_id):
     negatively and have no sample in the database to match against.
     """
     client = get_client()
-    function_entry = client.getFunctionById(function_id)
+    # a failure on the backend's side raises here rather than reading as "no function"
+    function_entry = with_server_errors(client).getFunctionById(function_id)
     if function_entry is None:
         flash(f"There is no function with id {function_id}.", category='error')
         return redirect(url_for('explore.functions'))
@@ -424,13 +451,10 @@ def compare_function(function_id):
         # cannot build the rule without it and raises BuildError. That is a 500 with a
         # traceback where a sentence was owed.
         #
-        # Every sibling route in this module needs the same guard and gets it from
-        # issue #43's `require_result`. This route is the one that fix could not cover,
-        # because it does not exist on that branch - it arrives with this one.
-        #
-        # The fallback is the listing rather than this function's own page, so a backend
-        # that is genuinely down does not answer with a second, wrong message ("There is
-        # no function with id N") stacked on top of this one.
+        # The sibling routes in this module answer that with `require_result`'s page.
+        # This one keeps its message, and falls back to the listing rather than this
+        # function's own page, so a backend that is genuinely down does not answer with
+        # a second, wrong message ("There is no function with id N") on top of it.
         flash('Ups, MCRIT would not start the job.', category='error')
         return redirect(url_for('explore.functions'))
     # forward=1 so a job that is already finished goes straight to the report; while it
@@ -444,7 +468,9 @@ def compare_vs(sample_id_a, sample_id_b):
     client = get_client()
     rematch = parse_checkbox_query_param(request, 'rematch')
     minhash_band_range = parse_band_range(request)
-    job_id = client.requestMatchesForSampleVs(sample_id_a, sample_id_b, force_recalculation=rematch, band_matches_required=minhash_band_range)
+    job_id = require_result(
+        with_server_errors(client).requestMatchesForSampleVs(sample_id_a, sample_id_b, force_recalculation=rematch, band_matches_required=minhash_band_range),
+        "a job for this comparison")
     return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
 
 #: What a query upload may declare beyond the role's cap on the file itself: the other
@@ -476,19 +502,32 @@ def query():
 
         base_address = None
         form_options = request.form['options']
-        is_dump_or_smda = form_options in ['dumped', 'smda']
-        if is_dump_or_smda:
+        # only a memory dump needs a base address: an SMDA report carries its own, and
+        # requestMatchesForSmdaReport() - where the smda branch below ends - takes none
+        if form_options == "dumped":
             # the form also carries a bitness field, but McritClient has no parameter for it -
             # the server derives bitness from the mapped binary itself
-            base_address = int(request.form['base_addr'], 16)
+            base_address = parse_base_addr_form_param(request)
+            if base_address is None:
+                flash("Please enter the base address of the sample as a hexadecimal number, e.g. 0x400000.", category='error')
+                return "", 400 # Bad Request
 
         binary_content = f.read()
         if role_limit is not None and len(binary_content) > role_limit:
             flash(f'Your account may only upload files for query that are up to {role_limit} bytes in size.', category='error')
             return "", 403 # Bad Request
         if form_options == "smda":
-            content_as_dict = json.loads(binary_content)
-            smda_report = SmdaReport.fromDict(content_as_dict)
+            # the file is whatever was dropped on the page, so a body that is not a
+            # readable SMDA report is ordinary user input and has to become a message.
+            # It used to be covered by accident: the base address was demanded first,
+            # and an empty one answered 400 before anything was parsed. That check is
+            # now correctly limited to a dump, so this needs its own.
+            try:
+                smda_report = SmdaReport.fromDict(json.loads(binary_content))
+            except Exception:
+                current_app.logger.warning("analyze.query - the uploaded file is not a readable SMDA report")
+                flash('That file could not be read as an SMDA report.', category='error')
+                return "", 400 # Bad Request
 
         minhash_band_range = parse_band_range(request)
         if form_options == "smda":

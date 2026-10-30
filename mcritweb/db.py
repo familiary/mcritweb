@@ -60,10 +60,28 @@ def generate_apitoken():
     MD5's, so the tokens were never weak - but MD5 in an authentication path is a
     finding every auditor writes up, and there is no reason to keep it. See issue #100.
 
-    Tokens already issued stay valid: nothing validates their shape, and
-    `get_user_by_apitoken` matches on equality.
+    Tokens already issued stay valid - except that a deployment may retire the
+    pre-1.5.0 (32-character) ones with `ACCEPT_LEGACY_APITOKENS` (issue #250).
+    Nothing here validates a token's shape, and `get_user_by_apitoken` matches
+    on equality.
     """
     return secrets.token_hex(APITOKEN_BYTES)
+
+
+#: Pre-1.5.0 tokens were `md5(uuid4().bytes)` and are always 32 hex characters;
+#: tokens generated since are `secrets.token_hex(APITOKEN_BYTES)` and always 64.
+#: The length is therefore a reliable discriminator, so finding the old ones needs
+#: no migration and no extra column. See issue #250.
+LEGACY_APITOKEN_RE = re.compile(r"[0-9a-f]{32}")
+
+
+def is_legacy_apitoken(apitoken):
+    """True when `apitoken` has the pre-1.5.0 (32-character) shape.
+
+    The 'no login' placeholder a freshly inserted row carries and the tokens the
+    test fixtures invent do not match, so they are never reported as legacy.
+    """
+    return apitoken is not None and LEGACY_APITOKEN_RE.fullmatch(apitoken) is not None
 
 
 class UserInfo:
@@ -679,11 +697,20 @@ class UserColumnSettings:
         database.commit()
 
 
+#: Seconds a connection waits on another one's lock before giving up with "database is
+#: locked". Passed as sqlite3's `timeout`, which is how Python installs SQLite's busy
+#: handler. 5 is also Python's default, so this changes nothing on its own - it is
+#: spelled out because two gunicorn workers with several threads each share this file,
+#: and the wait is part of how they do it rather than an accident of a default.
+DATABASE_TIMEOUT = 5.0
+
+
 def get_db():
     if 'db' not in g:
         g.db = sqlite3.connect(
             current_app.config['DATABASE'],
-            detect_types=sqlite3.PARSE_DECLTYPES
+            detect_types=sqlite3.PARSE_DECLTYPES,
+            timeout=DATABASE_TIMEOUT,
         )
         g.db.row_factory = sqlite3.Row
     return g.db
@@ -723,14 +750,52 @@ def init_app(app):
     app.cli.add_command(init_db_command)
 
 
+def enable_write_ahead_log(db):
+    """Switch the database file to WAL, and return the journal mode it ended up in.
+
+    In the default rollback-journal mode a write locks out every reader in every worker
+    until it commits, and a reader holds off a writer; with WAL, readers carry on
+    against the last commit while one writer appends. The mode is stored in the file,
+    so setting it once at startup covers every connection opened later.
+
+    SQLite does not refuse a mode it cannot use, it keeps the old one and answers with
+    that - ":memory:" says "memory". That is reported rather than raised: the app works
+    without WAL, it just serializes readers behind writers as it always has.
+
+    A database this process may not write is the one case it does raise for, since
+    the switch is a write: "attempt to write a readonly database". That is reported
+    too, so an instance whose mcritweb.sqlite is read-only starts and serves reads as
+    it did before WAL. Only that error, though - anything else SQLite raises here is a
+    database that is broken rather than read-only, and still stops the start.
+    """
+    try:
+        journal_mode = db.execute("PRAGMA journal_mode=WAL;").fetchone()[0]
+    except sqlite3.OperationalError as error:
+        # by the primary result code, so that the extended ones count too: a writable
+        # file in a read-only directory is SQLITE_READONLY_DIRECTORY, because the -wal
+        # file would have to be created beside it
+        if getattr(error, "sqlite_errorcode", 0) & 0xFF != sqlite3.SQLITE_READONLY:
+            raise
+        journal_mode = db.execute("PRAGMA journal_mode;").fetchone()[0]
+        print(f"SQLite kept journal_mode={journal_mode} instead of WAL, the database is read-only: {error}")
+        return journal_mode
+    if journal_mode.lower() != "wal":
+        print(f"SQLite kept journal_mode={journal_mode} instead of WAL, readers will wait for writers.")
+    return journal_mode
+
+
 def migrate(app_context):
     # custom connect since we are before app initialization
     db = sqlite3.connect(
             app_context.config['DATABASE'],
-            detect_types=sqlite3.PARSE_DECLTYPES
+            detect_types=sqlite3.PARSE_DECLTYPES,
+            timeout=DATABASE_TIMEOUT,
         )
     # close on every exit path, including the early return and any failing migration
     try:
+        # before the early return below, so a database `flask init-db` is about to
+        # create - it builds the app, and with it runs this, first - is in WAL too
+        enable_write_ahead_log(db)
         # check if DB was initialized before taking further action.
         try:
             db.execute('SELECT * FROM user').fetchone()

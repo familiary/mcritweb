@@ -15,6 +15,7 @@ chooses them, and two templates dropped them into a quoted JS string literal. A 
 alone would not have shown that the value was attacker-controlled rather than an id.
 """
 
+import json
 import logging
 import os
 import re
@@ -116,6 +117,28 @@ def test_a_family_name_cannot_break_out_of_a_script_string(client, as_role, fake
     assert b"<script>alert(1)</script>" not in response.data, (
         f"a crafted family name broke out of the JS string literal on {path}"
     )
+
+
+@pytest.mark.parametrize("path, variables", [
+    ("/analyze/compare", ["selected"]),
+    ("/analyze/compare_versus", ["selected_a", "selected_b"]),
+])
+def test_a_selected_sample_from_the_url_stays_a_string_in_the_compare_pages(client, as_role, fake_mcrit, path, variables):
+    """`selected`, `selected_a` and `selected_b` come straight from the query string and
+    were written as `'{{ ... }}'`. Autoescaping turns a quote into `&#39;`, which a
+    script body keeps as text, but it leaves a backslash alone, and one at the end of the
+    value escapes the closing quote - the string runs on into the next line and the
+    whole script block fails to parse. `|tojson` writes a string any value survives."""
+    value = "a'b\\c\\"
+    as_role("visitor")
+    response = client.get(path, query_string={name: value for name in variables})
+
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    for name in variables:
+        literal = re.search(rf"^var {name} = (.*?);?$", page, re.MULTILINE)
+        assert literal, f"var {name} is gone from {path}"
+        assert json.loads(literal.group(1)) == value, literal.group(0)
 
 
 @pytest.mark.parametrize("name", [BREAKOUT_NAME, ATTRIBUTE_NAME])
