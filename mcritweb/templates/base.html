@@ -24,10 +24,11 @@
      Bootstrap gives that display:none, so the glyph has no box and the font is fetched and
      discarded. Measured: /login at 390x844 requests fa-solid-900.woff2 (150KB) and
      document.fonts reports nothing loaded. Signed-in pages draw icons in the content
-     itself, at every width, so there the preload is paid for.
+     itself, at every width, so there the preload is paid for. The file preloaded is the
+     face cut to the glyphs the templates draw, 6KB (scripts/subset_fontawesome.py).
      See issue #62 and tests/testIconPreload.py #}
   {% if g.user %}
-  <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ url_for('static', filename='webfonts/fa-solid-900.woff2') }}">
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ url_for('static', filename='webfonts/subset/fa-solid-900.woff2') }}">
   {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="icon" type="image/png" href=" {{ url_for('static',filename='d20_mcrit_cabaret_small.png') }}">

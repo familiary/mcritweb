@@ -70,15 +70,34 @@ project's patched `static/dropzone.js` (the pre-fill patch) is what loads; the s
 `bootstrap.min.css` is the minified build of the vendored 5.0.2 sources, produced with
 `rcssmin`, so nothing is vendored twice. Font Awesome is subset by
 `scripts/subset_fontawesome.py`, which scans the templates for the `fa-*` classes in use
-and writes only those glyph rules to `static/css/fontawesome-subset.css`; the webfonts
-are unchanged. `tests/testAssetDiet.py` fails if a template uses an icon the subset does
-not carry, so adding an icon means re-running the script and committing the result.
+and writes only those glyph rules to `static/css/fontawesome-subset.css`.
+`tests/testAssetDiet.py` fails if a template uses an icon the subset does not carry, so
+adding an icon means re-running the script and committing the result. all.css spells a
+glyph rule two ways, `.fa-house::before` and, for its 499 brand icons,
+`.fa-github:before`. The script's pattern knew only the first and kept every brand rule,
+23,547 of the subset's 45,797 bytes, though no template draws a brand icon. The pattern
+now knows both.
+
+The script cuts the webfonts too. The solid face is 150 KB and base.html preloads it on
+every signed-in page (issue #62), for the 35 of its 1,389 glyphs the templates draw. The
+solid and regular faces, cut to those glyphs, are written to `static/webfonts/subset/` as
+woff2 and TrueType, 6.0 KB and 4.2 KB as woff2, and the subset's `@font-face` rules point
+at them. Each keeps the Basic Latin and angle-quote characters it maps: cut to the icons'
+private-use codepoints alone, Chromium placed the pager's arrows a fraction of a pixel
+lower, and with them every page renders as it did with the whole fonts. On
+`/explore/samples` the icon stylesheet and the solid face come to 9,022 bytes on the
+wire, against 158,133 with the whole face and the brand rules. The whole fonts stay as
+the source, as `all.css` does for the CSS. Cutting needs fontTools with brotli, a tool
+for whoever adds an icon, not a dependency of the application. `tests/testIconFonts.py`
+reads the cut files with the standard library and fails when a font lacks a glyph the CSS
+draws or holds one it does not.
 
 ## Consequences
 
 - The rule from 0015 stands: reference vendored libraries, inline the lines that wire
   them to this page's data, and put a library in `base.html` only if most pages call it.
-- A new icon needs `scripts/subset_fontawesome.py` run again; the test says so.
+- A new icon needs `scripts/subset_fontawesome.py` run again, with fontTools installed;
+  the tests say so.
 - A new inline script that calls Bootstrap must run from `DOMContentLoaded` or later.
 - gzip in the proxy is still worth turning on for the reference deployment, for the
   bytes the proxy serves itself; it is no longer the only place the bullet can be closed.
