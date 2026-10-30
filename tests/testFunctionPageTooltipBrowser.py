@@ -34,6 +34,8 @@ def test_the_tooltip_shows_a_blocks_text_as_text(browser_page, live_server):
     errors = []
     browser_page.on("pageerror", lambda error: errors.append(str(error)))
     browser_page.goto(f"{live_server}/explore/functions/{harness.FUNCTION_A}")
+    # the page loads its graph viewer once the graph comes into view (#312)
+    browser_page.evaluate("document.getElementById('xcfg_top').scrollIntoView()")
     browser_page.wait_for_selector("#graphContainer g.node", state="attached")
     browser_page.check("#enableTooltip")
     node = browser_page.evaluate_handle(
