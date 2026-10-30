@@ -245,7 +245,12 @@ html {
      Markdown output carries no Bootstrap classes, so the few elements it produces
      that need them are styled here rather than by post-processing the HTML. */
   .manual img {
-    max-width: 100%;
+    /* The width and height attributes (manual.py) are the file's size, which is the size of
+       the picture: with border-box, as everything else here, the 1px border came out of it and
+       the screenshot was drawn 2px narrower, resampled. The border goes around the picture,
+       and the 2px come off the largest width the column allows. */
+    box-sizing: content-box;
+    max-width: calc(100% - 2px);
     height: auto;
     display: block;
     margin: 1rem auto;
