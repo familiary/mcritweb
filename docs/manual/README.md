@@ -451,6 +451,8 @@ Additionally, users with level contributor and above can also change their usern
 Changing the password logs the account out in every other browser; logging out logs it out everywhere, this browser included.
 Logging out leaves the API token as it is, so a token that may have been copied has to be replaced with the button next to it.
 
+Under "Delete account", every user can delete their own account by typing their password again. This removes the username, password, API token and preferences from MCRIT Web, signs the account out in every browser, and cannot be undone. Samples and families you added and jobs you started stay on the MCRIT backend, where a job can still show the username it was requested under. A wrong password counts towards the same limit as a failed login. The first account registered on an instance cannot be deleted, by its owner or by an admin: it stays an administrator, so that the instance always has one.
+
 Under "Change theme", every user picks the colour theme of the pages they see while signed in: Light, Dark, or Match my system, which follows the light or dark preference of the operating system and switches with it. Accounts start on Light.
 
 All users with level visitor or above can also set a number of filter preferences, that are automatically applied to all matching results.

@@ -44,6 +44,13 @@ rather than reconstructing it from the commit log at release time.
   too. A role with a query upload cap - by default a visitor - reruns only its own queries, since a
   stored query may be larger than that role could have uploaded. With an older one it is offered on
   the 1vsN, 1vs1 and cross compare jobs it can rebuild from their parameters.
+- Every user can delete their own account under Settings, "Delete account", by typing their password
+  again; until now only an admin could, from the users page. It removes what the admin's delete
+  removes - the account with its password, API token and preferences - signs it out in every
+  browser and lands on the login page. A wrong password counts against the same limit as a failed
+  login. The first account registered cannot delete itself, as an admin cannot delete it either: it
+  is the administrator the instance always keeps, and so is an admin when no other account holds the
+  role, in case that account was demoted or removed in the database. Samples, families and jobs stay on the backend.
 
 ### Changed
 
