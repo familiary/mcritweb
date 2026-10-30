@@ -136,7 +136,7 @@ class CorpusStillRunningCrossChildGone(CorpusStillRunningCross):
     def __init__(self):
         super().__init__()
         self._queue = [job for job in self._queue if job["_id"]["$oid"] != self.GONE]
-        self._queue_by_id.pop(self.GONE)
+        self._queued_by_id.pop(self.GONE)
 
 
 RUNNING_TOTAL = '<span data-elapsed-seconds="8">0:00:08</span> and counting'
