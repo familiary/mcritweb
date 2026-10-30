@@ -50,7 +50,9 @@ SECRET_VIEWS = {"mcritweb.views.authentication.settings": "settings.html",
 #: names with "token" in them that a template uses and that are not stored secrets: the
 #: visitor's own ?token= input, a registration token proposed afresh on every render, and
 #: whether one is asked for
-NOT_SECRETS = {"register.html": {"query_token", "proposed_registration_token", "is_registration_token_required"}}
+NOT_SECRETS = {"register.html": {"query_token", "proposed_registration_token", "is_registration_token_required"},
+               # #254: who still holds a legacy token, and the button that rotates them
+               "users.html": {"legacy_token_user_ids", "admin.regenerate_legacy_apitokens"}}
 #: a {{ }} or {% %} block, wherever a token can be printed from: directly, through a macro,
 #: a subscript or a variable set first. What it finds are names with "token" in them; the
 #: views hand templates the user and server records, whose fields are printed by name.
