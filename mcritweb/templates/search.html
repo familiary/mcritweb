@@ -39,18 +39,18 @@ Search
     <input type="search" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocorrect="off" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" {% if focus_search.value %}autofocus{% endif %} autocomplete="on">
     <fieldset>
       <legend class="visually-hidden">Search in</legend>
-      <input class="form-check-input shadow-none" type="checkbox" name="type" value="family" id="families_checkbox" {% if search_types.__contains__('family') %}checked{% endif %}>
-      <label class="form-check-label" for="families_checkbox">
-        Families
-      </label>
-      <input class="form-check-input shadow-none" type="checkbox" name="type" value="sample" id="samples_checkbox" {% if search_types.__contains__('sample') %}checked{% endif %}>
-      <label class="form-check-label" for="samples_checkbox">
-        Samples
-      </label>
-      <input class="form-check-input shadow-none" type="checkbox" name="type" value="function" id="functions_checkbox" {% if search_types.__contains__('function') %}checked{% endif %}>
-      <label class="form-check-label" for="functions_checkbox">
-        Functions
-      </label>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input shadow-none" type="checkbox" name="type" value="family" id="families_checkbox" {% if search_types.__contains__('family') %}checked{% endif %}>
+        <label class="form-check-label" for="families_checkbox">Families</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input shadow-none" type="checkbox" name="type" value="sample" id="samples_checkbox" {% if search_types.__contains__('sample') %}checked{% endif %}>
+        <label class="form-check-label" for="samples_checkbox">Samples</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input shadow-none" type="checkbox" name="type" value="function" id="functions_checkbox" {% if search_types.__contains__('function') %}checked{% endif %}>
+        <label class="form-check-label" for="functions_checkbox">Functions</label>
+      </div>
       | <a href="{{ url_for('help') }}#search"><i class="fas fa-book" aria-hidden="true"></i> Search Syntax</a>
     </fieldset>
      <input type='submit' hidden>

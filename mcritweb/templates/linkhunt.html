@@ -2,7 +2,7 @@
 {% from 'table/column_table.html' import sample_column_table, matching_result_job_column_table %}
 {% from 'table/matching_statistics_table.html' import matching_statistics_table %}
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
-{% from 'table/filter_fields.html' import filter_field %}
+{% from 'table/filter_fields.html' import filter_field, filter_checks, filter_buttons %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -37,12 +37,10 @@ LinkHunt for Job: {{ job_info.job_id }}
       {{ filter_field("filter_unpenalized_family_count", "Unpenalized family count", matching_result.getFilterValue("filter_unpenalized_family_count"), cols="col-12 col-sm-6", placeholder="3", kind="count") }}
       {{ filter_field("filter_exclude_families", "Exclude family IDs", matching_result.getFilterValue("filter_exclude_families"), cols="col-6", placeholder="1, 2, 3", kind="ids") }}
       {{ filter_field("filter_exclude_samples", "Exclude sample IDs", matching_result.getFilterValue("filter_exclude_samples"), cols="col-6", placeholder="1, 2, 3", kind="ids") }}
-      <label class="col-4" for="filter_strongest_per_family">strongest per family only</label>
-      <input class="col-1" type="checkbox" name='filter_strongest_per_family' id="filter_strongest_per_family" {% if matching_result.getFilterValue("filter_strongest_per_family") %}checked{% endif %}>
-      <div class="d-grid gap-4 d-md-block">
-        <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">Filter</button>
-        <button class="btn btn-secondary" type="submit" name="filter_button_action" value="clear">Clear</button>
-      </div>
+      {{ filter_checks([
+        ("filter_strongest_per_family", "strongest per family only", matching_result.getFilterValue("filter_strongest_per_family")),
+      ]) }}
+      {{ filter_buttons() }}
     </div>
 </form>
 <h3 class="h4" id="linkhunt-clusters">Link Clusters</h3>

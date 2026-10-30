@@ -49,7 +49,7 @@
 {% macro _half_table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table", caption=None) %}
 
   <div class="table-scroll">
-  <table class="table table-hover" style="width: 66%;" id="{{table_id}}">
+  <table class="table table-hover table-half" id="{{table_id}}">
     {% if caption %}<caption class="visually-hidden">{{ caption }}</caption>{% endif %}
     <thead class="table-light">
       {{ header_macro(**kwargs) }}
@@ -98,10 +98,9 @@
             <label for="family_new_name" class="col-form-label">Family Name:</label>
             <input type="text" class="form-control" name="family_new_name" id="family_new_name" maxlength="64">
           </div>
-          <div class="form-group mb-3">
-            <input type="checkbox" value="" name="family_is_library" id="family_is_library">
-            &nbsp;&nbsp;
-            <label for="family_is_library" class="col-form-label">Family is Library?</label>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" value="" name="family_is_library" id="family_is_library">
+            <label for="family_is_library" class="form-check-label">Family is Library?</label>
           </div>
           {% if kwargs.get('tags_editable') %}
           {# only where the view found tags editable: a form without the field changes no tags #}
@@ -111,15 +110,13 @@
             <div class="form-text" id="family_tags_help">Separated by commas. Emptying the field removes them all.</div>
           </div>
           {% endif %}
-          <div class="form-group mb-3">
-            <input type="checkbox" value="" name="family_delete" id="family_delete" onclick='toggle_delete_family(this);'>
-            &nbsp;&nbsp;
-            <label for="family_delete" class="col-form-label">Delete Family</label>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" value="" name="family_delete" id="family_delete" onclick='toggle_delete_family(this);'>
+            <label for="family_delete" class="form-check-label">Delete Family</label>
           </div>
-          <div id="div_family_keeping_samples" class="form-group mb-3" hidden>
-            <input type="checkbox" value="" name="family_keeping_samples" id="family_keeping_samples" checked>
-            &nbsp;&nbsp;
-            <label for="family_keeping_samples" class="col-form-label">Keep samples (put under unlabeled family)</label>
+          <div id="div_family_keeping_samples" class="form-check mb-3" hidden>
+            <input class="form-check-input" type="checkbox" value="" name="family_keeping_samples" id="family_keeping_samples" checked>
+            <label for="family_keeping_samples" class="form-check-label">Keep samples (put under unlabeled family)</label>
           </div>
           <div>
             <button type="button" class="btn btn-secondary mb-3" data-bs-dismiss="modal">Close</button>
@@ -190,10 +187,9 @@
             <label for="sample_version" class="col-form-label">Version:</label>
             <input class="form-control" name="sample_version" id="sample_version" maxlength="64">
           </div>
-          <div class="form-group mb-3">
-            <input type="checkbox" value="" name="sample_is_library" id="sample_is_library">
-            &nbsp;&nbsp;
-            <label for="sample_is_library" class="col-form-label">Sample is Library?</label>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" value="" name="sample_is_library" id="sample_is_library">
+            <label for="sample_is_library" class="form-check-label">Sample is Library?</label>
           </div>
           {% if kwargs.get('tags_editable') %}
           {# only where the view found tags editable: a form without the field changes no tags #}
@@ -203,10 +199,9 @@
             <div class="form-text" id="sample_tags_help">Separated by commas. Emptying the field removes them all.</div>
           </div>
           {% endif %}
-          <div class="form-group mb-3">
-            <input type="checkbox" value="" name="sample_delete" id="sample_delete" onclick='toggle_delete_sample(this);'>
-            &nbsp;&nbsp;
-            <label for="sample_delete" class="col-form-label">Delete Sample</label>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" value="" name="sample_delete" id="sample_delete" onclick='toggle_delete_sample(this);'>
+            <label for="sample_delete" class="form-check-label">Delete Sample</label>
           </div>
           <div>
             <button type="button" class="btn btn-secondary mb-3" data-bs-dismiss="modal">Close</button>

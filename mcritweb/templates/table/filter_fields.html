@@ -38,3 +38,42 @@
     {{- error_message(error, name) }}
   </div>
 {%- endmacro %}
+
+{#
+  A check box of the same forms, its label beside it. The boxes used to be cells of the
+  form's grid, `<input class="col-1">` and a `<label class="col-3">`, so a box was stretched
+  to a twelfth of the row (from 32px to 605px wide, and up to 72px tall where its label
+  wrapped), sat away from its label, and started 12px left of the fields, pulled out by the
+  row's negative margin. A Bootstrap form-check keeps the box at --control-check-size beside its
+  label on every page and at every width. No value attribute, so a ticked box still sends
+  "on", which is what views/params.py reads.
+#}
+{% macro filter_check(name, label, checked=false) -%}
+  <div class="form-check form-check-inline">
+    <input class="form-check-input" type="checkbox" name="{{ name }}" id="{{ name }}"{% if checked %} checked{% endif %}>
+    <label class="form-check-label" for="{{ name }}">{{ label }}</label>
+  </div>
+{%- endmacro %}
+
+{#- A form's check boxes on a line of their own under its fields, wrapping as the width needs:
+    `checks` is a list of (name, label, checked). -#}
+{% macro filter_checks(checks) -%}
+  <div class="col-12 filter-checks">
+    {%- for name, label, checked in checks %}
+    {{ filter_check(name, label, checked) }}
+    {%- endfor %}
+  </div>
+{%- endmacro %}
+
+{#- The submit buttons of a filter form, at the page's gutter like its fields. A bare button in
+    the row was stretched across it and started 12px left of the fields. `named` sends
+    filter_button_action=filter with the submit button, as the pages that also offer Clear have
+    always done; `clear` adds that button. -#}
+{% macro filter_buttons(clear=true, named=true, label="Filter") -%}
+  <div class="col-12 filter-actions">
+    <button class="btn btn-primary" type="submit"{% if named %} name="filter_button_action" value="filter"{% endif %}>{{ label }}</button>
+    {%- if clear %}
+    <button class="btn btn-secondary" type="submit" name="filter_button_action" value="clear">Clear</button>
+    {%- endif %}
+  </div>
+{%- endmacro %}

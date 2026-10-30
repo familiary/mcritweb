@@ -169,6 +169,18 @@ rather than reconstructing it from the commit log at release time.
 
 ### Fixed
 
+- Form controls are one size and line up on every page. The check boxes of the result pages', link
+  hunt's and default filter's forms were grid cells, stretched from 32px to 605px wide and up to
+  72px tall, a column away from their labels, and with the Filter and Clear buttons they started
+  12px left of the fields (4px from a phone's edge); a Filter button with nothing beside it was
+  stretched across the form. Every check box and radio button is now 16px, beside and centred on
+  its label, in the edit dialogs, the search options, the compare pages and the graph viewer's
+  toolbar too, whose boxes and buttons were the browser's own and stayed light in the dark theme.
+  The filter forms are built from shared macros, send the same parameters as before, and start at
+  the page's edge like the rest of the page; the settings page's tab bar does as well, where it was
+  centred far from the tab it opens. On a phone, the home page's job table no longer squeezes its
+  Type column to four letters a line, and a cross compare result no longer scrolls the page 60px
+  sideways.
 - Control flow graph hovering fixed on both function pages. On a function's page, hovering a node
   scrolls the code panel to that block again; it threw an error on every hover instead, because it
   looked for the comparison page's panel. On the comparison page, a block's tooltip is as wide as

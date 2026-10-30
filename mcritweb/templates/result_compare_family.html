@@ -5,7 +5,7 @@
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id %}
 {% from 'table/compare_breadcrumb.html' import compare_breadcrumb %}
 {% from 'table/match_row.html' import famlib_header, famlib_row, aggregated_function_header, aggregated_function_row %}
-{% from 'table/filter_fields.html' import filter_field %}
+{% from 'table/filter_fields.html' import filter_field, filter_checks, filter_buttons %}
 
 {% extends 'base.html' %}
 {% block title%}
@@ -40,12 +40,10 @@ Results for Job: {{ job_info.job_id }}
     {{ filter_field("filter_direct_nonlib_min_score", "Min. nonlib direct score", matching_result.getFilterValue("filter_direct_nonlib_min_score"), placeholder="0-100", kind="score") }}
     {{ filter_field("filter_frequency_min_score", "Min. frequency score", matching_result.getFilterValue("filter_frequency_min_score"), placeholder="0-100", kind="score") }}
     {{ filter_field("filter_frequency_nonlib_min_score", "Min. nonlib frequency score", matching_result.getFilterValue("filter_frequency_nonlib_min_score"), placeholder="0-100", kind="score") }}
-    <input class="col-1" type="checkbox" name='filter_unique_only' id="filter_unique_only" {% if matching_result.getFilterValue("filter_unique_only") %}checked{% endif %}>
-    <label class="col-5" for="filter_unique_only">only show samples with unique matches</label>
-    <div class="d-grid gap-4 d-md-block">
-      <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">Filter</button>
-      <button class="btn btn-secondary" type="submit" name="filter_button_action" value="clear">Clear</button>
-    </div>
+    {{ filter_checks([
+      ("filter_unique_only", "only show samples with unique matches", matching_result.getFilterValue("filter_unique_only")),
+    ]) }}
+    {{ filter_buttons() }}
   </div>
 </form>
 {{ set_pagination_params(samp, _anchor="sample-matches") }}
@@ -85,16 +83,12 @@ Results for Job: {{ job_info.job_id }}
     {{ filter_field("filter_function_max_score", "Max. score", matching_result.getFilterValue("filter_function_max_score"), placeholder="0-100", kind="score") }}
     {{ filter_field("filter_min_num_samples", "Min. samples", matching_result.getFilterValue("filter_min_num_samples"), kind="count") }}
     {{ filter_field("filter_max_num_samples", "Max. samples", matching_result.getFilterValue("filter_max_num_samples"), kind="count") }}
-    <input class="col-1" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" {% if matching_result.getFilterValue("filter_exclude_library") %}checked{% endif %}>
-    <label class="col-3" for="filter_exclude_library">exclude functions with library hits</label>
-    <input class="col-1" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" {% if matching_result.getFilterValue("filter_exclude_pic") %}checked{% endif %}>
-    <label class="col-3" for="filter_exclude_pic">exclude PIC hits</label>
-    <input class="col-1" type="checkbox" name='filter_func_unique' id="filter_func_unique" {% if matching_result.getFilterValue("filter_func_unique") %}checked{% endif %}>
-    <label class="col-3" for="filter_func_unique">unique only</label>
-    <div class="d-grid gap-4 d-md-block">
-      <button class="btn btn-primary" type="submit" name="filter_button_action" value="filter">Filter</button>
-      <button class="btn btn-secondary" type="submit" name="filter_button_action" value="clear">Clear</button>
-    </div>
+    {{ filter_checks([
+      ("filter_exclude_library", "exclude functions with library hits", matching_result.getFilterValue("filter_exclude_library")),
+      ("filter_exclude_pic", "exclude PIC hits", matching_result.getFilterValue("filter_exclude_pic")),
+      ("filter_func_unique", "unique only", matching_result.getFilterValue("filter_func_unique")),
+    ]) }}
+    {{ filter_buttons() }}
   </div>
 </form>
 {{ set_pagination_params(funp, _anchor="function-matches") }}
