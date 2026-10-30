@@ -17,7 +17,9 @@ Then the states that only exist while something is open or in use (the drop zone
 menu, a Bootstrap tooltip, a hint tooltip, each tab of the settings page, a picker row that is
 chosen, a control that is hovered or has the keyboard's focus), the pages of an account that is
 not signed in (always light), the "system" theme under an emulated colour scheme (and a live
-change of it), and the light theme, which must never fetch a dark file.
+change of it), and the light theme, which must never fetch a dark file. Last, a forced colour
+palette (Windows' contrast themes) over either theme: what Bootstrap shows only with fills, images
+and box shadows has to survive it.
 
 The probe is tried on pages that are known to be wrong (the light theme's, a dark page with a
 light square planted in it) so that "nothing found" can be believed.
@@ -32,6 +34,7 @@ to launch, as in testPickerRowsBrowser.py; a launch that fails with it set is an
 a skip: a browser test that silently skips tests nothing.
 """
 
+import io
 import logging
 import os
 import threading
@@ -40,6 +43,7 @@ import pytest
 import themeCss
 from conftest import session_cookie_for
 from fixtureData import job_id_of
+from PIL import Image, ImageChops
 from testResultPages import CorpusWithEveryMatchedFunction
 from werkzeug.security import generate_password_hash
 from werkzeug.serving import make_server
@@ -312,7 +316,8 @@ PROBE = "(allowed, iconExceptions) => {" + HELPERS + r"""
 
 #: Icons the 3:1 is not asked of, and why: the idle arrow of a sortable column head. It says
 #: "this column sorts", beside a label that says which column, at 2.93:1 on the head in dark
-#: against the 2.09:1 master drew it with in light (testTheme.py holds dark above light).
+#: against the 2.09:1 master drew it with in light (testTheme.py holds dark above light). A reader
+#: who asks for more contrast gets it at 3:1 or more (test_asking_for_more_contrast_...).
 ICON_EXCEPTIONS = [".fa-sort"]
 
 #: Elements that may paint a light background in the dark theme, and why.
@@ -1091,3 +1096,422 @@ def test_the_current_page_of_the_pager_shows_its_focus(visit):
     found = current.evaluate(FOCUS_INDICATOR_OF)
 
     assert found["ring"] is not None and found["ring"] >= 3, f"the current page in focus: {found}"
+
+
+# --- forced colours (Windows' contrast themes) ------------------------------------------------
+#
+# A forced colour palette replaces every colour an author sets with the user's own few, and drops
+# background images and box shadows. Bootstrap 5.0.2 draws a ticked box as a white SVG on its blue
+# fill, its focus rings as box shadows, the current page and tab as a fill: all of it goes. The
+# palette Chromium emulates follows the colour scheme, and the light one is where a white tick lands
+# on a white box, so these run on it, for an account of each theme.
+
+FORCED = {"forced_colors": "active", "color_scheme": "light"}
+
+
+@pytest.fixture
+def open_in(browser, served):
+    """open_in(theme, path, ready=None, **media) -> a page of a fresh context of that theme's account,
+    with the media features asked for emulated (forced_colors, reduced_motion, contrast, color_scheme)."""
+    base, cookies = served
+    opened = []
+
+    def _open(theme, path, ready=None, **media):
+        context = browser.new_context(viewport=VIEWPORT, **media)
+        opened.append(context)
+        context.add_cookies([cookies[theme]])
+        page = context.new_page()
+        page.set_default_timeout(SCRIPT_TIMEOUT_MS)
+        page.goto(base + path, wait_until="load")
+        settle(page, ready)
+        return page
+
+    yield _open
+    for context in opened:
+        context.close()
+
+
+def picture_of(page, locator, pad=0, inset=0):
+    """The pixels of an element as drawn, `pad` px around it, or only its middle with `inset` (a
+    fraction of each side) cut off."""
+    box = locator.bounding_box()
+    x, y, width, height = box["x"] - pad, box["y"] - pad, box["width"] + 2 * pad, box["height"] + 2 * pad
+    clip = {"x": x + width * inset, "y": y + height * inset, "width": width * (1 - 2 * inset), "height": height * (1 - 2 * inset)}
+    return Image.open(io.BytesIO(page.screenshot(clip=clip))).convert("RGB")
+
+
+def pixels_apart(first, second):
+    """How many pixels of two pictures of one size differ, past antialiasing."""
+    red, green, blue = ImageChops.difference(first, second).split()
+    return ImageChops.lighter(ImageChops.lighter(red, green), blue).point(lambda value: 255 if value > 48 else 0).histogram()[255]
+
+
+def pixels_off(picture, ground):
+    """How many pixels of a picture are not the (r, g, b) ground."""
+    return pixels_apart(picture, Image.new("RGB", picture.size, ground))
+
+
+def canvas_of(page):
+    return tuple(round(channel) for channel in as_rgb(page.evaluate("getComputedStyle(document.documentElement).backgroundColor")))
+
+
+def keyboard_focus(page, locator):
+    """Focus an element the way the keyboard does, so that :focus-visible is what it matches."""
+    page.keyboard.press("Shift")
+    locator.evaluate("(element) => element.focus()")
+    calm(page)
+    assert locator.evaluate("(element) => element.matches(':focus-visible')"), "the focus did not count as the keyboard's"
+
+
+#: (what it is, the page it is on, a box that is ticked, one that is not)
+CHOICES = [
+    ("a ticked search type", "/explore/search?query=citadel&type=sample&type=family", "#families_checkbox", "#functions_checkbox"),
+    ("the chosen kind of upload", "/data/submit", "#unmapped", "#dumped"),
+]
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("what, path, ticked, empty", CHOICES, ids=[choice[0] for choice in CHOICES])
+def test_in_forced_colours_a_ticked_box_does_not_look_like_an_empty_one(open_in, theme, what, path, ticked, empty):
+    """Bootstrap turns the native box off (appearance: none) and draws the tick as a white image on a
+    blue fill. Forced colours paint the fill in the canvas colour and keep the image: white on white,
+    so the search types, the kind of upload and the theme a user had chosen all looked unchosen."""
+    page = open_in(theme, path, **FORCED)
+    ticked, empty = page.locator(ticked), page.locator(empty)
+    assert ticked.is_checked() and not empty.is_checked(), "the page does not start the way the test needs"
+
+    assert ticked.evaluate("(box) => getComputedStyle(box).appearance") != "none"
+    assert pixels_apart(picture_of(page, ticked, inset=0.25), picture_of(page, empty, inset=0.25)) >= 4, f"{what}: the middle of a ticked box is drawn like an empty one's"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_in_forced_colours_the_minhash_slider_is_drawn(open_in, theme):
+    """The slider's track and thumb are background colours, which forced colours turn into the canvas:
+    the whole control vanished, and with it the setting it shows."""
+    page = open_in(theme, "/analyze/compare", "tr.parent_table_sample", **FORCED)
+    slider = page.locator("#minhashBandRange")
+
+    assert pixels_off(picture_of(page, slider), canvas_of(page)) >= 50
+
+
+#: (what it is, the page it is on, the element): one of each kind of control whose focus Bootstrap
+#: draws as a box shadow, which forced colours drop
+FORCED_FOCUS = [
+    ("a row's action button", "/explore/samples", "td a.btn"),
+    ("a menu button", "/explore/samples", "button.btn.dropdown-toggle"),
+    ("the current page", "/explore/samples", ".page-item.active .page-link"),
+    ("another page", "/explore/functions", ".page-item:not(.active):not(.disabled) a.page-link"),
+    ("the rows-per-page menu", "/explore/samples", "select.page-link"),
+    ("a search field", "/explore/samples", "input.form-control"),
+    ("a checkbox", "/explore/search?query=citadel", "#functions_checkbox"),
+    ("a radio button", "/data/submit", "#dumped"),
+    ("an accordion header", f"/explore/functions/{FUNCTION_A}", ".accordion-button"),
+]
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("what, path, selector", FORCED_FOCUS, ids=[control[0] for control in FORCED_FOCUS])
+def test_in_forced_colours_the_keyboard_focus_is_drawn(open_in, theme, what, path, selector):
+    """Bootstrap sets `outline: 0` and draws focus as a box shadow; forced colours drop the shadow, so
+    on these controls a keyboard user could not see where they were. An outline is drawn instead."""
+    page = open_in(theme, path, **FORCED)
+    element = page.locator(f"{selector}:visible").first
+    assert element.count() == 1, f"{path} has no {what} ({selector})"
+    element.scroll_into_view_if_needed()
+    page.evaluate("document.activeElement && document.activeElement.blur()")
+    calm(page)
+    before = picture_of(page, element, pad=8)
+
+    keyboard_focus(page, element)
+    outline = element.evaluate("(element) => [getComputedStyle(element).outlineStyle, parseFloat(getComputedStyle(element).outlineWidth)]")
+    after = picture_of(page, element, pad=8)
+
+    assert outline[0] not in ("none", "hidden") and outline[1] >= 2, f"{what} in focus: outline {outline}"
+    assert pixels_apart(before, after) >= 20, f"{what}: focusing it changes nothing on the screen"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize(
+    "what, path, ready, selector",
+    [
+        ("a square of the cross compare matrix", f"/data/result/{RESULT['cross_compare']}", ".score-swatch", ".score-swatch"),
+        ("a swatch of the CFG legend", f"/data/matches/function/{FUNCTION_A}/{FUNCTION_B}", "#graphContainer_a g.node", ".cfg-legend span.swatch"),
+    ],
+    ids=["matrix", "legend"],
+)
+def test_in_forced_colours_a_colour_that_is_data_keeps_its_colour(open_in, theme, what, path, ready, selector):
+    """The matrix squares are nothing but their colour, and the legend says which colour of the graph
+    means what (the graph keeps its colours, SVG fills are not forced). Forced colours painted both in
+    the canvas colour: a blank matrix, and a legend of identical empty boxes."""
+    page = open_in(theme, path, ready, **FORCED)
+    swatches = page.locator(f"{selector}:visible")
+    assert swatches.count() >= 3, f"{what}: hardly any on the page"
+
+    found = swatches.evaluate_all("(swatches) => swatches.map((swatch) => [getComputedStyle(swatch).forcedColorAdjust, getComputedStyle(swatch).backgroundColor])")
+    assert all(adjust == "none" for adjust, _colour in found), found
+    assert len({colour for _adjust, colour in found}) >= 2, f"{what}: every one is {found[0][1]}"
+    assert all(tuple(round(channel) for channel in as_rgb(colour)) != canvas_of(page) for _adjust, colour in found), found
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize(
+    "what, path, current, other",
+    [
+        ("the current tab", "/settings", ".nav-pills .nav-link.active", ".nav-pills .nav-link:not(.active)"),
+        ("the current page", "/explore/functions", ".page-item.active .page-link", ".page-item:not(.active):not(.disabled) .page-link"),
+    ],
+    ids=["tab", "page"],
+)
+def test_in_forced_colours_the_current_tab_and_page_are_marked(open_in, theme, what, path, current, other):
+    """Both were told apart by their fill alone (and in the dark theme an underline drawn as a box
+    shadow), which forced colours replace: six identical tab labels, a row of identical page numbers.
+    The mark is an outline, and the keyboard's focus is one too, so focusing the current one has to
+    show as well."""
+    page = open_in(theme, path, **FORCED)
+    current, other = page.locator(f"{current}:visible").first, page.locator(f"{other}:visible").first
+
+    assert current.evaluate("(element) => getComputedStyle(element).outlineStyle") not in ("none", "hidden"), f"{what} is not marked"
+    assert other.evaluate("(element) => getComputedStyle(element).outlineStyle") in ("none", "hidden"), f"the others are marked like {what}"
+    current.scroll_into_view_if_needed()
+    page.evaluate("document.activeElement && document.activeElement.blur()")
+    calm(page)
+    before = picture_of(page, current, pad=8)
+    keyboard_focus(page, current)
+    assert pixels_apart(before, picture_of(page, current, pad=8)) >= 20, f"focusing {what} changes nothing on the screen"
+
+
+@pytest.mark.parametrize("palette", ["light", "dark"])
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_in_forced_colours_the_close_cross_of_a_dialog_is_drawn(open_in, theme, palette):
+    """Bootstrap draws the cross as a black image, which forced colours keep as it is: black on the
+    black canvas of a dark palette. The dark theme inverts it, so there it was white on the white
+    canvas of a light palette instead. Either way the one visible way out of the dialog was gone."""
+    page = open_in(theme, "/explore/samples", "table.table tbody tr", forced_colors="active", color_scheme=palette)
+    # Dropzone is fetched on the first drag (#126); the dialog's zone is one only after that
+    page.evaluate("new Promise((resolve) => mcritLoadDropzone(resolve))")
+    page.evaluate("$('#submitFileModal').modal('show')")
+    page.wait_for_selector("#submitFileModal.show")
+    page.wait_for_function("() => getComputedStyle(document.querySelector('#submitFileModal')).opacity === '1'")
+    calm(page)
+    cross = page.locator("#submitFileModal .btn-close")
+    ground = tuple(round(channel) for channel in as_rgb(computed(page, "#submitFileModal .modal-content", "background-color")[0]))
+
+    assert pixels_off(picture_of(page, cross), ground) >= 20, f"the close cross is not drawn on rgb{ground}"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_in_forced_colours_a_page_link_that_leads_nowhere_looks_it(open_in, theme):
+    """On the first page, "First page" and "Previous page" go nowhere; forced colours drew them in the
+    link colour like the others."""
+    page = open_in(theme, "/explore/functions", **FORCED)
+    colour = "(element) => getComputedStyle(element).color"
+
+    assert page.locator(".page-item.disabled .page-link").first.evaluate(colour) != page.locator(".page-item:not(.active):not(.disabled) a.page-link").first.evaluate(colour)
+
+
+# --- the light theme's own contrast ------------------------------------------------------------
+#
+# The light pages keep master's colours (testTheme.py pins them) except where a pair of them was
+# measured short of WCAG: those changes are named in testTheme.py's LIGHT_CHANGES, and measured on
+# the pages here.
+
+#: (what it is, the page it is on, the element) whose edge is all that shows where it is
+LIGHT_EDGES = [
+    ("a field", "/admin/server", "#mcrit_server_url"),
+    ("a search field", "/explore/samples", "input.form-control"),
+    ("a checkbox", "/explore/search?query=citadel", "#functions_checkbox"),
+    ("a radio button", "/data/submit", "#dumped"),
+]
+
+
+@pytest.mark.parametrize("what, path, selector", LIGHT_EDGES, ids=[control[0] for control in LIGHT_EDGES])
+def test_in_the_light_theme_the_edge_of_a_field_or_a_box_holds_3_to_1(open_in, what, path, selector):
+    """WCAG 1.4.11. Bootstrap's grey edge was 1.5:1 on the page (a check box's 1.8:1): an empty field,
+    an unticked box, showed hardly at all."""
+    page = open_in("light", path)
+    element = page.locator(f"{selector}:visible").first
+    assert element.count() == 1, f"{path} has no {what} ({selector})"
+
+    found = element.evaluate("(element) => {" + HELPERS + """
+      const behind = background(element.parentElement).rgb, own = background(element).rgb;
+      const edge = over(parse(getComputedStyle(element).borderTopColor), behind);
+      return [ratio(edge, behind), ratio(edge, own)];
+    }""")
+
+    assert min(found) >= 3, f"{what}: its edge is {found[0]:.2f}:1 against the page and {found[1]:.2f}:1 against its own fill"
+
+
+#: How visible the ring or the outline of the element in focus is, laid over what is behind it. Unlike
+#: FOCUS_INDICATOR_OF, the border is left out: here it is there before the focus as well.
+FOCUS_RING_OF = (
+    "(element) => {" + HELPERS + """
+  const behind = background(element.parentElement).rgb;
+  const style = getComputedStyle(element);
+  const found = { ring: null, outline: null, behind: behind.map(Math.round) };
+  const ring = style.boxShadow.match(/(rgba?\\([^)]*\\)|color\\(srgb[^)]*\\))\\s+0px\\s+0px\\s+0px\\s+([\\d.]+)px(?!\\s+inset)/);
+  if (ring && parseFloat(ring[2]) >= 2) found.ring = Math.round(ratio(over(parse(ring[1]), behind), behind) * 100) / 100;
+  if (!["none", "hidden"].includes(style.outlineStyle) && parseFloat(style.outlineWidth) >= 2) found.outline = Math.round(ratio(over(parse(style.outlineColor), behind), behind) * 100) / 100;
+  return found;
+}"""
+)
+
+#: (what it is, the page it is on, the element): one of each kind of control the light pages focus
+LIGHT_FOCUS = [
+    ("a page link", "/explore/functions", ".page-item:not(.active):not(.disabled) a.page-link"),
+    ("the rows-per-page menu", "/explore/samples", "select.page-link"),
+    ("an outline button", "/explore/samples", ".btn-outline-dark"),
+    ("a primary button", "/admin/server", ".btn-primary"),
+    ("a field", "/admin/server", "#mcrit_server_url"),
+    ("a search field without the ring", "/explore/samples", "input.form-control.shadow-none"),
+    ("a radio button", "/data/submit", "#dumped"),
+    ("a checkbox without the ring", "/explore/search?query=citadel", "#functions_checkbox"),
+    ("an accordion header", f"/explore/functions/{FUNCTION_A}", ".accordion-button"),
+]
+
+
+@pytest.mark.parametrize("what, path, selector", LIGHT_FOCUS, ids=[control[0] for control in LIGHT_FOCUS])
+def test_in_the_light_theme_the_keyboards_focus_holds_3_to_1_against_what_is_behind_the_control(open_in, what, path, selector):
+    """WCAG 1.4.11 again, for what shows where the keyboard is. Bootstrap's ring was 1.4:1 on the
+    light page; the search boxes and check boxes that turn it off (`.shadow-none`) showed a 1px
+    border going a paler blue, 2.1:1, and five pages open with the focus in such a box."""
+    page = open_in("light", path)
+    element = page.locator(f"{selector}:visible").first
+    assert element.count() == 1, f"{path} has no {what} ({selector})"
+    element.scroll_into_view_if_needed()
+
+    keyboard_focus(page, element)
+    found = element.evaluate(FOCUS_RING_OF)
+
+    best = max([value for value in (found["ring"], found["outline"]) if value is not None], default=0)
+    assert best >= 3, f"{what} in focus: ring {found['ring']}:1, outline {found['outline']}:1 against rgb{tuple(found['behind'])}"
+
+
+def test_in_the_light_theme_the_current_page_of_the_pager_is_marked_at_3_to_1(open_in):
+    """The current page was told from the others by a grey fill alone, #f0f0f0 on the white page:
+    1.14:1, a state no one with low vision could see. It is underlined in the accent, as in dark."""
+    page = open_in("light", "/explore/functions")
+    current = page.locator(".page-item.active .page-link:visible").first
+    assert current.count() == 1, "the functions page has no current page in its pager"
+
+    found = current.evaluate("(element) => {" + HELPERS + """
+      const mark = getComputedStyle(element).boxShadow.match(/(rgba?\\([^)]*\\))\\s+0px\\s+-?[\\d.]+px\\s+0px(?:\\s+0px)?\\s+inset/);
+      if (!mark) return null;
+      const own = background(element).rgb, page = background(element.parentElement).rgb;
+      return [ratio(over(parse(mark[1]), own), own), ratio(over(parse(mark[1]), own), page)];
+    }""")
+
+    assert found is not None, "the current page has no underline"
+    assert min(found) >= 3, f"its underline is {found[0]:.2f}:1 against its own fill and {found[1]:.2f}:1 against the page"
+
+
+def test_in_the_light_theme_the_current_page_of_the_pager_shows_its_focus(open_in):
+    """The underline is a box shadow, the property the focus ring is drawn with: one rule must not
+    replace the other (test_the_current_page_of_the_pager_shows_its_focus, for dark)."""
+    page = open_in("light", "/explore/functions")
+    current = page.locator(".page-item.active .page-link:visible").first
+    current.scroll_into_view_if_needed()
+
+    keyboard_focus(page, current)
+    found = current.evaluate(FOCUS_RING_OF)
+
+    assert found["ring"] is not None and found["ring"] >= 3, f"the current page in focus: {found}"
+
+
+def walked_in_light(walker, name):
+    """The probe's report on one of the WALKED pages under the light theme."""
+    if name in PAGES:
+        path, ready = PAGES[name]
+        return walker.walk(f"light: {name}", path, ready, context="light")
+    tab = name.removeprefix("settings, the ").removesuffix(" tab")
+    return walker.walk(f"light: {name}", "/settings", tab=tab, context="light")
+
+
+@pytest.mark.parametrize("name", WALKED)
+def test_in_the_light_theme_every_visible_text_node_and_icon_has_its_contrast(walker, name):
+    """The walk of the dark pages, over the light ones: 4.5:1 for text and 3:1 for icons. Two pairs
+    were short there. The tick of a yes/no column was `green`, 2.5:1 on the darker score tints; and
+    the job number's link in the head of the jobs list was the accent on the grey Bootstrap paints a
+    `.table-light` cell with, 4.4:1."""
+    report = walked_in_light(walker, name)
+
+    assert report["present"] and report["counts"]["judged"] >= 4, f"{name}: the page did not draw what the walk judges, {report['counts']}"
+    assert report["errors"] == [] and report["failed"] == [], f"{name}: {report['errors']} {report['failed']}"
+    assert report["text"] == [], f"{name}: text below 4.5:1:\n" + listed(report["text"])
+    assert report["fields"] == [], f"{name}: field values or placeholders below 4.5:1:\n" + listed(report["fields"])
+    assert report["icons"] == [], f"{name}: icons below 3:1:\n" + listed(report["icons"])
+
+
+#: The blocks "Show Cycles" colours, each block's text against its fill as it is drawn: the fill at
+#: its own fill-opacity over what is behind the graph.
+CYCLE_TEXT_CONTRAST = (
+    "() => {" + HELPERS + """
+  return [...document.querySelectorAll('g.node[fill="white"]')].map((node) => {
+    const rect = node.querySelector('rect'), text = node.querySelector('text');
+    const behind = background(node.closest('svg')).rgb;
+    const fill = parse(getComputedStyle(rect).fill);
+    const shown = over([fill[0], fill[1], fill[2], fill[3] * parseFloat(getComputedStyle(rect).fillOpacity)], behind);
+    const ink = over(parse(getComputedStyle(text).fill), shown);
+    return { ratio: Math.round(ratio(ink, shown) * 100) / 100, fill: fill.slice(0, 3).map(Math.round) };
+  });
+}"""
+)
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize(
+    "path, ready, button",
+    [
+        (f"/explore/functions/{FUNCTION_A}", "#graphContainer g.node", "#showCycles"),
+        (f"/data/matches/function/{FUNCTION_A}/{FUNCTION_B}", "#graphContainer_a g.node", "#showCycles"),
+    ],
+    ids=["function", "function vs function"],
+)
+def test_the_blocks_show_cycles_colours_keep_their_text_readable(open_in, theme, path, ready, button):
+    """The viewer paints the blocks of each cycle in one of sixteen saturated colours and turns their
+    text white (fill="white" on the block, main.js and main_duo.js). In the light theme that was
+    2.1:1 on the orange, and black text would be 1.8:1 on the darkest; the dark theme already shows
+    the colours at 35% under its own text colour."""
+    page = open_in(theme, path, ready)
+    page.wait_for_function(f"() => !document.querySelector('{button}').disabled")
+
+    page.click(button)
+    page.wait_for_selector('g.node[fill="white"]', state="attached")
+    found = page.evaluate(CYCLE_TEXT_CONTRAST)
+
+    assert len(found) >= 3, f"hardly any block was coloured: {found}"
+    worst = min(found, key=lambda block: block["ratio"])
+    assert worst["ratio"] >= 4.5, f"block text at {worst['ratio']}:1 on rgb{tuple(worst['fill'])}"
+
+
+def test_a_file_waiting_to_be_uploaded_is_drawn_on_the_dark_palette(open_in):
+    """The walk sees an empty drop zone. Once a file is in it, Dropzone shows its progress in a
+    capsule it paints 90% white (dropzone.min.css), which theme-dark.css's Dropzone rules did not
+    reach: a bright bar in the dark preview card of every upload that waits for "Submit"."""
+    page = open_in("dark", "/data/submit", ".dropzone")
+    page.wait_for_function("() => window.Dropzone !== undefined && document.getElementById('myDropzone').dropzone !== undefined")
+
+    page.evaluate("Dropzone.forElement('#myDropzone').addFile(new File(['MZ'], 'waiting.exe'))")
+    page.wait_for_selector(".dropzone .dz-preview .dz-progress")
+    calm(page)
+    report = run_probe(page)
+
+    assert page.locator(".dropzone .dz-preview .dz-progress").is_visible()
+    assert report["light"] == [], "elements whose background is lighter than 0.4:\n" + listed(report["light"])
+    assert report["text"] == [], "text below 4.5:1:\n" + listed(report["text"])
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_asking_for_more_contrast_brings_the_idle_sort_arrow_to_3_to_1(open_in, theme):
+    """The arrow of a column that sorts but is not sorted is faint by design (ICON_EXCEPTIONS): 2.1:1
+    on the light table head. It is the only sign that the column sorts, and a reader who has asked
+    the system for more contrast (prefers-contrast: more) is asking for exactly this."""
+    page = open_in(theme, "/explore/samples", "table.table tbody tr", contrast="more")
+    arrows = page.locator("th .fa-sort:visible")
+    assert arrows.count() >= 1, "the samples list has no column that sorts and is not sorted"
+
+    found = arrows.first.evaluate("(arrow) => {" + HELPERS + """
+      const under = background(arrow).rgb;
+      return ratio(over(parse(getComputedStyle(arrow).color), under), under);
+    }""")
+
+    assert found >= 3, f"the idle sort arrow is {found:.2f}:1"

@@ -48,9 +48,13 @@
   --border-strong: #657790;
   --border-swatch: #8796a8;
   --dropzone-border: #657790;
+  /* control borders: 3:1 or more on every surface a control sits on, the chrome (3.4)
+     and the raised dialogs (3.1) included */
+  --border-control: #657790;
 
   --sort-idle: rgba(207, 215, 224, 0.45);
   --sort-active: var(--text-strong);
+  --focus-ring: rgba(122, 180, 220, 0.6);
   --accordion-focus-ring: var(--focus-ring);
   /* a muted sage: the light theme's yellowgreen family, without its glare */
   --row-selected: #2c4a38;
@@ -69,12 +73,8 @@
   --surface-hover: rgba(255, 255, 255, 0.06);
   --surface-active: #2a3542;
   --border: #34404e;
-  /* control borders: 3:1 or more on every surface a control sits on, the chrome (3.4)
-     and the raised dialogs (3.1) included */
-  --border-control: #657790;
   --primary: #2c6fb7;
   --primary-hover: #3678bf;
-  --focus-ring: rgba(122, 180, 220, 0.6);
   --shadow-raised: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
   /* tooltips: a raised dark bubble with a hairline, rather than a bright one that flares
      up over the page every time the pointer rests on a score */
@@ -110,16 +110,17 @@
   --cfg-matched: #c8a05a;
   --cfg-tooltip-bg: var(--surface-raised);
   --cfg-tooltip-shadow: 4px 4px 10px rgba(0, 0, 0, 0.6);
+  /* how much of a cycle's colour shows over the canvas (see .node[fill="white"] below) */
+  --cfg-cycle-opacity: 0.35;
   /* names only the CFG viewer section below needs: what outlines a hovered block or edge
      (the light theme's #008080 is 3.8:1 on the canvas and 1.7:1 on the palest loop fill;
      the accent is 8.1:1 and 4.7:1); the rose of a loop's back edge, from #dd1c77 (3.9:1
-     and 1.7:1) to 5.5:1 and 3.2:1; how much of a loop's colour shows over the canvas, and
-     how much of a cycle's; the lift of the hovered line of code */
+     and 1.7:1) to 5.5:1 and 3.2:1; how much of a loop's colour shows over the canvas; the
+     lift of the hovered line of code */
   --cfg-highlight: var(--accent);
   --cfg-backedge: #c0789a;
   --cfg-code-active: color-mix(in srgb, var(--accent) 14%, transparent);
   --cfg-hull-opacity: 0.22;
-  --cfg-cycle-opacity: 0.35;
   /* the label of "Show Loop Boundaries" is the first loop colour as it is drawn, i.e. at
      the hull opacity over the canvas */
   --cfg-loop-label: color-mix(in srgb, #fdd0a2 calc(var(--cfg-hull-opacity) * 100%), var(--cfg-canvas));
@@ -384,7 +385,13 @@
   border-color: var(--primary);
 }
 
-:root .form-check-input:focus,
+:root .form-check-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.25rem var(--focus-ring);
+}
+
+/* a rule of its own: a prefixed pseudo-element in a list can take the whole rule down
+   (tests/testSelectorLists.py) */
 :root .form-range:focus::-webkit-slider-thumb {
   border-color: var(--accent);
   box-shadow: 0 0 0 0.25rem var(--focus-ring);
@@ -901,4 +908,18 @@
 :root #tooltip_b {
   background-color: var(--cfg-tooltip-bg) !important;
   box-shadow: var(--cfg-tooltip-shadow) !important;
+}
+
+/* --- Dropzone's progress bar ------------------------------------------------------------ */
+
+/* the capsule a file waiting to be uploaded shows its progress in: Dropzone paints it 90% white,
+   a bright bar in the dark preview card. It is a field's fill inside the control border here
+   (3.1:1 on the card), and the bar fills it in the primary colour (3.5:1 on it) */
+:root .dropzone .dz-preview .dz-progress {
+  background-color: var(--surface-input);
+  border: 1px solid var(--border-control);
+}
+
+:root .dropzone .dz-preview .dz-progress .dz-upload {
+  background: var(--primary);
 }

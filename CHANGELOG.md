@@ -115,6 +115,45 @@ rather than reconstructing it from the commit log at release time.
   its longest instruction and stays inside its pane and the window; it was sized from the drawn
   block, so most instructions ran out of the box, and the combined view's "B's code" tooltip was not
   held inside the pane at all.
+- Windows' contrast themes (forced colours) no longer hide what Bootstrap draws with fills and
+  shadows. A ticked checkbox or chosen radio button looked empty, the MinHash slider vanished, the
+  keyboard's focus did not show on buttons, fields, the pager or accordion headers, the current tab
+  and page looked like the others, the cross compare matrix and the CFG comparison's legend were
+  blank, and a dialog's close cross vanished on a dark palette (on a light one, in the dark theme).
+  Each now has something the forced palette keeps: the browser's own boxes, outlines in the user's
+  highlight colour, a cross in the user's button text colour, and the data colours left as they
+  are.
+- In the light theme, the edges of fields, check boxes and radio buttons, and the ring the
+  keyboard's focus draws, can be seen: Bootstrap's grey edge was 1.5:1 against the page (a check
+  box's 1.8:1) and its focus ring 1.4:1, where WCAG asks 3:1. They are 3.2:1 or more now, on the
+  page and on the grey chrome. The search boxes and check boxes that turn the ring off (five pages
+  open with the focus in one) show an outline in the accent colour instead, in both themes.
+- In the light theme the current page of a pager is underlined in the accent colour, as in the dark
+  theme. Its grey fill alone was 1.14:1 against the white page, so the page you were on could hardly
+  be told from the others.
+- Three light-theme colours that fell short of WCAG are a step darker: the tick of a yes/no column
+  (2.5:1 on the darker score tints, now 3.9:1), the "rendering diagram" caption shown while a match
+  diagram loads (3.6:1, now 5.0:1), and a link in a table head, such as the jobs list's "#" (4.4:1,
+  now 9.4:1).
+- In the light theme, the blocks "Show Cycles" and "Show Loops" colour keep readable text. They
+  were painted in full-strength colours with white text, 2.1:1 on the orange; the colour now shows
+  at half strength under the page's own text colour, 6.9:1 or more, as the dark theme already did
+  with its values.
+- The upload form's extra fields open and close at once, instead of sliding, for a reader who has
+  asked the system for reduced motion; jQuery's slides took no notice of the setting. A change of
+  the setting is followed while the page is open.
+- A page that is not there, one the account's role does not reach, a form the CSRF check refuses
+  and a method a route does not take (404, 403, 400 and 405) are answered with a page in the site's
+  layout and in the account's theme. They were Werkzeug's bare documents, white even on the dark
+  theme. The page needs nothing from the MCRIT backend. The API, and scripts that ask for JSON,
+  get the same answer as before.
+- With reduced motion asked for, a file waiting in the drop zone no longer pulses for as long as it
+  waits, and the score tooltips appear at once instead of sliding into place.
+- In the dark theme, the progress bar of a file waiting in the drop zone is dark too; Dropzone drew
+  it as a bright white bar in the dark preview card.
+- A reader who has asked the system for more contrast sees the arrow of a column that sorts but is
+  not sorted at full strength. It is faint by design, 2.1:1 on the light table head, and it is the
+  only sign that a column sorts.
 - Submitting the binary of a sample MCRIT has not verified against a binary - one indexed from a
   submitted report or an import, or stored before mcrit recorded this - sends it to MCRIT instead of
   stopping at "Sample was already in database", and so does promoting a binary query of such a
