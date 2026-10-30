@@ -233,6 +233,7 @@ If the sample turns out to be interesting after all, the result page of a query 
 Promotion works from the copy of the upload that MCRITweb keeps under `instance/temp/uploads/`, because MCRIT itself does not hand a query's input back out again.
 That copy only exists on the machine that received the upload through the web interface, so a query submitted through the API or the IDA plugin, or one made against a different host of the same deployment, cannot be promoted - the result page says so instead of offering the form.
 Promoting a sample that is already in the collection simply takes you to it.
+The exception is a binary query of a sample that MCRIT has not verified against a binary, such as one indexed from a submitted SMDA report: the file is sent, and an MCRIT that supports it replaces the stored analysis with its own disassembly of the file, as it does when you submit that file. An MCRIT that does not refuses it, and you are taken to the sample as before.
 
 
 #### Unique Blocks

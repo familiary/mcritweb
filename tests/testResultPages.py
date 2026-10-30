@@ -229,6 +229,46 @@ def test_linkhunt_for_a_job_id_nobody_knows_says_it_was_not_found(client, as_rol
     assert b"was not found in the system" in response.data
 
 
+# --- the result of adding a binary ----------------------------------------------
+
+@pytest.fixture
+def binary_result(app, client, as_role):
+    def _binary_result(result_json):
+        job_data = _job_like("addBinarySample")
+        app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: OneJob(job_data, result_json)
+        as_role("visitor")
+        return client.get(f"/data/result/{job_data['_id']}")
+    return _binary_result
+
+
+def _flashes(client):
+    with client.session_transaction() as session:
+        return [message for _category, message in session.get("_flashes", [])]
+
+
+def test_the_result_of_an_added_binary_leads_to_its_sample(binary_result):
+    response = binary_result({"sample_info": {"sample_id": 3}})
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/explore/samples/3")
+
+
+@pytest.mark.parametrize("result_json", [
+    # mcrit's answer for a sample deleted while its binary replaced its analysis
+    # (familiary/mcrit#306), which carries the sample id in `verification` instead
+    {"sample_info": None, "verification": {"status": "sample_deleted", "sample_id": 3}},
+    # a result without the key, as an older one may be
+    {"verification": {"status": "sample_deleted", "sample_id": 3}},
+    {"sample_info": {}},
+], ids=["none", "missing", "no-sample-id"])
+def test_the_result_of_a_binary_whose_sample_is_gone_does_not_fail(binary_result, client, result_json):
+    response = binary_result(result_json)
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/explore/samples")
+    assert _flashes(client) == ["The sample this job added is no longer in the collection."]
+
+
 def test_result_page_applies_a_score_filter(client, as_role):
     """The filter parameters drive MatchingResult.applyFilterValues, which is where a
     report gets narrowed - rendering it unfiltered proves much less."""

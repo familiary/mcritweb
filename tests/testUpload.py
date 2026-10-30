@@ -368,6 +368,105 @@ def test_an_smda_report_whose_sha256_is_not_one_never_reaches_the_backend(client
     assert not [c for c in fake_mcrit.calls if c[0] in ("getSampleBySha256", "addReport")]
 
 
+# --- a binary for a sample MCRIT has not verified (familiary/mcrit#270, #306) ------
+
+#: a sample id the fake corpus answers with, so a redirect to it can be told apart
+KNOWN_SAMPLE_ID = 7
+
+#: an entry with no `sha256_verified` at all, as an mcrit package older than the field builds
+NO_FIELD = object()
+
+REPLACING = "MCRIT is replacing its stored analysis with its own disassembly of this file."
+
+
+def flashes(client):
+    with client.session_transaction() as session:
+        return [message for _category, message in session.get("_flashes", [])]
+
+
+def know_sample(fake_mcrit, sha256_verified):
+    """Make every sha256 lookup find one sample with the given provenance."""
+    sample = SimpleNamespace(sample_id=KNOWN_SAMPLE_ID, sha256="ab" * 32)
+    if sha256_verified is not NO_FIELD:
+        sample.sha256_verified = sha256_verified
+    fake_mcrit.getSampleBySha256 = lambda sha256, *a, **kw: (fake_mcrit._record("getSampleBySha256", sha256), sample)[1]
+    return sample
+
+
+def binary_submissions(fake_mcrit):
+    return [c for c in fake_mcrit.calls if c[0] == "addBinarySample"]
+
+
+@pytest.mark.parametrize("sha256_verified", [False, None, NO_FIELD])
+def test_a_binary_of_an_unverified_sample_is_sent_to_replace_its_analysis(client, as_role, fake_mcrit, sha256_verified):
+    as_role("contributor")
+    know_sample(fake_mcrit, sha256_verified)
+
+    response = submit_binary(client, b"MZ the real bytes", filename="real.exe", family="", version="")
+
+    assert response.status_code == 202
+    submitted = binary_submissions(fake_mcrit)
+    assert len(submitted) == 1
+    assert submitted[0][1][0] == b"MZ the real bytes"
+    # mcrit applies the family and version an upload names to the sample it replaces,
+    # so blank ones are not sent as empty strings that would clear them
+    assert submitted[0][2]["family"] is None and submitted[0][2]["version"] is None
+    assert submitted[0][2]["filename"] == "real.exe"
+    assert "/data/jobs/" in response.get_data(as_text=True)
+    assert f"Sample {KNOWN_SAMPLE_ID} already has this sha256, but MCRIT has not verified it against a binary. {REPLACING}" in flashes(client)
+    assert "Sample was already in database" not in flashes(client)
+
+
+def test_a_typed_family_and_version_travel_with_the_replacing_binary(client, as_role, fake_mcrit):
+    as_role("contributor")
+    know_sample(fake_mcrit, False)
+
+    submit_binary(client, b"MZ the real bytes", family="R&D", version="1.0")
+
+    _, _, kwargs = binary_submissions(fake_mcrit)[0]
+    assert kwargs["family"] == quote("R&D", safe="")
+    assert kwargs["version"] == "1.0"
+
+
+def test_a_backend_that_refuses_the_unverified_sample_lands_on_it_as_before(client, as_role, fake_mcrit):
+    """An mcrit before #306 answers 409, which addBinarySample hands back as None."""
+    as_role("contributor")
+    know_sample(fake_mcrit, False)
+    fake_mcrit.addBinarySample = lambda binary, **kwargs: fake_mcrit._record("addBinarySample", binary, **kwargs)
+
+    response = submit_binary(client, b"MZ the real bytes")
+
+    assert response.status_code == 202
+    assert len(binary_submissions(fake_mcrit)) == 1
+    assert response.get_data(as_text=True).endswith(f"/explore/samples/{KNOWN_SAMPLE_ID}")
+    assert flashes(client) == ["Sample was already in database"]
+
+
+def test_a_binary_of_a_verified_sample_is_not_sent(client, as_role, fake_mcrit):
+    as_role("contributor")
+    know_sample(fake_mcrit, True)
+
+    response = submit_binary(client, b"MZ the real bytes")
+
+    assert response.status_code == 202
+    assert not binary_submissions(fake_mcrit)
+    assert response.get_data(as_text=True).endswith(f"/explore/samples/{KNOWN_SAMPLE_ID}")
+    assert flashes(client) == ["Sample was already in database"]
+
+
+@pytest.mark.parametrize("sha256_verified", [False, None, True])
+def test_a_report_of_a_known_sample_verifies_nothing(client, as_role, fake_mcrit, sha256_verified):
+    as_role("contributor")
+    know_sample(fake_mcrit, sha256_verified)
+
+    response = submit_smda(client, fake_mcrit, "ab" * 32)
+
+    assert response.status_code == 202
+    assert not [c for c in fake_mcrit.calls if c[0] in ("addBinarySample", "addReport")]
+    assert response.get_data(as_text=True).endswith(f"/explore/samples/{KNOWN_SAMPLE_ID}")
+    assert flashes(client) == ["Sample was already in database"]
+
+
 # --- the filename probe the dropzone fires on drop ---------------------------------
 
 def filename_info(client, filename, file_header="", file_metadata=None):
