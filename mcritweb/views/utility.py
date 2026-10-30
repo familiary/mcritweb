@@ -382,7 +382,8 @@ def get_user_column_setup(table_type:str):
 
 #: A backend-issued job id, as it is allowed to appear in a path: the two shapes the
 #: two queue implementations actually answer, and nothing else. MongoQueue hands back
-#: `str(ObjectId)` and LocalQueue `str(uuid.uuid4())`.
+#: `str(ObjectId)`, and so does LocalQueue since mcrit 1.14; before that LocalQueue
+#: answered `str(uuid.uuid4())`, and setup.py still allows those releases.
 #:
 #: Matching the shape rather than merely excluding separators is what keeps three
 #: things out. A path cannot walk out of the folder. `MongoQueue.put` returns None on
