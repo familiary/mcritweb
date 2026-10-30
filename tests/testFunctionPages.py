@@ -174,6 +174,37 @@ def test_the_comparison_page_renders_with_the_match_data(client, as_role):
     assert f"/api/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}" in page
 
 
+def test_the_comparison_graphs_name_the_layout_worker(client, as_role):
+    """Each graph is laid out in the worker its svg names (`layOutGraph()` in main_duo.js);
+    without one the page lays them out itself, as it did before."""
+    import os
+    as_role("visitor")
+    page = client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}").get_data(as_text=True)
+    for panel in ("a", "b", "c"):
+        svg = re.search(rf'<svg id="graphContainer_{panel}"[^>]*>', page)
+        assert svg and 'data-layout-worker="/static/trace_CFG/layout_worker.js"' in svg.group(0), panel
+    assert os.path.isfile(os.path.join(os.path.dirname(__file__), "..", "mcritweb", "static", "trace_CFG", "layout_worker.js"))
+
+
+def test_the_comparison_graphs_are_drawn_from_the_worker_s_layout():
+    """The two graphs side by side and the combined one are drawn from the layout
+    `layOutGraph()` calls back with; a refresh of main_duo.js from upstream would lay them out
+    on the page again. The browser tests (testFunctionVsBrowser.py) check the drawing itself."""
+    import os
+    static = os.path.join(os.path.dirname(__file__), "..", "mcritweb", "static")
+    with open(os.path.join(static, "trace_CFG", "main_duo.js")) as f:
+        main_duo = f.read()
+    with open(os.path.join(static, "function_compare.js")) as f:
+        function_compare = f.read()
+    for panel in ("a", "b"):
+        assert re.search(rf'layOutGraph\(cfgPanels\.{panel}\.rendered, cfgPanels\.{panel}\.container, function\(laidOut\) \{{\s*'
+                         rf'showGraph\("{panel}", node_colors, laidOut\);', main_duo), panel
+    assert "renderer.layout({ run: function() { return laidOut; } });" in main_duo
+    assert re.search(r'layOutGraph\(graph, "#graphContainer_c", function \(laidOut\) \{\s*onceCombinedShown\(function \(\) \{'
+                     r'[^}]*renderCombined\(graph, laidOut\);', function_compare)
+    assert "renderer.layout({ run: function () { return laidOut; } });" in function_compare
+
+
 def test_the_comparison_page_asks_for_the_pair_without_checking_the_ids_first(client, as_role, fake_mcrit):
     """The backend checks both ids when it is asked for the comparison, so two
     `isFunctionId` requests ahead of it only repeated that check (issue #207)."""

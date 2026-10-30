@@ -229,6 +229,12 @@ form.form-inline input {
   min-height: 100px;
   height: calc(100vh - 106px);
 }
+/* out of the flow, so the graph does not move up by the note's 400 px when it goes: the
+   graph is drawn when its layout comes back from the worker, seconds after the click on a
+   large pair, when the move counts as a layout shift */
+#loading_c {
+  position: absolute;
+}
 #graphContainer_c {
   width: 100%;
   height: 100%;
