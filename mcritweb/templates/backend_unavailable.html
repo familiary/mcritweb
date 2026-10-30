@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title%}
+MCRIT server unavailable
+{% endblock %}
+{% block style %}
+{% endblock %}
+{% block content %}
+<h1>MCRIT server unavailable</h1>
+<p role="alert">{{ reason }}</p>
+<p>This page needs the MCRIT backend and could not reach it.</p>
+{# Deliberately not "nothing was changed". On a timeout the backend may well have
+   received the request and acted on it - we stopped waiting for the answer, which
+   is not the same as the request not arriving. Saying otherwise would be a
+   confident claim we cannot make, and the reader would act on it. #}
+{% if request.method in ('POST', 'PUT', 'PATCH', 'DELETE') %}
+<p>Whether the request went through is unknown: the server may have received it and
+   answered too late, or not received it at all. Check before submitting it again.</p>
+{% endif %}
+{% if g.user and g.user.role == 'admin' %}
+<p>Check that the server is running and that its address in
+   <a href="{{ url_for('admin.server') }}">server settings</a> is correct,
+   then try again.</p>
+{% else %}
+<p>Try again in a moment, or ask an administrator to check the server.</p>
+{% endif %}
+{% endblock %}

@@ -1,22 +1,27 @@
 /* the logos carry intrinsic width/height attributes; without width:auto the attribute width would stretch them at these heights */
 .navbar-brand img {
-  height: 100px;
+  height: 48px;
   width: auto;
 }
-.navbar-brand-small img {
-  height: 40px;
+@media (min-width: 992px) {
+  .navbar-brand img {
+    height: 60px;
+  }
 }
-.navbar{
+.navbar {
   margin-bottom: 20px;
-  padding: 0.5rem;  
+  padding: 0.5rem 1rem;
 }
+/* the partner logo sits in the top-right corner, above the menu, as before #253; in the
+   flex row it landed next to the MCRIT logo. It is only shown from 992px (d-lg-block) */
 .navbar .right-logo {
-  position:absolute;
-  top:0;
-  right:0;
-  margin: 0.5rem;
+  position: absolute;
+  top: 0;
+  right: 0;
+  /* 3px, not 0.5rem, on top: the menu's help icon starts 3px under a 0.5rem-high logo */
+  margin: 3px 1rem 0;
 }
-.navbar .right-logo img{
-  height:50px;
+.navbar .right-logo img {
+  height: 40px;
   width: auto;
 }

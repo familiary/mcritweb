@@ -8,6 +8,7 @@ collapses the repeated per-view ServerInfo lookups into one instance per request
 See issue #88.
 """
 
+import requests
 from flask import current_app, g
 from mcrit.client.McritClient import McritClient
 
@@ -102,3 +103,25 @@ def _entries_by_id(kind, entry_ids, fetch_many, fetch_one):
         for entry_id in missing:
             known[entry_id] = found.get(entry_id)
     return {entry_id: known[entry_id] for entry_id in entry_ids}
+
+
+def backend_version(client):
+    """The MCRIT backend's version as a string, or "unknown".
+
+    `McritClient.getVersion()` answers with the dict mcrit's own
+    `MinHashIndex.getVersion` builds - `{"version": "1.4.3"}` - not a bare string, so
+    rendering it directly put `{'version': '1.4.3'}` on the page. It answers None when
+    the backend could not be reached or refused, which is not a version either.
+    """
+    try:
+        version = client.getVersion()
+    except requests.RequestException:
+        # An unreachable backend is exactly when an admin needs this page: it carries the
+        # form for correcting the server URL, and `backend_unavailable.html` sends them
+        # here to do it. Letting the transport failure out turns that instruction into a
+        # dead end - the one page that can fix the outage is the one the outage breaks.
+        # Only the transport family is caught; anything else here is our own bug.
+        return "unknown"
+    if isinstance(version, dict):
+        version = version.get("version")
+    return version if isinstance(version, str) and version else "unknown"

@@ -673,11 +673,12 @@ def test_a_job_whose_id_could_not_have_named_a_file_promotes_nothing(client, as_
     rather than beside it.
 
     A job id reaches here off the wire and out of a URL, and only two shapes are ever
-    issued: an ObjectId, or a uuid4. "None" is what `QueueRemoteCalls` hands back when
-    `MongoQueue.put` returns None on an unacknowledged insert - one name for every such
-    failure - and "NUL" is a Windows device rather than a file. Neither can name an
-    upload, so neither may be promoted from one, whatever happens to be lying at that
-    name in a folder every query writes into.
+    issued: an ObjectId, or the uuid4 a local queue minted before mcrit 1.14. "None"
+    is what `QueueRemoteCalls` hands back when `MongoQueue.put` returns None on an
+    unacknowledged insert - one name for every such failure - and "NUL" is a Windows
+    device rather than a file. Neither can name an upload, so neither may be promoted
+    from one, whatever happens to be lying at that name in a folder every query
+    writes into.
     """
     as_role("contributor")
     register_query(fake_mcrit, job_id=job_id)

@@ -16,6 +16,12 @@ the file at once. Each must come away with the one key that ends up on disk - a 
 holding a key of its own would reject every session and CSRF token the others issue,
 until the next restart. So a new key is written in full to a private file first and
 published with `os.link`, which fails rather than overwrite when another process won.
+A filesystem without hard links - vfat, exFAT, some SMB and FUSE mounts - refuses the
+link itself, and there the same staged file is renamed into place instead. A rename
+overwrites, so it happens under a lock on the instance folder that every process takes
+and, once it has it, looks again before publishing. A file created empty and filled in
+afterwards would let a process that opened it in between read, or replace, a file the
+creator is about to write to.
 
 An explicit key in `instance/config.py` still wins. That remains the right answer for
 a multi-host deployment, where all hosts must share one key and a per-host file
@@ -49,6 +55,10 @@ def load_or_create_secret_key(instance_path):
                 return key
             except FileExistsError:
                 pass
+            except OSError:
+                # no hard links here: EPERM on vfat and exFAT, ENOTSUP on some SMB and
+                # FUSE mounts. Any other reason, the rename meets as well and raises
+                return _publish_under_lock(instance_path, path, staged, key)
             existing = _read_key(path)
             if existing:
                 return existing
@@ -89,6 +99,31 @@ def _stage_new_key(instance_path):
         os.unlink(staged)
         raise
     return staged, key
+
+
+def _publish_under_lock(instance_path, path, staged, key):
+    """Publish `staged` without a hard link, and return the key that ends up in `path`.
+
+    Only one process at a time gets past the lock on the instance folder. It looks at
+    `path` again, so a key published while it queued is returned rather than replaced,
+    and an empty file left by older code or a crash is replaced once, not once per
+    process. What it publishes is the staged file, complete before it is visible, so
+    nobody ever reads a part of a key - and nobody writes into a file somebody else may
+    be replacing, which is how two processes used to end up with different keys.
+
+    fcntl is imported here for the same reason as in _replace_if_still_empty."""
+    import fcntl
+
+    descriptor = os.open(instance_path, os.O_RDONLY)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        existing = _read_key(path)
+        if existing:
+            return existing
+        os.replace(staged, path)
+        return key
+    finally:
+        os.close(descriptor)
 
 
 def _replace_if_still_empty(path, staged):
