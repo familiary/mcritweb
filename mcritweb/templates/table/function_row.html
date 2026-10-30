@@ -1,5 +1,6 @@
 {% from 'table/pagination_widget.html' import sortable_header_col %}
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id, mark %}
+{% from 'table/links.html' import status_icon %}
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro function_row_std_js() %}
@@ -74,13 +75,13 @@
       {% if column_type == "function_id" %}
         <th align="left" valign="middle" scope="row" class="function-id">{{ "%d"|format(function.function_id) }}</th>
       {% elif column_type == "family_id" and not for_sample_view %}
-        <td align="right" valign="middle" scope="row" class="family-id">{{ format_family_id(function.family_id) }}</td>
+        <td align="right" valign="middle" class="family-id">{{ format_family_id(function.family_id) }}</td>
       {% elif column_type == "sample_id" and not for_sample_view %}
-        <td align="right" valign="middle" scope="row" class="sample-id">{{ format_sample_id(function.sample_id) }}</td>
+        <td align="right" valign="middle" class="sample-id">{{ format_sample_id(function.sample_id) }}</td>
       {% elif column_type == "pic_hash" %}
         <td align="right" valign="middle" class="font-monospace">{{ format_pichash(function.pichash) }}</td>
       {% elif column_type == "has_minhash" %}
-        <td align="center" valign="middle"><i {% if function.minhash|length > 0 %}style="color: var(--status-yes);" class="fa-solid fa-square-check" title="MinHash present"{% else %}style="color: var(--status-no);" class="fa-solid fa-times-circle" title="No MinHash"{% endif %}></i></td>
+        <td align="center" valign="middle">{{ status_icon(function.minhash|length > 0, yes="MinHash present", no="No MinHash", title=true) }}</td>
       {% elif column_type == "offset" %}
         <td align="right" valign="middle" class="font-monospace">{{ format_offset(function.offset) }}</td>
       {% elif column_type == "function_name" %}
@@ -97,7 +98,7 @@
          url_for still writes the negative id into the href, so without this the row
          would offer a button that only ever answers 404 #}
       {% if function.function_id >= 0 %}
-      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('analyze.compare_function', function_id=function.function_id) }}" role="button" aria-label="New: 1 vs N for this function" title="New: 1 vs N for this function"><i class="fa-solid fa-flask"></i></a>
+      <a class="btn btn-outline-dark btn-sm" href="{{ url_for('analyze.compare_function', function_id=function.function_id) }}" role="button" aria-label="New: 1 vs N for function {{ function.function_id }}"><i class="fa-solid fa-flask" aria-hidden="true"></i></a>
       {% endif %}
     </td>
   </tr>

@@ -1,6 +1,7 @@
 {% macro cross_table(method, samples, matching_percent, matching_matches, fifth_indices, job_info) %}
 
   <table>
+    <caption class="visually-hidden">Cross comparison matrix</caption>
     {# header cells, so every cell below has one (axe's td-has-header); normal weight,
        because they looked like the rest of the table when they were <td> #}
     <tr>
@@ -38,7 +39,7 @@
         <td class="sha256" style="font-size: 13px; min-width: 100px;">{{ format_sha_short_clipboard(sample.sha256) }}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.family}}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.version}}</td>
-        <td><a aria-label="Edit sample" title="Edit sample" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square"></i></a></td>
+        <td><a aria-label="Edit sample {{ sample.sample_id }}" class="btn btn-outline-dark btn-sm" style="padding: 1px; width: 25px; height: 25px;" id="{{method}}_sample_{{ sample.sample_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ sample.is_library }}"  data-bs-version="{{ sample.version }}"  data-bs-sampleid="{{ sample.sample_id }}" data-bs-familyname="{{ sample.family }}"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></a></td>
         <td class="id clickable" style="padding: 0 5px; font-size: 13px; color: var(--text-strong)">{{ sample.sample_id }}</td>
         <td class="" style="padding: 0 5px; font-size: 13px">{{sample.bitness}}</td>
         <td class="" style="padding: 0 5px; font-size: 13px; color: var(--text-strong)">{{sample.statistics['num_functions']}}</td>
@@ -156,7 +157,7 @@ Results for Job: {{ job_info.job_id }}
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="editSampleModalLabel">Modify Sample</h5>
+        <h2 class="modal-title h5" id="editSampleModalLabel">Modify Sample</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -297,6 +298,10 @@ Results for Job: {{ job_info.job_id }}
         sourceIndex[row.querySelector("td.id").textContent.trim()] = index;
       });
       var table = rendered.cloneNode(false);
+      {# the caption names the table; the tab around it says which method it shows #}
+      if (rendered.caption) {
+        table.appendChild(rendered.caption.cloneNode(true));
+      }
       var body = table.appendChild(rendered.tBodies[0].cloneNode(false));
       body.appendChild(rendered.rows[0].cloneNode(true));
       var indices = body.appendChild(rendered.rows[1].cloneNode(true));

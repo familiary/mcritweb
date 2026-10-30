@@ -1,4 +1,8 @@
-{# note: pagination widgets support _anchor argument#}
+{# note: pagination widgets support _anchor argument.
+   `_label` names the table a pager pages ("sample matches"). Several tables share a
+   page, so without it every pager's nav and links carry the same names for different
+   targets. It is a macro argument of its own, not part of kwargs, so it never reaches
+   a generated URL. #}
 
 {########## js helper for js pagination ###########}
 
@@ -29,11 +33,11 @@
 
 {########### unified pagination widget: behaves like std or cursor pagination widget #############}
 
-{% macro pagination_widget(pagination) %}
+{% macro pagination_widget(pagination, _label=none) %}
   {% if pagination.__class__.__name__ == "Pagination" %}
-    {{ std_pagination_widget(pagination, **kwargs) }}
+    {{ std_pagination_widget(pagination, _label=_label, **kwargs) }}
   {% elif pagination.__class__.__name__ == "CursorPagination" %}
-    {{ cursor_pagination_widget(pagination, **kwargs) }}
+    {{ cursor_pagination_widget(pagination, _label=_label, **kwargs) }}
   {% else %}
     invalid pagination
   {% endif %}
@@ -46,7 +50,8 @@
 
 {########### std pagination widget ############}
 
-{% macro std_pagination_widget(pagination) %}
+{% macro std_pagination_widget(pagination, _label=none) %}
+  {% set of_label = (' of ' ~ _label) if _label else '' %}
 
   {%- macro _get_href_or_onclick(page, _js_argument_provider=none) -%}
     {% if _js_argument_provider is not none %}
@@ -65,36 +70,39 @@
     {% endif %}
   {%- endmacro -%}
 
+  <nav aria-label="{{ (_label|capitalize ~ ' pages') if _label else 'Pagination' }}">
   <ul class="pagination justify-content-center">
     <li class="page-item {% if pagination.page_index == 0 %}disabled{% endif %}">
-      <a aria-label="First page" title="First page" class="page-link" {{ _get_href_or_onclick(1, **kwargs) }}><i class="fa-solid fa-angles-left"></i></a>
+      <a aria-label="First page{{ of_label }}" title="First page" class="page-link" {{ _get_href_or_onclick(1, **kwargs) }}><i class="fa-solid fa-angles-left" aria-hidden="true"></i></a>
     </li>
     <li class="page-item {% if pagination.page_index == 0 %}disabled{% endif %}">
-      <a aria-label="Previous page" title="Previous page" class="page-link" {{ _get_href_or_onclick(pagination.page - 1, **kwargs) }}><i class="fa-solid fa-angle-left"></i></a>
+      <a aria-label="Previous page{{ of_label }}" title="Previous page" class="page-link" {{ _get_href_or_onclick(pagination.page - 1, **kwargs) }}><i class="fa-solid fa-angle-left" aria-hidden="true"></i></a>
     </li>
     {% for item in pagination.pages %}
-      <li class="page-item {% if loop.index == pagination.page_index + 1 %}active{% endif %}"><a class="page-link" {{ _get_href_or_onclick(item, **kwargs) }}>{{ item }}</a></li>
+      <li class="page-item {% if loop.index == pagination.page_index + 1 %}active{% endif %}"><a class="page-link" {% if _label %}aria-label="Page {{ item }}{{ of_label }}" {% endif %}{% if loop.index == pagination.page_index + 1 %}aria-current="page" {% endif %}{{ _get_href_or_onclick(item, **kwargs) }}>{{ item }}</a></li>
     {% endfor %}
     <li class="page-item {% if pagination.pages[pagination.page_index] == pagination.max_page %}disabled{% endif %}">
-      <a aria-label="Next page" title="Next page" class="page-link" {{ _get_href_or_onclick(pagination.page + 1, **kwargs) }}><i class="fa-solid fa-angle-right "></i></a>
+      <a aria-label="Next page{{ of_label }}" title="Next page" class="page-link" {{ _get_href_or_onclick(pagination.page + 1, **kwargs) }}><i class="fa-solid fa-angle-right " aria-hidden="true"></i></a>
     </li>
     <li class="page-item {% if pagination.pages[pagination.page_index] == pagination.max_page %}disabled{% endif %}">
-      <a aria-label="Last page" title="Last page" class="page-link" {{ _get_href_or_onclick(pagination.max_page, **kwargs) }}><i class="fa-solid fa-angles-right "></i></a>
+      <a aria-label="Last page{{ of_label }}" title="Last page" class="page-link" {{ _get_href_or_onclick(pagination.max_page, **kwargs) }}><i class="fa-solid fa-angles-right " aria-hidden="true"></i></a>
     </li>
     <li class="page-item">
-      <select aria-label="Rows per page" class="form-select page-link" {{ _get_limit_onchange(**kwargs) }} style="border: none; background: transparent;">
+      <select aria-label="Rows per page{{ of_label }}" class="form-select page-link" {{ _get_limit_onchange(**kwargs) }} style="border: none; background: transparent;">
         {% for limit_option in [10, 25, 50, 100, 250] %}
           <option value="{{ limit_option }}" {% if pagination.limit == limit_option %}selected{% endif %}>{{ limit_option }}</option>
         {% endfor %}
       </select>
     </li>
   </ul>
+  </nav>
 {% endmacro %}
 
 
 {####### search cursor pagination + generation of sortable table headers ########}
 
-{% macro cursor_pagination_widget(pagination) %}
+{% macro cursor_pagination_widget(pagination, _label=none) %}
+  {% set of_label = (' of ' ~ _label) if _label else '' %}
   {%- macro _get_href_or_onclick(page, _js_argument_provider=none) -%}
     {% if _js_argument_provider is not none %}
       href="{{ pagination.get_link(page, **kwargs) }}" onclick="pagination_js_helper('{{ pagination.get_link(page, **kwargs).replace("'", "\\'") }}', {{ _js_argument_provider }}() ); return false"
@@ -117,54 +125,56 @@
   {% set params = dict() %}
   {{ params.update(pagination|getattr("_extra_pagination_params", {}))|silent }}
   {{ params.update(**kwargs)|silent }}
+  <nav aria-label="{{ (_label|capitalize ~ ' pages') if _label else 'Pagination' }}">
   <ul class="pagination justify-content-center">
     <li class="page-item {% if not pagination.hasBackward %}disabled{% endif %}">
-      <a aria-label="First page" title="First page" class="page-link" {{ _get_href_or_onclick('first', **params) }}><i class="fa-solid fa-angles-left"></i></a>
+      <a aria-label="First page{{ of_label }}" title="First page" class="page-link" {{ _get_href_or_onclick('first', **params) }}><i class="fa-solid fa-angles-left" aria-hidden="true"></i></a>
     </li>
     <li class="page-item {% if not pagination.hasBackward %}disabled{% endif %}">
-      <a aria-label="Previous page" title="Previous page" class="page-link" {{ _get_href_or_onclick('backward', **params) }}><i class="fa-solid fa-angle-left"></i></a>
+      <a aria-label="Previous page{{ of_label }}" title="Previous page" class="page-link" {{ _get_href_or_onclick('backward', **params) }}><i class="fa-solid fa-angle-left" aria-hidden="true"></i></a>
     </li>
     {% if pagination.hasBackward %}
-      <li class="page-item"><a class="page-link" {{ _get_href_or_onclick('backward', **params) }}>{{ pagination.page-1 }}</a></li>
+      <li class="page-item"><a class="page-link" {% if _label %}aria-label="Page {{ pagination.page-1 }}{{ of_label }}" {% endif %}{{ _get_href_or_onclick('backward', **params) }}>{{ pagination.page-1 }}</a></li>
     {% endif %}
-    <li class="page-item active"><a class="page-link" {{ _get_href_or_onclick('current', **params) }}>{{ pagination.page }}</a></li>
+    <li class="page-item active"><a class="page-link" {% if _label %}aria-label="Page {{ pagination.page }}{{ of_label }}" {% endif %}aria-current="page" {{ _get_href_or_onclick('current', **params) }}>{{ pagination.page }}</a></li>
     {% if pagination.hasForward %}
-      <li class="page-item"><a class="page-link" {{ _get_href_or_onclick('forward', **params) }}>{{ pagination.page+1 }}</a></li>
+      <li class="page-item"><a class="page-link" {% if _label %}aria-label="Page {{ pagination.page+1 }}{{ of_label }}" {% endif %}{{ _get_href_or_onclick('forward', **params) }}>{{ pagination.page+1 }}</a></li>
     {% endif %}
     <li class="page-item {% if not pagination.hasForward %}disabled{% endif %}">
-      <a aria-label="Next page" title="Next page" class="page-link" {{ _get_href_or_onclick('forward', **params) }}><i class="fa-solid fa-angle-right "></i></a>
+      <a aria-label="Next page{{ of_label }}" title="Next page" class="page-link" {{ _get_href_or_onclick('forward', **params) }}><i class="fa-solid fa-angle-right " aria-hidden="true"></i></a>
     </li>
     <li class="page-item disabled">
       <span class="d-inline-block" tabindex="0" data-toggle="tooltip" data-placement="top" title="Last page not supported for search.&#013;Please reverse sort order instead.">
-        <a role="link" aria-disabled="true" aria-label="Last page" title="Last page" class="page-link"><i class="fa-solid fa-angles-right"></i></a>
+        <a role="link" aria-disabled="true" aria-label="Last page{{ of_label }}" title="Last page" class="page-link"><i class="fa-solid fa-angles-right" aria-hidden="true"></i></a>
       </span>
     </li>
     <li class="page-item">
-      <select aria-label="Rows per page" class="form-select page-link" {{ _get_limit_onchange(**kwargs) }} style="border: none; background: transparent;">
+      <select aria-label="Rows per page{{ of_label }}" class="form-select page-link" {{ _get_limit_onchange(**kwargs) }} style="border: none; background: transparent;">
         {% for limit_option in [10, 25, 50, 100, 250] %}
           <option value="{{ limit_option }}" {% if pagination.limit == limit_option %}selected{% endif %}>{{ limit_option }}</option>
         {% endfor %}
       </select>
     </li>
   </ul>
+  </nav>
 {% endmacro %}
 
 {%- macro cursor_pagination_sort_symbol(pagination, sort_by) -%}
   {% if not pagination is none %}
     {% if pagination.sort_by is none %}
       {# we do not know the search order #}
-      <i class="fa-solid fa-sort"></i>
+      <i class="fa-solid fa-sort" aria-hidden="true"></i>
     {% else %}
       {% if pagination.sort_by == sort_by %}
         {# we are considering the column that is sorted by #}
         {% if pagination.is_ascending %}
-          <i class="fa-solid fa-sort-up"></i>
+          <i class="fa-solid fa-sort-up" aria-hidden="true"></i>
         {% else %}
-          <i class="fa-solid fa-sort-down"></i>
+          <i class="fa-solid fa-sort-down" aria-hidden="true"></i>
         {% endif %}
       {% else %}
         {# a column not used for sort right now #}
-        <i class="fa-solid fa-sort"></i>
+        <i class="fa-solid fa-sort" aria-hidden="true"></i>
       {% endif %}
     {% endif %}
   {% endif %}

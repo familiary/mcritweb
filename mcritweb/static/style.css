@@ -391,3 +391,70 @@ form.form-inline input {
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }
+
+/* What the page's structure says to assistive technology. A rule here changes how a
+   screen reader reads the page, not how it looks. */
+
+/* Generated text that is decoration is not read out: the diagram's placeholder stays in
+   the accessibility tree once the diagram covers it, and a breadcrumb read "slash"
+   between its items. The alternative text, written after a slash, is newer than the rest
+   of `content`, so a browser without it drops these declarations and keeps the rule above
+   and Bootstrap's, as before. */
+.mcrit-diagram::before {
+  content: "rendering diagram\2026" / "";
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+  content: "/" / "";
+}
+
+/* The skip link is out of sight until the keyboard reaches it, and then sits over the top
+   left corner. It is out of the flow, and its box starts in the same place in both states,
+   padding and border included, so neither the page nor the link's text moves when it
+   appears; only its clip and size change. Its colours are its own, so its contrast does
+   not depend on what it lies over. */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 2001;
+  padding: 0.5rem 1rem;
+  color: var(--link);
+  background-color: var(--surface-page);
+  border: 1px solid var(--accent);
+}
+
+.skip-link:where(:not(:focus-within, :active)) {
+  clip-path: inset(50%);
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  white-space: nowrap;
+}
+
+/* A closed accordion panel that find in page can search (static/collapsed_find.js marks
+   it, where the browser can): Bootstrap gives a closed panel and any [hidden] element
+   display: none, which would keep its text from the search. The browser hides an
+   until-found element's content itself, and the panel has no padding or border of its
+   own, so it still takes no room. */
+.accordion-collapse[hidden="until-found"] {
+  display: block !important;
+}
+
+/* hint.css tooltips (the data-hint attribute) are laid out only while they are shown. hint.css
+   merely hides the others, and a hidden box still takes its room: the labels that became
+   <th> carry hints written on one line (white-space: pre), up to 960px, and the cross compare
+   pages scrolled sideways by that much in a phone. The idle state is one plain selector, and
+   the rules for a shown tooltip start with :hover or :focus-visible, so that on a matrix of
+   tens of thousands of hints all but one fail at once. */
+[data-hint]::before,
+[data-hint]::after {
+  display: none;
+}
+
+[data-hint]:hover::before,
+[data-hint]:hover::after,
+[data-hint]:focus-visible::before,
+[data-hint]:focus-visible::after {
+  display: block;
+}

@@ -5,7 +5,7 @@
 
 {% extends 'base.html' %}
 {% block title%}
-Results for Job: {{ job_info.job_id }}
+LinkHunt for Job: {{ job_info.job_id }}
 {% endblock %}
 {% block style %}
 {{ pagination_js() }}
@@ -51,6 +51,7 @@ Results for Job: {{ job_info.job_id }}
 {# a cluster can hold any number of links, so only the first few are shown open #}
 {% set shown_links = 8 %}
 <table class="table table-hover">
+  <caption class="visually-hidden">Link clusters</caption>
   <thead class="table-light">
     <tr>
       <th style="text-align: right;" scope="col">Rank</th>
@@ -68,7 +69,7 @@ Results for Job: {{ job_info.job_id }}
       <td style="text-align: right;" valign="middle">{{ clup.start_index + loop.index }}</td>
       <td style="text-align: right;" valign="middle">{{ "%7.2f"|format(cluster_entry['score']) }}</td>
       <td style="text-align: right;" valign="middle">{{ "%7.2f"|format(cluster_entry['max_score']) }}</td>
-      <td style="text-align: right;" valign="middle"><i class="fa-solid fa-bug " title="Family ID"></i>({{ cluster_entry['family_id'] }}) {{ format_family_name(cluster_entry['family'], cluster_entry['family_id']) }}</td>
+      <td style="text-align: right;" valign="middle"><i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i>({{ cluster_entry['family_id'] }}) {{ format_family_name(cluster_entry['family'], cluster_entry['family_id']) }}</td>
       <td style="text-align: right;" valign="middle">{{ "%d"|format(cluster_entry['links']|length) }}</td>
       <td style="text-align: right;" valign="middle">{{ "%d"|format(cluster_entry['unique_matches']|length) }}</td>
       <td style="text-align: right;" valign="middle" class="linkhunt-links">
@@ -78,12 +79,12 @@ Results for Job: {{ job_info.job_id }}
           {% endif %}
           <a href="{{ url_for('explore.function_by_id', function_id=link_entry.function_id) }}">
             {% if link_entry.matched_unique %}
-            <b style="color: var(--text-strong);">0x{{ "%x"|format(link_entry.offset) }}</b></a>
+            <b style="color: var(--text-strong);">0x{{ "%x"|format(link_entry.offset) }}<span class="visually-hidden"> (unique)</span></b></a>
             {% else %}
             0x{{ "%x"|format(link_entry.offset) }}</a>
             {% endif %}
             {% if not matching_result.is_query %}
-              <a aria-label="Compare the two functions" title="Compare the two functions" target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>
+              <a aria-label="Compare function {{ link_entry.function_id }} with function {{ link_entry.matched_function_id }}" target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare" aria-hidden="true"></i></a>
               &nbsp;
             {% endif %}
             {% if loop.index > 0 and loop.index % 4 == 0 %}
@@ -98,10 +99,11 @@ Results for Job: {{ job_info.job_id }}
     {% endfor %}
   </tbody>
 </table>
-{{ pagination_widget(clup, _anchor="linkhunt-clusters")}}
+{{ pagination_widget(clup, _label="link clusters", _anchor="linkhunt-clusters")}}
 <h3 class="h4" id="linkhunt-links">Individual Links</h3>
 <p>Family-unique matches in bold.</p>
 <table class="table table-hover">
+  <caption class="visually-hidden">Individual links</caption>
     <thead class="table-light">
       <tr>
         <th style="text-align: right;" scope="col">Rank</th>
@@ -120,25 +122,25 @@ Results for Job: {{ job_info.job_id }}
       <tr style="background-color: {{ scp.getMatchTintByScore100(link_entry.matched_link_score) }}">
         <td style="text-align: right;" valign="middle">{{ funp.start_index + loop.index }}</td>
         <td style="text-align: right;" valign="middle">{{ "%5.2f"|format(link_entry.matched_link_score) }}</td>
-        <td style="text-align: right;" valign="middle" scope="row" class="id"><a href="{{ url_for('explore.function_by_id', function_id=link_entry.function_id * -1 if matching_result.is_query else link_entry.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ link_entry.function_id }}</a></td>
+        <td style="text-align: right;" valign="middle" class="id"><a href="{{ url_for('explore.function_by_id', function_id=link_entry.function_id * -1 if matching_result.is_query else link_entry.function_id) }}">{% if matching_result.is_query %}*{% endif %}{{ link_entry.function_id }}</a></td>
         <td style="text-align: right;" valign="middle">0x{{ "%x"|format(link_entry.offset) }}</td>
         <td style="text-align: right;" valign="middle">{{ "%d"|format(link_entry.num_bytes) }}</td>
-        <td style="text-align: right;" valign="middle"><i class="fa-solid fa-bug " title="Family ID"></i>({{ link_entry.matched_family_id }}) {{ format_family_name(link_entry.matched_family, link_entry.matched_family_id) }}</td>
+        <td style="text-align: right;" valign="middle"><i class="fa-solid fa-bug " title="Family ID" aria-hidden="true"></i>({{ link_entry.matched_family_id }}) {{ format_family_name(link_entry.matched_family, link_entry.matched_family_id) }}</td>
         <td style="text-align: right;" valign="middle">{{ link_entry.matched_sample_id }}</td>
         <td style="text-align: right;" valign="middle">
           <a href="{{ url_for('explore.function_by_id', function_id=link_entry.matched_function_id) }}">
           {% if link_entry.matched_unique %}
-          <b style="color: var(--text-strong);">{{ link_entry.matched_function_id }}</b>
+          <b style="color: var(--text-strong);">{{ link_entry.matched_function_id }}<span class="visually-hidden"> (unique)</span></b>
           {% else %}
           {{ link_entry.matched_function_id }}
           {% endif %}
-        </a>{% if not matching_result.is_query %}&nbsp;<a aria-label="Compare the two functions" title="Compare the two functions" target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare"></i></a>{% endif %}</td>
+        </a>{% if not matching_result.is_query %}&nbsp;<a aria-label="Compare function {{ link_entry.function_id }} with function {{ link_entry.matched_function_id }}" target="_blank" href="{{ url_for('data.match_functions', function_id_a=link_entry.function_id, function_id_b=link_entry.matched_function_id) }}"><i class="fa-solid fa-code-compare" aria-hidden="true"></i></a>{% endif %}</td>
         <td style="text-align: right;" valign="middle">{{ "%5.2f"|format(link_entry.matched_score) }}</td>
      </tr>
       {% endfor %}
     </tbody>
   </table>
-  {{ pagination_widget(funp, _anchor="linkhunt-links")}}
+  {{ pagination_widget(funp, _label="individual links", _anchor="linkhunt-links")}}
 
 {% endblock %}
 

@@ -137,12 +137,18 @@ def progress_text(page):
     return page.evaluate("document.getElementById('job-progress').textContent.replace(/\\s+/g, ' ').trim()")
 
 
+def progress_bar(page):
+    """The value of the cell's progress bar, which assistive technology reads; None without one."""
+    return page.evaluate("(document.querySelector('#job-progress progress') || {}).value")
+
+
 def test_progress_alone_is_updated_in_place(browser_page, live_server, solo_backend):
     answer = status(progress=0.5, unfinished_sub_jobs=0)
     browser_page.route(f"**/data/jobs/{PARENT_JOB_ID}/status", lambda route: route.fulfill(status=200, content_type="application/json", body=answer))
     traffic = open_overview(browser_page, live_server)
     browser_page.wait_for_function("document.getElementById('job-progress').textContent.trim() === '50.00%'")
 
+    assert progress_bar(browser_page) == 50
     assert traffic.loads == 1
 
 
@@ -156,6 +162,7 @@ def test_the_dependencies_average_is_updated_in_place(browser_page, live_server,
     browser_page.wait_for_function("document.getElementById('job-progress').textContent.includes('75.00%')")
 
     assert progress_text(browser_page) == "75.00% (across 2 dependencies)"
+    assert progress_bar(browser_page) == 75
     assert traffic.loads == 1
 
 

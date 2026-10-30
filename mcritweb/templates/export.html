@@ -3,6 +3,7 @@
 Export
 {% endblock %}
 {% block content %}
+<h1 class="visually-hidden">Export</h1>
 <div class="container my-4" style="max-width: 600px;">
     <form action = "{{ url_for('data.export_view') }}" method='post'>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

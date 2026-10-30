@@ -30,8 +30,9 @@
 
 {# `highlight_terms` is named rather than left in kwargs so it reaches the row macros
    only - a header has no search hit to mark, and half of them do not accept kwargs. #}
-{% macro _table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table", highlight_terms=None) %}
+{% macro _table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table", highlight_terms=None, caption=None) %}
   <table class="table table-hover" id="{{table_id}}">
+    {% if caption %}<caption class="visually-hidden">{{ caption }}</caption>{% endif %}
     <thead class="table-light">
       {{ header_macro(**kwargs) }}
     </thead>
@@ -43,9 +44,10 @@
   </table>
 {% endmacro %}
 
-{% macro _half_table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table") %}
+{% macro _half_table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table", caption=None) %}
 
   <table class="table table-hover" style="width: 66%;" id="{{table_id}}">
+    {% if caption %}<caption class="visually-hidden">{{ caption }}</caption>{% endif %}
     <thead class="table-light">
       {{ header_macro(**kwargs) }}
     </thead>
@@ -57,31 +59,31 @@
   </table>
 {% endmacro %}
 
-{% macro job_table(jobs, table_id="job-table", empty_message=None, empty_link=None) %}
+{% macro job_table(jobs, table_id="job-table", empty_message=None, empty_link=None, caption="Jobs") %}
   {% if jobs %}
-  {{ _table_base(jobs, job_header, job_row, table_id=table_id, **kwargs) }}
+  {{ _table_base(jobs, job_header, job_row, table_id=table_id, caption=caption, **kwargs) }}
   {% else %}
   {{ empty_state(empty_message or "No jobs available. Click here to create your first job", empty_link if empty_message else url_for("analyze.compare")) }}
   {% endif %}
 {% endmacro %}
 
-{% macro minijob_table(jobs, table_id="job-table", empty_message=None, empty_link=None) %}
+{% macro minijob_table(jobs, table_id="job-table", empty_message=None, empty_link=None, caption="Jobs") %}
   {% if jobs %}
-  {{ _half_table_base(jobs, minijob_header, minijob_row, table_id=table_id, **kwargs) }}
+  {{ _half_table_base(jobs, minijob_header, minijob_row, table_id=table_id, caption=caption, **kwargs) }}
   {% else %}
   {{ empty_state(empty_message or "No jobs available. Click here to create your first job", empty_link if empty_message else url_for("analyze.compare")) }}
   {% endif %}
 {% endmacro %}
 
 
-{% macro family_table(families, table_id="family-table", empty_message=None, empty_link=None) %}
+{% macro family_table(families, table_id="family-table", empty_message=None, empty_link=None, caption="Families") %}
   {% if families %}
 <!-- Modal -->
 <div class="modal fade" id="editFamilyModal" tabindex="-1" aria-labelledby="editFamilyModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="editFamilyModalLabel">Modify Family</h5>
+        <h2 class="modal-title h5" id="editFamilyModalLabel">Modify Family</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -137,28 +139,28 @@
       toggle_delete_family(deleteBox);
     });
   </script>
-  {{ _table_base(families, family_header, family_row, table_id=table_id, **kwargs) }}
+  {{ _table_base(families, family_header, family_row, table_id=table_id, caption=caption, **kwargs) }}
   {% else %}
   {{ empty_state(empty_message or "No families available. Click here to upload your first sample", empty_link if empty_message else url_for("data.submit")) }}
   {% endif %}
 {% endmacro %}
 
-{% macro function_table(functions, table_id="function-table", empty_message=None, empty_link=None) %}
+{% macro function_table(functions, table_id="function-table", empty_message=None, empty_link=None, caption="Functions") %}
   {% if functions %}
-  {{ _table_base(functions, function_header, function_row, table_id=table_id, **kwargs) }}
+  {{ _table_base(functions, function_header, function_row, table_id=table_id, caption=caption, **kwargs) }}
   {% else %}
   {{ empty_state(empty_message or "No functions available. Click here to upload your first sample", empty_link if empty_message else url_for("data.submit")) }}
   {% endif %}
 {% endmacro %}
 
-{% macro sample_table(samples, table_id="sample-table", empty_message=None, empty_link=None) %}
+{% macro sample_table(samples, table_id="sample-table", empty_message=None, empty_link=None, caption="Samples") %}
   {% if samples %}
 <!-- Modal -->
 <div class="modal fade" id="editSampleModal" tabindex="-1" aria-labelledby="editSampleModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="editSampleModalLabel">Modify Sample</h5>
+        <h2 class="modal-title h5" id="editSampleModalLabel">Modify Sample</h2>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -210,15 +212,15 @@
       toggle_delete_sample(deleteBox);
     });
   </script>
-  {{ _table_base(samples, sample_header, sample_row, table_id=table_id, **kwargs) }}
+  {{ _table_base(samples, sample_header, sample_row, table_id=table_id, caption=caption, **kwargs) }}
   {% else %}
   {{ empty_state(empty_message or "No samples available. Click here to upload your first sample", empty_link if empty_message else url_for("data.submit")) }}
   {% endif %}
 {% endmacro %}
 
-{% macro minisample_table(samples, table_id="sample-table", empty_message=None, empty_link=None) %}
+{% macro minisample_table(samples, table_id="sample-table", empty_message=None, empty_link=None, caption="Samples") %}
   {% if samples %}
-  {{ _half_table_base(samples, minisample_header, minisample_row, table_id=table_id, **kwargs) }}
+  {{ _half_table_base(samples, minisample_header, minisample_row, table_id=table_id, caption=caption, **kwargs) }}
   {% else %}
   {{ empty_state(empty_message or "No samples available. Click here to upload your first sample", empty_link if empty_message else url_for("data.submit")) }}
   {% endif %}

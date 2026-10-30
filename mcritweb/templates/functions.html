@@ -14,19 +14,21 @@ Functions
 
 {% block content %}
 <h1>Overview of Functions</h1>
+  <search>
   <div class="d-flex align-items-center" style="width:100%">
     <form class="flex-grow-1 me-3" method="GET" required action="#">
     <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" autofocus autocomplete="on">
     <input type='submit' hidden>
   </form>
     <div class="d-flex align-items-center">
-      <a href="{{ url_for('help') }}#search"><i class="fas fa-book"></i> Search Syntax</a>
+      <a href="{{ url_for('help') }}#search"><i class="fas fa-book" aria-hidden="true"></i> Search Syntax</a>
     </div>
 </div>
+  </search>
 
 {{ function_table(functions, sort_pagination=pagination, column_setup=user_column_setup, row_decorations=row_decorations,
    empty_message=("No functions match \"" ~ query ~ "\".") if query else None, highlight_terms=query|search_terms) }}
 {% if functions %}
-{{ pagination_widget(pagination) }}
+{{ pagination_widget(pagination, _label="functions") }}
 {% endif %}
 {% endblock %}

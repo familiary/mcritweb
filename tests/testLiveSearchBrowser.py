@@ -179,6 +179,56 @@ def test_the_edit_modal_still_opens_for_a_row_swapped_in(page, live_server, list
     assert "zeus" in page.locator(f"#{name_field}").input_value()
 
 
+#: every page with a live search: its path, the id of the region it swaps, and a term to
+#: type. The corpus matches a term as a substring of the whole query, so on a family's or a
+#: sample's page, whose view prefixes the term with `family_id:`/`sample_id:`, nothing does.
+LIVE_SEARCH_PAGES = [
+    ("/explore/samples", "sample-list", "dridex"),
+    ("/explore/families", "family-list", "zeus"),
+    ("/explore/families/1", "family-samples", "citadel"),
+    ("/explore/samples/0", "sample-functions", "0x40"),
+]
+
+
+def fail_searches_for(monkeypatch, backend, term):
+    """The backend answers None, as for a failed call, to any search for `term`."""
+    for method in ("search_families", "search_samples", "search_functions"):
+        def search(search_term="", *args, _real=getattr(backend, method), **kwargs):
+            return None if term in (search_term or "") else _real(search_term, *args, **kwargs)
+        monkeypatch.setattr(backend, method, search)
+
+
+@pytest.mark.parametrize("path, region, term", LIVE_SEARCH_PAGES)
+def test_a_live_search_says_what_it_found_on_every_page_that_has_one(page, live_server, path, region, term):
+    open_page(page, f"{live_server}{path}")
+
+    type_term(page, term)
+
+    rows = page.locator(f"#{region} tbody > tr").count()
+    found = f"{rows} row{'' if rows == 1 else 's'} on this page" if rows else "No results"
+    assert page.locator(f"#{region}-status").inner_text() == found
+    assert page.locator("main.content > .alert").count() == 0
+    assert page.evaluate("window.loadedOnce") is True
+
+
+@pytest.mark.parametrize("path, region, term", LIVE_SEARCH_PAGES)
+def test_a_failed_live_search_says_it_failed(page, live_server, fake_mcrit, monkeypatch, path, region, term):
+    """The page the search fetches carries the backend's failure as a flashed error. The
+    script looked for the messages in a `section.content` the layout does not have (it is
+    `main.content`), so the error was dropped and the status said "No results": the reader
+    was told the search had matched nothing when it had not run."""
+    fail_searches_for(monkeypatch, fake_mcrit, "boom")
+    open_page(page, f"{live_server}{path}")
+
+    type_term(page, "boom")
+
+    assert page.locator(f"#{region}-status").inner_text() == "The search failed, see the message above"
+    error = page.locator("main.content > .alert-danger")
+    assert error.count() == 1
+    assert "the backend did not answer" in error.inner_text()
+    assert page.evaluate("window.loadedOnce") is True
+
+
 def test_a_failed_fetch_loads_the_page_instead(page, live_server):
     """Here the session is gone, so the fetch answers with the login page, which has no
     table to take; the page the form would load is loaded, and says what happened."""

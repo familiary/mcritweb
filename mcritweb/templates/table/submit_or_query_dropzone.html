@@ -113,7 +113,10 @@ function handleSliderChange_dropzone(val) {
       </div>
     </div>
     </div>
-    <button type="submit" class="btn btn-primary" id="submit-dropzone" disabled>{% if not select_form_type and not show_submit_fields %}Query{% else %}Submit{% endif %} <span id="submit-spinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display:none"></span></button>
+    <button type="submit" class="btn btn-primary" id="submit-dropzone" disabled>{% if not select_form_type and not show_submit_fields %}Query{% else %}Submit{% endif %} <span id="submit-spinner" class="spinner-border spinner-border-sm" aria-hidden="true" style="display:none"></span></button>
+    {# what the spinner shows, for a screen reader: there before it is written to, and
+       outside the button, whose content is its name #}
+    <span id="submit-status" class="visually-hidden" role="status"></span>
 </form>
 </div>
 {% include 'js/ac_family_names.html' %}

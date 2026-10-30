@@ -13,7 +13,7 @@ Home
     <p>
       You are: {{g.user.role}}
       {% if g.user.role == "admin" %}
-      <i class="fas fa-crown"></i>
+      <i class="fas fa-crown" aria-hidden="true"></i>
       {% endif %}
     </p>
   {% if g.user.role == 'pending' %}
@@ -21,10 +21,10 @@ Home
   {% else %}
   <br />
   <h2 class="h3">Latest Sample Additions</h2>
-  {{ minisample_table(latest_samples, empty_message="Nothing has been submitted yet. Click here to add the first sample.", empty_link=url_for("data.submit")) }}
+  {{ minisample_table(latest_samples, caption="Latest sample additions", empty_message="Nothing has been submitted yet. Click here to add the first sample.", empty_link=url_for("data.submit")) }}
   <br /><br />
   <h2 class="h3">Latest Matching Jobs</h2>
-  {{ minijob_table(jobs, table_id="matching_jobs", families_by_id=families, samples_by_id=samples, empty_message="No matching job has run yet. Click here to start one.", empty_link=url_for("analyze.compare")) }}
+  {{ minijob_table(jobs, table_id="matching_jobs", caption="Latest matching jobs", families_by_id=families, samples_by_id=samples, empty_message="No matching job has run yet. Click here to start one.", empty_link=url_for("analyze.compare")) }}
   {% endif %}
 {% endif %}
   

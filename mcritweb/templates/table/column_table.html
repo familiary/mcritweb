@@ -1,4 +1,5 @@
 {% from 'table/links.html' import format_pichash, format_function_id, format_family_name, format_family_id, format_sample_id, format_sha_short_clipboard, sha256_provenance, clipboard_btn %}
+{% from 'table/links.html' import status_icon %}
 
 {% macro sample_column_table()%}
   {# `show_sha256_provenance=true` adds where each sample's sha256 comes from to its SHA256 cell
@@ -15,6 +16,7 @@
     {% if name_and_sample[1].sample_id is not none and name_and_sample[1].sample_id >= 0 %}{% set identity.is_stored = true %}{% endif %}
   {% endfor %}
   <table class="table table-hover">
+    <caption class="visually-hidden">Sample details</caption>
     <thead class="table-light">
       <tr>
         <th scope="col">Field</th>
@@ -25,7 +27,7 @@
     </thead>
     <tbody>
       <tr>
-        <td valign="middle">Sample ID{% if identity.is_stored %} | Family{% endif %}: </td>
+        <th scope="row" valign="middle">Sample ID{% if identity.is_stored %} | Family{% endif %}: </th>
         {% for name_and_sample in varargs %}
           <td valign="middle">{% if name_and_sample[1].sample_id < 0 %}*{{ name_and_sample[1].sample_id|abs }}{% else%}<a href="{{ url_for('explore.sample_by_id', sample_id=name_and_sample[1].sample_id) }}">{{ name_and_sample[1].sample_id }}</a>{% endif %}{% if identity.is_stored %} | {% if is_stored_sample(name_and_sample[1]) %}
             {{ format_family_name(name_and_sample[1].family, name_and_sample[1].family_id) }}{% else %}-{% endif %}{% endif %}
@@ -35,13 +37,13 @@
 
       {% if identity.is_stored %}
       <tr>
-        <td valign="middle">Version | Component | Library: </td>
+        <th scope="row" valign="middle">Version | Component | Library: </th>
         {% for name_and_sample in varargs %}
           {% if is_stored_sample(name_and_sample[1]) %}
           <td valign="middle">
             {{ name_and_sample[1].version or "-" }} | 
             {{ name_and_sample[1].component or "-" }} | 
-            <i {% if name_and_sample[1].is_library %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+            {{ status_icon(name_and_sample[1].is_library) }}</td>
           {% else %}
           {# a query has none of these; an empty cell keeps the row aligned without
              claiming the queried binary is not a library, which we do not know #}
@@ -51,25 +53,25 @@
       </tr>
       {% endif %}
       <tr>
-        <td valign="middle">SHA256 | Filename: </td>
+        <th scope="row" valign="middle">SHA256 | Filename: </th>
         {% for name_and_sample in varargs %}
-          <td valign="middle">{{ format_sha_short_clipboard(name_and_sample[1].sha256) }} | {{ name_and_sample[1].getShortFilename() or "-" }} {{ clipboard_btn(name_and_sample[1].filename) }}{% if kwargs.show_sha256_provenance %}{{ sha256_provenance(name_and_sample[1]|getattr("sha256_verified", none)) }}{% endif %}</td>
+          <td valign="middle">{{ format_sha_short_clipboard(name_and_sample[1].sha256) }} | {{ name_and_sample[1].getShortFilename() or "-" }} {{ clipboard_btn(name_and_sample[1].filename, "Copy filename " ~ (name_and_sample[1].getShortFilename() or "")) }}{% if kwargs.show_sha256_provenance %}{{ sha256_provenance(name_and_sample[1]|getattr("sha256_verified", none)) }}{% endif %}</td>
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">Base Address:</td>
+        <th scope="row" valign="middle">Base Address:</th>
         {% for name_and_sample in varargs %}
           <td valign="middle">0x{{ "%x"|format(name_and_sample[1].base_addr) }}</td>
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">Binary Size (BinWeight): </td>
+        <th scope="row" valign="middle">Binary Size (BinWeight): </th>
         {% for name_and_sample in varargs %}
           <td valign="middle">{{ "{:,d}".format(name_and_sample[1].binary_size) }} ({{ "{:,.0f}".format(name_and_sample[1].binweight) }}) bytes</td>
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">Functions | Blocks | Instructions: </td>
+        <th scope="row" valign="middle">Functions | Blocks | Instructions: </th>
         {% for name_and_sample in varargs %}
           <td valign="middle">
             {{ "{:,d}".format(name_and_sample[1].statistics['num_functions']) }} | 
@@ -79,7 +81,7 @@
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">Platform: </td>
+        <th scope="row" valign="middle">Platform: </th>
         {% for name_and_sample in varargs %}
           <td valign="middle">{{ name_and_sample[1].architecture }} / {{ name_and_sample[1].bitness }}bit</td>
         {% endfor %}
@@ -91,6 +93,7 @@
 
 {% macro function_column_table()%}
   <table class="table table-hover">
+    <caption class="visually-hidden">Function details</caption>
     <thead class="table-light">
       <tr>
         <th scope="col">Field</th>
@@ -101,7 +104,7 @@
     </thead>
     <tbody>
       <tr>
-        <td valign="middle">Sample ID | Family: </td>
+        <th scope="row" valign="middle">Sample ID | Family: </th>
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">{% if name_fe_se_ph[1].sample_id < 0 %}*{{ name_fe_se_ph[1].sample_id|abs }}{% else%}<a href="{{ url_for('explore.sample_by_id', sample_id=name_fe_se_ph[1].sample_id) }}">{{ name_fe_se_ph[1].sample_id }}</a>{% endif %} | 
             {{ format_family_name(name_fe_se_ph[2].family, name_fe_se_ph[2].family_id) }}
@@ -109,25 +112,25 @@
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">SHA256 | Filename: </td>
+        <th scope="row" valign="middle">SHA256 | Filename: </th>
         {% for name_fe_se_ph in varargs %}
-          <td valign="middle">{{ format_sha_short_clipboard(name_fe_se_ph[2].sha256) }} | {{ name_fe_se_ph[2].getShortFilename(16) }} {{ clipboard_btn(name_fe_se_ph[2].filename) }}</td>
+          <td valign="middle">{{ format_sha_short_clipboard(name_fe_se_ph[2].sha256) }} | {{ name_fe_se_ph[2].getShortFilename(16) }} {{ clipboard_btn(name_fe_se_ph[2].filename, "Copy filename " ~ name_fe_se_ph[2].getShortFilename(16)) }}</td>
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">Function ID:</td>
+        <th scope="row" valign="middle">Function ID:</th>
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">{{ format_function_id(name_fe_se_ph[1].function_id) }}</td>
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">Offset:</td>
+        <th scope="row" valign="middle">Offset:</th>
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">0x{{ "%x"|format(name_fe_se_ph[1].offset) }}</td>
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">Function Name:</td>
+        <th scope="row" valign="middle">Function Name:</th>
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">
             {{ name_fe_se_ph[1].function_name }}
@@ -135,7 +138,7 @@
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">Function Labels:</td>
+        <th scope="row" valign="middle">Function Labels:</th>
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">
           {% for label_entry in name_fe_se_ph[1].function_labels|sort(attribute='timestamp', reverse=True) %}
@@ -150,13 +153,13 @@
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">BinWeight: </td>
+        <th scope="row" valign="middle">BinWeight: </th>
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">{{ "{:,.0f}".format(name_fe_se_ph[1].binweight) }} bytes</td>
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">Blocks | Instructions: </td>
+        <th scope="row" valign="middle">Blocks | Instructions: </th>
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">
             {{ "{:,d}".format(name_fe_se_ph[1].num_blocks) }} | 
@@ -165,32 +168,32 @@
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">Platform: </td>
+        <th scope="row" valign="middle">Platform: </th>
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">{{ name_fe_se_ph[1].architecture }} / {{ name_fe_se_ph[2].bitness }}bit</td>
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">PicHash: </td>
+        <th scope="row" valign="middle">PicHash: </th>
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">
             {{ format_pichash(name_fe_se_ph[1].pichash) }}
-            {{ name_fe_se_ph[3]["families"] }} <i class="fa-solid fa-bug" title="Families matched"> </i>, 
-            {{ name_fe_se_ph[3]["samples"] }} <i class="fa-solid fa-virus" title="Samples matched"> </i>,
-            {{ name_fe_se_ph[3]["functions"] }} <i class="fa-solid fa-project-diagram" title="Functions matched"> </i>
+            {{ name_fe_se_ph[3]["families"] }} <i class="fa-solid fa-bug" title="Families matched" aria-hidden="true"> </i><span class="visually-hidden">families matched</span>, 
+            {{ name_fe_se_ph[3]["samples"] }} <i class="fa-solid fa-virus" title="Samples matched" aria-hidden="true"> </i><span class="visually-hidden">samples matched</span>,
+            {{ name_fe_se_ph[3]["functions"] }} <i class="fa-solid fa-project-diagram" title="Functions matched" aria-hidden="true"> </i><span class="visually-hidden">functions matched</span>
           </td>
         {% endfor %}
       </tr>
       <tr>
-        <td valign="middle">MinHash: </td>
+        <th scope="row" valign="middle">MinHash: </th>
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">
             {% if name_fe_se_ph[1].minhash|length > 0 %}
-              <i style="color: var(--status-yes);" class="fa-solid fa-square-check" title="MinHash available"></i>
-              <span class="font-monospace">{{ name_fe_se_ph[1].minhash.hex()[:16] }}&hellip;</span> {{ clipboard_btn(name_fe_se_ph[1].minhash.hex()) }}
+              <i style="color: var(--status-yes);" class="fa-solid fa-square-check" title="MinHash available" aria-hidden="true"></i>
+              <span class="font-monospace">{{ name_fe_se_ph[1].minhash.hex()[:16] }}&hellip;</span> {{ clipboard_btn(name_fe_se_ph[1].minhash.hex(), "Copy the MinHash of function " ~ name_fe_se_ph[1].function_id) }}
               ({{ name_fe_se_ph[1].minhash|length // 4 }} x 32 bit)
             {% else %}
-              <i style="color: var(--status-no);" class="fa-solid fa-times-circle" title="No MinHash"></i> not calculated
+              <i style="color: var(--status-no);" class="fa-solid fa-times-circle" title="No MinHash" aria-hidden="true"></i> not calculated
               <span style="font-size: 0.8em; color: var(--text-muted);">(too small to be minhashed, or the MinHash job has not run yet)</span>
             {% endif %}
           </td>
@@ -205,9 +208,10 @@
 
 {% macro job_column_table(job_info, show_created=True, show_started=True, show_finished=True, show_progress=False, show_duration=True, child_progress=None, child_jobs=None, progress_id=None) %}
   <table class="table table-hover">
+    <caption class="visually-hidden">Job details</caption>
     <tbody>
       <tr>
-        <td valign="middle">Task:</td>
+        <th scope="row" valign="middle">Task:</th>
         {# the readable form; the RPC call the queue recorded stays reachable as the tooltip (issue #40).
            It reaches the job overview and every result page through this macro, and a long one
            widens the page the way the raw string did, so it keeps the wrapping class (issue #41). #}
@@ -230,24 +234,24 @@
       {% set minhash_matching = minhash_matching_label(job_info) %}
       {% if minhash_matching %}
         <tr>
-          <td valign="middle">MinHash Matching: </td>
+          <th scope="row" valign="middle">MinHash Matching: </th>
           <td valign="middle">{{ minhash_matching }}</td>
         </tr>
       {% endif %}
       <tr>
-        <td valign="middle">Job ID:</td>
+        <th scope="row" valign="middle">Job ID:</th>
         <td valign="middle">{{ job_info.job_id }}</td>
       </tr>
       {% if job_info.username is defined %}
         {# who asked for the job (fkie-cad/mcritweb#37); the row exists only when the backend records it #}
         <tr>
-          <td valign="middle">Requested by:</td>
+          <th scope="row" valign="middle">Requested by:</th>
           <td valign="middle">{{ job_info.username if job_info.username else "-" }}</td>
         </tr>
       {% endif %}
       {% if show_created %}
         <tr>
-          <td valign="middle">Created: </td>
+          <th scope="row" valign="middle">Created: </th>
           <td valign="middle">
             {% if job_info.created_at|length > 15 %}
               {{ job_info.created_at|date_time }}
@@ -259,7 +263,7 @@
       {% endif %}
       {% if show_started %}
         <tr>
-          <td valign="middle">Started: </td>
+          <th scope="row" valign="middle">Started: </th>
           <td valign="middle">
             {% if job_info.started_at %}
               {{ job_info.started_at|date_time }}
@@ -271,7 +275,7 @@
       {% endif %}
       {% if show_finished %}
         <tr>
-          <td valign="middle">Finished: </td>
+          <th scope="row" valign="middle">Finished: </th>
           <td valign="middle">
             {% if job_info.finished_at %}
               {{ job_info.finished_at|date_time }}
@@ -285,7 +289,7 @@
       {% endif %}
       {% if show_duration %}
         <tr>
-          <td valign="middle">Duration: </td>
+          <th scope="row" valign="middle">Duration: </th>
           <td valign="middle">
             {% if job_info.finished_at %}
               {{ job_info.duration }}
@@ -306,10 +310,10 @@
       {% if job_total_duration is not none %}
         <tr>
           {% if job_info.finished_at %}
-            <td valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued. A job that fans out is queued just after the children it waits on, so this is a lower bound by that enqueue interval - 10ms for five children.">Total (since queued): </span></td>
+            <th scope="row" valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued. A job that fans out is queued just after the children it waits on, so this is a lower bound by that enqueue interval - 10ms for five children.">Total (since queued): </span></th>
             <td valign="middle">{{ job_total_duration }}</td>
           {% else %}
-            <td valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued to the latest time the backend recorded on it or its sub-jobs, since the backend's clock need not be this server's. From there it counts on in the browser, so it is a lower bound.">Total (since queued): </span></td>
+            <th scope="row" valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued to the latest time the backend recorded on it or its sub-jobs, since the backend's clock need not be this server's. From there it counts on in the browser, so it is a lower bound.">Total (since queued): </span></th>
             <td valign="middle"><span data-elapsed-seconds="{{ job_total_duration.total_seconds()|int }}">{{ job_total_duration }}</span> and counting</td>
           {% endif %}
         </tr>
@@ -335,7 +339,7 @@
       {% endif %}
       {% if show_progress %}
         <tr>
-          <td valign="middle">Progress: </td>
+          <th scope="row" valign="middle">Progress: </th>
           {# the flag tells the overview's polling script that the number here is the
              dependencies' average, which it takes from data.job_status's
              dependency_progress rather than from the job's own progress #}
@@ -349,18 +353,24 @@
                    #46 about progress. The children carry the real number and this page
                    has already fetched them. #}
                 {{ "%5.2f"|format(100 * child_progress) }}% <span class="text-muted">(across {{ child_jobs|length }} dependencies)</span>
+                {% set shown_progress = child_progress %}
               {% elif job_info.started_at %}
                 {{ "%5.2f"|format(100 * job_info.progress) }}% 
+                {% set shown_progress = job_info.progress %}
               {% else %}
                 {{ "%5.2f"|format(0) }}% 
+                {% set shown_progress = 0 %}
               {% endif %}
+              {# the same number as a progress bar, which assistive technology reports as one;
+                 the overview's polling script moves it along with the number #}
+              <progress max="100" value="{{ "%.2f"|format(100 * shown_progress) }}" aria-label="Job progress"></progress>
             {% endif %}
           </td>
         </tr>
       {% endif %}
       {% if job_info.finished_at %}
         <tr>
-          <td valign="middle">Raw Result: </td>
+          <th scope="row" valign="middle">Raw Result: </th>
           <td valign="middle">
             <a href="{{ url_for('data.download_result', job_id=job_info.job_id) }}">Download as JSON</a>
           </td>
@@ -368,7 +378,7 @@
       {% endif %}
       {% if job_info.is_failed and job_info.last_error %}
         <tr>
-          <td valign="middle">Error Message: </td>
+          <th scope="row" valign="middle">Error Message: </th>
           <td valign="middle">
             <pre class="job-error"><code>{{ (job_info.last_error.rstrip()|e) -}}</code></pre>
           </td>
