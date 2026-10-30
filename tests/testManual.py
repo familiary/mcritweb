@@ -170,7 +170,10 @@ def test_the_manual_documents_every_yara_parameter_the_page_offers():
 
     offered = {name for name in ("min_ins", "max_ins", "min_bytes", "max_bytes",
                                  "condition_required")
-               if f"name='{name}'" in template or f'name="{name}"' in template}
+               # the fields are drawn by the filter_field macro, which names the input
+               # after its first argument
+               if f"name='{name}'" in template or f'name="{name}"' in template
+               or f'filter_field("{name}"' in template or f"filter_field('{name}'" in template}
     assert offered, "the YARA rule form no longer names its inputs the way this test reads them"
 
     described = "instructions" in manual and "bytes" in manual and "condition" in manual

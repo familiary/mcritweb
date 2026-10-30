@@ -11,7 +11,7 @@ from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.pagination import Pagination
 from mcritweb.views.params import parse_band_range, parse_base_addr_form_param, parse_checkbox_query_param, parse_integer_list_query_param
 from mcritweb.views.search import search_page
-from mcritweb.views.utility import mcrit_server_required, query_upload_path
+from mcritweb.views.utility import mcrit_server_required, query_upload_path, refuse_upload
 
 bp = Blueprint('analyze', __name__, url_prefix='/analyze')
 
@@ -493,12 +493,10 @@ def query():
         # that declares no length could only be measured by reading it, and browsers
         # always declare one for a form upload.
         if role_limit is not None and (request.content_length is None or request.content_length > role_limit + QUERY_FORM_ALLOWANCE):
-            flash(f'Your account may only upload files for query that are up to {role_limit} bytes in size.', category='error')
-            return "", 403
+            return refuse_upload(f'Your account may only upload files for query that are up to {role_limit} bytes in size.', 403)
         f = request.files.get('file')
         if f is None:
-            flash("Please upload a file", category='error')
-            return "", 400 # Bad Request
+            return refuse_upload("Please upload a file")
 
         base_address = None
         form_options = request.form['options']
@@ -509,13 +507,11 @@ def query():
             # the server derives bitness from the mapped binary itself
             base_address = parse_base_addr_form_param(request)
             if base_address is None:
-                flash("Please enter the base address of the sample as a hexadecimal number, e.g. 0x400000.", category='error')
-                return "", 400 # Bad Request
+                return refuse_upload("Please enter the base address of the sample as a hexadecimal number, e.g. 0x400000.")
 
         binary_content = f.read()
         if role_limit is not None and len(binary_content) > role_limit:
-            flash(f'Your account may only upload files for query that are up to {role_limit} bytes in size.', category='error')
-            return "", 403 # Bad Request
+            return refuse_upload(f'Your account may only upload files for query that are up to {role_limit} bytes in size.', 403)
         if form_options == "smda":
             # the file is whatever was dropped on the page, so a body that is not a
             # readable SMDA report is ordinary user input and has to become a message.
@@ -526,8 +522,7 @@ def query():
                 smda_report = SmdaReport.fromDict(json.loads(binary_content))
             except Exception:
                 current_app.logger.warning("analyze.query - the uploaded file is not a readable SMDA report")
-                flash('That file could not be read as an SMDA report.', category='error')
-                return "", 400 # Bad Request
+                return refuse_upload('That file could not be read as an SMDA report.')
 
         minhash_band_range = parse_band_range(request)
         if form_options == "smda":
@@ -568,6 +563,5 @@ def query():
             flash('Sample submitted!', category='success')
             return url_for('data.job_by_id', job_id=job_id, refresh=3, forward=1), 202 # Accepted
         else:
-            flash('Sample could not be parsed / disassembled!', category='error')
-            return "", 400 # Bad Request
+            return refuse_upload('Sample could not be parsed / disassembled!')
     return render_template('query.html', show_submit_fields=False)

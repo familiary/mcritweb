@@ -211,6 +211,10 @@ def register():
     is_registration_token_required = False
     if server_info:
         is_registration_token_required = server_info.registration_token not in [None, ""]
+    # a refused registration comes back with what was typed, apart from the passwords and the
+    # server token, and with its message beside the field it concerns
+    entered = {}
+    field_error = None
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['inputPassword1']
@@ -218,6 +222,7 @@ def register():
         if 'registrationToken' in request.form:
             provided_registration_token = request.form['registrationToken']
         error = None
+        error_field = None
         # the guessable secret on this route is the registration token, so it is metered
         # by the same counter as /login. Ordinary validation slips - a short username, a
         # password typed twice differently - deliberately do NOT record an attempt: they
@@ -225,17 +230,17 @@ def register():
         if _throttled(registration_token_attempt(username)):
             error = TOO_MANY_ATTEMPTS
         elif not username:
-            error = 'Username is required.'
+            error, error_field = 'Username is required.', 'username'
         elif not db.is_well_formed_username(username):
-            error = "Username has wrong format. Must be 3-20 characters, alphanumeric with dots and underscores allowed, but cannot start or end with dots/underscores, nor contain two of them in a row."
+            error, error_field = "Username has wrong format. Must be 3-20 characters, alphanumeric with dots and underscores allowed, but cannot start or end with dots/underscores, nor contain two of them in a row.", 'username'
         elif db.is_reserved_username(username):
-            error = "Username is reserved."
+            error, error_field = "Username is reserved.", 'username'
         elif not password:
-            error = 'Password is required.'
+            error, error_field = 'Password is required.', 'inputPassword1'
         elif not password == request.form['inputPassword2']:
-            error = 'The passwords do not match. No new user was created.'
+            error, error_field = 'The passwords do not match. No new user was created.', 'inputPassword2'
         elif is_registration_token_required and server_info.registration_token != provided_registration_token:
-            error = 'Invalid registration token provided. No new user was created.'
+            error, error_field = 'Invalid registration token provided. No new user was created.', 'registrationToken'
             db.record_failed_login(request.remote_addr, registration_token_attempt(username))
         if error is None:
             user_info = UserInfo()
@@ -289,14 +294,21 @@ def register():
                     flash(REGISTRATION_SUBMITTED, category='info')
                 return redirect(url_for("authentication.login"))
         flash(error, category='error')
+        if error_field:
+            field_error = {"fields": [error_field], "message": error}
+        entered = {name: request.form[name] for name in ("username", "registrationToken", "url", "setRegistrationToken", "operationMode")
+                   if name in request.form}
     proposed_registration_token = ""
     if g.first_user:
-        proposed_registration_token = str(uuid.uuid4())
+        # the token the form carried, which its admin may have copied already, rather than a new one
+        proposed_registration_token = entered.get("setRegistrationToken", str(uuid.uuid4()))
     query_token = request.args.get('token')
     if query_token is None or not re.match(r"^[a-zA-Z0-9._\-]{3,36}$", query_token):
         query_token = ""
-    default_server = os.environ.get('MCRIT_DEFAULT_SERVER', "http://127.0.0.1:8000")
-    return render_template("register.html", default_mcrit_server=default_server, is_registration_token_required=is_registration_token_required, proposed_registration_token=proposed_registration_token, query_token=query_token)
+    query_token = entered.get("registrationToken", query_token)
+    default_server = entered.get("url", os.environ.get('MCRIT_DEFAULT_SERVER', "http://127.0.0.1:8000"))
+    return render_template("register.html", default_mcrit_server=default_server, is_registration_token_required=is_registration_token_required, proposed_registration_token=proposed_registration_token, query_token=query_token,
+                           entered=entered, field_error=field_error)
 
 
 @bp.route('/login', methods=('GET', 'POST'))
@@ -315,7 +327,7 @@ def login():
             # the dummy check below is deliberately expensive and would otherwise make
             # this route the cheapest way to spend the server's CPU
             flash(TOO_MANY_ATTEMPTS, category='error')
-            return render_template('login.html')
+            return render_template('login.html', username=username)
 
         user_info = UserInfo.fromDb(username=username)
         error = None
@@ -340,6 +352,10 @@ def login():
             return redirect(url_for('index'))
         db.record_failed_login(request.remote_addr, username)
         flash(error, category='error')
+        # one message for both fields, as it says nothing about which of them was wrong; the
+        # name stays, the password field is emptied and focused
+        return render_template('login.html', username=username,
+                               field_error={"fields": ["username", "current-password"], "message": error})
     return render_template('login.html')
 
 
@@ -407,11 +423,32 @@ def login_required(view):
     return wrapped_view
 
 
+#: The session key carrying a refused settings form to the settings page its view redirects
+#: to: the tab it is on, the fields the message concerns, the message, and what was typed.
+SETTINGS_FORM_ERROR = 'settings_form_error'
+
+#: Longer than any value a settings form field takes, so a value worth typing again is kept
+#: whole, while the session cookie is not made to carry whatever was posted.
+KEPT_VALUE_LENGTH = 64
+
+
+def refuse_settings_form(tab, fields, message, values=None):
+    """Answer a refused settings form. The message is flashed, as it always was, and also
+    shown beside the fields it concerns on the settings page the redirect leads to, which
+    opens on the form's tab with what was typed - never a password - still in it."""
+    flash(message, category='error')
+    kept = {name: value for name, value in (values or {}).items() if len(value) <= KEPT_VALUE_LENGTH}
+    session[SETTINGS_FORM_ERROR] = {"tab": tab, "fields": list(fields), "message": message, "typed": kept}
+    # settings.html needs a context these views do not assemble - the settings view builds it
+    return redirect(url_for('authentication.settings'))
+
+
 @bp.route('/settings')
 @login_required
 def settings():
     # login_required has settled that g.user holds this session's row
     user_info = g.user
+    form_error = session.pop(SETTINGS_FORM_ERROR, None)
     user_id = user_info.user_id
     user_filters = UserFilters.fromDb(user_id)
     user_column_settings = UserColumnSettings.fromDb(user_id)
@@ -425,7 +462,11 @@ def settings():
     # the token is not printed: the page fetches it from admin.show_apitoken when asked,
     # and at once, this one time, after a regenerate
     show_apitoken_now = session.pop(SHOW_APITOKEN_NOW, False)
-    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken), only_admin=db.is_only_admin(user_info), show_apitoken_now=show_apitoken_now)
+    if form_error and form_error["tab"] == "default-filter":
+        # a refused default filter shows what was typed, not what is stored
+        user_filters = UserFilters.fromDict(user_id, form_error["typed"])
+    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken), only_admin=db.is_only_admin(user_info), show_apitoken_now=show_apitoken_now,
+                           form_error=form_error, open_tab=form_error["tab"] if form_error else "info")
 
 def admin_required(view):
     @functools.wraps(view)

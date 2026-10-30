@@ -1,25 +1,44 @@
+{% from 'table/field_feedback.html' import USERNAME_RULE, username_hint, error_attrs, error_message, password_toggle, required_note %}
 {% extends 'base.html' %}
 {% block title%}
 Register
 {% endblock %}
+{% block style %}<script>later({{ url_for('static', filename='form_fields.js')|tojson }})</script>{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-center my-4">
   <div style="max-width: 500px; width: 100%;">
-  <form method='post'>
+  <form method='post' aria-describedby="register-required">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <h3 class="mb-3">Define User Details:</h3>
+    {# the first user's form mixes in server settings that are optional, and their labels say so #}
+    {{ required_note("register-required", "Fields are required unless they say optional." if g.first_user else "All fields are required.") }}
     <div class="mb-2">
-      <input name='username' class="form-control" id="username" aria-label="Enter username" placeholder="Enter username" title="Allowed: ^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$ -- i.e. 3-20 chars, alphanumeric with single dots and underscores in the middle" pattern="^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$" required autofocus>
+      <label for="username" class="form-label">Username</label>
+      {{ username_hint("username-hint") }}
+      <input name='username' class="form-control" id="username" title="{{ USERNAME_RULE }}" pattern="^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$" autocomplete="username" spellcheck="false" autocapitalize="off" autocorrect="off" required{% if entered.username %} value="{{ entered.username }}"{% endif %}{{ error_attrs(field_error, "username", "username-hint") }}{% if not field_error or "username" in field_error.fields %} autofocus{% endif %}>
+      {{ error_message(field_error, "username") }}
     </div>
     <div class="mb-2">
-      <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" aria-label="Enter password" placeholder="Enter password" required>
+      <label for="inputPassword1" class="form-label">Password</label>
+      <div class="password-field">
+        <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" autocomplete="new-password" required{{ error_attrs(field_error, "inputPassword1") }}{% if field_error and "inputPassword1" in field_error.fields %} autofocus{% endif %}>
+        {{ password_toggle("inputPassword1") }}
+      </div>
+      {{ error_message(field_error, "inputPassword1") }}
     </div>
     <div class="mb-3">
-        <input type="password" class="form-control" name="inputPassword2" id="inputPassword2" aria-label="Confirm password" placeholder="Confirm password" required>
+        <label for="inputPassword2" class="form-label">Confirm password</label>
+        <div class="password-field">
+          <input type="password" class="form-control" name="inputPassword2" id="inputPassword2" autocomplete="new-password"{% if not is_registration_token_required and not g.first_user %} enterkeyhint="done"{% endif %} required{{ error_attrs(field_error, "inputPassword2") }}{% if field_error and "inputPassword2" in field_error.fields %} autofocus{% endif %}>
+          {{ password_toggle("inputPassword2") }}
+        </div>
+        {{ error_message(field_error, "inputPassword2") }}
     </div>
     {% if is_registration_token_required %}
       <div class="mb-3">
-        <input class="form-control" name="registrationToken" id="registrationToken" aria-label="Registration token" placeholder="Enter registration token" value="{{ query_token }}" required>
+        <label for="registrationToken" class="form-label">Registration token</label>
+        <input class="form-control" name="registrationToken" id="registrationToken" value="{{ query_token }}" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off"{% if not g.first_user %} enterkeyhint="done"{% endif %} required{{ error_attrs(field_error, "registrationToken") }}{% if field_error and "registrationToken" in field_error.fields %} autofocus{% endif %}>
+        {{ error_message(field_error, "registrationToken") }}
       </div>
     {% endif %}
       {% if g.first_user %}
@@ -30,25 +49,28 @@ Register
       </div>
       <div class="mb-3">
         <label for="mcritServerToken" class="form-label">Enter optional Server Token (sent as AUTH_TOKEN):</label>
-        <input type="text" name='mcritServerToken' class="form-control" id="mcritServerToken" value="">
+        <input type="text" name='mcritServerToken' class="form-control" id="mcritServerToken" value="" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">
       </div>
       <div class="mb-3">
         <label for="set-registration-token" class="form-label">Optional registration token (replace or clear if other or no token desired):</label>
-        <input name='setRegistrationToken' class="form-control" id="set-registration-token" value="{{ proposed_registration_token }}" pattern="^[a-zA-Z0-9._\-]{3,36}$">
+        <input name='setRegistrationToken' class="form-control" id="set-registration-token" value="{{ proposed_registration_token }}" pattern="^[a-zA-Z0-9._\-]{3,36}$" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" enterkeyhint="done">
       </div>
     <h3 class="mt-4 mb-3">Define Operation Mode:</h3>
+    <fieldset>
+    <legend class="visually-hidden">Operation mode</legend>
     <div class="form-check mb-2">
-        <input class="form-check-input" type="radio" name="operationMode" id="radio_single" value="single" checked>
+        <input class="form-check-input" type="radio" name="operationMode" id="radio_single" value="single" {% if entered.operationMode != "multi" %}checked{% endif %}>
         <label class="form-check-label" for="radio_single">
           Single-user
         </label>
     </div>
     <div class="form-check mb-3">
-        <input class="form-check-input" type="radio" name="operationMode" id="radio_multi" value="multi">
+        <input class="form-check-input" type="radio" name="operationMode" id="radio_multi" value="multi" {% if entered.operationMode == "multi" %}checked{% endif %}>
         <label class="form-check-label" for="radio_multi">
           Multi-user
         </label>
     </div>
+    </fieldset>
     {% endif %}
     <button type="submit" class="btn btn-primary w-100">Register</button>
   </form>

@@ -1,4 +1,6 @@
 {% from 'table/links.html' import clipboard_btn %}
+{% from 'table/filter_fields.html' import filter_field %}
+{% from 'table/field_feedback.html' import USERNAME_RULE, username_hint, error_attrs, error_message, password_toggle, required_note %}
 {% extends 'base.html' %}
 {% block title%}
 Settings
@@ -11,6 +13,7 @@ Settings
 {% if can_use_api %}
 <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='show_apitoken.js')|tojson }})</script>
 {% endif %}
+<script>later({{ url_for('static', filename='form_fields.js')|tojson }})</script>
 <style>
     .list-group.col {
         min-height: 50px;
@@ -25,18 +28,18 @@ Settings
 <div class="settings-container">
 <ul class="nav nav-pills justify-content-center mb-3" id="pills-tab" role="tablist">
   <li class="nav-item" role="presentation">
-    <button class="nav-link active" id="pills-info-tab" data-bs-toggle="pill" data-bs-target="#pills-info" type="button" role="tab" aria-controls="pills-info" aria-selected="true">User Information</button>
+    <button class="nav-link{% if open_tab == 'info' %} active{% endif %}" id="pills-info-tab" data-bs-toggle="pill" data-bs-target="#pills-info" type="button" role="tab" aria-controls="pills-info" aria-selected="{{ 'true' if open_tab == 'info' else 'false' }}">User Information</button>
   </li>
   {% if g.user.role == 'admin' or g.user.role == 'contributor' %}
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="pills-username-tab" data-bs-toggle="pill" data-bs-target="#pills-username" type="button" role="tab" aria-controls="pills-username" aria-selected="false">Change username</button>
+    <button class="nav-link{% if open_tab == 'username' %} active{% endif %}" id="pills-username-tab" data-bs-toggle="pill" data-bs-target="#pills-username" type="button" role="tab" aria-controls="pills-username" aria-selected="{{ 'true' if open_tab == 'username' else 'false' }}">Change username</button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="pills-password-tab" data-bs-toggle="pill" data-bs-target="#pills-password" type="button" role="tab" aria-controls="pills-password" aria-selected="false">Change password</button>
+    <button class="nav-link{% if open_tab == 'password' %} active{% endif %}" id="pills-password-tab" data-bs-toggle="pill" data-bs-target="#pills-password" type="button" role="tab" aria-controls="pills-password" aria-selected="{{ 'true' if open_tab == 'password' else 'false' }}">Change password</button>
   </li>
   {% endif %}
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="pills-default-filter-tab" data-bs-toggle="pill" data-bs-target="#pills-default-filter" type="button" role="tab" aria-controls="pills-default-filter" aria-selected="false">Change default result filter</button>
+    <button class="nav-link{% if open_tab == 'default-filter' %} active{% endif %}" id="pills-default-filter-tab" data-bs-toggle="pill" data-bs-target="#pills-default-filter" type="button" role="tab" aria-controls="pills-default-filter" aria-selected="{{ 'true' if open_tab == 'default-filter' else 'false' }}">Change default result filter</button>
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="pills-column-settings-tab" data-bs-toggle="pill" data-bs-target="#pills-column-settings" type="button" role="tab" aria-controls="pills-column-settings" aria-selected="false">Change table column settings</button>
@@ -49,7 +52,7 @@ Settings
   </li>
 </ul>
 <div class="tab-content" id="pills-tabContent">
-  <div class="tab-pane fade show active" id="pills-info" role="tabpanel" aria-labelledby="pills-info-tab">
+  <div class="tab-pane fade{% if open_tab == 'info' %} show active{% endif %}" id="pills-info" role="tabpanel" aria-labelledby="pills-info-tab">
     <table class="table table-striped w-auto">
       <tr>
         <th>Entity</th>
@@ -104,56 +107,76 @@ Settings
     </table>
 </div>
 {% if g.user.role == 'admin' or g.user.role == 'contributor' %}
-  <div class="tab-pane fade" id="pills-username" role="tabpanel" aria-labelledby="pills-username-tab">
-      <form action = "{{ url_for('admin.change_username') }}" method='post'>
+  <div class="tab-pane fade{% if open_tab == 'username' %} show active{% endif %}" id="pills-username" role="tabpanel" aria-labelledby="pills-username-tab">
+      <form action = "{{ url_for('admin.change_username') }}" method='post' aria-describedby="rename-required">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {{ required_note("rename-required") }}
           <div class="form-group mb-2">
-            <input name='username' class="form-control" id="username" aria-label="Enter new username" placeholder="Enter new username" autofocus required >
+            <label for="username" class="form-label">New username</label>
+            {{ username_hint("username-hint") }}
+            <input name='username' class="form-control" id="username" title="{{ USERNAME_RULE }}" pattern="^(?=[a-zA-Z0-9._]{3,20}$)(?!.*[_.]{2})[^_.].*[^_.]$" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" required{% if form_error and form_error.typed.username %} value="{{ form_error.typed.username }}"{% endif %}{{ error_attrs(form_error, "username", "username-hint") }}{% if form_error and "username" in form_error.fields %} autofocus{% endif %}>
+            {{ error_message(form_error, "username") }}
           </div>
           <div class="form-group mb-2">
-            <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" aria-label="Enter password" placeholder="Enter password" required>
+            <label for="inputPassword1" class="form-label">Password</label>
+            <div class="password-field">
+              <input type="password" name='inputPassword1' class="form-control" id="inputPassword1" autocomplete="current-password" enterkeyhint="done" required{{ error_attrs(form_error, "inputPassword1") }}{% if form_error and "inputPassword1" in form_error.fields %} autofocus{% endif %}>
+              {{ password_toggle("inputPassword1") }}
+            </div>
+            {{ error_message(form_error, "inputPassword1") }}
           </div>
           <button type="submit" class="btn btn-primary">Confirm Change</button>
       </form>
   </div>
-  <div class="tab-pane fade" id="pills-password" role="tabpanel" aria-labelledby="pills-password-tab">
-      <form action = "{{ url_for('admin.change_password') }}" method='post'>
+  <div class="tab-pane fade{% if open_tab == 'password' %} show active{% endif %}" id="pills-password" role="tabpanel" aria-labelledby="pills-password-tab">
+      <form action = "{{ url_for('admin.change_password') }}" method='post' aria-describedby="password-required">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {{ required_note("password-required") }}
           <div class="form-group mb-2">
-            <input type="password" name='inputPassword2' class="form-control" id="inputPassword2" aria-label="Enter old password" placeholder="Enter old password" required>
+            <label for="inputPassword2" class="form-label">Current password</label>
+            <div class="password-field">
+              <input type="password" name='inputPassword2' class="form-control" id="inputPassword2" autocomplete="current-password" required{{ error_attrs(form_error, "inputPassword2") }}{% if form_error and "inputPassword2" in form_error.fields %} autofocus{% endif %}>
+              {{ password_toggle("inputPassword2") }}
+            </div>
+            {{ error_message(form_error, "inputPassword2") }}
           </div>
           <div class="form-group mb-2">
-              <input type="password" class="form-control" name="inputPassword3" id="inputPassword3" aria-label="Enter new password" placeholder="Enter new password" required>
+              <label for="inputPassword3" class="form-label">New password</label>
+              <div class="password-field">
+                <input type="password" class="form-control" name="inputPassword3" id="inputPassword3" autocomplete="new-password" required{{ error_attrs(form_error, "inputPassword3") }}{% if form_error and "inputPassword3" in form_error.fields %} autofocus{% endif %}>
+                {{ password_toggle("inputPassword3") }}
+              </div>
+              {{ error_message(form_error, "inputPassword3") }}
             </div>
           <div class="form-group mb-2">
-              <input type="password" class="form-control" name="inputPassword4" id="inputPassword4" aria-label="Confirm new password" placeholder="Confirm new password" required>
+              <label for="inputPassword4" class="form-label">Confirm new password</label>
+              <div class="password-field">
+                <input type="password" class="form-control" name="inputPassword4" id="inputPassword4" autocomplete="new-password" enterkeyhint="done" required{{ error_attrs(form_error, "inputPassword4") }}{% if form_error and "inputPassword4" in form_error.fields %} autofocus{% endif %}>
+                {{ password_toggle("inputPassword4") }}
+              </div>
+              {{ error_message(form_error, "inputPassword4") }}
             </div>
           <button type="submit" class="btn btn-primary">Confirm Change</button>
       </form>
   </div>
   {% endif %}
-  <div class="tab-pane fade" id="pills-default-filter" role="tabpanel" aria-labelledby="pills-default-filter-tab">
+  <div class="tab-pane fade{% if open_tab == 'default-filter' %} show active{% endif %}" id="pills-default-filter" role="tabpanel" aria-labelledby="pills-default-filter-tab">
     <form class="form-inline" action = "{{ url_for('admin.change_default_filter') }}" method='post'>
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group row text-start">
           <h3>Family / Sample result filter</h3> 
-          <label class="col-8">Filter results to (nonlib) direct score</label>
-          <input class="col-2" type="text" name='filter_direct_min_score' id="filter_direct_min_score" placeholder="regular" {% if user_filters.filter_direct_min_score is not none %}value="{{user_filters.filter_direct_min_score}}"{% endif %}>
-          <input class="col-2" type="text" name='filter_direct_nonlib_min_score' id="filter_direct_nonlib_min_score" placeholder="nonlib" {% if user_filters.filter_direct_nonlib_min_score is not none %}value="{{user_filters.filter_direct_nonlib_min_score}}"{% endif %}>
-          <label class="col-8">Filter results to (nonlib) frequency score</label>
-          <input class="col-2" type="text" name='filter_frequency_min_score' id="filter_frequency_min_score" placeholder="regular" {% if user_filters.filter_frequency_min_score is not none %}value="{{user_filters.filter_frequency_min_score}}"{% endif %}>
-          <input class="col-2" type="text" name='filter_frequency_nonlib_min_score' id="filter_frequency_nonlib_min_score" placeholder="nonlib" {% if user_filters.filter_frequency_nonlib_min_score is not none %}value="{{user_filters.filter_frequency_nonlib_min_score}}"{% endif %}>
+          {{ filter_field("filter_direct_min_score", "Min. direct score", user_filters.filter_direct_min_score, placeholder="0-100", kind="score", error=form_error) }}
+          {{ filter_field("filter_direct_nonlib_min_score", "Min. nonlib direct score", user_filters.filter_direct_nonlib_min_score, placeholder="0-100", kind="score", error=form_error) }}
+          {{ filter_field("filter_frequency_min_score", "Min. frequency score", user_filters.filter_frequency_min_score, placeholder="0-100", kind="score", error=form_error) }}
+          {{ filter_field("filter_frequency_nonlib_min_score", "Min. nonlib frequency score", user_filters.filter_frequency_nonlib_min_score, placeholder="0-100", kind="score", error=form_error) }}
           <label class="col-8" for="filter_unique_only">only show families/samples with unique matches</label>
           <input class="col-4" type="checkbox" name='filter_unique_only' id="filter_unique_only" {% if user_filters.filter_unique_only %}checked{% endif %}>
           <label class="col-8" for="filter_exclude_own_family">exclude own family</label>
           <input class="col-4" type="checkbox" name='filter_exclude_own_family' id="filter_exclude_own_family" {% if user_filters.filter_exclude_own_family %}checked{% endif %}>
           <h3>Function result filter</h3> 
-          <label class="col-8">Filter results to min score</label>
-          <input class="col-4" type="text" name='filter_function_min_score' id="filter_function_min_score" placeholder="min score (0-100)" {% if user_filters.filter_function_min_score is not none %}value="{{user_filters.filter_function_min_score}}"{% endif %}>
-          <label class="col-8">Filter results to max score</label>
-          <input class="col-4" type="text" name='filter_function_max_score' id="filter_function_max_score" placeholder="max score (0-100)" {% if user_filters.filter_function_max_score is not none %}value="{{user_filters.filter_function_max_score}}"{% endif %}>
-          <label class="col-8">Filter results to max num families/samples</label>
-          <input class="col-4" type="text" name='filter_max_num_families' id="filter_max_num_families" placeholder="max. families" {% if user_filters.filter_max_num_families is not none %}value="{{user_filters.filter_max_num_families}}"{% endif %}>
+          {{ filter_field("filter_function_min_score", "Min. score", user_filters.filter_function_min_score, placeholder="0-100", kind="score", error=form_error) }}
+          {{ filter_field("filter_function_max_score", "Max. score", user_filters.filter_function_max_score, placeholder="0-100", kind="score", error=form_error) }}
+          {{ filter_field("filter_max_num_families", "Max. families/samples", user_filters.filter_max_num_families, kind="count", error=form_error) }}
           <label class="col-8" for="filter_exclude_library">exclude functions with library hits</label>
           <input class="col-4" type="checkbox" name='filter_exclude_library' id="filter_exclude_library" {% if user_filters.filter_exclude_library %}checked{% endif %}>
           <label class="col-8" for="filter_exclude_pic">exclude PIC hits</label>
@@ -189,7 +212,7 @@ Settings
         <div class="col"><strong>Active</strong></div>
         <div class="col"><strong>Available</strong></div>
     </div>
-    <div id="items" class="row" style="display: flex; justify-content: space-between;">
+    <div class="row" style="display: flex; justify-content: space-between;">
         <div id="family_table_active" class="list-group col">
             {% for item in user_column_settings.family_table.active %}
             <div class="list-group-item">{{ item }}</div>
@@ -207,7 +230,7 @@ Settings
         <div class="col"><strong>Active</strong></div>
         <div class="col"><strong>Available</strong></div>
     </div>
-    <div id="items" class="row" style="display: flex; justify-content: space-between;">
+    <div class="row" style="display: flex; justify-content: space-between;">
         <div id="samples_table_active" class="list-group col">
             {% for item in user_column_settings.samples_table.active %}
             <div class="list-group-item">{{ item }}</div>
@@ -225,7 +248,7 @@ Settings
         <div class="col"><strong>Active</strong></div>
         <div class="col"><strong>Available</strong></div>
     </div>
-    <div id="items" class="row" style="display: flex; justify-content: space-between;">
+    <div class="row" style="display: flex; justify-content: space-between;">
         <div id="functions_table_active" class="list-group col">
             {% for item in user_column_settings.functions_table.active %}
             <div class="list-group-item">{{ item }}</div>
@@ -243,7 +266,7 @@ Settings
         <div class="col"><strong>Active</strong></div>
         <div class="col"><strong>Available</strong></div>
     </div>
-    <div id="items" class="row" style="display: flex; justify-content: space-between;">
+    <div class="row" style="display: flex; justify-content: space-between;">
         <div id="result_family_table_active" class="list-group col">
             {% for item in user_column_settings.result_family_table.active %}
             <div class="list-group-item">{{ item }}</div>
@@ -261,7 +284,7 @@ Settings
         <div class="col"><strong>Active</strong></div>
         <div class="col"><strong>Available</strong></div>
     </div>
-    <div id="items" class="row" style="display: flex; justify-content: space-between;">
+    <div class="row" style="display: flex; justify-content: space-between;">
         <div id="result_function_unfiltered_table_active" class="list-group col">
             {% for item in user_column_settings.result_function_unfiltered_table.active %}
             <div class="list-group-item">{{ item }}</div>
@@ -279,7 +302,7 @@ Settings
         <div class="col"><strong>Active</strong></div>
         <div class="col"><strong>Available</strong></div>
     </div>
-    <div id="items" class="row" style="display: flex; justify-content: space-between;">
+    <div class="row" style="display: flex; justify-content: space-between;">
         <div id="result_function_sample_filtered_table_active" class="list-group col">
             {% for item in user_column_settings.result_function_sample_filtered_table.active %}
             <div class="list-group-item">{{ item }}</div>
@@ -297,7 +320,7 @@ Settings
         <div class="col"><strong>Active</strong></div>
         <div class="col"><strong>Available</strong></div>
     </div>
-    <div id="items" class="row" style="display: flex; justify-content: space-between;">
+    <div class="row" style="display: flex; justify-content: space-between;">
         <div id="result_function_function_filtered_table_active" class="list-group col">
             {% for item in user_column_settings.result_function_function_filtered_table.active %}
             <div class="list-group-item">{{ item }}</div>

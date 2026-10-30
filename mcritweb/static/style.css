@@ -602,3 +602,63 @@ form.form-inline input {
     color: var(--sort-active);
   }
 }
+
+/* The filter forms' fields (templates/table/filter_fields.html): a label above its field.
+   Where a label wraps to a second line, as the longer ones do on a phone, its field stays
+   level with the fields beside it instead of dropping below them. */
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* A refused field and what was wrong with it (templates/table/field_feedback.html,
+   static/form_fields.js). The message carries an icon as well as the colour. From :root, so
+   the dark theme's border for every field does not win over it. */
+.field-error {
+  margin-top: 0.25rem;
+  color: var(--text-danger);
+}
+:root .form-control[aria-invalid="true"] {
+  border-color: var(--text-danger);
+}
+:root .form-control:user-invalid {
+  border-color: var(--text-danger);
+}
+
+/* A password field and its Show button (templates/table/field_feedback.html) on one line */
+.password-field {
+  display: flex;
+  gap: 0.25rem;
+}
+.password-field .form-control {
+  flex: 1 1 auto;
+}
+
+/* The upload form's word on the upload (static/upload_form.js, sayAboutUpload): a file still to
+   be chosen, or why the server refused one */
+.upload-feedback {
+  margin-top: 0.5rem;
+  color: var(--text-danger);
+}
+
+/* The MinHash sliders (the compare pages and the upload form). Bootstrap takes a focused range's
+   outline away and leaves a faint halo on its thumb, about 1.05:1 against the unfocused slider,
+   so a keyboard user could not see where focus was. */
+.form-range:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+/* The family type-ahead's suggestions (static/family_names.js gives its menu the listbox role).
+   Bootstrap marks the suggestion under the pointer by its background alone and the vendored
+   widget the typed part of each by its colour alone: forced colours take both away, and neither
+   tells a reader who cannot see the difference. An outline and a weight survive both. */
+.dropdown-menu[role="listbox"] .dropdown-item:hover,
+.dropdown-menu[role="listbox"] .dropdown-item:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.dropdown-menu[role="listbox"] .dropdown-item .text-primary {
+  font-weight: 700;
+}

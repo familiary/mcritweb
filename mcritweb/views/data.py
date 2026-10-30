@@ -67,6 +67,7 @@ from mcritweb.views.utility import (
     job_parameters_or_none,
     mcrit_server_required,
     query_upload_path,
+    refuse_upload,
 )
 
 bp = Blueprint('data', __name__, url_prefix='/data')
@@ -2921,8 +2922,7 @@ def submit():
     if request.method == 'POST':
         f = request.files.get('file')
         if f is None:
-            flash("Please upload a file", category='error')
-            return "", 400 # Bad Request
+            return refuse_upload("Please upload a file")
         family = request.form['family']
         version = request.form['version']
         bitness = None
@@ -2934,12 +2934,10 @@ def submit():
         if is_dump:
             bitness = parse_bitness_form_param(request)
             if bitness is None:
-                flash("Please select the bitness of the sample.", category='error')
-                return "", 400 # Bad Request
+                return refuse_upload("Please select the bitness of the sample.")
             base_address = parse_base_addr_form_param(request)
             if base_address is None:
-                flash("Please enter the base address of the sample as a hexadecimal number, e.g. 0x400000.", category='error')
-                return "", 400 # Bad Request
+                return refuse_upload("Please enter the base address of the sample as a hexadecimal number, e.g. 0x400000.")
 
         binary_content = f.read()
         if form_options == "smda":
@@ -2952,12 +2950,10 @@ def submit():
                 smda_report = SmdaReport.fromDict(json.loads(binary_content))
             except Exception:
                 current_app.logger.warning("data.submit - the uploaded file is not a readable SMDA report")
-                flash('That file could not be read as an SMDA report.', category='error')
-                return "", 400 # Bad Request
+                return refuse_upload('That file could not be read as an SMDA report.')
             upload_sha256 = smda_report.sha256
             if not isinstance(upload_sha256, str) or not SMDA_SHA256.match(upload_sha256):
-                flash("The SMDA report does not carry a valid sha256.", category='error')
-                return "", 400 # Bad Request
+                return refuse_upload("The SMDA report does not carry a valid sha256.")
             # the corpus holds lowercase hashes and both lookups match exactly, as promote_query does
             upload_sha256 = smda_report.sha256 = upload_sha256.lower()
         else:
