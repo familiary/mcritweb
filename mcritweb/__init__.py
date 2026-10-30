@@ -1,4 +1,5 @@
 import datetime
+import mimetypes
 import os
 
 from flask import Flask, g, redirect, render_template, request, send_from_directory, url_for
@@ -88,7 +89,7 @@ def create_app(test_config=None, instance_path=None):
     # import - including a test that only wants a pure-python helper. See issue #88.
     from flask_dropzone import Dropzone
 
-    from . import backend_errors, db, manual
+    from . import backend_errors, compression, db, manual
     from .csrf import CsrfProtect
     from .jobnames import folded_sample_ids, job_method_name, job_task, unique_blocks_samples
     from .search_highlighting import get_highlight_terms, split_search_matches
@@ -105,6 +106,14 @@ def create_app(test_config=None, instance_path=None):
         get_mcritweb_version_from_setup,
         job_is_describable,
     )
+
+    # Flask sends a file with the type mimetypes guesses from /etc/mime.types, falling
+    # back on Python's own table. Images without that file, such as python:3.12-slim,
+    # have only the table, which knows no WOFF2 at all and WebP only from Python 3.13 on,
+    # so the help page's WebP screenshot and the icon fonts went out as
+    # application/octet-stream, and under nosniff the browser refuses those.
+    mimetypes.add_type("image/webp", ".webp")
+    mimetypes.add_type("font/woff2", ".woff2")
 
     # create and configure the app
     # instance_path is overridable so tests get their own cache/temp/uploads tree
@@ -281,6 +290,8 @@ def create_app(test_config=None, instance_path=None):
     # a failed backend call answers with a page saying so, not a stack trace (#43)
     backend_errors.register(app)
     app.config['MCRITWEB_VERSION'] = get_mcritweb_version_from_setup()
+    # gzip the text responses for deployments without a compressing proxy (issue #63)
+    compression.register(app)
     app.config['DROPZONE_DEFAULT_MESSAGE'] = "Drop file or click here to import"
     app.config['DROPZONE_ALLOWED_FILE_CUSTOM'] = True
     app.config['DROPZONE_ALLOWED_FILE_TYPE'] = ""
