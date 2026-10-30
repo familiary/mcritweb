@@ -1,4 +1,5 @@
 import datetime
+import mimetypes
 import os
 
 from flask import Flask, g, redirect, render_template, request, send_from_directory, url_for
@@ -105,6 +106,14 @@ def create_app(test_config=None, instance_path=None):
         get_mcritweb_version_from_setup,
         job_is_describable,
     )
+
+    # Flask sends a file with the type mimetypes guesses from /etc/mime.types, falling
+    # back on Python's own table. Images without that file, such as python:3.12-slim,
+    # have only the table, which knows no WOFF2 at all and WebP only from Python 3.13 on,
+    # so the help page's WebP screenshot and the icon fonts went out as
+    # application/octet-stream, and under nosniff the browser refuses those.
+    mimetypes.add_type("image/webp", ".webp")
+    mimetypes.add_type("font/woff2", ".woff2")
 
     # create and configure the app
     # instance_path is overridable so tests get their own cache/temp/uploads tree
