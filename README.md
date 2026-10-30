@@ -1,5 +1,5 @@
 # MCRITweb
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/fkie-cad/mcritweb)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/familiary/mcritweb)
 
 MCRITweb is a Flask-based user interface for the [MinHash-based Code Recognition & Investigation Toolkit (MCRIT)](https://github.com/danielplohmann/mcrit).  
 MCRITweb has been developed by Daniel Enders, Manuel Blatt, and Daniel Plohmann.
@@ -40,6 +40,8 @@ and then to run MCRITweb, execute:
 `$ flask run`
 
 Note that most functionality of MCRITweb will only work if an MCRIT backend is configured and available.
+
+MCRITweb gzips its stylesheets, scripts and JSON for browsers that accept it, so a bare `flask run` or waitress deployment is not stuck with uncompressed transfers. The reference `docker-mcrit` deployment does not compress either: its NGINX configuration has no `gzip` directive (`docs/adr/0015-the-rest-of-63-is-gzip-in-the-proxy.md`). HTML pages are left uncompressed, because they carry the session's CSRF token next to input they reflect, which a compressed response leaks to a BREACH attack; so are downloads and the `/api` passthrough, which are streamed rather than read into memory, and bodies over 1 MiB. A proxy that compresses on its own leaves already encoded bodies alone; to hand the job to the proxy entirely, set `MCRITWEB_COMPRESS_RESPONSES = False` in `instance/config.py`, and keep `text/html` out of its `gzip_types` for the same reason.
 
 ### Running behind a reverse proxy
 

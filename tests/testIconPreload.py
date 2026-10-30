@@ -43,7 +43,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
 logging.disable(logging.CRITICAL)
 
 PRELOAD_LINK = re.compile(rb"<link\s[^>]*rel=\"preload\"[^>]*>")
-SOLID_FONT = b"webfonts/fa-solid-900.woff2"
+#: the solid face, cut to the glyphs the templates draw by scripts/subset_fontawesome.py
+SOLID_FONT = b"webfonts/subset/fa-solid-900.woff2"
 
 
 def preload_links(html):
