@@ -277,3 +277,11 @@ def test_the_size_is_read_from_a_lossless_webp_header(tmp_path):
         (tmp_path / f"{name}.webp").write_bytes(webp(1267, 793, **wrong))
         assert _image_size(tmp_path / f"{name}.webp") is None, name
     assert _image_size(tmp_path / "missing.webp") is None
+
+
+def test_the_manual_s_lines_are_at_most_80_characters_long():
+    """171 characters a line at 1280px, 199 at 1920px. tests/testTypographyBrowser.py
+    measures them."""
+    css = (pathlib.Path(__file__).resolve().parents[1] / "mcritweb" / "static" / "style.css").read_text()
+
+    assert re.search(r"\.manual :is\(p, li, blockquote, dd\):not\(:has\(> img\)\)\s*\{\s*max-inline-size:\s*80ch;", css)

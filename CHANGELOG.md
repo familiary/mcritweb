@@ -80,6 +80,30 @@ rather than reconstructing it from the commit log at release time.
 - Control flow graphs are laid out about three times faster on large functions, with the same
   result: 5.6 s instead of 21.7 s for a 971-block function. A patch to the vendored dagre builds the
   graph of each rank in one pass instead of walking the whole graph once per rank.
+- On a screen 1200px wide or more, the column headings of a list or result table stay at the top of
+  the window while its rows scroll by, so the 100 or 250 rows of a page can be read without
+  scrolling back up to tell the score columns apart.
+- A table or cross compare matrix that scrolls sideways fades out at its right edge while there is
+  more of it to the right, in Chrome and Edge; a touch scrollbar stays hidden until the table is
+  touched, so nothing used to say there was more. Other browsers show no fade, as before.
+  The matrix's fade follows its scroll position by a scroll-driven animation rather than a
+  scroll-state container, which made every tab switch of a 100 x 100 matrix spend about 190ms more
+  restyling the page.
+- The help page's paragraphs and list items are at most 80 characters wide, instead of running the
+  width of the window, up to about 200 characters a line on a wide screen; its screenshots, tables
+  and code still use the whole width.
+- The pages follow the text size set for the whole system on Android and ChromeOS, in Chrome and
+  Edge: they opt in with `<meta name="text-scale" content="scale">`. The text that was sized in
+  pixels and so would not have grown - the score tooltips, the cross compare matrix's labels, the
+  login fields - is sized in `rem` instead, and a copy button grows with its icon instead of
+  clipping it; it is at least 24px square, up from 16px.
+  The tooltips take a line height of 1.4 instead of 1, so one that wraps onto several lines stays
+  readable.
+- On a phone, a tablet or a window under 1200px wide, a result page lays out its function matches
+  only when they are scrolled near, in browsers that support `content-visibility`. With 250 rows a
+  page that halves the layout and style work before the page is first shown (2.7 s to 1.0 s of
+  layout on a phone-speed processor), and the page is as long as before while the table waits, to
+  within half a percent, so its scrollbar does not jump when the table is laid out.
 - An icon-only link or button names itself once in the markup. Its tooltip, which repeated the
   `aria-label` word for word in a `title` on each of a match table's hundred rows, is given by
   `page_loading.js` once the page has painted, so a result page is smaller by the text of those
@@ -141,6 +165,34 @@ rather than reconstructing it from the commit log at release time.
   its longest instruction and stays inside its pane and the window; it was sized from the drawn
   block, so most instructions ran out of the box, and the combined view's "B's code" tooltip was not
   held inside the pane at all.
+- On a phone, a tablet or a small laptop a wide table scrolls sideways in a box of its own instead of
+  widening the whole page. A data table is as wide as the headings, ids, families and buttons it
+  keeps on one line, 1,064px on the samples list, and below about 1,100px the page scrolled sideways
+  with it, taking the heading, the filters and the pagination along. Below 1200px each data table
+  now scrolls on its own, and the menus in its rows, a sample's Analyze menu and a user's actions,
+  open over the edge of the box rather than being cut off by it. On the function pages the box no
+  longer covers the API usage button that floats before it, which stopped the button opening its
+  dialog.
+- The tables that list the fields of one thing - a sample, a function, a job, the settings - break a
+  long value onto the next line instead of pushing the page wider than a phone: the 64-character API
+  token on the settings page, a long filename, a 37-character statistics field. The labels of those
+  tables keep their words whole ("Registration:", not "Registratio" and "n:"), and the tables that
+  put samples or functions side by side scroll in a box of their own below 1200px where a 320px
+  window leaves them too little room.
+- A cross compare matrix wider than the window can be scrolled back to its first column. Centred
+  in its pane, it overflowed on both sides, and the index, hash and copy button of every row sat to
+  the left of where the scrollbar could go: on a phone always, on a desktop from about 40 samples.
+- Searching for a SHA-256 no longer makes the page wider than the window, at any width: the heading
+  that quotes the term, the notice the search flashes and an empty table's message break the hash
+  across lines, as do the other headings, a family's name among them. The rule meant to do this for
+  headings was written for a `<section>` no page has.
+- On a phone the control flow graph and its code, or the two graphs of a comparison, are stacked
+  and each takes the width of the page; side by side at every width, they were two slivers of
+  about 150px. The panes are as tall as the window with the browser's bars shown, so the bottom
+  of a pane no longer hides behind them.
+- A graph's "Loading" note and the combined graph's error show in a short window. They sat 400px
+  down a pane that is the window's height less 106px, so on a landscape phone the pane cut them
+  off; they now sit about halfway down it.
 - A live search that the backend fails to answer says so. The table's search box showed "No results"
   and dropped the error the page reported, because the script looked for the messages in an element
   the layout does not have; the error is now shown above the table and the screen-reader status says

@@ -2,6 +2,10 @@
 {% block title%}
 Users
 {% endblock %}
+{% block style %}
+{# the actions menu of a row, out of reach of the box that scrolls the table #}
+<script>later({{ url_for('static', filename='table_scroll.js')|tojson }})</script>
+{% endblock %}
 {% block content %}
 <h1 class="visually-hidden">Users</h1>
 <ul class="nav nav-pills mb-3 justify-content-center" id="pills-tab" role="tablist">
@@ -35,6 +39,7 @@ Users
 {% endif %}
 <div class="tab-content" id="pills-tabContent">
   <div class="tab-pane fade {% if active == 'pending' %}show active{% endif %}" id="pills-pending" role="tabpanel" aria-labelledby="pills-pending-tab">
+    <div class="table-scroll">
     <table class="table table-hover">
       <caption class="visually-hidden">Pending users</caption>
       <thead class="table-light">
@@ -69,8 +74,10 @@ Users
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   <div class="tab-pane fade {% if active == 'contributors' %}show active{% endif %}" id="pills-contributors" role="tabpanel" aria-labelledby="pills-contributors-tab">
+    <div class="table-scroll">
     <table class="table table-hover">
       <caption class="visually-hidden">Contributors</caption>
       <thead class="table-light">
@@ -104,8 +111,10 @@ Users
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   <div class="tab-pane fade {% if active == 'admins' %}show active{% endif %}" id="pills-admins" role="tabpanel" aria-labelledby="pills-admins-tab">
+    <div class="table-scroll">
     <table class="table table-hover">
       <caption class="visually-hidden">Admins</caption>
       <thead class="table-light">
@@ -139,8 +148,10 @@ Users
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   <div class="tab-pane fade {% if active == 'all' %}show active{% endif %}" id="pills-all" role="tabpanel" aria-labelledby="pills-all-tab">
+    <div class="table-scroll">
     <table class="table table-hover">
       <caption class="visually-hidden">All users</caption>
       <thead class="table-light">
@@ -189,8 +200,10 @@ Users
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   <div class="tab-pane fade {% if active == 'visitors' %}show active{% endif %}" id="pills-visitors" role="tabpanel" aria-labelledby="pills-visitors-tab">
+    <div class="table-scroll">
     <table class="table table-hover">
       <caption class="visually-hidden">Visitors</caption>
       <thead class="table-light">
@@ -224,6 +237,7 @@ Users
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 {% endblock %}

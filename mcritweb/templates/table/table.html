@@ -19,7 +19,7 @@
 {% set CONTRIBUTOR_ONLY_LINKS = [url_for("data.submit"), url_for("data.submit_or_query")] %}
 
 {% macro empty_state(message, link=None) %}
-  <div class="text-center my-3">
+  <div class="text-center my-3 empty-state">
     {%- if link and not (link in CONTRIBUTOR_ONLY_LINKS and g.user.role not in ["admin", "contributor"]) -%}
       <a href="{{ link }}" class="text-primary text-decoration-underline">{{ message }}</a>
     {%- else -%}
@@ -31,6 +31,7 @@
 {# `highlight_terms` is named rather than left in kwargs so it reaches the row macros
    only - a header has no search hit to mark, and half of them do not accept kwargs. #}
 {% macro _table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table", highlight_terms=None, caption=None) %}
+  <div class="table-scroll">
   <table class="table table-hover" id="{{table_id}}">
     {% if caption %}<caption class="visually-hidden">{{ caption }}</caption>{% endif %}
     <thead class="table-light">
@@ -42,10 +43,12 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 {% endmacro %}
 
 {% macro _half_table_base(iterable_rows, header_macro, row_macro, table_id="unknown-table", caption=None) %}
 
+  <div class="table-scroll">
   <table class="table table-hover" style="width: 66%;" id="{{table_id}}">
     {% if caption %}<caption class="visually-hidden">{{ caption }}</caption>{% endif %}
     <thead class="table-light">
@@ -57,6 +60,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 {% endmacro %}
 
 {% macro job_table(jobs, table_id="job-table", empty_message=None, empty_link=None, caption="Jobs") %}

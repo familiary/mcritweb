@@ -101,12 +101,16 @@
 }
 
 html {
-    font-family: 'Roboto', sans-serif;
     background: var(--surface-page);
 }
   
 body {
     max-width: 1824px;
+    /* the generic sans-serif the pages have always been set in, from a style attribute on
+       <body> until now: Bootstrap's body rule would set system-ui, and the 'Roboto' this
+       sheet named on html never reached a page (no text font is shipped, and Bootstrap's
+       rule is on body) */
+    font-family: sans-serif;
     font-size: 0.9em;
     margin: 0 auto;
     background: var(--surface-page);
@@ -192,9 +196,11 @@ hr {
     color: var(--text-strong);
 }
 
+/* at least the 24px a target needs (WCAG 2.5.8), and as big as its icon: a maximum of 24px
+   clipped the icon of a text size doubled by the reader */
 .btn-clipboard {
-    max-height: 24px;
-    max-width: 24px;
+    min-height: 24px;
+    min-width: 24px;
     padding: 0;
     line-height: 1;
 }
@@ -241,9 +247,13 @@ tr.row-pending { background-color: var(--row-pending); }
   /* Same string, two more places it can widen the page. The job overview and progress
      headings print the raw `job.parameters`, and a heading that overflows does not
      enlarge its own bounding box - it just pushes documentElement.scrollWidth out, so
-     it is invisible to an element-overflow check and very visible to a reader. Scoped
-     to the content region so the navbar and the manual are untouched. */
-  section.content h1 {
+     it is invisible to an element-overflow check and very visible to a reader. Other
+     headings print what someone typed or named - the term searched for, a SHA-256 more
+     often than not, or a family's name - and so do the message of an empty table and the
+     notice a search flashes. None of them is the worse for breaking a word that does not
+     fit its line. (This was `section.content h1`, and the content region is a <main>: it
+     matched nothing.) */
+  h1, h2, h3, h4, h5, h6, .empty-state, .alert {
     overflow-wrap: anywhere;
   }
 
@@ -359,7 +369,8 @@ form.form-inline input {
   background-color: var(--cfg-canvas);
   width: 100%;
   min-height: 100px;
-  height: calc(100vh - 106px);
+  /* svh, as the panes below */
+  height: calc(100svh - 106px);
 }
 /* out of the flow, so the graph does not move up by the note's 400 px when it goes: the
    graph is drawn when its layout comes back from the worker, seconds after the click on a
@@ -943,4 +954,279 @@ li[data-reorder-item] {
    own, so it still takes no room. */
 .accordion-collapse[hidden="until-found"] {
   display: block !important;
+}
+
+/* Tables wider than the screen.
+
+   A data table is as wide as the cells issue #52 keeps on one line - headings, ids,
+   families, action buttons - which is up to 1,064px on the samples page and 1,120px on a
+   result page. Nothing held it, so it widened the page: on a phone or a tablet the
+   heading, the filters and the pagination slid sideways with it, the title and the table
+   were never on screen together, and nothing said the page scrolled. Each data table now
+   sits in a .table-scroll, which scrolls it on its own below 1200px.
+
+   Only below. A box that scrolls sideways also clips what overflows it at the top and
+   bottom, which on a wide screen, where the tables fit, would cut off the hover tooltips
+   of the first rows; and a box that scrolls is what a sticky heading sticks to (below).
+
+   position: relative because Bootstrap's .visually-hidden is position: absolute, and a
+   scroll box clips an absolutely positioned descendant only when it is the descendant's
+   containing block: without it the box scrolls and the page is still 922px wide. The
+   table's bottom margin goes to the box, so the spacing below a table stays what it was
+   whether the box scrolls (and so holds the margin in) or not, and a scrollbar sits right
+   under the table. Bootstrap's dropdown menus in a row, which the box would clip as well,
+   are placed by static/table_scroll.js. */
+.table-scroll {
+  position: relative;
+  margin-bottom: 1rem;
+  /* beside a float, as the table it holds is, not under it: a positioned box that ran under
+     the floated API usage button of the function pages painted over it and took its clicks */
+  display: flow-root;
+}
+.table-scroll > .table {
+  margin-bottom: 0;
+}
+@media (max-width: 1199.98px) {
+  .table-scroll {
+    overflow-x: auto;
+  }
+}
+
+/* A table that is not in a box lists the fields of one thing - a sample, a function, a
+   job, an account - and breaks a long value instead: the 64-character API token, a
+   43-character filename or a 37-character field name had nowhere to break, and pushed the
+   table and the page past the window, 641px wide at 390px on the settings page.
+   `anywhere`, as for td.job-description above, because a table is sized from the narrowest
+   its cells can be, and only `anywhere` lets a long token give that up. */
+table.table:not(.table-scroll > table) :is(td, th) {
+  overflow-wrap: anywhere;
+}
+
+/* On a wide screen a data table's headings stay at the top of the window while its rows
+   go by: a page holds up to 250 rows, and a score table's columns are told apart by their
+   headings alone. Not below 1200px, where the box scrolls and is what a heading would stick
+   to, and nothing would. The light head's cells carry Bootstrap's opaque background, which
+   hides the rows passing under them; any other head gets the page's. */
+@media (min-width: 1200px) {
+  .table-scroll > .table > thead > tr > th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .table-scroll > .table > thead:not(.table-light) > tr > th {
+    background-color: var(--surface-page);
+  }
+}
+
+/* The cross compare matrix is centred in its pane by its margins. It used to be by the
+   pane's justify-content: center, which, once the matrix is wider than the pane, pushes
+   its start out to the left, where a scroll position cannot go below 0: on a phone the
+   index, the hash and the copy button of every row were cut off, and so were about 126px
+   of a 40-sample matrix on a desktop. Auto margins centre what fits and fall to 0 for
+   what does not, so the pane scrolls from the matrix's first column. */
+.cross-pane-body > table {
+  margin-inline: auto;
+}
+
+/* A box that scrolls a table sideways says so with a fade at its right edge, shown while
+   more of the table lies to the right. Nothing else did: on a phone or a Mac the scrollbar
+   stays hidden until the table is touched, and a table cut at the edge of the screen looks
+   like a whole one. The box becomes a grid of one cell holding the table and the fade, so
+   that the fade is as tall as the table and sticks to the box's edge however far it is
+   scrolled; it takes no room and catches no click, so nothing moves when it shows. Where
+   scroll-state queries are not supported there is no fade, as before. */
+@supports (container-type: scroll-state) {
+  @media (max-width: 1199.98px) {
+    .table-scroll {
+      container-type: scroll-state;
+      display: grid;
+    }
+  }
+  .table-scroll > table {
+    grid-area: 1 / 1;
+  }
+  .table-scroll::after {
+    content: "";
+    grid-area: 1 / 1;
+    justify-self: end;
+    position: sticky;
+    inset-inline-end: 0;
+    inline-size: 1.5rem;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(to left, var(--surface-page), transparent);
+  }
+  @container scroll-state(scrollable: inline-end) {
+    .table-scroll::after {
+      opacity: 1;
+    }
+  }
+}
+/* The cross compare matrix's pane has the same fade, but is not a scroll-state container: on
+   a 100 x 100 matrix the container added about 190ms of style time to every tab switch. A
+   scroll-driven animation of the fade's own opacity does not: it runs while the pane is
+   scrollable, one step from shown to gone at the end of the scroll range, and a pane that
+   does not scroll has no timeline, so the fade keeps its opacity of 0. */
+@supports (animation-timeline: scroll()) {
+  .cross-pane-body {
+    display: grid;
+  }
+  .cross-pane-body > table {
+    grid-area: 1 / 1;
+  }
+  .cross-pane-body::after {
+    content: "";
+    grid-area: 1 / 1;
+    justify-self: end;
+    position: sticky;
+    inset-inline-end: 0;
+    inline-size: 1.5rem;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(to left, var(--surface-page), transparent);
+    animation: cross-pane-fade steps(1, end) both;
+    animation-timeline: scroll(nearest inline);
+  }
+  @keyframes cross-pane-fade {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+}
+/* the fade is the page's colour, which forced colours replace around it */
+@media (forced-colors: active) {
+  :is(.table-scroll, .cross-pane-body)::after {
+    display: none;
+  }
+}
+
+/* A result page's function matches are laid out only once they come near the window. With
+   250 rows a page the tables of a sample's result are 20,000 elements, all laid out before
+   the first paint; leaving the function matches, the last and longest, until they are
+   needed halved the layout and style time. Until then the table is held at about its
+   height, which the template works out from its number of rows (2.35rem and a 1px border
+   a row of function matches, one line at every width, and 3rem for the headings, which take
+   one line or two), so that the page, and its scrollbar, are as long as they will be to
+   within half a percent; `auto` keeps the height it had once
+   it has been laid out. It is laid out before it scrolls into view, and when something in it
+   is found or focused. The tables above are left alone: the samples or families matched
+   are near the top and laid out at once anyway, and a library match's version wraps in a
+   narrow column, so that no estimate of their height would hold.
+   Below 1200px only: content-visibility clips the box as a scroll container does, and on
+   a wide screen, where the box does not scroll so that the headings can stick, a table
+   wider than the window would be cut off with no way to reach the rest. A browser without
+   content-visibility lays the table out at once, as before. */
+@media (max-width: 1199.98px) {
+  .table-deferred {
+    content-visibility: auto;
+  }
+}
+
+/* The panes of the control flow graph viewer. trace_CFG/cfg_style.css floats the graph and
+   the code (or the two graphs) side by side, 50% each at every width, as tall as the
+   window less the 106px above them. On a phone that was two 147px slivers - the graph a
+   speck, the code cut after twenty characters - so below 768px they stack, each most of
+   the window's height. Heights are in svh, the window with the browser's bars shown,
+   rather than vh, which on a phone is the window without them and so taller than what
+   shows while they are; and rather than dvh, which follows the bars as they come and go
+   and would resize the panes, and move what is below them, as the reader scrolls.
+   `main` outweighs cfg_style.css's id rules, which are linked after this sheet. */
+main #xcfg_left,
+main #xcfg_right,
+main #xcfg_text_right {
+  height: calc(100svh - 106px);
+}
+@media (max-width: 767.98px) {
+  main #xcfg_left,
+  main #xcfg_right,
+  main #xcfg_text_right {
+    float: none;
+    width: 100%;
+    height: 70svh;
+  }
+}
+
+/* The "Loading" note of a graph pane, and the combined graph's error, sat 400px down the
+   pane, and a pane is the window's height less 106px: in a landscape phone's 284px its
+   overflow hid them. They sit about halfway down now, and never further than before. */
+.graph-note {
+  margin-top: min(400px, calc(50svh - 73px));
+  margin-left: 20px;
+  font-size: x-large;
+  color: var(--text-progress);
+}
+
+/* The manual's paragraphs ran the width of the page, 171 characters a line at 1280px and
+   199 at 1920px; past about 80 a reader loses their place on the way back to the start
+   of the next line. Its pictures, tables and code keep the whole width: a picture is a
+   paragraph of its own, which is therefore not held to 80 characters. */
+.manual :is(p, li, blockquote, dd):not(:has(> img)) {
+  max-inline-size: 80ch;
+}
+
+/* Text sizes that follow the reader's. base.html opts the pages in to the system text
+   size, which the browser applies to the root font size, so a size in px stays what it
+   was. The cross compare matrix's labels are a little smaller than the page's text and
+   its column index smaller still: 13px and 10px, now in rem. hint.css, vendored, sets its
+   tooltips' 12px on a 12px line; :root outweighs it, as in theme-dark.css. */
+.cross-matrix th,
+.cross-matrix td.sha256,
+.cross-matrix td.id,
+.cross-matrix .cross-label {
+  font-size: 0.8125rem;
+}
+.cross-matrix th {
+  color: var(--text-strong);
+  font-weight: normal;
+}
+.cross-matrix .cross-index {
+  font-size: 0.625rem;
+  color: var(--text-strong);
+}
+:root [data-hint]::after {
+  font-size: 0.75rem;
+  /* unitless, so it scales with the text; more than hint.css's single line, since tooltips
+     wrap and at 1 their lines sit on top of each other */
+  line-height: 1.4;
+}
+
+/* The yes and no of an icon or a message: green and dark red, and their dark-theme values
+   (theme-dark.css redefines the two properties). They were a style attribute on 36 elements,
+   each a place to change a colour, and one the dark sheet could only outweigh with
+   !important. After .graph-note above, whose colour the error note replaces. */
+.status-yes {
+  color: var(--status-yes);
+}
+.status-no {
+  color: var(--status-no);
+}
+
+/* The Active and Available columns of the settings page's table views: a Bootstrap .row, which
+   is a flex box already, so that only the spacing was left to say. */
+.settings-columns {
+  justify-content: space-between;
+}
+
+/* The labels of a table of fields keep their words. A table breaking a long value at any
+   point (above) is sized from the narrowest its cells can be, which for `anywhere` is one
+   letter, so the label column was squeezed until "Registration:" broke after the "n" and
+   "Instructions:" after the "Ins". The label cells, the first of a row, are at least as
+   wide as the longest word a label has, and a value as a number of eight digits, and the
+   rest of a value gives up the width instead.
+   The tables that compare samples or functions side by side hold more than a phone has
+   room for even then, below about 360px: they sit in a box that scrolls them there, and
+   in the box they break a long value as well, rather than scrolling at once. */
+.table-wrap > table :is(td, th) {
+  overflow-wrap: anywhere;
+}
+table.table:not(.table-scroll > table) :is(td, th):first-child,
+.table-wrap > table :is(td, th):first-child {
+  min-width: 14ch;
+}
+table.table:not(.table-scroll > table) :is(td, th):not(:first-child),
+.table-wrap > table :is(td, th):not(:first-child) {
+  min-width: 10ch;
 }
