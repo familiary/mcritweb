@@ -137,13 +137,13 @@ def test_the_lazy_loader_attaches_by_hand_and_runs_the_handlers_once(client, as_
     for needle in ("Dropzone.autoDiscover = false", "new Dropzone(element, window.mcritDropzoneOptions)", "mcritInitDropzone()", "mcritDropzoneLoading.push(done)", 'classList.add("dropzone")'):
         assert needle in loader, needle
     assert "function mcritInitDropzone()" in page
-    assert "$(document).ready(mcritInitDropzone)" not in page, "the handlers must wait for the library on a lazy page"
+    assert "whenReady(mcritInitDropzone)" not in page, "the handlers must wait for the library on a lazy page"
 
 
 def test_the_upload_pages_run_the_handlers_on_ready(client, as_role):
     as_role("contributor")
     page = client.get("/analyze/query").get_data(as_text=True)
-    assert "$(document).ready(mcritInitDropzone)" in page
+    assert "whenReady(mcritInitDropzone)" in page
 
 
 if __name__ == "__main__":

@@ -59,7 +59,7 @@
 
 {%- macro clipboard_js() -%}
 <script>
-$(function () {
+whenReady(function () {
   $('[data-bs-toggle="tooltip"], [data-toggle="tooltip"]').tooltip()
 })
 function copy_to_clipboard(btn){

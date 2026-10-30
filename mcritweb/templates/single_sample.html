@@ -18,7 +18,7 @@ Sample: {{ entry.sample_id }}
 {% block content %}
 
 <script>
-  $(document).ready(function(){
+  whenReady(function(){
     var editSampleModal = document.getElementById('editSampleModal');
     editSampleModal.addEventListener('show.bs.modal', function (event) {
     // Button that triggered the modal

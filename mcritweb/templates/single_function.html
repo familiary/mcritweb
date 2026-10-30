@@ -71,7 +71,7 @@ Function: {{ function_id }}
     ("Its sample", "/samples/%d" % entry.sample_id),
   ], "function_entry = client.getFunctionById(%d, with_xcfg=True)\nprint(client.getMatchesForPicHash(function_entry.pichash, summary=True))" % function_id) }}
 <script>
-  $(document).ready(function(){
+  whenReady(function(){
     $("#compare_function_form").submit(function(eventObj) {
       eventObj.preventDefault();
       // the placeholder id 0 is what url_for needs to build the path; the real id replaces it

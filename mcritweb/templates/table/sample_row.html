@@ -6,7 +6,7 @@
 <script>
   var button_clicked = false;
   
-  $(document).ready(function(){
+  whenReady(function(){
     // delegated, so the listener holds whichever modal the page has, including one a
     // live search (live_search.js) brings in; Bootstrap's modal events bubble
     document.addEventListener('show.bs.modal', function (event) {

@@ -14,33 +14,37 @@
 {{ dropzone.style('border: 2px dashed black; margin: 20px auto; width: 100%; max-width: 600px; min-height: 200px; border-radius: 25px; background: rgb(240, 240, 240);') }}
 <script>
   function show_extended(x) {
-    if (x.checked) {      
+    if (x.checked && window.jQuery) {
       $(document.getElementById("extendedFields")).slideDown();   
     }
   }
  
   function hide_extended(x) {
-    if (x.checked) {
+    if (x.checked && window.jQuery) {
       $(document.getElementById("extendedFields")).slideUp();
     }
   }
 
   function show_submit(x) {
-    if (x.checked) {      
+    if (x.checked && window.jQuery) {
       $(document.getElementsByClassName("submit-form-exclusive")).slideDown();   
       $(document.getElementsByClassName("query-form-exclusive")).slideUp();   
     }
   }
  
   function hide_submit(x) {
-    if (x.checked) {
+    if (x.checked && window.jQuery) {
       $(document.getElementsByClassName("submit-form-exclusive")).slideUp();   
       $(document.getElementsByClassName("query-form-exclusive")).slideDown();   
     }
   }
 
-  $(document).ready(function(){
-    if ($("#dumped").prop("checked")){
+  whenReady(function(){
+    // the state the checked radios ask for, whichever way they got checked: a toggle
+    // before the deferred jQuery had run is left to this (the handlers above slide the
+    // fields with jQuery), and a page the browser restores comes back with its radios as
+    // they were. SMDA shows the fields as Dumped does.
+    if ($("#dumped").prop("checked") || $("#smda").prop("checked")){
       $(document.getElementById("extendedFields")).slideDown(); 
     }
     {% if select_form_type %}
@@ -152,7 +156,7 @@
 
   }
   {% if not lazy %}
-  $(document).ready(mcritInitDropzone);
+  whenReady(mcritInitDropzone);
   {% endif %}
 
 function handleSliderChange_dropzone(val) {

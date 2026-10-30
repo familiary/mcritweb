@@ -2,7 +2,7 @@
 
 {% macro job_row_std_js() %}
 <script>
-  $(document).ready(function(){
+  whenReady(function(){
     $("td.job-cell").click(function(){
       var job_id = $(this)[0].getAttribute('job_id')
       window.location.href="/data/jobs/" + job_id;
