@@ -3802,8 +3802,14 @@ function highlightUERs(UERtype){
   // mcritweb: showGraph used to bind these four, so using one before the first graph
   // was drawn did nothing, and the page draws the graphs only once they come into
   // view. A panel picks up what they set when it draws (reapplyHighlight,
-  // renderLoopBoundaries, the hover handler), so the page binds them when it loads.
+  // renderLoopBoundaries, the hover handler), so the page binds them as the viewer
+  // starts, and the checkboxes, which may have been changed before it loaded, are read.
   function bindDisplayControls(){
+    var tooltipBox = document.getElementById("enableTooltip");
+    var boundaryBox = document.getElementById("loopBgFill");
+    if (tooltipBox) { isTooltipEnabled = tooltipBox.checked; }
+    if (boundaryBox) { isLoopBoundaryShown = boundaryBox.checked; }
+
     d3.select("#enableTooltip").on("change", function(){
       isTooltipEnabled = this.checked;
     });
