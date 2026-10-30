@@ -13,9 +13,11 @@ view now, which is the one place that assembles it.
 """
 
 import logging
+import threading
 import unittest
 
 import pytest
+from conftest import hold_each_write_for_the_other, log_in_as
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb.db import UserInfo, get_db
@@ -213,6 +215,30 @@ def test_a_rename_cannot_take_a_name_that_differs_only_in_case(app, client, as_r
     assert _flashes(client) == ["Username is already taken!"]
     with app.app_context():
         assert UserInfo.fromDb(user_id=user_id).username == "contributoruser"
+
+
+def test_two_renames_at_once_cannot_take_one_name_in_two_cases(app, make_user, monkeypatch):
+    """The lookup before the write was all that refused the other case, so two renames
+    to "Eve" and "eve" at once could both find the name free."""
+    clients = {}
+    for username, new_username in (("first.user", "Eve"), ("second.user", "eve")):
+        clients[new_username] = app.test_client()
+        log_in_as(clients[new_username], make_user(role="contributor", username=username))
+    hold_each_write_for_the_other(monkeypatch, "UPDATE user SET username")
+
+    threads = [threading.Thread(target=client.post, args=("/admin/change_username",),
+                                kwargs={"data": {"username": new_username, "inputPassword1": "password"}})
+               for new_username, client in clients.items()]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    with app.app_context():
+        names = [row["username"] for row in get_db().execute("SELECT username FROM user")]
+    assert len([name for name in names if name.lower() == "eve"]) == 1, names
+    assert sorted(_flashes(client)[0] for client in clients.values()) == [
+        "Username is already taken!", "Username successfully changed"]
 
 
 def test_a_user_can_still_change_the_case_of_their_own_name(app, client, as_role):

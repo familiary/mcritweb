@@ -14,6 +14,7 @@ module skips there rather than failing.
 import threading
 
 import pytest
+from conftest import session_cookie_for
 from werkzeug.serving import make_server
 
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
@@ -44,7 +45,7 @@ def live_server(app):
 @pytest.mark.parametrize("path", ["/analyze/query", "/data/submit", "/data/import"])
 def test_the_drop_zone_is_as_wide_before_dropzone_has_filled_it_as_after(app, live_server, make_user, path, viewport_width, expected):
     user_id = make_user(role="contributor")
-    cookie = app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id})
+    cookie = session_cookie_for(app, user_id)
     widths = {}
     with sync_api.sync_playwright() as playwright:
         try:

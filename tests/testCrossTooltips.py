@@ -23,6 +23,7 @@ import threading
 from html.parser import HTMLParser
 
 import pytest
+from conftest import session_cookie_for
 from fixtureData import job_id_of, load
 from mcrit.storage.SampleEntry import SampleEntry
 from werkzeug.serving import make_server
@@ -193,7 +194,7 @@ def browser_page(app, live_server, make_user):
     """A Chromium page logged in as a visitor, on `live_server`."""
     sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
     user_id = make_user(role="visitor")
-    cookie = app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id})
+    cookie = session_cookie_for(app, user_id)
 
     with sync_api.sync_playwright() as playwright:
         try:

@@ -62,6 +62,7 @@ import re
 import threading
 
 import pytest
+from conftest import session_cookie_for
 from markupsafe import escape
 from mcrit.storage.FamilyEntry import FamilyEntry
 
@@ -372,15 +373,6 @@ def test_the_ratchet_accepts_a_correct_call_site(description):
 
 # --- the browser ------------------------------------------------------------------
 
-def session_cookie_value(app, user_id):
-    """A signed session cookie for a browser, matching what `as_role` sets on the
-    test client."""
-    from flask.sessions import SecureCookieSessionInterface
-
-    serializer = SecureCookieSessionInterface().get_signing_serializer(app)
-    return serializer.dumps({"user_id": user_id})
-
-
 @pytest.fixture
 def live_url(app):
     """The app on a real socket. Playwright needs one; the test client is not a server."""
@@ -460,7 +452,7 @@ def drive_type_ahead(sync_api, app, live_url, user_id, path, lookup, expected_it
             context = browser.new_context()
             context.add_cookies([{
                 "name": "session",
-                "value": session_cookie_value(app, user_id),
+                "value": session_cookie_for(app, user_id),
                 "url": live_url,
             }])
             page = context.new_page()
@@ -606,7 +598,7 @@ def test_the_drop_overlay_suggests_without_doubling_the_modal_widgets(app, poiso
             context = browser.new_context()
             context.add_cookies([{
                 "name": "session",
-                "value": session_cookie_value(app, user_id),
+                "value": session_cookie_for(app, user_id),
                 "url": live_url,
             }])
             page = context.new_page()

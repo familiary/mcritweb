@@ -26,6 +26,7 @@ import re
 import threading
 
 import pytest
+from conftest import session_cookie_for
 from werkzeug.serving import make_server
 
 sync_api = pytest.importorskip("playwright.sync_api", reason="playwright is not installed")
@@ -80,7 +81,7 @@ def browser_page(app, live_server, make_user):
     change to the login markup instead.
     """
     user_id = make_user(role="visitor")
-    cookie = app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id})
+    cookie = session_cookie_for(app, user_id)
 
     with sync_api.sync_playwright() as playwright:
         try:

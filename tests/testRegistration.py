@@ -19,6 +19,7 @@ import threading
 import unittest
 
 import pytest
+from conftest import hold_each_write_for_the_other
 from werkzeug.security import generate_password_hash
 
 from mcritweb.db import ServerInfo, UserInfo, get_db
@@ -243,6 +244,46 @@ def test_the_instance_can_still_be_set_up_after_a_failed_first_registration(app,
     assert client.post("/register", data=first_user_form("operator", "http://127.0.0.1:8001")).status_code == 302
     with app.app_context():
         assert UserInfo.fromDb(username="operator").role == "admin"
+
+
+# --- two registrations of one name in two cases -------------------------------------
+
+def test_two_registrations_cannot_take_one_name_in_two_cases(app, monkeypatch, open_instance):
+    """A name is refused when it differs from a stored one only in case, and that lookup
+    was all that enforced it: two registrations of "Eve" and "eve" at once could both
+    find the name free, and both be written."""
+    hold_each_write_for_the_other(monkeypatch, "INSERT INTO user (")
+
+    register_both_at_once(app, monkeypatch, [
+        {"username": username, "inputPassword1": PASSWORD, "inputPassword2": PASSWORD, "registrationToken": ""}
+        for username in ("Eve", "eve")
+    ])
+
+    with app.app_context():
+        names = [row["username"] for row in get_db().execute("SELECT username FROM user")]
+    assert len([name for name in names if name.lower() == "eve"]) == 1, names
+
+
+def test_a_failed_write_lets_go_of_the_lock_it_took(app, open_instance):
+    """A new name is checked and written under one write lock. A write that fails after
+    taking it must not leave the lock held, nor its transaction open for the next write
+    on the connection to commit."""
+    with app.app_context():
+        user_info = UserInfo()
+        user_info.username = "mallory"
+        user_info.password = None
+        user_info.role = "pending"
+
+        with pytest.raises(sqlite3.IntegrityError):
+            user_info.saveToDb()
+
+        assert not get_db().in_transaction
+        other = sqlite3.connect(app.config["DATABASE"], timeout=0)
+        try:
+            other.execute("BEGIN IMMEDIATE;")
+            other.rollback()
+        finally:
+            other.close()
 
 
 if __name__ == "__main__":

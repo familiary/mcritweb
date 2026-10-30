@@ -222,11 +222,12 @@ def test_the_base_layout_exposes_the_token_to_scripts(client, as_role):
     assert carries_the_session_token(token, client)
 
 
-@pytest.mark.parametrize("path", ["/data/import", "/data/submit"])
+@pytest.mark.parametrize("path", ["/data/import", "/data/submit", "/analyze/query"])
 def test_the_dropzones_send_the_token(client, as_role, path):
     """Uploads go out as XHR, so no hidden input reaches them. Flask-Dropzone emits
     the header itself once DROPZONE_ENABLE_CSRF is on and it can find our protector
-    under `app.extensions["csrf"]` - break either and the upload silently 400s."""
+    under `app.extensions["csrf"]` - break either and the upload silently 400s. The
+    query route takes its token from no other place (`CsrfProtect.header_only`)."""
     as_role("admin")
     page = client.get(path).get_data(as_text=True)
     token = re.search(r'headers: \{"X-CSRF-Token": "([0-9a-f]+)"\}', page).group(1)
