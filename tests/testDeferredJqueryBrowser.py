@@ -418,6 +418,9 @@ def test_a_search_keeps_the_pickers_state(held_back, live_server, picker, when):
 QUEUED_IN_BASE = ["jquery.js", "post_action.js", "page_loading.js", "autocomplete.js",
                   "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js"]
 
+#: what the samples page queues: base.html's scripts and the search as you type (#293)
+QUEUED_ON_THE_SAMPLES_PAGE = QUEUED_IN_BASE + ["live_search.js"]
+
 
 #: the scripts in the order they run: a script's load event fires once it has run
 RUN_ORDER = """
@@ -445,8 +448,8 @@ def test_the_queue_is_fetched_once_the_page_has_been_painted(open_as, live_serve
             .map(entry => [entry.name.split("/static/")[1], entry.startTime]),
         ran: window.mcritRunOrder,
     })""")
-    assert sorted(name for name, _ in timings["scripts"]) == sorted(QUEUED_IN_BASE)
-    assert timings["ran"] == QUEUED_IN_BASE
+    assert sorted(name for name, _ in timings["scripts"]) == sorted(QUEUED_ON_THE_SAMPLES_PAGE)
+    assert timings["ran"] == QUEUED_ON_THE_SAMPLES_PAGE
     assert all(start > timings["paint"] for _, start in timings["scripts"]), timings
     assert page.errors == []
 
