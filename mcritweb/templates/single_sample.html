@@ -2,7 +2,7 @@
 {% from 'table/function_row.html' import function_row_std_js %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% from 'table/job_row.html' import job_row_std_js %}
-{% from 'table/links.html' import clipboard_btn %}
+{% from 'table/links.html' import clipboard_btn, tag_badges %}
 {% from 'table/column_table.html' import sample_column_table %}
 {% extends 'base.html' %}
 {% block title%}
@@ -45,6 +45,11 @@ Sample: {{ entry.sample_id }}
     else {
       modalBodyLibrary.checked = false;
     }
+    // present only where tags are editable, see the modal below
+    var modalBodyTags = editSampleModal.querySelector('.modal-body #sample_tags');
+    if (modalBodyTags) {
+      modalBodyTags.value = button.getAttribute('data-bs-tags') || '';
+    }
     });
   });
 </script>
@@ -73,6 +78,14 @@ Sample: {{ entry.sample_id }}
             &nbsp;&nbsp;
             <label for="sample_is_library" class="col-form-label">Sample is Library?</label>
           </div>
+          {% if tags_editable %}
+          {# as in sample_table: a form without the field changes no tags #}
+          <div class="form-group mb-3">
+            <label for="sample_tags" class="col-form-label">Tags:</label>
+            <input type="text" class="form-control" name="sample_tags" id="sample_tags" aria-describedby="sample_tags_help">
+            <div class="form-text" id="sample_tags_help">Separated by commas. Emptying the field removes them all.</div>
+          </div>
+          {% endif %}
           <div class="form-group mb-3">
             <input type="checkbox" value="" name="sample_delete" id="sample_delete" onclick='toggle_delete_sample(this);'>
             &nbsp;&nbsp;
@@ -108,6 +121,7 @@ Sample: {{ entry.sample_id }}
 
 
 <h1>Sample: {{ entry.sample_id }}</h1>
+{{ tag_badges(entry) }}
 {% set matching_jobs = job_collection.getJobsForSample(entry.sample_id, matching_only=True) -%}
 {% set last_matches_job = job_collection.getJobsForSample(entry.sample_id, method="getMatchesForSample", finished_only=True) -%}
 <div class="container">
@@ -134,7 +148,7 @@ Sample: {{ entry.sample_id }}
         </div>
           <a aria-label="Unique blocks" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_family_blocks" href="{{ url_for('analyze.blocks_sample', sample_id=entry.sample_id) }}" target="_self"><i class="fa-solid fa-cubes-stacked" aria-hidden="true"></i></a>
           <a aria-label="Export" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_export" href="{{ url_for('data.specific_export', type='samples', item_id=entry.sample_id) }}" target="_self"><i class="fa-solid fa-file-export" aria-hidden="true"></i></a>
-          <button type="button" aria-label="Edit sample" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_edit" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ entry.is_library }}"  data-bs-version="{{ entry.version }}"  data-bs-sampleid="{{ entry.sample_id }}" data-bs-familyname="{{ entry.family }}"><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></button>
+          <button type="button" aria-label="Edit sample" class="btn btn-outline-dark btn-sm" id="sample_{{ entry.sample_id }}_edit" data-bs-toggle="modal" data-bs-target="#editSampleModal" data-bs-islibrary="{{ entry.is_library }}"  data-bs-version="{{ entry.version }}"  data-bs-sampleid="{{ entry.sample_id }}" data-bs-familyname="{{ entry.family }}"{% if tags_editable %} data-bs-tags="{{ entry|getattr('tags', [])|join(', ') }}"{% endif %}><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i></button>
       </div>
     </div>
 </div>

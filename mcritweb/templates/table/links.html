@@ -137,3 +137,19 @@ function copy_to_clipboard(btn){
     <div class="alert alert-warning py-1 px-2 mt-2 mb-0 small" role="note"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> This sha256 was taken from a submitted report or an import. It was not checked against a binary.</div>
   {%- endif -%}
 {%- endmacro -%}
+
+{#- An entry's tags, each a link to the search for everything that carries it
+    (familiary/mcrit#53). Tags come from the corpus and are written as text, so autoescaping
+    covers them. Read through getattr: entries of an mcrit package without tags have no such
+    attribute, and then nothing is shown. -#}
+{%- macro tag_badges(entry) -%}
+  {%- set tags = entry|getattr('tags', none) -%}
+  {%- if tags %}
+  <p class="tag-badges"><span class="text-muted">Tags:</span>
+    {% for tag in tags -%}
+    {#- text-white, not the badge's own colour: a link's hover colour would win over that one -#}
+    <a class="badge rounded-pill bg-secondary text-white text-decoration-none" href="{{ url_for('explore.search', query=tag_search_query(tag), type='family,sample,function') }}">{{ tag }}</a>
+    {% endfor -%}
+  </p>
+  {%- endif -%}
+{%- endmacro -%}

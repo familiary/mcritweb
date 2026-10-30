@@ -16,6 +16,16 @@ rather than reconstructing it from the commit log at release time.
 
 ### Added
 
+- Families, samples and functions show their tags (familiary/mcrit#53) under the heading of their
+  pages, each linking to a search for everything that carries it, and the statistics page lists the
+  tags in use with how many of each carry them. Contributors edit them in the family and sample edit
+  dialogs and in a tags dialog on the function page, and API tokens through `POST`/`DELETE` on
+  `/api/<families|samples|functions>/<id>/tags` and `GET /api/tags`. Saving adds and removes only
+  what changed, so a tag added meanwhile by someone else is kept. **Nothing about tags shows until
+  both sides have them:** the installed `mcrit` package needs the tag methods on `McritClient`,
+  which no mcrit release has yet, so the requirement is not raised; and the backend is asked whether
+  it stores tags (an older one answers 404), because a build of mcrit with tags still reports the
+  version before them. Until then the pages are as before.
 - A dark theme (#70). Every user picks Light, Dark or Match my system under Settings, "Change
   theme"; accounts start on Light, so nothing changes until someone picks another. **BREAKS DB ->
   the `user` table gains a `theme` column**, added on first start by an idempotent migration that
