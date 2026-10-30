@@ -13,6 +13,7 @@ skips there rather than failing.
 import threading
 
 import pytest
+from conftest import session_cookie_for
 from fixtureData import job_id_of
 from werkzeug.serving import make_server
 
@@ -62,7 +63,7 @@ def test_a_delete_ticked_and_cancelled_is_not_ticked_when_the_dialog_opens_again
     dialog, delete_box, delete_button = PAGES[path]
     url = live_server + (f"/data/result/{job_id_of('cross_compare')}" if path == "cross_compare" else path)
     user_id = make_user(role="contributor")
-    cookie = app.session_interface.get_signing_serializer(app).dumps({"user_id": user_id})
+    cookie = session_cookie_for(app, user_id)
     with sync_api.sync_playwright() as playwright:
         try:
             browser = playwright.chromium.launch()

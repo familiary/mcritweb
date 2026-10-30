@@ -14,6 +14,7 @@ import threading
 import unittest
 
 import pytest
+from conftest import session_cookie_for
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -28,10 +29,7 @@ def fake_mcrit(corpus_mcrit):
 
 
 def session_cookie_value(app, user_id):
-    from flask.sessions import SecureCookieSessionInterface
-
-    serializer = SecureCookieSessionInterface().get_signing_serializer(app)
-    return serializer.dumps({"user_id": user_id})
+    return session_cookie_for(app, user_id)
 
 
 @pytest.fixture
