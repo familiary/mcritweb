@@ -138,8 +138,9 @@ def poisoned_backend(fake_mcrit):
 
 
 def autocomplete_scripts(markup):
-    """Every `<script>` block on the page that constructs the type-ahead."""
-    return [block for block in SCRIPT_BLOCK.findall(markup) if "new Autocomplete(" in block]
+    """Every `<script>` block on the page that constructs the type-ahead, or queues
+    static/family_names.js, which does."""
+    return [block for block in SCRIPT_BLOCK.findall(markup) if "new Autocomplete(" in block or "family_names.js" in block]
 
 
 @pytest.mark.parametrize("path", TYPE_AHEAD_PAGES)
@@ -196,11 +197,11 @@ EMPTY_LITERAL = re.compile(r"\[\s*\]")
 #: cannot quietly become the exception list AGENTS.md warns grows back.
 #:
 #: Exempt per expression rather than per file: every production call site goes through
-#: this one partial, so exempting the file would leave the ratchet checking no live
-#: call site at all - a partial that decoded the labels before handing them on would
-#: pass every offline test.
+#: this one file, which `js/ac_family_names.html` queues, so exempting the file would
+#: leave the ratchet checking no live call site at all - a file that decoded the labels
+#: before handing them on would pass every offline test.
 ESCAPED_AT_THE_SOURCE = {
-    "templates/js/ac_family_names.html": {
+    "static/family_names.js": {
         "data.suggestions || []": (
             "fetched from explore.family_names, which answers {label, value} items built "
             "by mcritweb.autocomplete.autocomplete_items. Pinned by testScriptEscaping.py::"
@@ -353,7 +354,7 @@ RATCHET_ACCEPTS = {
 
 #: The cases are judged as if they were the fetching partial, the one file with an
 #: exemption, so a bypass has to get past that exemption to count.
-PARTIAL_EXEMPTION = ESCAPED_AT_THE_SOURCE["templates/js/ac_family_names.html"]
+PARTIAL_EXEMPTION = ESCAPED_AT_THE_SOURCE["static/family_names.js"]
 
 
 @pytest.mark.parametrize("description", sorted(RATCHET_BYPASSES))
@@ -462,6 +463,9 @@ def drive_type_ahead(sync_api, app, live_url, user_id, path, lookup, expected_it
             page = context.new_page()
             page.goto(live_url + path)
             page.wait_for_selector(FIELD_SELECTOR, state="attached", timeout=15000)
+            # the type-ahead is attached once the page's scripts have run, after its first
+            # paint, which can come after load
+            page.evaluate("() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })")
 
             page.evaluate(TYPE_INTO_FIELD, [FIELD_SELECTOR, lookup])
             page.wait_for_function(HAS_SUGGESTION, arg=[FIELD_SELECTOR, expected_items], timeout=10000)
@@ -580,11 +584,12 @@ WIDGETS_PER_FIELD = """
 
 
 def test_the_drop_overlay_suggests_without_doubling_the_modal_widgets(app, poisoned_backend, live_url, make_user):
-    """`/explore/samples` runs `js/ac_family_names.html` twice since #192: once for its
-    edit modals, once through the drop overlay's dropzone macro. The overlay's field
+    """`/explore/samples` includes `js/ac_family_names.html` twice since #192: once for
+    its edit modals, once through the drop overlay's dropzone macro. The overlay's field
     has to get suggestions - it used to be built with none - and the modal fields must
     still carry exactly one widget each, or every keystroke there would render two
-    dropdowns and fetch twice."""
+    dropdowns and fetch twice. later() runs static/family_names.js once, and the file's
+    own guard would keep a second run from attaching a second widget."""
     sync_api = pytest.importorskip("playwright.sync_api")
     user_id = make_user("admin")
     with sync_api.sync_playwright() as playwright:
@@ -602,6 +607,7 @@ def test_the_drop_overlay_suggests_without_doubling_the_modal_widgets(app, poiso
             page = context.new_page()
             page.goto(live_url + "/explore/samples")
             page.wait_for_selector("#family", state="attached", timeout=15000)
+            page.evaluate("() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })")
 
             page.evaluate(TYPE_INTO_FIELD, ["#family", LOOKUP])
             page.wait_for_function(HAS_SUGGESTION, arg=["#family", len(PAYLOADS)], timeout=10000)

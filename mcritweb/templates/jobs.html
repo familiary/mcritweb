@@ -16,7 +16,8 @@ Jobs
    would have made things worse rather than better: it would sort the 25 rows of the
    current page and leave the rest of the queue where it was, which is the "sort should
    be done in mcrit and not only consider displayed elements" half of issue #51. The
-   order the whole queue is sorted in is the '#' column link, handled by data.jobs(). #}
+   order the whole queue is sorted in is the '#' column link, handled by data.jobs().
+   The DataTables JS and CSS that base.html loaded for it on every page are gone too (#63). #}
 
 <style>
   .black {
@@ -241,28 +242,30 @@ Jobs
     </div>
 </div>
   <script>
-  $('.confirm-delete').on('click', function(e) {
-      // preven form submit
-      e.preventDefault();
-      
-      // get the current image/form id
-      var id = $(this).attr("id");
-      
-      // assign the current id to the modal
-      $('#jobDeleteModal').data('id', id).modal('show');
-  });
+  whenReady(function(){
+    $('.confirm-delete').on('click', function(e) {
+        // preven form submit
+        e.preventDefault();
 
-  $('#btnDelete').click(function() {
-      // handle deletion here
-      var job_id = $('#jobDeleteModal').data('id');
-      job_id = job_id.replace("job_id_", "");
-      var url = "{{url_for('data.delete_job_by_id', job_id='PLACEHOLDER')}}";
-      url = url.replace("PLACEHOLDER", job_id);
-      // POST it: deleting a job must not be reachable by GET (issue #84)
-      postTo(url);
-      
-      // hide modal
-      $('#jobDeleteModal').modal('hide');
+        // get the current image/form id
+        var id = $(this).attr("id");
+
+        // assign the current id to the modal
+        $('#jobDeleteModal').data('id', id).modal('show');
+    });
+
+    $('#btnDelete').click(function() {
+        // handle deletion here
+        var job_id = $('#jobDeleteModal').data('id');
+        job_id = job_id.replace("job_id_", "");
+        var url = "{{url_for('data.delete_job_by_id', job_id='PLACEHOLDER')}}";
+        url = url.replace("PLACEHOLDER", job_id);
+        // POST it: deleting a job must not be reachable by GET (issue #84)
+        postTo(url);
+
+        // hide modal
+        $('#jobDeleteModal').modal('hide');
+    });
   });
 </script>
 

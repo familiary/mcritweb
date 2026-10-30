@@ -4,7 +4,7 @@
 
 {% macro function_row_std_js() %}
 <script>
-  $(document).ready(function(){
+  whenReady(function(){
     // delegated, so rows a live search (live_search.js) swaps in follow too
     $(document).on("click", "tr.function-row", function(){
       var function_id = $(this).children("th.function-id").text();
