@@ -77,6 +77,8 @@ def credential_fields(client, as_role, make_user):
     pages["registration"] = inputs_by_name(page_of(client, "/register"))
     as_role("contributor")
     pages["settings"] = inputs_by_name(page_of(client, "/settings"))
+    # the drop overlay's form, which a page fetches on the first drag (ADR-0023)
+    pages["drop overlay"] = inputs_by_name(page_of(client, "/data/drop_overlay"))
     return pages
 
 
@@ -157,7 +159,7 @@ def test_identifiers_and_codes_are_typed_as_they_are(client, as_role, make_user)
     pages = credential_fields(client, as_role, make_user)
     fields = [("login", "username"), ("registration", "username"), ("registration", "registrationToken"),
               ("first registration", "mcritServerToken"), ("first registration", "setRegistrationToken"),
-              ("settings", "username"), ("settings", "family"), ("settings", "version"), ("settings", "base_addr")]
+              ("settings", "username"), ("drop overlay", "family"), ("drop overlay", "version"), ("drop overlay", "base_addr")]
     wrong = [(page, name) for page, name in fields
              if {attr: pages[page][name].get(attr) for attr in NO_CORRECTION} != NO_CORRECTION]
     assert wrong == []
@@ -239,7 +241,7 @@ class ButtonText(HTMLParser):
 
 @pytest.mark.parametrize("path, label", [("/data/submit", "Submit"), ("/analyze/query", "Query"),
                                          # the drop overlay, whose form opens on "Match against database"
-                                         ("/explore/samples", "Query")])
+                                         ("/data/drop_overlay", "Query")])
 def test_the_upload_button_says_what_the_chosen_mode_does(client, as_role, path, label):
     """The overlay's button said "Submit" while the form was set to match the file against
     the database, which is a query; the query page's own button says "Query"."""

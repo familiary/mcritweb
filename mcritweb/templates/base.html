@@ -175,7 +175,7 @@
 
   {# the drop overlay's behaviour, and what builds it on the first drag: see the slot below #}
   {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
-  <script>later({{ url_for('static', filename='upload_form.js')|tojson }})</script>
+  <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='upload_form.js')|tojson }})</script>
   {% endif %}
   {{ clipboard_js() }}
   {% block style %}{% endblock %}

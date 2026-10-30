@@ -14,7 +14,7 @@ Import
 <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='dropzone_attach.js')|tojson }})</script>
 {# no form here for it to act on; it carries the guard that keeps a file let go beside the
    zone from replacing the page #}
-<script>later({{ url_for('static', filename='upload_form.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='upload_form.js')|tojson }})</script>
 {% endblock %}
 {% set suppress_dropzone_overlay=true %}
 {% block content %}

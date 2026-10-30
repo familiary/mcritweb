@@ -322,6 +322,7 @@ if (typeof window.handleSliderChange_dropzone !== "function") {
     window.handleSliderChange_dropzone = function (val) {
         const mapping = JSON.parse(document.getElementById("minhashBandRange_dropzone").dataset.labels);
         document.getElementById("minhashBandRange-currentSelection_dropzone").innerHTML = "&nbsp;" + mapping[val];
+        document.getElementById("minhashBandRange_dropzone").setAttribute("aria-valuetext", mapping[val]);
     };
 }
 
