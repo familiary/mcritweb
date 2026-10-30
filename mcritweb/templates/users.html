@@ -4,7 +4,7 @@ Users
 {% endblock %}
 {% block style %}
 {# the actions menu of a row, out of reach of the box that scrolls the table #}
-<script>later({{ url_for('static', filename='table_scroll.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='table_scroll.js')|tojson }})</script>
 {% endblock %}
 {% block content %}
 <h1 class="visually-hidden">Users</h1>
