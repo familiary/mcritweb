@@ -16,6 +16,7 @@ measured here rather than asserted from memory.
 """
 
 import logging
+import pathlib
 import sqlite3
 import unittest
 
@@ -128,6 +129,85 @@ def test_a_database_that_cannot_use_wal_is_reported_not_fatal(tmp_path, capsys):
 
     # and the app still starts on one
     _fresh_app(tmp_path, ":memory:")
+
+
+def _open_read_only(monkeypatch):
+    """Every connection opened from here on gets the database read-only, as a process
+    that may not write the file does. Through SQLite's own mode=ro rather than chmod,
+    which does not stop root - and so not many a container."""
+    real_connect = sqlite3.connect
+
+    def connect_read_only(database, *args, **kwargs):
+        return real_connect(pathlib.Path(database).as_uri() + "?mode=ro", *args, uri=True, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", connect_read_only)
+
+
+def _refusing_wal(connection, sqlite_errorcode):
+    """`connection`, except that switching it to WAL fails with this SQLite result code."""
+    error = sqlite3.OperationalError("attempt to write a readonly database")
+    error.sqlite_errorcode = sqlite_errorcode
+
+    class Refusing:
+        def execute(self, sql, *args):
+            if sql == "PRAGMA journal_mode=WAL;":
+                raise error
+            return connection.execute(sql, *args)
+
+    return Refusing()
+
+
+def test_a_read_only_database_still_starts_and_serves_reads(app, make_user, monkeypatch, capsys):
+    """A deployment from before WAL whose mcritweb.sqlite this process may not write.
+
+    It used to start and serve pages. The switch to WAL is a write, and SQLite raises
+    for it on a read-only file rather than keeping the old mode, so create_app died in
+    migrate() instead."""
+    database_path = app.config["DATABASE"]
+    make_user("visitor")
+    _set_journal_mode(database_path, "delete")
+    _open_read_only(monkeypatch)
+
+    read_only_app = create_app({"DATABASE": database_path, "TESTING": True, "SECRET_KEY": "test-secret"},
+                               instance_path=app.instance_path)
+
+    assert "the database is read-only" in capsys.readouterr().out
+    assert _journal_mode(database_path) == "delete"
+    # the login page reads the user and the server table before it renders
+    response = read_only_app.test_client().get("/login")
+    assert response.status_code == 200
+    assert b"inputPassword" in response.data
+
+
+def test_a_read_only_directory_is_reported_not_fatal(tmp_path, capsys):
+    """A writable file in a directory that is not. SQLite cannot create the -wal file
+    beside it, and raises an extended code of SQLITE_READONLY for that, which has to
+    count as read-only too. A directory's mode does not stop root either, so the error
+    is raised here as SQLite raises it for everyone else."""
+    connection = sqlite3.connect(tmp_path / "mcritweb.sqlite")
+    try:
+        refusing = _refusing_wal(connection, sqlite3.SQLITE_READONLY_DIRECTORY)
+        assert mcritweb_db.enable_write_ahead_log(refusing) == "delete"
+    finally:
+        connection.close()
+    assert "the database is read-only" in capsys.readouterr().out
+
+
+def test_a_writable_database_that_cannot_be_switched_still_stops_the_start(app, monkeypatch):
+    """Only a read-only database is let through. One that another connection holds
+    locked past the busy timeout is something else, and is not something to start on."""
+    database_path = app.config["DATABASE"]
+    _set_journal_mode(database_path, "delete")
+    monkeypatch.setattr(mcritweb_db, "DATABASE_TIMEOUT", CONTENDING_TIMEOUT)
+    holder = _connect(database_path)
+    try:
+        holder.execute("BEGIN EXCLUSIVE;")
+        with pytest.raises(sqlite3.OperationalError, match="database is locked"):
+            create_app({"DATABASE": database_path, "TESTING": True, "SECRET_KEY": "test-secret"},
+                       instance_path=app.instance_path)
+    finally:
+        holder.execute("ROLLBACK;")
+        holder.close()
 
 
 def test_get_db_waits_on_a_lock_for_the_configured_time(app, monkeypatch):
