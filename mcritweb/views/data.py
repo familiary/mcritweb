@@ -9,6 +9,7 @@ from datetime import datetime
 from urllib.parse import quote, urlencode
 
 from flask import Blueprint, Response, current_app, flash, g, json, redirect, render_template, request, send_from_directory, session, url_for
+from flask_dropzone import allowed_file_extensions
 from mcrit.client.McritClient import McritClient
 from mcrit.config.MinHashConfig import MinHashConfig
 from mcrit.config.StorageConfig import StorageConfig
@@ -24,6 +25,7 @@ from smda.common.SmdaReport import SmdaReport
 from werkzeug.exceptions import NotFound
 
 from mcritweb.backend_errors import require_result, with_server_errors
+from mcritweb.csrf import generate_csrf
 from mcritweb.db import UserColumnSettings, UserFilters, get_query_filename, utc_now
 from mcritweb.views.analyze import query as analyze_query
 from mcritweb.views.authentication import contributor_required, visitor_required
@@ -2759,6 +2761,62 @@ def rerun_job_by_id(job_id):
 ################################################################
 # Binary submission
 ################################################################
+
+def drop_overlay_options():
+    """The Dropzone options of the drop overlay, as data.
+
+    The query and submit pages have flask-dropzone write theirs as a script,
+    `dropzone.config(max_file_size=..., redirect_view=None, custom_options='autoProcessQueue:
+    false')`. The overlay's form is fetched by static/upload_form.js on the first drag, and
+    a script in fetched markup does not run, so these are the options that call writes, read
+    from the same settings, for the page to parse. Its `init` is empty with these arguments,
+    and the token is masked afresh, as in a page. tests/testDropOverlay.py compares the two.
+    """
+    config = current_app.config
+    if config["DROPZONE_ALLOWED_FILE_CUSTOM"]:
+        accepted = config["DROPZONE_ALLOWED_FILE_TYPE"]
+    else:
+        accepted = allowed_file_extensions[config["DROPZONE_ALLOWED_FILE_TYPE"]]
+    max_files = config["DROPZONE_MAX_FILES"]
+    options = {
+        "uploadMultiple": config["DROPZONE_UPLOAD_MULTIPLE"] in [True, "true", "True", 1],
+        "parallelUploads": config["DROPZONE_PARALLEL_UPLOADS"],
+        "paramName": config["DROPZONE_INPUT_NAME"],
+        # in MB, the cap table/submit_or_query_dropzone.html passes
+        "maxFilesize": 100000000,
+        "acceptedFiles": accepted,
+        # written into the script as it is, so the default "null" is null there
+        "maxFiles": None if max_files in (None, "null") else max_files,
+        "dictDefaultMessage": config["DROPZONE_DEFAULT_MESSAGE"],
+        "dictFallbackMessage": config["DROPZONE_BROWSER_UNSUPPORTED"],
+        "dictInvalidFileType": config["DROPZONE_INVALID_FILE_TYPE"],
+        "dictFileTooBig": config["DROPZONE_FILE_TOO_BIG"],
+        "dictResponseError": config["DROPZONE_SERVER_ERROR"],
+        "dictMaxFilesExceeded": config["DROPZONE_MAX_FILE_EXCEED"],
+        "dictCancelUpload": config["DROPZONE_CANCEL_UPLOAD"],
+        "dictRemoveFile": config["DROPZONE_REMOVE_FILE"],
+        "dictCancelUploadConfirmation": config["DROPZONE_CANCEL_CONFIRMATION"],
+        "dictUploadCanceled": config["DROPZONE_UPLOAD_CANCELED"],
+        "autoProcessQueue": False,
+    }
+    if config["DROPZONE_TIMEOUT"]:
+        options["timeout"] = config["DROPZONE_TIMEOUT"]
+    if config["DROPZONE_ENABLE_CSRF"]:
+        options["headers"] = {"X-CSRF-Token": generate_csrf()}
+    return options
+
+
+@bp.route('/drop_overlay')
+@visitor_required
+def drop_overlay():
+    """The drop overlay's dialog and upload form, which every signed-in page used to carry,
+    about 2 KB of its gzipped weight, for the moment a file is dragged over it. The page
+    has a slot for it and static/upload_form.js fetches this on the first drag. It holds a
+    token, so it is kept by nobody."""
+    response = Response(render_template("drop_overlay.html", dropzone_options=drop_overlay_options()))
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
 
 @bp.route('/request_filename_info', methods=['POST'])
 @contributor_required

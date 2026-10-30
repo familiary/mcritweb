@@ -69,6 +69,43 @@ rather than reconstructing it from the commit log at release time.
 - Control flow graphs are laid out about three times faster on large functions, with the same
   result: 5.6 s instead of 21.7 s for a 971-block function. A patch to the vendored dagre builds the
   graph of each rank in one pass instead of walking the whole graph once per rank.
+- The browser keeps the static files from one page to the next instead of asking for each of them
+  again. Their URLs carry a digest of the file (`?v=`), which changes when the file does, and a URL
+  with the current digest may be kept for a year; on a phone at 150 ms round trips the next page
+  paints about 100 ms sooner. The files a stylesheet or the CFG layout worker names themselves (the
+  icon fonts, the CFG viewer's images and its dagre bundle) are kept for an hour. Match diagrams
+  and the manual's screenshots are still revalidated on every view. A compressible file sent
+  without gzip now says `Vary: Accept-Encoding` as well, so that a shared cache keeping it does not
+  hand that copy to clients that take gzip.
+- The help page asks for its first screenshot, its largest paint, at high priority.
+- Phones and tablets no longer download the Fraunhofer logo, which the navbar shows only from 992px
+  up.
+- The help page and the query, submit, import and export forms preload the icon font only from
+  992px up. Below that they draw no icon until the menu is opened, and their first paint on a phone
+  comes about 50 ms sooner.
+- A running job's overview stops polling its status, and its elapsed time stops counting, while
+  its tab is hidden; it polls at once when the tab is shown again. A long job watched from a
+  background tab cost the backend a status read every interval for as long as the tab was open.
+- A function page shows its code without waiting for the match lookup of every block: each block's
+  "Matches" line says "looking up..." until its answer arrives.
+- A cross compare result no longer waits for jQuery UI's 36 KB theme stylesheet before its first
+  paint; the one rule of it the sample list uses is in `style.css`.
+- A page is sent without the indentation and blank lines of its templates, and without the comment
+  lines of its inline scripts: a result page is 1.5 KB smaller gzipped, a tenth of it, which is
+  what a slow connection's first round trip, about 14.6 KB, can be the difference of for the
+  page's first paint. It is drawn as before. `MCRITWEB_THIN_PAGES = False` in `instance/config.py`
+  sends the page as the templates write it.
+- The drop-a-file overlay is fetched when a file is first dragged over the page, with Dropzone,
+  instead of being carried by every signed-in page: about 1.7 KB less of each page gzipped, 1.9 KB
+  of a result page, and the family type-ahead's script is no longer loaded on pages that have no
+  family field of their own. A file let go before the overlay is in is now kept and put in its
+  drop zone; the browser used to open it in place of the page, or drop it. The new
+  `/data/drop_overlay` answers the overlay to any signed-in user but a pending one.
+- The project's own stylesheets (`style.css`, `theme-dark.css`, `navbar.css`, `signin.css`) are
+  served without their comments. The comments stay in the files, where AGENTS.md wants the reasons
+  for a rule, but a stylesheet is what a page's first paint waits for, and they were most of its
+  bytes. The ETag, gzip, 304 answers and cache lifetimes are those of any other static file;
+  vendored stylesheets are sent as they are.
 
 ### Fixed
 

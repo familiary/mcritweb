@@ -103,7 +103,7 @@ def test_a_term_typed_before_the_script_has_run_is_searched_once_it_has(page, li
     """The box has focus from the start, and base.html's queue runs live_search.js only
     after the first paint, so typing can come first."""
     held = []
-    page.route("**/static/live_search.js", lambda route: held.append(route))
+    page.route("**/static/live_search.js*", lambda route: held.append(route))
     page.goto(f"{live_server}/explore/samples", wait_until="commit")
     page.wait_for_selector("#query")
     everything = row_ids(page, "sample-row")

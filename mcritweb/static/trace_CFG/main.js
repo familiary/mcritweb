@@ -99,8 +99,8 @@
   var isGraphRequested = false;
   // set when the code panel was built before the graph, so showGraph() leaves it be
   var isCodeShownWithoutGraph = false;
-  // set once getCodefromGraph() has started: it renders after its lookups, so the panel's
-  // paragraphs can't tell whether a build is already under way
+  // set once getCodefromGraph() has started, so that a second call does not send its lookups
+  // again
   var isCodePanelRequested = false;
 
   var isHoverOnLeftPanel=false;
@@ -3521,7 +3521,6 @@ function highlightUERs(UERtype){
     isCodePanelRequested = true;
     var nodes = g.nodes();
     var num_nodes = nodes.length;
-    var lookups = [];
     for (var i=0; i<num_nodes; i++)  {
       var nodeId = nodes[i];
       // MCRIT: here we can process any custom information we provided into the graph
@@ -3555,24 +3554,22 @@ function highlightUERs(UERtype){
       var picblockhash = this_node.comment;
       if (picblockhash) {
         var hash_only = picblockhash.substring(picblockhash.indexOf('x') + 1);
-        
-        lookups.push(fetchPicBlockMatches(code, hash_only));
+        // mcritweb: the line the lookup fills in, there from the start so the lines below do not move then
+        code['block_display'] = ">>> Matches: looking up...\n" + label;
+        fetchPicBlockMatches(code, hash_only);
       }
       codes[i] = code;
     }    
     
-    // mcritweb: lookups are asynchronous and parallel (synchronous XHR is deprecated); render once all settle
-    var blockCodes = codes;
-    Promise.all(lookups).then(function(){
-      // initialize() replaces `codes` when another graph is loaded; drop this one's late result
-      if (blockCodes === codes) {
-        renderCodefromGraph();
-      }
-    });
+    // mcritweb: lookups are asynchronous and parallel (synchronous XHR is deprecated). The panel is
+    // drawn at once, and each block's match line is filled in as its lookup answers; drawn once
+    // every lookup had settled, the code waited for the slowest of them
+    renderCodefromGraph();
   }
 
   // A failed lookup leaves the block as it is without a picblockhash: no match line.
   function fetchPicBlockMatches(code, hash_only){
+    var blockCodes = codes;
     return fetch("../getPicBlockMatches/" + hash_only)
       .then(function(response){
         if (!response.ok) {
@@ -3586,7 +3583,15 @@ function highlightUERs(UERtype){
         // code['block_color'] = "red";
       })
       .catch(function(error){
+        code['block_display'] = code['label'];
         console.warn("PicBlockHash lookup failed for " + hash_only + ": " + error);
+      })
+      .then(function(){
+        // mcritweb: into the block's paragraph of the panel; initialize() replaces `codes` when
+        // another graph is loaded, and a late answer for this one is dropped
+        if (blockCodes === codes && code['nodeId'] in nodeToTextGroups) {
+          nodeToTextGroups[code['nodeId']][0].text(code['block_display']);
+        }
       });
   }
 

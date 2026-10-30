@@ -200,6 +200,16 @@ def test_only_the_first_screenshot_loads_eagerly():
     assert all('loading="lazy"' in image for image in images[1:])
 
 
+def test_the_first_screenshot_is_fetched_at_high_priority():
+    """It is /help's largest paint at both widths, and the browser asked for it at Medium
+    priority, after the 7 KB logo at High. Asked for at High, it arrived about 10 ms sooner
+    and the largest paint came 12 ms (phone) to 64 ms (desktop) sooner, at 1.6 Mbit/s and
+    150 ms round trips."""
+    images = re.findall(r"<img [^>]*>", str(render("/help/images/")))
+    assert 'fetchpriority="high"' in images[0]
+    assert all("fetchpriority" not in image for image in images[1:])
+
+
 def test_every_screenshot_carries_the_size_of_its_file():
     """A lazy screenshot without a size is a 2px placeholder until it loads, so the
     ones arriving next to a /help#section target pushed that section 4,000+ px away

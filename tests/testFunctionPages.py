@@ -173,7 +173,7 @@ def test_the_comparison_page_renders_with_the_match_data(client, as_role):
     assert f"/explore/fetchCombinedDotGraph/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}" in page
     assert f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}/diff" in page
     # the script itself comes with the rest of the graph viewer, once the graphs are wanted
-    assert '"/static/function_compare.js"' in page
+    assert re.search(r'"/static/function_compare\.js(\?v=\w+)?"', page)
     assert f"/api/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}" in page
 
 
@@ -185,7 +185,7 @@ def test_the_comparison_graphs_name_the_layout_worker(client, as_role):
     page = client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}").get_data(as_text=True)
     for panel in ("a", "b", "c"):
         svg = re.search(rf'<svg id="graphContainer_{panel}"[^>]*>', page)
-        assert svg and 'data-layout-worker="/static/trace_CFG/layout_worker.js"' in svg.group(0), panel
+        assert svg and re.search(r'data-layout-worker="/static/trace_CFG/layout_worker\.js(\?v=\w+)?"', svg.group(0)), panel
     assert os.path.isfile(os.path.join(os.path.dirname(__file__), "..", "mcritweb", "static", "trace_CFG", "layout_worker.js"))
 
 

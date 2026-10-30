@@ -28,8 +28,8 @@ def searched_terms(fake_mcrit, method):
 
 
 #: how a page loads the script: queued with base.html's later(), which runs it after the
-#: first paint (ADR-0021)
-LOADS_LIVE_SEARCH = r'<script nonce="[^"]*">later\("[^"]*live_search\.js"\)</script>'
+#: first paint (ADR-0021). url_for appends a `?v=` version to the static URL.
+LOADS_LIVE_SEARCH = r'<script nonce="[^"]*">later\("[^"]*live_search\.js(?:\?v=\w+)?"\)</script>'
 
 
 def live_search_forms(page):

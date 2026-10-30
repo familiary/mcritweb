@@ -511,7 +511,7 @@ def test_the_dark_page_loaded_the_dark_logos_and_diagram(walker, name):
     report = walked(walker, name)
 
     assert len(report["logos"]) == 3, report["logos"]
-    assert all(logo["src"].endswith("_dark.png") and logo["width"] > 0 for logo in report["logos"]), report["logos"]
+    assert all(logo["src"].split("?")[0].endswith("_dark.png") and logo["width"] > 0 for logo in report["logos"]), report["logos"]
     assert all(diagram["src"].endswith(".dark.png") and diagram["width"] > 0 for diagram in report["diagrams"]), report["diagrams"]
 
 
@@ -790,7 +790,7 @@ def test_a_page_nobody_is_signed_in_to_is_light_whatever_the_browser_prefers(vis
     assert themeCss.luminance(as_rgb(assert_text)) < 0.05, f"the text of a light page is {assert_text}"
     assert page.evaluate("document.querySelector('meta[name=color-scheme]').content") == "light"
     assert asked_for_dark(opened.requests) == [], "a light page fetched a dark file"
-    assert [image["src"].rsplit("/", 1)[-1] for image in page.evaluate("[...document.querySelectorAll('nav picture img')].map((image) => ({src: image.currentSrc}))")] == [
+    assert [image["src"].split("?")[0].rsplit("/", 1)[-1] for image in page.evaluate("[...document.querySelectorAll('nav picture img')].map((image) => ({src: image.currentSrc}))")] == [
         "d20_mcrit_cabaret.png",
         "d20_mcrit_cabaret.png",
         "fkie_190x52.gif",
@@ -800,7 +800,7 @@ def test_a_page_nobody_is_signed_in_to_is_light_whatever_the_browser_prefers(vis
 # --- "system": the browser decides, live ------------------------------------------------------
 
 def logo_files(page):
-    return [src.rsplit("/", 1)[-1] for src in page.evaluate("[...document.querySelectorAll('nav picture img')].map((image) => image.currentSrc)")]
+    return [src.split("?")[0].rsplit("/", 1)[-1] for src in page.evaluate("[...document.querySelectorAll('nav picture img')].map((image) => image.currentSrc)")]
 
 
 @pytest.mark.parametrize("preference, dark", [("dark", True), ("light", False)])
@@ -817,7 +817,7 @@ def test_the_system_theme_applies_the_dark_palette_when_the_browser_prefers_dark
     assert logo_files(page) == (["d20_mcrit_cabaret_dark.png"] * 2 + ["fkie_190x52_dark.png"] if dark else ["d20_mcrit_cabaret.png"] * 2 + ["fkie_190x52.gif"])
     if dark:
         assert report_clean(run_probe(page)), "the system theme's dark page has what the dark theme's has not"
-        assert any(url.endswith("theme-dark.css") for url in opened.requests)
+        assert any(url.split("?")[0].endswith("theme-dark.css") for url in opened.requests)
     else:
         assert [url for url in opened.requests if "_dark.png" in url or ".dark.png" in url] == [], "a browser that prefers light fetched a dark image"
         assert page.evaluate("document.styleSheets.length") >= 1
@@ -852,7 +852,7 @@ def test_the_system_theme_follows_a_change_of_the_browsers_preference_without_a_
 
     page.emulate_media(color_scheme="dark")
     page.wait_for_function(f"() => getComputedStyle(document.documentElement).backgroundColor === '{DARK_PAGE}'")
-    page.wait_for_function("() => [...document.querySelectorAll('nav picture img')].every((image) => image.currentSrc.endsWith('_dark.png'))")
+    page.wait_for_function("() => [...document.querySelectorAll('nav picture img')].every((image) => image.currentSrc.split('?')[0].endsWith('_dark.png'))")
     calm(page)
     assert logo_files(page) == ["d20_mcrit_cabaret_dark.png"] * 2 + ["fkie_190x52_dark.png"]
     assert report_clean(run_probe(page)), "after the switch the page is not the dark theme's"
@@ -897,7 +897,7 @@ def test_the_light_theme_never_requests_the_dark_stylesheet_or_a_dark_image(visi
         assert logo_files(page) == ["d20_mcrit_cabaret.png"] * 2 + ["fkie_190x52.gif"], path
 
     assert asked_for_dark(opened.requests) == []
-    assert any(url.endswith("/static/style.css") for url in opened.requests), "the visit recorded nothing"
+    assert any(url.split("?")[0].endswith("/static/style.css") for url in opened.requests), "the visit recorded nothing"
     assert any("/data/diagrams/" in url and url.endswith(".png") for url in opened.requests), "the light diagram was never fetched: the visit did not reach one"
     assert opened.failed == []
 
@@ -910,11 +910,11 @@ def test_the_dark_theme_asks_for_exactly_the_dark_files(visit):
         settle(opened.goto(path), ready)
 
     asked = asked_for_dark(opened.requests)
-    assert any(url.endswith("/static/theme-dark.css") for url in asked)
-    assert any(url.endswith("/static/d20_mcrit_cabaret_dark.png") for url in asked)
-    assert any(url.endswith("/static/fkie_190x52_dark.png") for url in asked)
+    assert any(url.split("?")[0].endswith("/static/theme-dark.css") for url in asked)
+    assert any(url.split("?")[0].endswith("/static/d20_mcrit_cabaret_dark.png") for url in asked)
+    assert any(url.split("?")[0].endswith("/static/fkie_190x52_dark.png") for url in asked)
     assert any("/data/diagrams/" in url and url.endswith(".dark.png") for url in asked)
-    light_logos = [url for url in opened.requests if url.endswith(("/static/d20_mcrit_cabaret.png", "/static/fkie_190x52.gif"))]
+    light_logos = [url for url in opened.requests if url.split("?")[0].endswith(("/static/d20_mcrit_cabaret.png", "/static/fkie_190x52.gif"))]
     assert light_logos == [], f"a dark page also fetched the light logos: {light_logos}"
     assert opened.failed == []
 

@@ -48,7 +48,7 @@ AFTER_THE_READY_HANDLERS = """() => new Promise((resolve, reject) => {
 #: how long after DOMContentLoaded the queue started: the start of jquery.js's request
 QUEUE_DELAY = """() => {
     const loaded = performance.getEntriesByType("navigation")[0].domContentLoadedEventStart;
-    const jquery = performance.getEntriesByType("resource").find(entry => entry.name.endsWith("/static/jquery.js"));
+    const jquery = performance.getEntriesByType("resource").find(entry => entry.name.split("?")[0].endsWith("/static/jquery.js"));
     return jquery ? jquery.startTime - loaded : null;
 }"""
 
@@ -180,6 +180,16 @@ def test_a_sample_dragged_in_the_list_moves(open_as, live_server):
     assert page.errors == []
 
 
+def test_the_list_items_keep_jquery_uis_touch_action(open_as, live_server):
+    """The page no longer links jquery-ui.css for the one rule of it that applies here, and
+    style.css carries that rule: every item jQuery UI made a handle has it."""
+    page = ready(open_as("visitor"), f"{live_server}/data/result/{job_id_of('cross_compare')}")
+    assert not page.evaluate("() => [...document.styleSheets].some(sheet => (sheet.href || '').includes('jquery-ui'))")
+    assert page.evaluate("""() => [...document.querySelectorAll('#sortable li')]
+        .every(item => item.classList.contains('ui-sortable-handle') && getComputedStyle(item).touchAction === 'none')""")
+    assert page.errors == []
+
+
 def test_the_settings_lists_are_sortable(open_as, live_server):
     page = ready(open_as("visitor"), f"{live_server}/settings")
 
@@ -269,7 +279,7 @@ def held_back(open_as):
                 route.continue_()
             else:
                 waiting.append(route)
-        page.route("**/static/jquery.js", hold)
+        page.route("**/static/jquery.js*", hold)
 
         def release(settle=True):
             released.append(True)
@@ -449,7 +459,7 @@ RUN_ORDER = """
 window.mcritRunOrder = [];
 document.addEventListener("load", event => {
     if (event.target.tagName === "SCRIPT") {
-        window.mcritRunOrder.push(event.target.src.split("/static/")[1]);
+        window.mcritRunOrder.push(event.target.src.split("?")[0].split("/static/")[1]);
     }
 }, true);
 """
@@ -467,7 +477,7 @@ def test_the_queue_is_fetched_once_the_page_has_been_painted(open_as, live_serve
         paint: performance.getEntriesByName("first-contentful-paint")[0].startTime,
         scripts: performance.getEntriesByType("resource")
             .filter(entry => entry.initiatorType === "script")
-            .map(entry => [entry.name.split("/static/")[1], entry.startTime]),
+            .map(entry => [entry.name.split("?")[0].split("/static/")[1], entry.startTime]),
         ran: window.mcritRunOrder,
     })""")
     assert sorted(name for name, _ in timings["scripts"]) == sorted(QUEUED_ON_THE_SAMPLES_PAGE)
@@ -563,7 +573,7 @@ def test_the_queue_is_loaded_once(open_as, live_server):
     """The paint, the animation frame and the three-second backstop can all try to start it."""
     page = ready(open_as("visitor"), f"{live_server}/explore/samples")
     page.wait_for_timeout(3500)
-    assert page.evaluate("() => performance.getEntriesByType('resource').filter(entry => entry.name.endsWith('/static/jquery.js')).length") == 1
+    assert page.evaluate("() => performance.getEntriesByType('resource').filter(entry => entry.name.split('?')[0].endsWith('/static/jquery.js')).length") == 1
     assert page.errors == []
 
 
@@ -577,7 +587,8 @@ def test_when_ready_after_the_queue_has_run_runs_at_once(open_as, live_server):
 def test_the_upload_form_is_set_without_a_slide_at_load(open_as, live_server, role, path):
     """The form's ready handler runs after the first paint now: a slide there would move
     the upload page's fields under the reader, and on every other page animate the closed
-    drop overlay's form for nobody. The fields end where the checked radios ask."""
+    drop overlay's form for nobody - the overlay built on the first drag, before it is
+    shown. The fields end where the checked radios ask."""
     page = open_as(role)
     # counts every jQuery animation from the moment jQuery arrives: slideDown and slideUp
     # go through .animate()
@@ -590,6 +601,10 @@ def test_the_upload_form_is_set_without_a_slide_at_load(open_as, live_server, ro
         }});
     """)
     ready(page, live_server + path)
+    if path != "/analyze/query":
+        page.evaluate("() => new Promise((resolve) => mcritLoadDropzone(resolve))")
+        # its ready handler, queued once it was in
+        page.evaluate(AFTER_THE_READY_HANDLERS)
     assert page.evaluate("() => window.animations") == 0
     extended = page.evaluate("() => getComputedStyle(document.getElementById('extendedFields')).display")
     asked = page.evaluate("() => document.getElementById('dumped').checked || document.getElementById('smda').checked")
@@ -649,13 +664,18 @@ def test_the_slider_label_follows_the_slider_moved_before_the_scripts_are_in(hel
 
 
 def test_a_page_that_includes_the_family_type_ahead_twice_fetches_it_once(open_as, live_server):
-    """A listing includes js/ac_family_names.html for its edit modals and again with the
-    drop overlay's form. later() queues static/family_names.js once, and it attaches to
-    the overlay's family field."""
+    """A listing includes js/ac_family_names.html for its edit modals, and the drop
+    overlay's form, built on the first drag, names it again. static/family_names.js is
+    fetched once, and it attaches to the overlay's family field when it is focused."""
     page = open_as("contributor")
     requested = []
-    page.on("request", lambda request: requested.append(request.url) if request.url.endswith("/static/family_names.js") else None)
+    page.on("request", lambda request: requested.append(request.url) if request.url.split("?")[0].endswith("/static/family_names.js") else None)
     ready(page, f"{live_server}/explore/samples")
+    page.evaluate("() => new Promise((resolve) => mcritLoadDropzone(() => { $('#submitFileModal').modal('show'); resolve(); }))")
+    settled(page, "#submitFileModal")
+    page.check("#submit_form")
+    page.wait_for_selector("#family", state="visible")
+    page.focus("#family")
     assert len(requested) == 1, requested
     assert page.eval_on_selector("#family", "field => field.dataset.familyAutocomplete") == "attached"
     assert page.errors == []
