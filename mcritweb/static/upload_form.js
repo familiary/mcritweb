@@ -145,7 +145,9 @@ function mcritLoadDropzone(done) {
         css.id = "mcrit-dropzone-css";
         css.rel = "stylesheet";
         css.href = form.dataset.dropzoneCss;
-        document.head.appendChild(css);
+        // ahead of the page's own styles, where the eager pages link it: its `.dropzone` rule
+        // is as specific as the zone's style and would win if it came last
+        document.head.insertBefore(css, document.head.querySelector("link[rel=stylesheet], style"));
     }
     var script = document.createElement("script");
     // the project's patched build: it sends the head of the file the form is pre-filled from
