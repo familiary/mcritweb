@@ -23,6 +23,7 @@ is one too.
 import copy
 import json
 import logging
+import pathlib
 import re
 
 import pytest
@@ -37,6 +38,9 @@ from mcritweb.views.explore import (
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
 logging.disable(logging.CRITICAL)
+
+#: the family type-ahead, which js/ac_family_names.html queues
+FAMILY_NAMES_JS = pathlib.Path(__file__).resolve().parents[1] / "mcritweb" / "static" / "family_names.js"
 
 #: `sample_row` renders this when a sample has matching jobs, with the count after it.
 JOB_BADGE = re.compile(r'id="sample_(-?\d+)_analyze".*?</button>', re.DOTALL)
@@ -448,25 +452,27 @@ def test_the_submit_form_asks_for_family_names_as_they_are_typed(client, as_role
     assert calls_to(fake_mcrit, "getFamilies") == [], f"{path} still downloads every family"
     markup = response.get_data(as_text=True)
     assert 'name=\'family\' class="form-control" id="family"' in markup
-    assert "attachFamilyAutocomplete(document.getElementById('family'))" in markup
-    assert json.dumps("/explore/familyNames") in markup
+    assert "/static/family_names.js" in markup
+    assert f"var mcritFamilyNamesUrl = {json.dumps('/explore/familyNames')};" in markup
+    assert "attachFamilyAutocomplete(document.getElementById('family'))" in FAMILY_NAMES_JS.read_text()
 
 
 def test_the_drop_overlay_brings_its_own_family_type_ahead(client, as_role, fake_mcrit):
     """The drop overlay's family field used to be built with no names at all. Since
     #192 the dropzone macro includes `js/ac_family_names.html` itself, so a listing
-    page - which includes the partial for its edit modals too - runs it twice, and the
-    guard that stops the second run attaching a second widget to the modal fields is
-    what keeps that harmless. The browser test in testAutocompleteEscaping.py shows the
-    effect; this pins both includes and the guard offline."""
+    page - which includes the partial for its edit modals too - queues the type-ahead
+    twice. later() queues a file once, and the guard that stops a second run attaching a
+    second widget to a field stays in the file. The browser test in
+    testAutocompleteEscaping.py shows the effect; this pins both includes and the guard
+    offline."""
     as_role("contributor")
 
     markup = client.get("/explore/samples").get_data(as_text=True)
 
-    assert markup.count("attachFamilyAutocomplete(document.getElementById('family'))") == 2, (
+    assert markup.count("/static/family_names.js") == 2, (
         "the listing and its drop overlay should each include the family type-ahead"
     )
-    assert markup.count("field.dataset.familyAutocomplete") == 4, (
+    assert FAMILY_NAMES_JS.read_text().count("field.dataset.familyAutocomplete") == 2, (
         "the guard against attaching a second widget to a field is gone"
     )
 

@@ -529,10 +529,10 @@ def test_a_client_that_sends_no_metadata_window_still_works(client, as_role):
 # They assert on the rendered wiring, because the behaviour itself only exists in a
 # browser; it was checked by hand against a backend stub with a slow addImportData.
 
-#: The extension emits `Dropzone.options.myDropzone = {...}` in its own script block.
-#: Scoping the assertions to it keeps them from passing on some unrelated script in
-#: base.html.
-DROPZONE_OPTIONS = re.compile(r"Dropzone\.options\.myDropzone\s*=\s*\{.*?\n\s*\};", re.DOTALL)
+#: The extension emits `Dropzone.options.myDropzone = {...}` in its own script block, which
+#: the page parks as `window.mcritDropzoneOptions = {...}` until Dropzone is in. Scoping the
+#: assertions to it keeps them from passing on some unrelated script in base.html.
+DROPZONE_OPTIONS = re.compile(r"window\.mcritDropzoneOptions\s*=\s*\{.*?\n\s*\};", re.DOTALL)
 
 
 def dropzone_options(page):

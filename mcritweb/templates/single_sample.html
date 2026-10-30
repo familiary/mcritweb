@@ -18,7 +18,7 @@ Sample: {{ entry.sample_id }}
 {% block content %}
 
 <script>
-  $(document).ready(function(){
+  whenReady(function(){
     var editSampleModal = document.getElementById('editSampleModal');
     editSampleModal.addEventListener('show.bs.modal', function (event) {
     // Button that triggered the modal
@@ -161,7 +161,7 @@ Sample: {{ entry.sample_id }}
 {{ pagination_widget(pagination) }}
 {% endif %}
   </div>
-<script src="{{ url_for('static', filename='live_search.js') }}"></script>
+<script>later({{ url_for('static', filename='live_search.js')|tojson }})</script>
 {% if job_collection.count %}
 <h2 class="h3" id="jobs">Jobs</h2>
 {{ job_table(job_collection.getJobs(), samples_by_id=samples) }}
