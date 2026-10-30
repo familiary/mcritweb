@@ -2297,10 +2297,6 @@ function highlightUERs(UERtype){
     isHoverOnLeftPanel = false;
   })
 
-  d3.select("#enableTooltip").on("change", function(){
-    isTooltipEnabled = this.checked;
-  });
-
   d3.select("#enableNodeDrag").on("change", function(){
     is_node_dragging_enabled = this.checked;
   });  
@@ -2349,13 +2345,6 @@ function highlightUERs(UERtype){
 
     }
 
-  });
-
-  d3.select("#loopBgFill").on("change", function(){
-     // mcritweb: issue #69 - the boundaries are drawn per panel here, so this
-     // toggles both groups instead of the one-graph page's single #bgFill.
-     isLoopBoundaryShown = this.checked;
-     setLoopBoundaryVisibility();
   });
 
   //enable or disable brush using checkbox
@@ -2463,20 +2452,6 @@ function highlightUERs(UERtype){
 
     });    
     
-    d3.select("#showCycles")
-        .on("click", function(){
-          setHighlightMode(isCycleShown ? null : "cycles");
-        }
-      );
-
-    // mcritweb: issue #69 - Show Loops was only ever bound by loopCollapser.init(),
-    // which this page does not call, so the button did nothing at all.
-    d3.select("#showLoops")
-        .on("click", function(){
-          setHighlightMode(isLoopShown ? null : "loops");
-        }
-      );
-
     /* Disabled this feature, Will collapse instead */
       // $("g.node.enter").click(function(){
       //           $(this).find("tspan").toggle(); 
@@ -3822,6 +3797,37 @@ function highlightUERs(UERtype){
   function setLoopBoundaryVisibility(){
     // one group per panel here, rather than the single #bgFill the one-graph page has
     d3.selectAll("g.bgFill").style("display", isLoopBoundaryShown ? null : "none");
+  }
+
+  // mcritweb: showGraph used to bind these four, so using one before the first graph
+  // was drawn did nothing, and the page draws the graphs only once they come into
+  // view. A panel picks up what they set when it draws (reapplyHighlight,
+  // renderLoopBoundaries, the hover handler), so the page binds them when it loads.
+  function bindDisplayControls(){
+    d3.select("#enableTooltip").on("change", function(){
+      isTooltipEnabled = this.checked;
+    });
+
+    d3.select("#loopBgFill").on("change", function(){
+       // mcritweb: issue #69 - the boundaries are drawn per panel here, so this
+       // toggles both groups instead of the one-graph page's single #bgFill.
+       isLoopBoundaryShown = this.checked;
+       setLoopBoundaryVisibility();
+    });
+
+    d3.select("#showCycles")
+        .on("click", function(){
+          setHighlightMode(isCycleShown ? null : "cycles");
+        }
+      );
+
+    // mcritweb: issue #69 - Show Loops was only ever bound by loopCollapser.init(),
+    // which this page does not call, so the button did nothing at all.
+    d3.select("#showLoops")
+        .on("click", function(){
+          setHighlightMode(isLoopShown ? null : "loops");
+        }
+      );
   }
 
   // The two highlights paint the same rects, so at most one of them is on.
