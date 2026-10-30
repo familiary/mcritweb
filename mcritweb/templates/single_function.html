@@ -98,7 +98,7 @@ Function: {{ function_id }}
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
           <li><h6 class="dropdown-header">This function</h6></li>
-          <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#compareFunctionModal">Compare with function&hellip;</a></li>
+          <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#compareFunctionModal">Compare with function&hellip;</button></li>
           <li><a class="dropdown-item" href="{{ url_for('explore.search', query='pichash:0x' + ('%016x'|format(entry.pichash)), type='function') }}">Find functions with this PicHash</a></li>
           <li><hr class="dropdown-divider"></li>
           <li><h6 class="dropdown-header">Sample {{ entry.sample_id }}</h6></li>
@@ -113,19 +113,19 @@ Function: {{ function_id }}
           <li><a class="dropdown-item" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id, _anchor='jobs') }}">Previous Jobs</a></li>
         </ul>
       </div>
-      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_sample" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id) }}" role="button" aria-label="Go to sample {{ entry.sample_id }}" title="Go to sample {{ entry.sample_id }}"><i class="fa-solid fa-virus"></i></a>
+      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_sample" href="{{ url_for('explore.sample_by_id', sample_id=entry.sample_id) }}" aria-label="Go to sample {{ entry.sample_id }}" title="Go to sample {{ entry.sample_id }}"><i class="fa-solid fa-virus"></i></a>
       {% if sample_entry.family_id is not none %}
-      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_family" href="{{ url_for('explore.family_by_id', family_id=sample_entry.family_id) }}" role="button" aria-label="Go to family {{ sample_entry.family }}" title="Go to family {{ sample_entry.family }}"><i class="fa-solid fa-bug"></i></a>
+      <a class="btn btn-outline-dark btn-sm" id="function_{{ function_id }}_family" href="{{ url_for('explore.family_by_id', family_id=sample_entry.family_id) }}" aria-label="Go to family {{ sample_entry.family }}" title="Go to family {{ sample_entry.family }}"><i class="fa-solid fa-bug"></i></a>
       {% endif %}
       {% if g.user.role in ('admin', 'contributor') %}
         {% if can_modify_function %}
-        <a class="btn btn-outline-dark btn-sm" id="button_function_rename" role="button" data-bs-toggle="modal" data-bs-target="#renameFunctionModal" title="Rename function"><i class="fa-solid fa-pen"></i></a>
+        <button type="button" class="btn btn-outline-dark btn-sm" id="button_function_rename" data-bs-toggle="modal" data-bs-target="#renameFunctionModal" title="Rename function"><i class="fa-solid fa-pen"></i></button>
         {% else %}
-        <a class="btn btn-outline-dark btn-sm disabled" id="button_function_rename" role="button" aria-disabled="true" title="Renaming functions needs an MCRIT backend of version 1.10.0 or newer"><i class="fa-solid fa-pen"></i></a>
+        <button type="button" class="btn btn-outline-dark btn-sm disabled" id="button_function_rename" aria-disabled="true" title="Renaming functions needs an MCRIT backend of version 1.10.0 or newer"><i class="fa-solid fa-pen"></i></button>
         {% endif %}
       {% endif %}
       {{ api_usage_button("apiUsageModal") }}
-      <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" role="button" aria-label="Go to the control flow graph" title="Go to the control flow graph"><i class="fa-solid fa-diagram-project"></i></a>
+      <a class="btn btn-outline-dark btn-sm" href="#function_xcfg" aria-label="Go to the control flow graph" title="Go to the control flow graph"><i class="fa-solid fa-diagram-project"></i></a>
     </div>
   </div>
 </div>

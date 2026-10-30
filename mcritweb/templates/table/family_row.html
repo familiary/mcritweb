@@ -36,10 +36,11 @@
     })
 
 
-    // delegated, so rows a live search swaps in follow too
+    {# delegated, so rows a live search swaps in follow too. A click on the row is a
+       pointer's shortcut to the link its id cell holds #}
     $(document).on("click", "tr.family-row", function(e){
-      // links and buttons in the row (edit, compare, export, Malpedia) do their own thing;
-      // closest() also catches a click on the icon inside them
+      {# links and buttons in the row (the id, edit, compare, export, Malpedia) do their own
+         thing; closest() also catches a click on the icon inside them #}
       if ($(e.target).closest("a, button").length) {
         return;
       }
@@ -96,7 +97,7 @@
   {{ badge_column_cell(row_decorations, family.family_id) }}
   {% for column_type in column_setup %}
     {% if column_type == "family_id" %}
-      <th align="right" valign="middle" class="id" scope="row">{{ "%d"|format(family.family_id) }}</th>
+      <th align="right" valign="middle" class="id" scope="row">{{ format_family_id(family.family_id) }}</th>
     {% elif column_type == "family_name" %}
       <td valign="middle" >{{ format_family_name(family.family_name, None, highlight_terms, "family_name") }}<a aria-label="Show family on Malpedia" title="Show family on Malpedia" name="malpedia" href="https://malpedia.caad.fkie.fraunhofer.de/details/{{ family.family }}" target="_blank"><i class="fa-solid fa-external-link-alt "></i></a></td>
     {% elif column_type == "num_samples" %}
@@ -108,13 +109,13 @@
     {% endif %}
   {% endfor %}
     <td align="center" valign="middle" class="buttons">
-      <a class="btn btn-outline-dark btn-sm" name="compare" href="{{ url_for('analyze.compare', query=family.family_name, rematch='true') }}" role="button" target="_self" title="Compare 1vsN" aria-label="Compare family {{ family.family_name }}"><i class="fa-solid fa-flask"></i></a>
-      <a class="btn btn-outline-dark btn-sm" name="family_blocks" href="{{ url_for('analyze.blocks_family', family_id=family.family_id) }}" role="button" target="_self" title="Unique Blocks" aria-label="Unique blocks for family {{ family.family_name }}"><i class="fa-solid fa-cubes-stacked"></i></a>
+      <a class="btn btn-outline-dark btn-sm" name="compare" href="{{ url_for('analyze.compare', query=family.family_name, rematch='true') }}" target="_self" title="Compare 1vsN" aria-label="Compare family {{ family.family_name }}"><i class="fa-solid fa-flask"></i></a>
+      <a class="btn btn-outline-dark btn-sm" name="family_blocks" href="{{ url_for('analyze.blocks_family', family_id=family.family_id) }}" target="_self" title="Unique Blocks" aria-label="Unique blocks for family {{ family.family_name }}"><i class="fa-solid fa-cubes-stacked"></i></a>
       {% if show_export %}
-        <a class="btn btn-outline-dark btn-sm" href="{{ url_for('data.specific_export', type='family', item_id=family.family_id) }}" role="button" target="_self" title="Export Family" aria-label="Export family {{ family.family_name }}"><i class="fa-solid fa-file-export"></i></a>
+        <a class="btn btn-outline-dark btn-sm" href="{{ url_for('data.specific_export', type='family', item_id=family.family_id) }}" target="_self" title="Export Family" aria-label="Export family {{ family.family_name }}"><i class="fa-solid fa-file-export"></i></a>
       {% endif %}
       {% if show_edit %}
-      <a class="btn btn-outline-dark btn-sm" id="family_{{ family.family_id }}_edit" role="button" data-bs-toggle="modal" data-bs-target="#editFamilyModal" data-bs-islibrary="{{ family.is_library }}" data-bs-familyid="{{ family.family_id }}" data-bs-familyname="{{ family.family_name }}" title="Edit Family" aria-label="Edit family {{ family.family_name }}"><i class="fa-solid fa-pen-to-square"></i></a>
+      <button type="button" class="btn btn-outline-dark btn-sm" id="family_{{ family.family_id }}_edit" data-bs-toggle="modal" data-bs-target="#editFamilyModal" data-bs-islibrary="{{ family.is_library }}" data-bs-familyid="{{ family.family_id }}" data-bs-familyname="{{ family.family_name }}" title="Edit Family" aria-label="Edit family {{ family.family_name }}"><i class="fa-solid fa-pen-to-square"></i></button>
     {% endif %}
     </td>
   </tr>

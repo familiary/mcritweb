@@ -1,5 +1,5 @@
 {% from 'table/table.html' import function_table, sample_table, family_table %}
-{% from 'table/pagination_widget.html' import pagination_widget, set_pagination_params %}
+{% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
 {% from 'table/family_row.html' import family_row_std_js %}
 {% from 'table/sample_row.html' import sample_row_std_js %}
 {% from 'table/function_row.html' import function_row_std_js %}
@@ -12,6 +12,8 @@ Search
 {{ function_row_std_js() }}
 {{ sample_row_std_js() }}
 {{ family_row_std_js() }}
+{# the "Rows per page" selects call into it; without it they threw and did nothing #}
+{{ pagination_js() }}
 
 {% endblock %}
 {% block content %}

@@ -1,6 +1,6 @@
 {% from 'table/compare_nav.html' import compare_nav %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
-{% from 'table/sample_row.html' import sample_header %}
+{% from 'table/sample_row.html' import sample_header, pick_cell %}
 {% from 'table/row_decoration.html' import row_tint %}
 {% from 'table/table.html' import empty_state %}
 
@@ -19,27 +19,31 @@ Compare
   console.log(selected)
   whenReady(function(){
     // a row the URL already selected carries the class `row-selected` (row_decoration.html)
-    // and is skipped here; the others toggle `row-pending`. Both are painted from style.css
-    $("tr.parent").click(function(){
-      if(!this.classList.contains("row-selected"))
-      {
-        if(selected.indexOf($(this).children("th.id").text()) == -1){
-        this.classList.add("row-pending");
-        selected.push($(this).children("th.id").text());
-        }
-        else{
-          this.classList.remove("row-pending");
-          const pos = selected.indexOf($(this).children("th.id").text());
-          console.log(pos);
-          if(pos == 0){
-            selected.shift();
-          }
-          else{
-            selected.splice(pos, 1);
-          }
-        }
+    {# and a ticked, disabled checkbox, and is skipped here; the others toggle `row-pending`.
+       Both are painted from style.css. The checkbox is what a keyboard and a screen reader
+       reach: a click anywhere else on the row ticks it, and either way pick() follows it #}
+    function pick(box) {
+      var row = box.closest("tr");
+      var id = $(row).children("th.id").text();
+      var position = selected.indexOf(id);
+      if (box.checked && position == -1) {
+        row.classList.add("row-pending");
+        selected.push(id);
+      } else if (!box.checked && position != -1) {
+        row.classList.remove("row-pending");
+        selected.splice(position, 1);
       }
-
+    }
+    $("tr.parent").click(function(event){
+      var box = this.querySelector("input[type=checkbox]");
+      if (event.target === box || this.classList.contains("row-selected")) {
+        return;
+      }
+      box.checked = !box.checked;
+      pick(box);
+    });
+    $("tr.parent input[type=checkbox]").change(function(){
+      pick(this);
     });
 
   });
@@ -182,11 +186,12 @@ function handleSliderChange(val) {
   {{ set_pagination_params(pagination, _anchor="Search", _js_argument_provider="fetchState") }}
   <table class="table table-hover">
       <thead class="table-light">
-        {{ sample_header(show_analyze=False, sort_pagination=pagination) }}
+        {{ sample_header(show_analyze=False, sort_pagination=pagination, pick="checkbox") }}
       </thead>
       <tbody>
         {% for sample in samples %}
         <tr class="parent{{ row_tint(row_decorations, sample.sample_id) }}">
+          {{ pick_cell("checkbox", none, sample.sample_id, (row_decorations or {}).get(sample.sample_id, {}).get("tint")) }}
           <th align="right" valign="middle" scope="row" class="id">{{ "%d"|format(sample.sample_id) }}</th>
           <td align="right" valign="middle" class="font-monospace">{{ sample.getShortSha256() }}</td>
           <td valign="middle">{{ sample.family }}</td>

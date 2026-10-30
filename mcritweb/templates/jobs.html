@@ -98,17 +98,17 @@ Jobs
     <div class="collapse navbar-collapse" id="first_level_navbar">
       <ul class="navbar-nav">
         <li class="nav-item  px-2">
-          <a aria-label="All jobs" title="All jobs" class="btn btn-outline-dark btn-sm" href="{{ url_for('data.jobs') }}"  role="button" target="_self"><i class="fa-solid fa-house"></i></a>
+          <a aria-label="All jobs" title="All jobs" class="btn btn-outline-dark btn-sm" href="{{ url_for('data.jobs') }}" target="_self"><i class="fa-solid fa-house"></i></a>
         {% for entry in menu_configuration["menu"] %}
         {% if entry['available'] %}
           {% if 'submenu' in entry %}
             <li class="nav-item dropdown  px-2">
-              <a class="nav-link dropdown-toggle {% if entry['active'] %}active{% endif %}" href="#" id="navbarDropdown-{{entry['group']}}" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              <button type="button" class="nav-link dropdown-toggle {% if entry['active'] %}active{% endif %}" id="navbarDropdown-{{entry['group']}}" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 {{ entry["title"] }}
-              </a>
+              </button>
               <div class="dropdown-menu" aria-labelledby="navbarDropdown-{{entry['group']}}">
                 {% for subentry in entry["submenu"] %}
-                  <a class="dropdown-item {% if not subentry['available'] %}disabled{% endif %}" href="{{ url_for('data.jobs', active=subentry['name']) }}">{{subentry["title"]}}</a>
+                  <a class="dropdown-item {% if not subentry['available'] %}disabled{% endif %}" href="{{ url_for('data.jobs', active=subentry['name']) }}"{% if not subentry['available'] %} tabindex="-1" aria-disabled="true"{% endif %}>{{subentry["title"]}}</a>
                 {% endfor %}
               </div>
             </li>

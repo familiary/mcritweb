@@ -1,5 +1,15 @@
 {% from 'table/links.html' import clipboard_btn %}
 {% extends 'base.html' %}
+
+{#- A column in the lists of the column settings. A pointer drags it within or between its
+    table's two lists. Its buttons, to move it up, down, or across to the other list by key
+    or by touch, are made by static/reorder_list.js once the page has run: written here, the
+    seven tables' items took the page from 42 KB to 100 KB, and this page is sent
+    uncompressed. The stylesheet keeps room for them at the item's end, so adding them moves
+    nothing. -#}
+{% macro column_item(item, active) %}
+            <div class="list-group-item" data-reorder-item data-column="{{ item }}">{{ item }}</div>
+{%- endmacro %}
 {% block title%}
 Settings
 {% endblock %}
@@ -8,6 +18,7 @@ Settings
 {# queued with later(): in <head> it held back the first paint, and the lists below are
    only made sortable from whenReady, once it has run (issue #63) #}
 <script>later({{ url_for('static', filename='sortablejs/Sortable.min.js')|tojson }})</script>
+<script>later({{ url_for('static', filename='reorder_list.js')|tojson }})</script>
 <style>
     .list-group.col {
         min-height: 50px;
@@ -167,10 +178,12 @@ Settings
   </div>
   <div class="tab-pane fade" id="pills-column-settings" role="tabpanel" aria-labelledby="pills-column-settings-tab">
     <div class="container mt-4 mb-4">
-      <p>Drag items between or within the columns to customize the table view.<br />
+      <p>Drag items between or within the columns, or move them with their arrow buttons, to customize the table view.<br />
          Only active items will be shown in the tables, using the order specified.<br />
          Note: direct / and frequency score columns in Result Family / Library Table can only be order next to each other respectively (enforced when saving).
       </p>
+      {# says where a column moved with its buttons went #}
+      <div id="reorder-status" class="visually-hidden" role="status"></div>
   <span><h3>Family Table</h3></span>
     <div class="row" style="display: flex; justify-content: space-between;">
         <div class="col"><strong>Active</strong></div>
@@ -179,12 +192,12 @@ Settings
     <div id="items" class="row" style="display: flex; justify-content: space-between;">
         <div id="family_table_active" class="list-group col">
             {% for item in user_column_settings.family_table.active %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, true) }}
             {% endfor %}
         </div>
         <div id="family_table_available" class="list-group col">
             {% for item in user_column_settings.family_table.available %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, false) }}
             {% endfor %}
         </div>
     </div>
@@ -197,12 +210,12 @@ Settings
     <div id="items" class="row" style="display: flex; justify-content: space-between;">
         <div id="samples_table_active" class="list-group col">
             {% for item in user_column_settings.samples_table.active %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, true) }}
             {% endfor %}
         </div>
         <div id="samples_table_available" class="list-group col">
             {% for item in user_column_settings.samples_table.available %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, false) }}
             {% endfor %}
         </div>
     </div>
@@ -215,12 +228,12 @@ Settings
     <div id="items" class="row" style="display: flex; justify-content: space-between;">
         <div id="functions_table_active" class="list-group col">
             {% for item in user_column_settings.functions_table.active %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, true) }}
             {% endfor %}
         </div>
         <div id="functions_table_available" class="list-group col">
             {% for item in user_column_settings.functions_table.available %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, false) }}
             {% endfor %}
         </div>
     </div>
@@ -233,12 +246,12 @@ Settings
     <div id="items" class="row" style="display: flex; justify-content: space-between;">
         <div id="result_family_table_active" class="list-group col">
             {% for item in user_column_settings.result_family_table.active %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, true) }}
             {% endfor %}
         </div>
         <div id="result_family_table_available" class="list-group col">
             {% for item in user_column_settings.result_family_table.available %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, false) }}
             {% endfor %}
         </div>
     </div>
@@ -251,12 +264,12 @@ Settings
     <div id="items" class="row" style="display: flex; justify-content: space-between;">
         <div id="result_function_unfiltered_table_active" class="list-group col">
             {% for item in user_column_settings.result_function_unfiltered_table.active %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, true) }}
             {% endfor %}
         </div>
         <div id="result_function_unfiltered_table_available" class="list-group col">
             {% for item in user_column_settings.result_function_unfiltered_table.available %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, false) }}
             {% endfor %}
         </div>
     </div>
@@ -269,12 +282,12 @@ Settings
     <div id="items" class="row" style="display: flex; justify-content: space-between;">
         <div id="result_function_sample_filtered_table_active" class="list-group col">
             {% for item in user_column_settings.result_function_sample_filtered_table.active %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, true) }}
             {% endfor %}
         </div>
         <div id="result_function_sample_filtered_table_available" class="list-group col">
             {% for item in user_column_settings.result_function_sample_filtered_table.available %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, false) }}
             {% endfor %}
         </div>
     </div>
@@ -287,12 +300,12 @@ Settings
     <div id="items" class="row" style="display: flex; justify-content: space-between;">
         <div id="result_function_function_filtered_table_active" class="list-group col">
             {% for item in user_column_settings.result_function_function_filtered_table.active %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, true) }}
             {% endfor %}
         </div>
         <div id="result_function_function_filtered_table_available" class="list-group col">
             {% for item in user_column_settings.result_function_function_filtered_table.available %}
-            <div class="list-group-item">{{ item }}</div>
+            {{ column_item(item, false) }}
             {% endfor %}
         </div>
     </div>
@@ -355,7 +368,7 @@ Settings
         function getElementsFromContainer(containerId) {
             const container = document.getElementById(containerId);
             const items = container.querySelectorAll('.list-group-item');
-            return Array.from(items).map(item => item.textContent.trim());
+            return Array.from(items).map(item => item.getAttribute('data-column'));
         }
 
         function saveColumnSettings() {

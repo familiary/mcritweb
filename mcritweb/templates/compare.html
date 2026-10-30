@@ -20,6 +20,7 @@ whenReady(function(){
     if ($(table.item(i)).children("th.sample-id").text()==selected){
       selected_column = table.item(i);
       table.item(i).classList.add("row-pending");
+      table.item(i).querySelector("input[type=radio]").checked = true;
     }
   }
 
@@ -28,19 +29,29 @@ whenReady(function(){
     selected_column = table.item(0);
     selected = $(selected_column).children("th.sample-id").text();
     selected_column.classList.add("row-pending");
+    selected_column.querySelector("input[type=radio]").checked = true;
     document.getElementById("button_match").style.display = "initial";
   }
 
-  // the tint of the chosen row is the class `row-pending` (style.css), so the theme paints it
-  $("tr.parent_table_sample").click(function(){
+  {# the tint of the chosen row is the class `row-pending` (style.css), so the theme paints it;
+     its radio button is the choice a keyboard and a screen reader reach. A click anywhere on
+     the row checks it, and a radio checked from the keyboard chooses its row #}
+  function choose(row) {
     if (selected_column === null) {
       document.getElementById("button_match").style.display = "initial";
     } else {
       selected_column.classList.remove("row-pending");
     }
-    selected_column = this;
+    selected_column = row;
     selected = $(selected_column).children("th.sample-id").text();
-    this.classList.add("row-pending");
+    row.classList.add("row-pending");
+    row.querySelector("input[type=radio]").checked = true;
+  }
+  $("tr.parent_table_sample").click(function(){
+    choose(this);
+  });
+  $("tr.parent_table_sample input[type=radio]").change(function(){
+    choose(this.closest("tr"));
   });
 
 });
@@ -102,7 +113,7 @@ function handleSliderChange(val) {
 {{ set_pagination_params(pagination, _js_argument_provider="fetchState", _anchor="Search") }}
 {# a search box sits directly above this table, so "upload your first sample" is
    almost never what happened - the collection is full and the term missed #}
-{{ sample_table(samples, table_id="table_sample", show_analyze=False, show_hint=True, sort_pagination=pagination,
+{{ sample_table(samples, table_id="table_sample", show_analyze=False, show_hint=True, sort_pagination=pagination, pick="radio",
                 empty_message="No sample matches \"" ~ query ~ "\"." if query else "No samples available. Click here to upload your first sample",
                 empty_link=none if query else url_for("data.submit")) }}
 {% if samples %}

@@ -24,7 +24,8 @@ logging.disable(logging.CRITICAL)
 
 #: the id cell of each row macro. The class is what the row's click handler reads, so
 #: it is the one part of the markup that cannot drift silently.
-ID_CELL = re.compile(r'<th[^>]*class="(?:id|sample-id|function-id)"[^>]*>\s*(-?\d+)\s*</th>')
+#: a row's id cell, which holds the link to the row's page
+ID_CELL = re.compile(r'<th[^>]*class="(?:id|sample-id|function-id)"[^>]*>\s*(?:<a [^>]*>)?(-?\d+)(?:</a>)?\s*</th>')
 
 
 @pytest.fixture
