@@ -1326,6 +1326,19 @@ function highlightUERs(UERtype){
     return Array.isArray(parsed) ? parsed : [];
   }
 
+  // mcritweb: findLoops answers a graph past the bounds of its loop analysis with no
+  // loops and an X-Loop-Analysis header (views/explore.py), and the panel is drawn
+  // without them; this says why, above the graphs.
+  function noteSkippedLoopAnalysis(graph_id, result){
+    var analysis = result && result.getResponseHeader ? result.getResponseHeader("X-Loop-Analysis") : null;
+    if(!analysis || analysis.indexOf("skipped") !== 0){
+      return;
+    }
+    d3.select("#loopAnalysisNote_" + graph_id).text("Function " + graph_id.toUpperCase()
+      + " is too large for loop analysis (" + cfgPanels[graph_id].graph.nodes().length
+      + " blocks); its loops are not highlighted.");
+  }
+
     function loadWithDotGraphAndFunctionIdA(function_id, node_colors) {
       isTraceSupplied = false;
       // Send request for loop information; load when ready
@@ -1345,6 +1358,7 @@ function highlightUERs(UERtype){
                 // mcritweb: issue #69 - each panel keeps its own loops, and the
                 // graph is drawn even when loop detection could not answer.
                 cfgPanels.a.loops = parseLoops(err, result);
+                noteSkippedLoopAnalysis("a", result);  // mcritweb
 
                 // loopify_dagre.init();
                 var modifiedDotFile_a = loopify_dagre.modifiedDotFile;
@@ -1392,6 +1406,7 @@ function highlightUERs(UERtype){
               // mcritweb: issue #69 - each panel keeps its own loops, and the
               // graph is drawn even when loop detection could not answer.
               cfgPanels.b.loops = parseLoops(err, result);
+              noteSkippedLoopAnalysis("b", result);  // mcritweb
 
               // loopify_dagre.init();
               var modifiedDotFile_b = loopify_dagre.modifiedDotFile;

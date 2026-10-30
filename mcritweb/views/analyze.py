@@ -3,12 +3,13 @@ import re
 from flask import Blueprint, current_app, flash, g, json, redirect, render_template, request, url_for
 from smda.common.SmdaReport import SmdaReport
 
+from mcritweb.backend_errors import require_result, with_server_errors
 from mcritweb.db import remember_query_filename
 from mcritweb.views.authentication import visitor_required
 from mcritweb.views.client import get_client, get_sample_entries, remember_samples
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.pagination import Pagination
-from mcritweb.views.params import parse_band_range, parse_checkbox_query_param, parse_integer_list_query_param
+from mcritweb.views.params import parse_band_range, parse_base_addr_form_param, parse_checkbox_query_param, parse_integer_list_query_param
 from mcritweb.views.search import search_page
 from mcritweb.views.utility import mcrit_server_required, query_upload_path
 
@@ -50,7 +51,7 @@ def blocks_family(family_id):
     client = get_client()
     family_samples = client.getSamplesByFamilyId(family_id)
     if family_samples:
-        job_id = client.requestUniqueBlocksForFamily(family_id)
+        job_id = require_result(with_server_errors(client).requestUniqueBlocksForFamily(family_id), "a job for the unique blocks of this family")
         return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
     else:
         flash("Can't locate unique blocks for a family without samples", category="error")
@@ -62,7 +63,7 @@ def blocks_family(family_id):
 @mcrit_server_required
 def blocks_sample(sample_id):
     client = get_client()
-    job_id = client.requestUniqueBlocksForSamples([sample_id])
+    job_id = require_result(with_server_errors(client).requestUniqueBlocksForSamples([sample_id]), "a job for the unique blocks of this sample")
     return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
 
 
@@ -181,7 +182,7 @@ def start_unique_blocks():
 @bp.route('/compare_submit_query')
 @visitor_required
 def compare_submit_query():
-    return render_template("compare_submit_query.html")
+    return redirect(url_for('analyze.query'))
 
 @bp.route('/cross_compare_from_hash_list', methods=['GET', 'POST'])
 @visitor_required
@@ -340,7 +341,9 @@ def start_cross_compare():
         else:
             flash('Please select at least one sample to cross compare.', category='error')
         return redirect(url_for('analyze.cross_compare'))
-    job_id = client.requestMatchesCross(selected_list, force_recalculation=rematch, sample_group_only=only_selected, band_matches_required=minhash_band_range)
+    job_id = require_result(
+        with_server_errors(client).requestMatchesCross(selected_list, force_recalculation=rematch, sample_group_only=only_selected, band_matches_required=minhash_band_range),
+        "a job for this cross comparison")
     return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
 
 
@@ -408,7 +411,9 @@ def compare_all(sample_id_a):
     # queued a fresh job on every visit. See issue #97.
     rematch = parse_checkbox_query_param(request, 'rematch')
     minhash_band_range = parse_band_range(request)
-    job_id = client.requestMatchesForSample(sample_id_a, force_recalculation=rematch, band_matches_required=minhash_band_range)
+    job_id = require_result(
+        with_server_errors(client).requestMatchesForSample(sample_id_a, force_recalculation=rematch, band_matches_required=minhash_band_range),
+        "a job for this comparison")
     return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
 
 @bp.route('/compare_function/<int:function_id>')
@@ -430,7 +435,8 @@ def compare_function(function_id):
     negatively and have no sample in the database to match against.
     """
     client = get_client()
-    function_entry = client.getFunctionById(function_id)
+    # a failure on the backend's side raises here rather than reading as "no function"
+    function_entry = with_server_errors(client).getFunctionById(function_id)
     if function_entry is None:
         flash(f"There is no function with id {function_id}.", category='error')
         return redirect(url_for('explore.functions'))
@@ -445,13 +451,10 @@ def compare_function(function_id):
         # cannot build the rule without it and raises BuildError. That is a 500 with a
         # traceback where a sentence was owed.
         #
-        # Every sibling route in this module needs the same guard and gets it from
-        # issue #43's `require_result`. This route is the one that fix could not cover,
-        # because it does not exist on that branch - it arrives with this one.
-        #
-        # The fallback is the listing rather than this function's own page, so a backend
-        # that is genuinely down does not answer with a second, wrong message ("There is
-        # no function with id N") stacked on top of this one.
+        # The sibling routes in this module answer that with `require_result`'s page.
+        # This one keeps its message, and falls back to the listing rather than this
+        # function's own page, so a backend that is genuinely down does not answer with
+        # a second, wrong message ("There is no function with id N") on top of it.
         flash('Ups, MCRIT would not start the job.', category='error')
         return redirect(url_for('explore.functions'))
     # forward=1 so a job that is already finished goes straight to the report; while it
@@ -465,7 +468,9 @@ def compare_vs(sample_id_a, sample_id_b):
     client = get_client()
     rematch = parse_checkbox_query_param(request, 'rematch')
     minhash_band_range = parse_band_range(request)
-    job_id = client.requestMatchesForSampleVs(sample_id_a, sample_id_b, force_recalculation=rematch, band_matches_required=minhash_band_range)
+    job_id = require_result(
+        with_server_errors(client).requestMatchesForSampleVs(sample_id_a, sample_id_b, force_recalculation=rematch, band_matches_required=minhash_band_range),
+        "a job for this comparison")
     return redirect(url_for('data.job_by_id', job_id=job_id, refresh=3))
 
 #: What a query upload may declare beyond the role's cap on the file itself: the other
@@ -497,19 +502,32 @@ def query():
 
         base_address = None
         form_options = request.form['options']
-        is_dump_or_smda = form_options in ['dumped', 'smda']
-        if is_dump_or_smda:
+        # only a memory dump needs a base address: an SMDA report carries its own, and
+        # requestMatchesForSmdaReport() - where the smda branch below ends - takes none
+        if form_options == "dumped":
             # the form also carries a bitness field, but McritClient has no parameter for it -
             # the server derives bitness from the mapped binary itself
-            base_address = int(request.form['base_addr'], 16)
+            base_address = parse_base_addr_form_param(request)
+            if base_address is None:
+                flash("Please enter the base address of the sample as a hexadecimal number, e.g. 0x400000.", category='error')
+                return "", 400 # Bad Request
 
         binary_content = f.read()
         if role_limit is not None and len(binary_content) > role_limit:
             flash(f'Your account may only upload files for query that are up to {role_limit} bytes in size.', category='error')
             return "", 403 # Bad Request
         if form_options == "smda":
-            content_as_dict = json.loads(binary_content)
-            smda_report = SmdaReport.fromDict(content_as_dict)
+            # the file is whatever was dropped on the page, so a body that is not a
+            # readable SMDA report is ordinary user input and has to become a message.
+            # It used to be covered by accident: the base address was demanded first,
+            # and an empty one answered 400 before anything was parsed. That check is
+            # now correctly limited to a dump, so this needs its own.
+            try:
+                smda_report = SmdaReport.fromDict(json.loads(binary_content))
+            except Exception:
+                current_app.logger.warning("analyze.query - the uploaded file is not a readable SMDA report")
+                flash('That file could not be read as an SMDA report.', category='error')
+                return "", 400 # Bad Request
 
         minhash_band_range = parse_band_range(request)
         if form_options == "smda":
