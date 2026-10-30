@@ -46,9 +46,17 @@ either one.
 What the extension provides and this does not, none of it the primary defence:
 
 - tokens are raw session values, not signed and time-limited — so a token is valid
-  for the life of the session, and identical on every page of it;
-- no referrer check on HTTPS requests;
-- no per-response token variation, which is a partial mitigation for BREACH.
+  for the life of the session;
+- no referrer check on HTTPS requests.
+
+Per-response token variation was on this list too, until pages were to be gzipped
+(`mcritweb/compression.py`): a secret identical in every response, compressed next to
+input the page reflects, is what a BREACH attack reads out of the response's length.
+`csrf_token()` now returns the session token masked behind a fresh random pad on every
+call, as hex of the pad followed by the token XOR the pad, the scheme Rails uses, and
+the check unmasks what it is sent. The bare token is still accepted, so a page
+rendered before the change keeps working. Still hand-rolled, still the same names, so
+the swap to flask-wtf described above is unchanged.
 
 The token's strength rests on the session cookie's signature, and so on
 `SECRET_KEY`. Fixing the `'dev'` default (`mcritweb/secret_key.py`) was part of the
