@@ -183,20 +183,78 @@ Function: {{ function_id }}
           <script type="text/javascript">
           window.onload = function() {
               var js_function_id = {{ function_id }};
-              loadWithDotGraphAndFunctionId(js_function_id)
+              // The graph viewer: d3, dagre and the scripts built on them, in the order they
+              // build on each other, that only the graph and the code beside it use. They are
+              // loaded, and the graph is fetched, laid out and drawn, once the graph comes into
+              // view or the keyboard reaches the link above it, rather than on load: on a phone
+              // and on a laptop screen the graph starts below the first screen.
+              var viewer = [
+                  {{ url_for('static', filename='trace_CFG/lib/d3.min.js')|tojson }},
+                  {{ url_for('static', filename='trace_CFG/lib/graphlib.min.js')|tojson }},
+                  {{ url_for('static', filename='trace_CFG/lib/graphlib-dot.min.js')|tojson }},
+                  {{ url_for('static', filename='trace_CFG/lib/dagre-d3.min.js')|tojson }},
+                  {{ url_for('static', filename='trace_CFG/lib/convexhull.js')|tojson }},
+                  {{ url_for('static', filename='trace_CFG/main.js')|tojson }},
+                  {{ url_for('static', filename='trace_CFG/fnManip.js')|tojson }},
+                  {{ url_for('static', filename='trace_CFG/loopCollapser.js')|tojson }},
+                  {{ url_for('static', filename='trace_CFG/loopify_dagre.js')|tojson }}
+              ];
+              var started = false;
+              function drawGraph() {
+                  if (started) {
+                      return;
+                  }
+                  started = true;
+                  var left = viewer.length;
+                  function settled() {
+                      left -= 1;
+                      if (left === 0) {
+                          loadWithDotGraphAndFunctionId(js_function_id);
+                      }
+                  }
+                  viewer.forEach(function (url) {
+                      var script = document.createElement("script");
+                      script.src = url;
+                      // added by a script, they would run as each arrives; this runs them in order
+                      script.async = false;
+                      script.onload = settled;
+                      // the viewer still starts, as it did when these were plain script tags
+                      script.onerror = function () {
+                          document.getElementById("viewer_error").hidden = false;
+                          settled();
+                      };
+                      document.body.appendChild(script);
+                  });
+              }
+              document.getElementById("xcfg_top").addEventListener("focusin", drawGraph);
+              if (!("IntersectionObserver" in window)) {
+                  drawGraph();
+                  return;
+              }
+              // the upper three quarters of the window, so that a graph only peeking in at the
+              // bottom does not start the work
+              var observer = new IntersectionObserver(function (entries) {
+                  if (entries.some(function (entry) { return entry.isIntersecting; })) {
+                      observer.disconnect();
+                      drawGraph();
+                  }
+              }, {rootMargin: "0px 0px -25% 0px"});
+              observer.observe(document.getElementById("xcfg_container"));
           };
           </script>
           <div id="xcfg_top" style="height: 60px;">
               <span id="function_xcfg"></span>
               <span style="float:right"><a href="#top">go to top</a></span>
-              <input style=" margin: 3px;" type="button" id="showCycles" class="cfg-graph-control" value="Show Cycles"/>
-              <input style=" margin: 3px;" type="button" id="showLoops" class="cfg-graph-control" value="Show Loops"/>
-              <label style=" margin:3px; background-color:#fdd0a2; padding:1px"><input style=" margin: 3px;" type="checkbox" id="loopBgFill" class="cfg-graph-control" value="loopBgFill" checked>Show Loop Boundaries</label>
+              {# disabled until the graph is drawn, which enables them: what they act on is not there yet #}
+              <input style=" margin: 3px;" type="button" id="showCycles" class="cfg-graph-control" value="Show Cycles" disabled/>
+              <input style=" margin: 3px;" type="button" id="showLoops" class="cfg-graph-control" value="Show Loops" disabled/>
+              <label style=" margin:3px; background-color:#fdd0a2; padding:1px"><input style=" margin: 3px;" type="checkbox" id="loopBgFill" class="cfg-graph-control" value="loopBgFill" checked disabled>Show Loop Boundaries</label>
               <!-- <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableNodeDrag" value="enableNodeDrag">Enable Node Dragging</label> -->
-              <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableTooltip" class="cfg-graph-control" value="enableTooltip">Enable Tooltip</label>
+              <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableTooltip" class="cfg-graph-control" value="enableTooltip" disabled>Enable Tooltip</label>
           </div>
           {# main.js says here when loop analysis was skipped; empty, it takes no space #}
           <div id="loopAnalysisNote" role="status"></div>
+          <div id="viewer_error" role="alert" hidden style="margin: 20px; color: darkred;">Part of the graph viewer could not be loaded. Reload the page to try again.</div>
           <div id="xcfg_container">
               <div id="xcfg_left">
                   <div id="tooltip" class="hidden">
@@ -223,16 +281,6 @@ Function: {{ function_id }}
     </div>
   </div>
   {% endif %}
-    {# the graph libraries load here, not in <head>: only the scripts below and window.onload use them, and in <head> they held back the first paint #}
-    <script src="{{ url_for('static', filename='trace_CFG/lib/d3.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='trace_CFG/lib/graphlib.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='trace_CFG/lib/graphlib-dot.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='trace_CFG/lib/dagre-d3.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='trace_CFG/lib/convexhull.js') }}"></script>
-    <script src="{{ url_for('static', filename='trace_CFG/main.js') }}"></script>
-    <script src="{{ url_for('static', filename='trace_CFG/fnManip.js') }}"></script>
-    <script src="{{ url_for('static', filename='trace_CFG/loopCollapser.js') }}"></script>
-    <script src="{{ url_for('static', filename='trace_CFG/loopify_dagre.js') }}"></script>
     <!--
     -->
 </div>

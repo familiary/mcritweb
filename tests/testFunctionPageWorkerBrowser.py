@@ -34,9 +34,16 @@ DRAWING = """() => JSON.stringify([
 ])"""
 
 
+def scroll_to_the_graph(page):
+    """The page loads its graph viewer once the graph comes into view, and the graph starts
+    below the first screen."""
+    page.evaluate("document.getElementById('xcfg_top').scrollIntoView()")
+
+
 def _open(page, live_server, function_id, errors):
     page.on("pageerror", lambda error: errors.append(str(error)))
     page.goto(f"{live_server}/explore/functions/{function_id}")
+    scroll_to_the_graph(page)
     page.wait_for_selector("#graphContainer g.node", state="attached")
     # the controls are enabled once everything after the drawing has run
     page.wait_for_function("!document.getElementById('showCycles').disabled")
@@ -100,6 +107,7 @@ def test_a_layout_the_worker_cannot_make_gives_the_button_back(browser_page, liv
         body="self.onmessage = function () { self.postMessage({ error: 'injected layout failure' }); };"))
     browser_page.on("pageerror", lambda error: errors.append(str(error)))
     browser_page.goto(f"{live_server}/explore/functions/{harness.FUNCTION_A}")
+    scroll_to_the_graph(browser_page)
     browser_page.wait_for_selector("#cfgDeferred:not(.hidden)")
 
     assert "could not be laid out" in browser_page.inner_text("#cfgDeferredNote")
@@ -136,6 +144,7 @@ def test_a_large_graph_shows_its_code_first_and_follows_without_a_click(browser_
     browser_page.on("request", lambda request: lookups.append(request.url) if "getPicBlockMatches" in request.url else None)
     browser_page.on("pageerror", lambda error: errors.append(str(error)))
     browser_page.goto(f"{live_server}/explore/functions/{harness.FUNCTION_A}")
+    scroll_to_the_graph(browser_page)
     browser_page.wait_for_function("document.querySelectorAll('#text_code p').length > 0")
     browser_page.wait_for_function("document.getElementById('drawGraph').disabled")
 

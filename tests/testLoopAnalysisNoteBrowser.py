@@ -86,6 +86,8 @@ def browser_page(app, live_server, make_user):
 
 def open_function(page, live_server, function_id=FUNCTION_A):
     page.goto(f"{live_server}/explore/functions/{function_id}")
+    # the function page loads its graph viewer once the graph comes into view (#312)
+    page.evaluate("document.getElementById('xcfg_top').scrollIntoView()")
     page.wait_for_selector("#graphContainer g.node", state="attached")
 
 
