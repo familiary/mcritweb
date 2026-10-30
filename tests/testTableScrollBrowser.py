@@ -537,3 +537,23 @@ def test_the_api_usage_button_of_a_function_page_opens_its_dialog(open_page, liv
     assert hit, "something else is drawn over the API usage button"
     button.click(timeout=5000)
     page.wait_for_selector("#apiUsageModal.show", timeout=5000)
+
+
+@pytest.mark.parametrize("width", [390, 820, 1280, 1920])
+def test_the_function_comparison_buttons_sit_above_the_details_table(open_page, live_server, width):
+    """The `</>` and graph buttons of the function comparison page sat right-aligned above the
+    details table. Floated, and followed by a .table-scroll that is display: flow-root, they
+    floated beside it instead, level with its header row: the table lost the buttons' width
+    and, at 390px, the buttons painted over the "Function Info B" header."""
+    page = open_page(live_server + "/data/matches/function/84/943", width)
+    boxes = page.evaluate("""() => {
+        const rect = (el) => { const r = el.getBoundingClientRect(); return {top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width}; };
+        const buttons = [...document.querySelectorAll("[data-bs-target='#apiUsageModal'], a[href='#function_xcfg']")];
+        const box = document.querySelector('.table-scroll');
+        return {buttons: buttons.map(rect), box: rect(box), content: box.parentElement.clientWidth - parseFloat(getComputedStyle(box.parentElement).paddingLeft) - parseFloat(getComputedStyle(box.parentElement).paddingRight)};
+    }""")
+    assert len(boxes["buttons"]) == 2
+    for button in boxes["buttons"]:
+        assert button["bottom"] <= boxes["box"]["top"] + 1, "a button is level with the table"
+    assert max(button["right"] for button in boxes["buttons"]) > boxes["box"]["right"] - 2, "the buttons are not at the right edge"
+    assert boxes["box"]["width"] == pytest.approx(boxes["content"], abs=1), "the table lost width to the buttons"
