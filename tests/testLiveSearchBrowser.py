@@ -63,9 +63,14 @@ def page(app, live_server, make_user):
             browser.close()
 
 
+#: resolves once base.html's queue has run, live_search.js among it (ADR-0021)
+QUEUE_HAS_RUN = "() => new Promise(resolve => whenReady(() => resolve(true)))"
+
+
 def open_page(page, url):
     """Load `url` and mark the document, so a later page load shows as the mark gone."""
     page.goto(url)
+    page.evaluate(QUEUE_HAS_RUN)
     page.evaluate("window.loadedOnce = true")
 
 
@@ -91,6 +96,29 @@ def test_the_sample_list_follows_the_typed_term_without_a_page_load(page, live_s
     assert all("dridex" in text for text in page.locator("tr.sample-row").all_inner_texts())
     assert page.evaluate("window.loadedOnce") is True
     assert page.locator("#sample-list-status").inner_text() == f"{len(narrowed)} rows on this page"
+
+
+def test_a_term_typed_before_the_script_has_run_is_searched_once_it_has(page, live_server):
+    """The box has focus from the start, and base.html's queue runs live_search.js only
+    after the first paint, so typing can come first."""
+    held = []
+    page.route("**/static/live_search.js", lambda route: held.append(route))
+    page.goto(f"{live_server}/explore/samples", wait_until="commit")
+    page.wait_for_selector("#query")
+    everything = row_ids(page, "sample-row")
+    page.locator("#query").press_sequentially("dridex", delay=20)
+    for _ in range(200):
+        if held:
+            break
+        page.wait_for_timeout(50)
+    page.evaluate("window.loadedOnce = true")
+    held[0].continue_()
+
+    page.wait_for_function("term => new URL(location.href).searchParams.get('query') === term", arg="dridex")
+    page.wait_for_function("() => !document.querySelector('[aria-busy]')")
+    narrowed = row_ids(page, "sample-row")
+    assert narrowed and len(narrowed) < len(everything)
+    assert page.evaluate("window.loadedOnce") is True
 
 
 def test_the_rows_a_search_swaps_in_mark_the_term(page, live_server):

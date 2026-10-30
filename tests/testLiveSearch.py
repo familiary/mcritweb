@@ -27,11 +27,16 @@ def searched_terms(fake_mcrit, method):
     return [args[0] for name, args, _ in fake_mcrit.calls if name == method]
 
 
+#: how a page loads the script: queued with base.html's later(), which runs it after the
+#: first paint (ADR-0021)
+LOADS_LIVE_SEARCH = r'<script>later\("[^"]*live_search\.js"\)</script>'
+
+
 def live_search_forms(page):
     """Each live-search form of a page, as (region id, the region's markup)."""
     found = []
     for region in re.findall(r'<form[^>]*data-live-search="([^"]+)"', page):
-        match = re.search(r'<div id="' + re.escape(region) + r'">(.*?)<script src="[^"]*live_search\.js', page, re.S)
+        match = re.search(r'<div id="' + re.escape(region) + r'">(.*?)' + LOADS_LIVE_SEARCH, page, re.S)
         found.append((region, match.group(1) if match else None))
     return found
 
@@ -66,7 +71,7 @@ def test_unscoped_function_searches_still_wait_for_enter(client, as_role, url):
     page = client.get(url + "?query=x").get_data(as_text=True)
 
     assert "data-live-search" not in page
-    assert not re.search(r'<script src="[^"]*live_search\.js', page)
+    assert not re.search(LOADS_LIVE_SEARCH, page)
 
 
 @pytest.mark.parametrize("typed", ["0x401010", "0X401010", " 0x401010 ", "0xDEADbeef"])

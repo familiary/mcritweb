@@ -79,7 +79,8 @@ def test_a_failed_load_is_tried_again_and_waiting_callers_are_queued_once(app, l
         try:
             page.route("**/static/dropzone.js", serve_dropzone)
             page.goto(live_url + "/explore/samples")
-            page.wait_for_load_state("load")
+            # the page's scripts load after its first paint, which can come after load
+            page.evaluate("() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })")
             page.evaluate("() => { window.calls = 0; window.count = () => window.calls++; mcritLoadDropzone(window.count); }")
             page.wait_for_function("() => window.mcritDropzoneLoading === null", timeout=10000)
             assert not page.evaluate("() => window.mcritDropzoneReady")
@@ -142,7 +143,8 @@ def test_a_dropped_file_sends_its_head_for_the_pre_fill(app, live_url, make_user
             page.route("**/data/request_filename_info", answer_filename_info)
             page.route("**/data/submit_or_query", lambda route: route.abort())
             page.goto(live_url + "/explore/samples")
-            page.wait_for_load_state("load")
+            # the page's scripts load after its first paint, which can come after load
+            page.evaluate("() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })")
             page.evaluate("() => mcritLoadDropzone(() => {})")
             page.wait_for_function("() => window.mcritDropzoneReady === true", timeout=10000)
             page.evaluate(

@@ -138,21 +138,31 @@ def test_only_base_html_loads_a_jquery():
     assert loaders == {"base.html"}, f"more than one template loads a jQuery build: {sorted(loaders)}"
 
 
-def test_bootstrap_is_deferred_but_never_lazy():
+#: a script base.html's queue loads after the first paint: `later({{ url_for(...)|tojson }})`
+#: in a template, `later("/static/...")` in a page
+QUEUED = re.compile(r"""later\((?:\{\{\s*url_for\('static',\s*filename='([^']+)'\)\|tojson\s*\}\}|"/static/([^"]+)")\)""")
+
+
+def queued(code):
+    """The static files `code` queues with later(), in order."""
+    return [template or page for template, page in QUEUED.findall(code)]
+
+
+def test_bootstrap_is_queued_and_never_loaded_on_demand():
     """What decides that `$.fn.tooltip` is Bootstrap's and not jQuery UI's.
 
     Bootstrap 5.0.2 defines its jQuery plugins when it executes, or on DOMContentLoaded
-    if it executes earlier. Deferred scripts run in document order, once the document
-    is parsed and before DOMContentLoaded, so Bootstrap registers last - and wins the
-    name - as long as it comes after every other deferred script that defines jQuery
-    plugins: jQuery UI on the cross compare, loaded from {% block style %}, which is why
-    base.html loads Bootstrap below that block (test_bootstrap_comes_after_the_page_libraries).
-    `async`, or loading it on demand after the page is up, would let jQuery UI register
-    after it. See ADR-0015, ADR-0018 and issue #63.
+    if it executes earlier. The queue runs its scripts in the order they were queued,
+    after DOMContentLoaded, so Bootstrap registers last - and wins the name - as long as
+    it is queued after every other script that defines jQuery plugins: jQuery UI on the
+    cross compare, queued from {% block style %}, which is why base.html queues Bootstrap
+    below that block (test_bootstrap_comes_after_the_page_libraries). A script tag of its
+    own, or loading it on demand after the queue has run, would let jQuery UI register
+    after it. See ADR-0015, ADR-0018, ADR-0021 and issue #63.
     """
-    tag = re.search(r"<script[^>]*bootstrap\.bundle\.min\.js[^>]*>", code_of(BASE))
-    assert tag is not None, "base.html no longer loads Bootstrap's bundle"
-    assert "defer" in tag.group(0) and "async" not in tag.group(0), tag.group(0)
+    code = code_of(BASE)
+    assert "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js" in queued(code), "base.html no longer queues Bootstrap's bundle"
+    assert re.search(r"<script[^>]*bootstrap\.bundle\.min\.js", code) is None, "Bootstrap has a script tag of its own"
 
 
 def test_bootstrap_comes_after_the_page_libraries():
@@ -166,25 +176,25 @@ def test_bootstrap_comes_after_the_page_libraries():
 
 def test_nothing_touches_bootstrap_while_the_page_parses():
     """The one construction that needs Bootstrap at once - `new Autocomplete`, which
-    builds a Bootstrap dropdown - waits for DOMContentLoaded, by which time the
-    deferred bundle has run. Measured: without the wait every page logged
-    "bootstrap is not defined" from autocomplete.js."""
+    builds a Bootstrap dropdown - waits in whenReady, by which time the queued bundle has
+    run. DOMContentLoaded is too early now: the queue starts loading after it. Measured:
+    without the wait every page logged "bootstrap is not defined" from autocomplete.js."""
     for path in TEMPLATE_ROOT.rglob("*.html"):
         code = path.read_text()
         for match in re.finditer(r"new Autocomplete\(", code):
             before = code[max(0, match.start() - 600):match.start()]
-            assert "DOMContentLoaded" in before or "whenReady(" in before, f"{path.name} builds an Autocomplete while parsing"
+            assert "whenReady(" in before and "DOMContentLoaded" not in before, f"{path.name} builds an Autocomplete before Bootstrap is there"
 
 
-def test_jquery_is_deferred():
+def test_jquery_is_queued_first():
     """It used to be the last script in <head> that held back the first paint: inline
     blocks called `$` while the page parsed, `$(document).ready(...)` being itself such a
     call. They hand that work to whenReady() now, and testParseTimeScripts.py fails on
-    one that does not. `async` would not do: jQuery has to run before the libraries
-    that extend it, and only `defer` keeps document order. See ADR-0018."""
-    tag = re.search(r"<script[^>]*jquery\.js[^>]*>", code_of(BASE))
-    assert tag is not None, "base.html no longer loads jquery.js"
-    assert "defer" in tag.group(0) and "async" not in tag.group(0), tag.group(0)
+    one that does not. It is the first script queued: every library after it extends it.
+    See ADR-0018 and ADR-0021."""
+    code = code_of(BASE)
+    assert queued(code)[:1] == ["jquery.js"], queued(code)
+    assert re.search(r"<script[^>]*jquery\.js", code) is None, "jQuery has a script tag of its own"
 
 
 def test_when_ready_is_defined_before_any_other_script():
@@ -198,15 +208,23 @@ def test_when_ready_is_defined_before_any_other_script():
     assert "jQuery(fn)" in first_script.group(1), "whenReady no longer hands its function to jQuery's ready queue"
 
 
-def test_the_listener_only_scripts_are_deferred():
-    """Nothing calls these while the page parses: page_loading.js and post_action.js only
-    register event listeners, and every `new Autocomplete` waits for DOMContentLoaded
-    (test_nothing_touches_bootstrap_while_the_page_parses), which fires after every
-    deferred script has run. As plain scripts in `<head>` they only delayed first paint."""
+def test_the_listener_only_scripts_are_queued():
+    """Nothing calls these before the queue has run: page_loading.js and post_action.js
+    only register event listeners, and every `new Autocomplete` waits in whenReady
+    (test_nothing_touches_bootstrap_while_the_page_parses). As plain scripts in `<head>`
+    they only delayed first paint."""
+    code = code_of(BASE)
     for asset in ("autocomplete.js", "page_loading.js", "post_action.js"):
-        tag = re.search(r"<script[^>]*" + re.escape(asset) + r"[^>]*>", code_of(BASE))
-        assert tag is not None, f"base.html no longer loads {asset}"
-        assert "defer" in tag.group(0) and "async" not in tag.group(0), tag.group(0)
+        assert asset in queued(code), f"base.html no longer queues {asset}"
+        assert re.search(r"<script[^>]*" + re.escape(asset), code) is None, f"{asset} has a script tag of its own"
+
+
+def test_no_template_defers_a_script():
+    """A deferred script runs before DOMContentLoaded, so before the queue: one that
+    extends jQuery would find no jQuery, and one that does not would hold back the
+    queue's own first paint for nothing."""
+    deferred = sorted(path.name for path in TEMPLATE_ROOT.rglob("*.html") if re.search(r"<script\b[^>]*\sdefer\b", code_of(path)))
+    assert deferred == []
 
 
 def test_the_pages_that_lost_a_library_still_render(client, as_role):
@@ -285,13 +303,12 @@ class TestTheCrossComparePage:
             "jQuery UI is loaded before the jQuery it extends"
 
     def test_jquery_ui_runs_between_jquery_and_bootstrap(self, client, as_role):
-        """All three are deferred, so they run in the order of the page: jQuery UI
+        """All three are queued, so they run in the order they were queued: jQuery UI
         after the jQuery it extends, and before the Bootstrap that has to take
         `$.fn.tooltip` and `$.fn.button` back from it."""
-        page = self.rendered(client, as_role)
-        tags = {name: re.search(r"<script[^>]*/" + re.escape(name) + r"[^>]*>", page) for name in ("jquery.js", "jquery-ui.js", "bootstrap.bundle.min.js")}
-        assert all(tag is not None and " defer" in tag.group(0) for tag in tags.values()), tags
-        assert tags["jquery.js"].start() < tags["jquery-ui.js"].start() < tags["bootstrap.bundle.min.js"].start()
+        order = queued(self.rendered(client, as_role))
+        assert {"jquery.js", "jquery-ui.js", "bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js"} <= set(order), order
+        assert order.index("jquery.js") < order.index("jquery-ui.js") < order.index("bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js")
 
     def test_no_other_page_ships_it(self, client, as_role):
         as_role("visitor")

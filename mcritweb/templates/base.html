@@ -35,49 +35,126 @@
   <link rel="icon" type="image/png" href=" {{ url_for('static',filename='d20_mcrit_cabaret_small.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='navbar.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='hint.css') }}">
-  {# jQuery is deferred, so that no script in <head> holds back the first paint (issue
-     #63). A deferred script runs only once the whole document is parsed, so while an
-     inline script runs `$` does not exist yet, and whenReady(fn) takes the place of
-     $(document).ready(fn) and $(fn) there. It waits for DOMContentLoaded, by which time
-     every deferred script - jQuery, a page's own libraries, Bootstrap - has run, and
-     then hands fn to jQuery's ready queue, so fn runs the way a ready handler always
-     did: after the DOMContentLoaded listeners (Dropzone's auto-discovery among them), in
-     the order the calls were made. Only what a script does at once has to go through
-     it. A function declaration that uses `$` in its body stays where it is, at the top
-     level of its script, because the onclick= attributes call it by its global name.
-     It is defined above every other script so that all of them can call it, and it is
-     for them only: called after DOMContentLoaded it would wait for an event that has
-     already fired. See ADR-0018; tests/testParseTimeScripts.py fails on a `$` that
-     runs while the page parses. #}
+  {# The scripts every page needs - jQuery, post_action.js, page_loading.js, the
+     type-ahead, a page's own jQuery plugins and Bootstrap - are fetched once the page has
+     been painted, not alongside the stylesheets it is painted with (issue #63, ADR-0021).
+     later(src) queues one, and the queue is loaded in the order of the calls once the
+     browser reports the page's first contentful paint. So while an inline script runs,
+     and while a DOMContentLoaded or load listener runs, `$` and the rest do not exist
+     yet, and whenReady(fn) takes the place of $(document).ready(fn) and $(fn): it hands
+     fn to jQuery's ready queue once every queued script has run, in the order the calls
+     were made, or at once if they already have. Only what a script does at once has to
+     go through it. A function declaration that uses `$` in its body stays where it is,
+     at the top level of its script, because the onclick= attributes call it by its global
+     name. A press on something only Bootstrap or post_action.js act on, before they are
+     there, is held and made again once they are. csrfToken() is defined here rather than
+     in post_action.js, because the CFG viewers ask for it from window.onload, which can
+     come first. This is the first script on the page, so that all of them can call it.
+     tests/testParseTimeScripts.py fails on a `$` that runs before the queue has. #}
   <script>
-    function whenReady(fn) {
-      document.addEventListener("DOMContentLoaded", function () { jQuery(fn); });
+    var mcritScripts = {queued: [], waiting: [], pressed: []};
+    function later(src) {
+      mcritScripts.queued.push(src);
     }
+    // replaced, once the queue has run, by one that hands fn to jQuery at once
+    function whenReady(fn) {
+      mcritScripts.waiting.push(fn);
+    }
+    // Reads the token the meta tag above carries. Without it a POST is indistinguishable
+    // from a forged one and the server rejects it with a 400. See mcritweb/csrf.py and
+    // issue #83.
+    function csrfToken() {
+      var meta = document.querySelector('meta[name="csrf-token"]');
+      return meta ? meta.getAttribute("content") : "";
+    }
+    // A tooltip is shown on hover and focus, not on a press, so a press on an element
+    // that has one goes on to the element's own handler.
+    function holdEarlyPress(event) {
+      var target = event.target.closest && event.target.closest('[data-bs-toggle]:not([data-bs-toggle="tooltip"]), [data-bs-dismiss], [data-post]');
+      if (target) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        mcritScripts.pressed.push(target);
+      }
+    }
+    document.addEventListener("click", holdEarlyPress, true);
+    document.addEventListener("DOMContentLoaded", function () {
+      function queueHasRun() {
+        document.removeEventListener("click", holdEarlyPress, true);
+        whenReady = function (fn) {
+          jQuery(fn);
+        };
+        mcritScripts.waiting.forEach(whenReady);
+        whenReady(function () {
+          mcritScripts.pressed.forEach(function (target) { target.click(); });
+        });
+      }
+      function loadTheQueue() {
+        var left = mcritScripts.queued.length;
+        mcritScripts.queued.forEach(function (src) {
+          var script = document.createElement("script");
+          script.src = src;
+          // added by a script, they would run as each arrives; this runs them in order
+          script.async = false;
+          script.onload = script.onerror = function () {
+            left -= 1;
+            if (left === 0) {
+              queueHasRun();
+            }
+          };
+          document.head.appendChild(script);
+        });
+      }
+      // once the browser reports the first contentful paint: a frame is presented some
+      // time after the main thread has produced it, so a timer set from
+      // requestAnimationFrame, which is what a browser without paint timing gets, can come
+      // before it. A page that is not visible paints nothing and loads at once, and one
+      // that has painted nothing three seconds on loads anyway.
+      var queueStarted = false;
+      function startTheQueue() {
+        if (!queueStarted) {
+          queueStarted = true;
+          loadTheQueue();
+        }
+      }
+      if (document.visibilityState === "hidden") {
+        startTheQueue();
+      } else if (window.PerformanceObserver && (PerformanceObserver.supportedEntryTypes || []).indexOf("paint") >= 0) {
+        new PerformanceObserver(function (list, observer) {
+          if (list.getEntriesByName("first-contentful-paint").length) {
+            observer.disconnect();
+            startTheQueue();
+          }
+        }).observe({type: "paint", buffered: true});
+      } else {
+        requestAnimationFrame(function () { setTimeout(startTheQueue, 0); });
+      }
+      setTimeout(startTheQueue, 3000);
+    });
   </script>
-  <script defer src="{{ url_for('static', filename='jquery.js') }}"></script>
+  <script>later({{ url_for('static', filename='jquery.js')|tojson }})</script>
   {# DataTables and jQuery UI used to be here: 623 KB of render-blocking JavaScript and
      41 KB of CSS, on every page, for two calls.
 
      DataTables is gone entirely - its one initialiser lived on the jobs page, against a
      selector that page never renders, so it did nothing anywhere. jQuery UI loads from
-     result_cross.html, the only page that calls `.sortable()`. It is deferred as well,
-     deferred scripts run in the order of the document, and {% block style %} comes after
-     this tag, so jQuery is in place before it. See issue #63.
+     result_cross.html, the only page that calls `.sortable()`. It is queued with later()
+     as well, the queue runs in the order of the calls, and {% block style %} comes after
+     the call above, so jQuery is in place before it. See issue #63.
 
-     The same ordering is why Bootstrap is loaded below {% block style %} rather than
+     The same ordering is why Bootstrap is queued below {% block style %} rather than
      here. Bootstrap 5.0.2 defines its jQuery plugins as it runs, once the document has
-     been parsed - which it has, by the time a deferred script runs - and jQuery UI has a
+     been parsed - which it has, by the time the queue runs - and jQuery UI has a
      `.tooltip()` and a `.button()` of its own, so whichever of the two runs last owns
      those names. It has to be Bootstrap: copy_to_clipboard asks
      `bootstrap.Tooltip.getInstance()` for the tooltip that `.tooltip()` built. A library
-     loaded *lazily*, after the page is up, would run after Bootstrap whatever the order
-     of the tags, and take the names. See ADR-0015. #}
-  {# `defer`: nothing below is called while the page parses. post_action.js and
-     page_loading.js only listen for events, and every `new Autocomplete` waits for
-     DOMContentLoaded. See issue #63. #}
-  <script defer src="{{ url_for('static', filename='post_action.js') }}"></script>
-  <script defer src="{{ url_for('static', filename='page_loading.js') }}"></script>
-  <script defer src="{{ url_for('static', filename='autocomplete.js') }}"></script>
+     loaded on demand, after the queue has run, would run after Bootstrap whatever the
+     order of the tags, and take the names. See ADR-0015. #}
+  {# nothing below is called before the queue has run: post_action.js and page_loading.js
+     only listen for events, and every `new Autocomplete` waits in whenReady. #}
+  <script>later({{ url_for('static', filename='post_action.js')|tojson }})</script>
+  <script>later({{ url_for('static', filename='page_loading.js')|tojson }})</script>
+  <script>later({{ url_for('static', filename='autocomplete.js')|tojson }})</script>
 
   {% if not suppress_dropzone_overlay and g.user and g.user.role != 'pending' %}
     {{ submit_or_query_dropzone_js(select_form_type=True, lazy=True) }}
@@ -109,10 +186,10 @@
   {% endif %}
   {{ clipboard_js() }}
   {% block style %}{% endblock %}
-  {# below the block, so that it runs after a page's own deferred jQuery plugins - see
-     above. Its declarative behaviour and its jQuery plugins are in place before
-     DOMContentLoaded, and so before any whenReady handler. #}
-  <script defer src="{{ url_for('static', filename='bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js') }}"></script>
+  {# below the block, so that it runs after a page's own jQuery plugins - see above. Its
+     declarative behaviour and its jQuery plugins are in place before any whenReady
+     handler runs. #}
+  <script>later({{ url_for('static', filename='bootstrap-5.0.2-dist/js/bootstrap.bundle.min.js')|tojson }})</script>
 </head>
 <body style="font-family: sans-serif">
   <header>
