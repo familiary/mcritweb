@@ -15,10 +15,12 @@ chooses them, and two templates dropped them into a quoted JS string literal. A 
 alone would not have shown that the value was attacker-controlled rather than an id.
 """
 
+import html
 import json
 import logging
 import os
 import re
+import urllib.parse
 
 import pytest
 from fixtureData import job_id_of
@@ -230,9 +232,12 @@ def test_a_registration_token_stays_a_string_in_the_admin_page_script(app, clien
 
     page = client.get("/admin/server").get_data(as_text=True)
 
-    literal = re.search(r"^\s*var js_token = (.*?);$", page, re.MULTILINE)
-    assert literal, "var js_token is gone from the admin server page"
-    assert json.loads(literal.group(1)) == value, literal.group(0)
+    # the copy is a clipboard button now, which carries the URL in an attribute rather
+    # than in a script: the token has to come out of it whole, as the query's value
+    button = re.search(r'data-clipboard-value="([^"]*)"[^>]*>', page[page.index("registration"):])
+    assert button and "Copy registration URL" in page, "the registration URL's copy is gone from the admin server page"
+    url = urllib.parse.urlsplit(html.unescape(button.group(1)))
+    assert urllib.parse.parse_qs(url.query) == {"token": [value]}, button.group(0)
 
 
 # --- a value in a URL ------------------------------------------------------------------
