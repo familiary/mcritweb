@@ -57,7 +57,7 @@ def change_username():
     elif db.is_reserved_username(new_username):
         error_msg = "Username is reserved."
     elif _throttled(user_info.username):
-        error_msg = TOO_MANY_ATTEMPTS
+        error_msg, error_field = TOO_MANY_ATTEMPTS, 'inputPassword1'
     elif not _password_checks_out(user_info, password):
         error_msg, error_field = 'Incorrect Password!', 'inputPassword1'
     elif UserInfo.fromDb(username=new_username) is not None:
@@ -91,7 +91,7 @@ def change_password():
     elif not new_password == request.form['inputPassword4']:
         error_msg, error_field = 'The entered passwords do not match!', 'inputPassword4'
     elif _throttled(user_info.username):
-        error_msg = TOO_MANY_ATTEMPTS
+        error_msg, error_field = TOO_MANY_ATTEMPTS, 'inputPassword2'
     elif not _password_checks_out(user_info, old_password):
         error_msg, error_field = 'Incorrect password!', 'inputPassword2'
     if error_msg is None:
