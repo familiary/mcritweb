@@ -239,7 +239,9 @@ var FunctionCompare = (function () {
     renderer.run(graph, inner);
 
     // colours and dashes come as attributes on the dot graph, see
-    // functiondiff.build_combined_dot_graph
+    // functiondiff.build_combined_dot_graph. The colours are var(--cfg-...)
+    // references (#70): they go to .style() as they are and the stylesheet in
+    // force, light or dark, resolves them
     d3.selectAll("#graphContainer_c g.node.enter").each(function (nodeId) {
       var attributes = graph.node(nodeId);
       var node = d3.select(this);

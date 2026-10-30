@@ -25,7 +25,13 @@ from mcritweb.views.authentication import contributor_required, visitor_required
 from mcritweb.views.client import get_client, get_family_entries, get_sample_entries
 from mcritweb.views.cross_compare import CROSS_ORDERINGS, get_sample_to_job_id, lazy_cross_panes, order_sample_ids, score_to_color
 from mcritweb.views.functiondiff import get_function_diff
-from mcritweb.views.MatchReportRenderer import MatchReportRenderer, count_diagram_blocks, stacked_diagram_size
+from mcritweb.views.MatchReportRenderer import (
+    DEFAULT_DIAGRAM_VARIANT,
+    DIAGRAM_PALETTES,
+    MatchReportRenderer,
+    count_diagram_blocks,
+    stacked_diagram_size,
+)
 from mcritweb.views.memo import app_memo
 from mcritweb.views.pagination import Pagination
 from mcritweb.views.params import (
@@ -74,8 +80,20 @@ def is_cacheable_job_id(job_id):
     return isinstance(job_id, str) and JOB_ID_RE.match(job_id) is not None
 
 
+#: The palettes a diagram has a file of its own for besides the default one, which keeps
+#: the name it had before there was more than one: "<name>.dark.png" is the diagram of
+#: "<name>.png" drawn in the dark palette (#70). The default's own name is not accepted
+#: with a variant in it (no ".light"), as that would be a second name, and a second
+#: cache file, for the same picture.
+DIAGRAM_VARIANTS = tuple(variant for variant in DIAGRAM_PALETTES if variant != DEFAULT_DIAGRAM_VARIANT)
+
+
 #: The diagram filenames create_match_diagram writes and the four result templates
-#: ask for: "<job_id>.png", or "<job_id>-famid_7.png" / "-samid_7" / "-funid_7".
+#: ask for: "<job_id>.png", or "<job_id>-famid_7.png" / "-samid_7" / "-funid_7", each
+#: of them optionally with a variant in front of the extension ("<job_id>.dark.png").
+#: A job id has no dot in it, so the variant cannot be taken for part of one. The
+#: variants come from the palettes the renderer has, so a name is accepted exactly when
+#: it can be drawn.
 #: The job id is lazy so that the optional filter suffix is preferred over letting
 #: the id swallow it - a uuid4 job id, which a local queue issued before mcrit 1.14,
 #: contains dashes, so a greedy id would read "<uuid>-famid_7.png" as one long
@@ -90,6 +108,7 @@ def is_cacheable_job_id(job_id):
 DIAGRAM_FILENAME_RE = re.compile(
     r"^(?P<job_id>[0-9A-Za-z_-]{1,64}?)"
     r"(?:-(?P<filter_kind>famid|samid|funid)_(?P<filter_id>0|-?[1-9][0-9]{0,17}))?"
+    r"(?:\.(?P<variant>" + "|".join(re.escape(variant) for variant in DIAGRAM_VARIANTS) + r"))?"
     r"\.png\Z"
 )
 
@@ -328,7 +347,17 @@ def match_diagram_size(result_json):
     return stacked_diagram_size(count_diagram_blocks([function_summary["num_instructions"] for function_summary in function_summaries]))
 
 
-def create_match_diagram(app, job_id, matching_result, filtered_family_id=None, filtered_sample_id=None, filtered_function_id=None):
+def diagram_variant_suffix(variant):
+    """What the palette `variant` adds in front of a diagram's extension: nothing for
+    the default one, so that its files keep the names they were cached under."""
+    if variant == DEFAULT_DIAGRAM_VARIANT:
+        return ""
+    if variant in DIAGRAM_VARIANTS:
+        return "." + variant
+    raise ValueError(f"No diagram palette named {variant!r}")
+
+
+def create_match_diagram(app, job_id, matching_result, filtered_family_id=None, filtered_sample_id=None, filtered_function_id=None, variant=DEFAULT_DIAGRAM_VARIANT):
     cache_path = os.sep.join([app.instance_path, "cache", "diagrams"])
     filter_suffix = ""
     if filtered_family_id is not None:
@@ -337,12 +366,12 @@ def create_match_diagram(app, job_id, matching_result, filtered_family_id=None, 
         filter_suffix = f"-samid_{filtered_sample_id}"
     elif filtered_function_id is not None:
         filter_suffix = f"-funid_{filtered_function_id}"
-    output_filename = job_id + filter_suffix + ".png"
+    output_filename = job_id + filter_suffix + diagram_variant_suffix(variant) + ".png"
     output_path = cache_path + os.sep + output_filename
     if not os.path.isfile(output_path):
         renderer = MatchReportRenderer()
         renderer.processReport(matching_result)
-        image = renderer.renderStackedDiagram(filtered_family_id=filtered_family_id, filtered_sample_id=filtered_sample_id, filtered_function_id=filtered_function_id)
+        image = renderer.renderStackedDiagram(filtered_family_id=filtered_family_id, filtered_sample_id=filtered_sample_id, filtered_function_id=filtered_function_id, variant=variant)
         write_atomically(app, cache_path, output_filename, lambda fout: image.save(fout, format="PNG"))
         # `app`, not `current_app`: this function takes an app precisely so it does
         # not depend on a request context, and uses app.instance_path fifteen lines up.
@@ -367,6 +396,9 @@ def render_missing_match_diagram(app, filename_match):
     job_id = filename_match.group("job_id")
     filter_kind = filename_match.group("filter_kind")
     filter_id = int(filename_match.group("filter_id")) if filter_kind else None
+    # the palette comes from the name that was asked for and from nothing else - not
+    # from who is asking: this file is cached under that name for everyone
+    variant = filename_match.group("variant") or DEFAULT_DIAGRAM_VARIANT
     client = get_client()
     result_json = load_cached_result(app, job_id)
     if not result_json:
@@ -394,6 +426,7 @@ def render_missing_match_diagram(app, filename_match):
         filtered_family_id=filter_id if filter_kind == "famid" else None,
         filtered_sample_id=filter_id if filter_kind == "samid" else None,
         filtered_function_id=filter_id if filter_kind == "funid" else None,
+        variant=variant,
     )
 
 # https://stackoverflow.com/a/39842765

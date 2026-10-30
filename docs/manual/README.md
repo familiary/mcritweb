@@ -439,6 +439,8 @@ A token issued before MCRITweb 1.5.0 has only 32 characters; the settings page m
 
 Additionally, users with level contributor and above can also change their username and password.
 
+Under "Change theme", every user picks the colour theme of the pages they see while signed in: Light, Dark, or Match my system, which follows the light or dark preference of the operating system and switches with it. Accounts start on Light.
+
 All users with level visitor or above can also set a number of filter preferences, that are automatically applied to all matching results.
 
 ![An example for the user filter preferences](images/pref_filter.png "An example for the user filter preferences")

@@ -35,25 +35,34 @@ from mcritweb.views.client import get_client
 from mcritweb.views.memo import app_memo
 from mcritweb.views.utility import get_server_url
 
+# The colours are named, not written: each is a `var(--cfg-...)` reference, which the
+# page resolves to the light or the dark value of the stylesheet it is in (#70). The
+# light values are in static/style.css and the dark ones in static/theme-dark.css; the
+# legend of templates/table/function_details.html writes the same names. They are only
+# compared as strings - _compute_function_diff tells unmatched blocks apart by
+# COLOR_UNMATCHED, and main_duo.js stores and re-applies them - so each must stay
+# distinct; main_duo.js sets them as a block's fill style and function_compare.js as the
+# fill and stroke of the combined graph.
+
 #: the base colour of a block nothing matched
-COLOR_UNMATCHED = "#FFA0A0"
-COLOR_ESCAPED_MATCH = "#00ff00"
-COLOR_ADHOC_PICBLOCK_MATCH = "#C0F4FF"
-COLOR_FULL_PICBLOCK_MATCH = "#00DDFF"
+COLOR_UNMATCHED = "var(--cfg-unmatched)"
+COLOR_ESCAPED_MATCH = "var(--cfg-escaped-match)"
+COLOR_ADHOC_PICBLOCK_MATCH = "var(--cfg-adhoc-picblock)"
+COLOR_FULL_PICBLOCK_MATCH = "var(--cfg-full-picblock)"
 #: a block that exists only in function B, used by the combined view where the
 #: unmatched colour above is reserved for blocks that exist only in function A
-COLOR_ONLY_IN_B = "#D0B0FF"
+COLOR_ONLY_IN_B = "var(--cfg-only-in-b)"
 
 LEVENSHTEIN_COLORS = {
-    0: "#40ff40",
-    1: "#c0ff80",
-    2: "#FFFF40",
-    3: "#FFCC40",
+    0: "var(--cfg-levenshtein-0)",
+    1: "var(--cfg-levenshtein-1)",
+    2: "var(--cfg-levenshtein-2)",
+    3: "var(--cfg-levenshtein-3)",
 }
 
-EDGE_COLOR_BOTH = "#000000"
-EDGE_COLOR_ONLY_A = "#d62728"
-EDGE_COLOR_ONLY_B = "#7b2cbf"
+EDGE_COLOR_BOTH = "var(--cfg-edge-both)"
+EDGE_COLOR_ONLY_A = "var(--cfg-edge-only-a)"
+EDGE_COLOR_ONLY_B = "var(--cfg-edge-only-b)"
 
 
 def node_id(offset):

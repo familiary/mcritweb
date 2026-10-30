@@ -75,13 +75,13 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
           <span>
             <input style="margin:3px;" type="button" id="showCycles" value="Show Cycles"/>
             <input style="margin:3px;" type="button" id="showLoops" value="Show Loops"/>
-            <label style="margin:3px; background-color:#fdd0a2; padding:1px"><input style="margin:3px;" type="checkbox" id="loopBgFill" value="loopBgFill" checked>Show Loop Boundaries</label>
+            <label style="margin:3px; background-color:var(--cfg-loop-label); padding:1px"><input style="margin:3px;" type="checkbox" id="loopBgFill" value="loopBgFill" checked>Show Loop Boundaries</label>
             <!-- <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableNodeDrag" value="enableNodeDrag">Enable Node Dragging</label> -->
             <label style="margin:3px; padding:3px;"><input style="margin:3px;" type="checkbox" id="enableTooltip" value="enableTooltip">Enable Tooltip</label>
           </span>
         </div>
         <div class="mb-1">{{ cfg_legend(combined=True) }}</div>
-        <div style="font-size: 0.85em; color: #6c757d;">Hover a block to outline its matches, click to centre the other graph on the first match. In the combined view, hovering a block that differs shows B's code.</div>
+        <div style="font-size: 0.85em; color: var(--text-muted);">Hover a block to outline its matches, click to centre the other graph on the first match. In the combined view, hovering a block that differs shows B's code.</div>
         {# main_duo.js says here when a panel's loop analysis was skipped; empty, they take no space #}
         <div id="loopAnalysisNote_a" role="status"></div>
         <div id="loopAnalysisNote_b" role="status"></div>
@@ -91,7 +91,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
             <div id="tooltip_a" class="hidden">
             <p><span id="value_a"></span></p>
             </div>
-            <div id="loading_a" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:#3f51b5 ; ">
+            <div id="loading_a" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--text-progress); ">
             Loading. Please Wait!
             </div>
             <svg id="graphContainer_a">
@@ -102,7 +102,7 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
           <div id="tooltip_b" class="hidden">
             <p><span id="value_b"></span></p>
             </div>
-            <div id="loading_b" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:#3f51b5 ; ">
+            <div id="loading_b" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--text-progress); ">
             Loading. Please Wait!
             </div>
             <svg id="graphContainer_b">
@@ -114,10 +114,10 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
         <div id="tooltip_c" class="hidden">
           <p><span id="value_c"></span></p>
         </div>
-        <div id="loading_c" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:#3f51b5 ; ">
+        <div id="loading_c" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--text-progress); ">
         Loading. Please Wait!
         </div>
-        <div id="combined_error" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:darkred;">
+        <div id="combined_error" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--status-no);">
         The combined graph could not be loaded.
         </div>
         <svg id="graphContainer_c">

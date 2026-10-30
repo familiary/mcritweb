@@ -4,9 +4,16 @@
    works it out from the report - and goes on the <img> as width/height, which is what
    makes the browser reserve the right box instead of shoving the tables below it down
    when the image lands. A size that turns out wrong costs nothing: the image's own
-   dimensions win once it has loaded. #}
+   dimensions win once it has loaded.
+
+   The diagram is a picture of data, so it is drawn once per palette instead of being
+   recoloured by CSS (#70): "<name>.dark.png" is "<name>.png" on the dark page colour,
+   and themed_img offers it to a dark page only, so a light page never fetches it. Both
+   have the size given here. Import this file `with context`: themed_img reads
+   theme_dark_media from it, and a macro imported without context does not see it. #}
+{% from 'table/themed_image.html' import themed_img with context %}
 {% macro match_diagram(filename, size=none) %}
   <div class="mcrit-diagram">
-    <img src="{{ url_for('data.diagram_file', filename=filename) }}" class="img-fluid" alt="MCRIT diagram"{% if size %} width="{{ size[0] }}" height="{{ size[1] }}"{% endif %} />
+    {{ themed_img(url_for('data.diagram_file', filename=filename), url_for('data.diagram_file', filename=filename[:-4] ~ '.dark.png'), class="img-fluid", alt="MCRIT diagram", width=size[0] if size else none, height=size[1] if size else none) }}
   </div>
 {% endmacro %}

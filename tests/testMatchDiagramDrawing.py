@@ -36,8 +36,12 @@ def _digest(image):
     return hashlib.sha256(f"{image.mode}{image.size}".encode() + image.tobytes()).hexdigest()
 
 
-def _render_report(report, variant, filter_id):
-    """What data.create_match_diagram draws for this report and filter."""
+def _render_report(report, variant, filter_id, palette=None):
+    """What data.create_match_diagram draws for this report and filter.
+
+    `variant` is which filter the diagram has ("plain", "famid", ...); `palette` is the
+    renderer's own variant argument, left out when the default is meant.
+    """
     matching_result = MatchingResult.fromDict(load(f"{report}.result"))
     kwargs = {}
     if variant == "famid":
@@ -48,6 +52,8 @@ def _render_report(report, variant, filter_id):
         kwargs["filtered_sample_id"] = filter_id
     elif variant == "funid":
         kwargs["filtered_function_id"] = filter_id
+    if palette is not None:
+        kwargs["variant"] = palette
     renderer = MatchReportRenderer()
     renderer.processReport(matching_result)
     return renderer.renderStackedDiagram(**kwargs)
@@ -122,6 +128,22 @@ def test_large_diagram_is_pixel_identical_to_master(variant, filter_id):
     image = renderer.renderStackedDiagram(**kwargs)
     # many columns, so the stack wraps and the padding blocks at the end are drawn
     assert image.size[1] > 400
+    assert _digest(image) == SYNTHETIC_DIGESTS[(variant, filter_id)]
+
+
+@pytest.mark.parametrize(("report", "variant", "filter_id"), list(MASTER_DIGESTS))
+def test_the_light_palette_asked_for_by_name_is_the_diagram_master_drew(app, report, variant, filter_id):
+    """The cached light files stay valid only if asking for the palette by name draws
+    what leaving it out always drew (#70): the hashes are master's."""
+    with app.app_context():
+        image = _render_report(report, variant, filter_id, palette="light")
+    assert _digest(image) == MASTER_DIGESTS[(report, variant, filter_id)]
+
+
+@pytest.mark.parametrize(("variant", "filter_id"), list(SYNTHETIC_DIGESTS))
+def test_the_light_palette_asked_for_by_name_draws_the_large_diagram_master_drew(variant, filter_id):
+    kwargs = {FILTER_KWARGS[variant]: filter_id} if variant in FILTER_KWARGS else {}
+    image = _synthetic_renderer().renderStackedDiagram(variant="light", **kwargs)
     assert _digest(image) == SYNTHETIC_DIGESTS[(variant, filter_id)]
 
 

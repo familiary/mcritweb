@@ -117,7 +117,7 @@ Sample: {{ entry.sample_id }}
           {# named by its content, so that the count it shows is part of its name (WCAG 2.5.3) #}
           <button type="button" class="btn btn-outline-dark btn-sm dropdown-toggle" id="button_sample_analyze" data-bs-toggle="dropdown" aria-expanded="false">
             {% if matching_jobs %}
-            <i style="color:green;" class="fa-solid fa-flask" aria-hidden="true"></i><span class="visually-hidden">Analyze sample, matching jobs:</span>&nbsp;{{ matching_jobs | length}}
+            <i style="color: var(--status-yes);" class="fa-solid fa-flask" aria-hidden="true"></i><span class="visually-hidden">Analyze sample, matching jobs:</span>&nbsp;{{ matching_jobs | length}}
             {% else %}
             <i class="fa-solid fa-flask" aria-hidden="true"></i><span class="visually-hidden">Analyze sample</span>
             {% endif %}

@@ -1,0 +1,10 @@
+{# An image that has a variant drawn for the dark palette (#70). The <source> carries the
+   media query base.html puts on theme-dark.css (see mcritweb/theme.py), so image and
+   stylesheet switch together. Under the light theme there is no <source>, and only the
+   light file is ever fetched. Import it `with context`: the query is a context variable. #}
+{% macro themed_img(src, dark_src) -%}
+<picture>
+  {%- if theme_dark_media %}<source srcset="{{ dark_src }}" media="{{ theme_dark_media }}">{% endif -%}
+  <img src="{{ src }}"{{ kwargs|xmlattr }}>
+</picture>
+{%- endmacro %}
