@@ -824,3 +824,74 @@ span[data-hint]:not(.score-swatch) {
 .status-message .btn-close {
   margin: 0 0 0 auto;
 }
+
+/* Keyboard access. A sortable column's header holds what sorts it: a link where the sort
+   loads the page sorted another way (sortable_header_col), a button where it reorders the
+   rows in place (the Unique Blocks statistics). Either keeps the look the header had while
+   the cell itself took the click - its colour and weight, no underline or button face -
+   and the cell's width to click on. */
+th > .table-sort {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  text-decoration: none;
+}
+
+/* A listing row's id is the link into what the row opens, and like the table links above
+   it is often a single digit: the same 24px minimum width keeps it a target WCAG 2.5.8
+   accepts. */
+th[scope="row"] > a:not(.btn) {
+  display: inline-block;
+  min-width: 24px;
+}
+
+/* A sample picker's chosen rows are tinted, and forced colours paint every row alike. The
+   row's radio button or checkbox says it is chosen; the frame keeps the row easy to find. */
+@media (forced-colors: active) {
+  tr.row-selected,
+  tr.row-pending {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+/* An item of a list ordered by dragging or with its buttons (static/reorder_list.js): its
+   name, with the buttons at its end, 24px targets that keep the item about as tall as the
+   name alone made it. The script adds the buttons after the first paint, so the room for
+   them is kept here, at the end of the item, and they fill it without moving the name or
+   resizing the item. A list-group item has three (up, down, across) and a sample two. */
+[data-reorder-item] {
+  position: relative;
+}
+.list-group-item[data-reorder-item] {
+  padding-right: calc(1rem + 84px);
+}
+li[data-reorder-item] {
+  padding-right: 56px;
+  /* the buttons are out of the flow, and a line of small text is shorter than they are:
+     without this each item's buttons ran over the next one's */
+  min-height: 24px;
+}
+.reorder-buttons {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: flex;
+  gap: 4px;
+  margin-top: -12px;
+}
+.list-group-item > .reorder-buttons {
+  right: 1rem;
+}
+.reorder-buttons > .btn {
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  line-height: 22px;
+}

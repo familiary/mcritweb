@@ -51,7 +51,7 @@ def serve_report(corpus_mcrit, monkeypatch):
 
 
 class _Cells(HTMLParser):
-    """The matrix cells of the rendered pane, as {(row id, column id): data-href or None}."""
+    """The matrix cells of the rendered pane, as {(row id, column id): href or None}."""
 
     def __init__(self, order):
         super().__init__()
@@ -65,10 +65,10 @@ class _Cells(HTMLParser):
         if tag == "tr" and attrs.get("class") == "sample-row":
             self._row = None
             self._column = 0
-        elif tag == "td" and "id" in (attrs.get("class") or "").split():
+        elif tag == "th" and "id" in (attrs.get("class") or "").split():
             self._row = "pending"
-        elif tag == "span" and "data-hint" in attrs and self._row not in (None, "pending"):
-            self.cells[(self._row, self.order[self._column])] = attrs.get("data-href")
+        elif tag in ("span", "a") and "data-hint" in attrs and self._row not in (None, "pending"):
+            self.cells[(self._row, self.order[self._column])] = attrs.get("href")
             self._column += 1
 
     def handle_data(self, data):

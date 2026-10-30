@@ -6,10 +6,12 @@
 {# Click-to-sort for a table that is already fully in memory, so no round trip and
    no new query parameter. `data-sort` marks the column type, `data-sort-value` on a
    cell carries the raw value a formatted cell ("2844 (66.76%)") would otherwise
-   hide. Sort symbols follow the ones cursor_pagination_sort_symbol renders. #}
+   hide. Sort symbols follow the ones cursor_pagination_sort_symbol renders. What takes the
+   click is a button inside the header, which the keyboard reaches and a screen reader
+   reads with the column's name; the header says with aria-sort how the table is sorted. #}
 {%- macro sortable_column(label, sort_type, align='left') -%}
-  <th style="text-align: {{ align }};" scope="col" class="pointer" data-sort="{{ sort_type }}">
-    <span>{{ label }}</span>&nbsp;<span style="float: right;"><i class="fa fa-sort"></i></span>
+  <th style="text-align: {{ align }};" scope="col" data-sort="{{ sort_type }}">
+    <button type="button" class="table-sort"><span>{{ label }}</span>&nbsp;<span style="float: right;"><i class="fa fa-sort" aria-hidden="true"></i></span></button>
   </th>
 {%- endmacro -%}
 {% block title%}
@@ -143,17 +145,17 @@ Unique Blocks for {{ sample_ids|length }} Samples
 
 <ul class="nav nav-pills mb-3 justify-content-center" id="pills-tab" role="tablist">
   <li class="nav-item" role="presentation">
-    <button class="nav-link {% if active_tab=='stats' %}show active{%endif%}" id="pills-statistics-tab" data-bs-toggle="pill" data-bs-target="#pills-statistics" type="button" role="tab" aria-controls="pills-statistics" aria-selected="true">Statistics</button>
+    <button class="nav-link {% if active_tab=='stats' %}show active{%endif%}" id="pills-statistics-tab" data-bs-toggle="pill" data-bs-target="#pills-statistics" type="button" role="tab" aria-controls="pills-statistics" aria-selected="{{ 'true' if active_tab == 'stats' else 'false' }}">Statistics</button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link {% if active_tab=='blocks' %}show active{%endif%}" id="pills-blocks-tab" data-bs-toggle="pill" data-bs-target="#pills-blocks" type="button" role="tab" aria-controls="pills-blocks" aria-selected="false">Unique Blocks</button>
+    <button class="nav-link {% if active_tab=='blocks' %}show active{%endif%}" id="pills-blocks-tab" data-bs-toggle="pill" data-bs-target="#pills-blocks" type="button" role="tab" aria-controls="pills-blocks" aria-selected="{{ 'true' if active_tab == 'blocks' else 'false' }}">Unique Blocks</button>
   </li>
   <li class="nav-item" role="presentation">
     {# deliberately still keyed on the stored statistics: this says whether the report
        can yield a rule at all. Keying it on the current cover would disable the tab as
        soon as a parameter selected no blocks - locking the reader out of the very form
        that would undo it. What the current parameters produced is reported inside. #}
-    <button class="nav-link {% if active_tab=='yara' %}show active{%endif%} {% if not statistics['has_yara_rule'] %}disabled{%endif%}" id="pills-yara-tab" data-bs-toggle="pill" data-bs-target="#pills-yara" type="button" role="tab" aria-controls="pills-yara" aria-selected="false">YARA Rule</button>
+    <button class="nav-link {% if active_tab=='yara' %}show active{%endif%} {% if not statistics['has_yara_rule'] %}disabled{%endif%}" id="pills-yara-tab" data-bs-toggle="pill" data-bs-target="#pills-yara" type="button" role="tab" aria-controls="pills-yara" aria-selected="{{ 'true' if active_tab == 'yara' else 'false' }}"{% if not statistics['has_yara_rule'] %} aria-disabled="true"{% endif %}>YARA Rule</button>
   </li>
 </ul>
 
@@ -314,12 +316,14 @@ Unique Blocks for {{ sample_ids|length }} Samples
           var isDescending = header.dataset.sortDirection !== "desc";
           Array.prototype.forEach.call(headers, function (other) {
             delete other.dataset.sortDirection;
+            other.removeAttribute("aria-sort");
             var symbol = other.querySelector("i.fa");
             if (symbol !== null) {
               symbol.className = "fa fa-sort";
             }
           });
           header.dataset.sortDirection = isDescending ? "desc" : "asc";
+          header.setAttribute("aria-sort", isDescending ? "descending" : "ascending");
           var symbol = header.querySelector("i.fa");
           if (symbol !== null) {
             symbol.className = isDescending ? "fa fa-sort-down" : "fa fa-sort-up";

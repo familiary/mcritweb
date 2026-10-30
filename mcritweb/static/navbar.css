@@ -25,3 +25,13 @@
   height: 40px;
   width: auto;
 }
+/* The menu toggles are buttons: they open a menu rather than go anywhere, and a link to
+   "#" in their place ignored Space. Bootstrap 5.0.2 styles .nav-link for links only, so
+   without this a toggle would draw the browser's button face, and in the collapsed menu
+   shrink to its text where the link spanned the menu's width. */
+.navbar-nav button.nav-link {
+  width: 100%;
+  background: none;
+  border: 0;
+  text-align: inherit;
+}

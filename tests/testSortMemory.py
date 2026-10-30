@@ -54,7 +54,7 @@ def last_search(backend, kind):
 
 def sample_ids(response):
     """Sample ids in the order the rows were rendered."""
-    return re.findall(r'class="sample-id">(\d+)</th>', response.get_data(as_text=True))
+    return re.findall(r'class="sample-id"><a href="[^"]*">(\d+)</a></th>', response.get_data(as_text=True))
 
 
 # --- remembering ------------------------------------------------------------------
