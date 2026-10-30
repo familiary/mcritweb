@@ -6,7 +6,7 @@
 
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='trace_CFG/cfg_style.css') }}">
 {# lets find in page search the closed panels below #}
-<script>later({{ url_for('static', filename='collapsed_find.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='collapsed_find.js')|tojson }})</script>
 
 {% endblock %}
 

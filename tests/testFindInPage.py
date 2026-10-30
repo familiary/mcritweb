@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent / "mcritweb"
-QUEUED = re.compile(r"<script>later\(\{\{ url_for\('static', filename='collapsed_find\.js'\)\|tojson \}\}\)</script>")
+QUEUED = re.compile(r"<script nonce=\"\{\{ csp_nonce\(\) \}\}\">later\(\{\{ url_for\('static', filename='collapsed_find\.js'\)\|tojson \}\}\)</script>")
 
 
 def test_every_page_with_a_closed_panel_queues_the_script():
