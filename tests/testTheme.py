@@ -1056,7 +1056,8 @@ def test_the_templates_that_tint_a_row_or_a_cell_use_the_tint_methods():
         called.update(re.findall(r"scp\.(\w+)\(", path.read_text(encoding="utf-8")))
 
     assert set(called) == {"getMatchTintFromResult", "getMatchTintByScore100", "getMatchTintByScore50", "getUniqueTint"}
-    assert sum(called.values()) >= 20
+    # #152 folds the result pages' copies of the match tables into table/match_row.html
+    assert sum(called.values()) >= 15
 
 
 # --- 5. the palette --------------------------------------------------------------------------
