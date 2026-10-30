@@ -98,10 +98,7 @@ progress{vertical-align:baseline}
 .col-auto{flex:0 0 auto;width:auto}
 .col-1{flex:0 0 auto;width:8.33333333%}
 .col-3{flex:0 0 auto;width:25%}
-.col-4{flex:0 0 auto;width:33.33333333%}
-.col-5{flex:0 0 auto;width:41.66666667%}
 .col-6{flex:0 0 auto;width:50%}
-.col-8{flex:0 0 auto;width:66.66666667%}
 .col-12{flex:0 0 auto;width:100%}
 .g-2{--bs-gutter-x:0.5rem}
 .g-2{--bs-gutter-y:0.5rem}
@@ -488,7 +485,6 @@ textarea.form-control{min-height:calc(1.5em + (0.75rem + 2px))}
 .float-end{float:right!important}
 .overflow-auto{overflow:auto!important}
 .d-inline-block{display:inline-block!important}
-.d-grid{display:grid!important}
 .d-flex{display:flex!important}
 .d-inline-flex{display:inline-flex!important}
 .d-none{display:none!important}
@@ -500,7 +496,6 @@ textarea.form-control{min-height:calc(1.5em + (0.75rem + 2px))}
 .flex-column{flex-direction:column!important}
 .flex-grow-1{flex-grow:1!important}
 .flex-wrap{flex-wrap:wrap!important}
-.gap-4{gap:1.5rem!important}
 .justify-content-end{justify-content:flex-end!important}
 .justify-content-center{justify-content:center!important}
 .align-items-center{align-items:center!important}

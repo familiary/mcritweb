@@ -98,6 +98,20 @@
      full strength the viewer's sixteen colours put the block's text under 4.5:1, white text
      on the orange (2.1:1) as much as black text on the darkest (1.8:1) */
   --cfg-cycle-opacity: 0.5;
+
+  /* sizes, not colours: the same in both themes, so theme-dark.css does not repeat them
+     (tests/testTheme.py, LAYOUT_TOKENS). See "Form controls" at the end of this sheet */
+  /* a check box and a radio button */
+  --control-check-size: 1rem;
+  /* from a check box or radio button to its label */
+  --control-check-gap: 0.5rem;
+  /* between the check boxes of a line */
+  --control-inline-gap: 1.5rem;
+  /* between the buttons of a form */
+  --control-button-gap: 0.5rem;
+  /* below each line of a form's fields, so that a line of check boxes keeps clear of the
+     fields above and the buttons below (WCAG 2.5.8 spacing) */
+  --control-row-gap: 1rem;
 }
 
 html {
@@ -351,15 +365,6 @@ table.table td.buttons {
    asks; side by side, the &nbsp; between them keeps both 24px targets clear of each other */
 table.table td.id, table.table td.family {
   white-space: nowrap;
-}
-
-/* The result pages' filter forms set a checkbox under each row of fields, less than 24px
-   tall at desktop width: under what WCAG 2.5.8 asks of a target unless it keeps 12px clear
-   of the next one. The 1em gap below every field that `.content input` gave them kept it
-   clear; without it, a checkbox sits flush against the field above and the Filter button
-   below. */
-form.form-inline input {
-  margin-bottom: 1em;
 }
 
 /* function comparison page (data.match_functions), issue #74 */
@@ -1237,4 +1242,93 @@ table.table:not(.table-scroll > table) :is(td, th):first-child,
 table.table:not(.table-scroll > table) :is(td, th):not(:first-child),
 .table-wrap > table :is(td, th):not(:first-child) {
   min-width: 10ch;
+}
+
+/* --- Form controls ------------------------------------------------------------------------
+
+   One size and one spacing for the controls of every page, from the --control-* sizes in the
+   :root block. Check boxes and radio buttons came in three sizes: Bootstrap's 1em of the text
+   around them (14.4px), the browser's own 13px on the CFG viewer, and on the filter forms the
+   width of a grid cell, 32px to 605px wide and up to 72px tall. They are all
+   --control-check-size now, centred on the first line of their label: Bootstrap puts a box
+   0.25em down whatever its size, and the 1.5em is the line height every label here has. */
+.form-check-input {
+  flex-shrink: 0;
+  width: var(--control-check-size);
+  height: var(--control-check-size);
+  margin-top: calc((1.5em - var(--control-check-size)) / 2);
+}
+/* The 2px above, as Bootstrap gives below, keeps the centre of a box under a field 12.8px from
+   it: the 12px WCAG 2.5.8 asks around a target under 24px. The search page's boxes, 3px under
+   the search field, were 11px from it. */
+.form-check {
+  margin-top: 0.125rem;
+  padding-left: calc(var(--control-check-size) + var(--control-check-gap));
+}
+.form-check .form-check-input {
+  margin-left: calc(-1 * (var(--control-check-size) + var(--control-check-gap)));
+}
+
+/* The filter forms (templates/table/filter_fields.html): a line of fields, a line of check
+   boxes, and the buttons, every one of them starting at the page's gutter. The gap below a
+   line used to be a margin on every input, the check boxes included, which pushed a box away
+   from its own label. */
+.filter-field,
+.filter-checks {
+  margin-bottom: var(--control-row-gap);
+}
+.filter-checks,
+.filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.filter-checks {
+  column-gap: var(--control-inline-gap);
+}
+.filter-checks .form-check-inline {
+  margin-right: 0;
+}
+.filter-actions {
+  gap: var(--control-button-gap);
+}
+
+/* The search page's line of check boxes ends with the link to the search syntax; on a phone
+   the line is full, and the link goes to the next one whole instead of breaking its name */
+search fieldset > a {
+  white-space: nowrap;
+}
+/* and the "|" before it stays a space from the last box, not a check box's width */
+search fieldset > .form-check-inline:last-of-type {
+  margin-right: 0;
+}
+
+/* The CFG viewer's controls (single_function.html, result_compare_function_vs.html) are the
+   same check boxes and small buttons as everywhere else. They were the browser's own, 13px
+   boxes and grey buttons set apart by inline margins, which kept the light look in the dark
+   theme. "Show Loop Boundaries" is labelled in the colour the outermost loop is drawn in. */
+#xcfg_top .btn {
+  margin: 3px;
+}
+.cfg-loop-check {
+  background-color: var(--cfg-loop-label);
+  padding-right: 0.25rem;
+}
+
+/* The home page's two short tables (_half_table_base in templates/table/table.html) take two
+   thirds of a wide page. They took two thirds of a phone's too, where the job table's Type
+   column, which breaks anywhere, was squeezed to four letters a line; below 1200px, where the
+   other tables scroll in their box, they take the whole width. */
+@media (min-width: 1200px) {
+  .table-half {
+    width: 66%;
+  }
+}
+
+/* The cross compare matrix's pane scrolls it, and is the containing block of the
+   .visually-hidden names of its columns, as .table-scroll is of a table's caption above:
+   without it those absolutely placed names were laid out against the page, outside the
+   pane, and made a phone's page 60px wider than the screen. */
+.cross-pane-body {
+  position: relative;
 }

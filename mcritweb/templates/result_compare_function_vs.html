@@ -169,17 +169,17 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
         <div class="d-flex flex-wrap align-items-center" style="gap: 4px 12px;">
           <fieldset>
             <legend class="visually-hidden">Graph view</legend>
-            <label style="margin:3px; padding:3px;"><input type="radio" name="viewMode" value="side-by-side" id="viewSideBySide" checked> Side by side</label>
-            <label style="margin:3px; padding:3px;"><input type="radio" name="viewMode" value="combined" id="viewCombined" disabled title="Available once both graphs are rendered"> Combined</label>
+            <label class="form-check form-check-inline"><input class="form-check-input" type="radio" name="viewMode" value="side-by-side" id="viewSideBySide" checked> Side by side</label>
+            <label class="form-check form-check-inline"><input class="form-check-input" type="radio" name="viewMode" value="combined" id="viewCombined" disabled title="Available once both graphs are rendered"> Combined</label>
           </fieldset>
-          <label style="margin:3px; padding:3px;" title="Pan and zoom both graphs together"><input style="margin:3px;" type="checkbox" id="syncGraphs" checked> Sync graphs</label>
-          <input style="margin:3px;" type="button" id="resetView" value="Reset view" title="Fit each graph to its pane again, at its own scale. Both graphs are fitted independently, so panning and zooming preserves whatever offset they started with - this puts them back."/>
+          <label class="form-check form-check-inline" title="Pan and zoom both graphs together"><input class="form-check-input" type="checkbox" id="syncGraphs" checked> Sync graphs</label>
+          <input class="btn btn-outline-secondary btn-sm" type="button" id="resetView" value="Reset view" title="Fit each graph to its pane again, at its own scale. Both graphs are fitted independently, so panning and zooming preserves whatever offset they started with - this puts them back."/>
           <span>
-            <input style="margin:3px;" type="button" id="showCycles" value="Show Cycles"/>
-            <input style="margin:3px;" type="button" id="showLoops" value="Show Loops"/>
-            <label style="margin:3px; background-color:var(--cfg-loop-label); padding:1px"><input style="margin:3px;" type="checkbox" id="loopBgFill" value="loopBgFill" checked>Show Loop Boundaries</label>
+            <input class="btn btn-outline-secondary btn-sm" type="button" id="showCycles" value="Show Cycles"/>
+            <input class="btn btn-outline-secondary btn-sm" type="button" id="showLoops" value="Show Loops"/>
+            <label class="form-check form-check-inline cfg-loop-check"><input class="form-check-input" type="checkbox" id="loopBgFill" value="loopBgFill" checked>Show Loop Boundaries</label>
             <!-- <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableNodeDrag" value="enableNodeDrag">Enable Node Dragging</label> -->
-            <label style="margin:3px; padding:3px;"><input style="margin:3px;" type="checkbox" id="enableTooltip" value="enableTooltip">Enable Tooltip</label>
+            <label class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="enableTooltip" value="enableTooltip">Enable Tooltip</label>
           </span>
         </div>
         <div class="mb-1">{{ cfg_legend(combined=True) }}</div>

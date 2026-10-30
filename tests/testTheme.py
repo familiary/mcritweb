@@ -1183,6 +1183,17 @@ LIGHT_CHANGES = {
 }
 PINNED_LIGHT = {**MASTER_PALETTE, **{name: value for name, (value, _why) in LIGHT_CHANGES.items()}}
 
+#: The sizes of the form controls (style.css, "Form controls"): in the palette's block, since that
+#: is the one :root block style.css has, but not colours. They are the same in both themes, so
+#: theme-dark.css does not repeat them, and they were never a literal of master's to pin.
+LAYOUT_TOKENS = {
+    "--control-check-size": "1rem",
+    "--control-check-gap": "0.5rem",
+    "--control-inline-gap": "1.5rem",
+    "--control-button-gap": "0.5rem",
+    "--control-row-gap": "1rem",
+}
+
 
 def colour_or_text(value, properties):
     """A token's value as something comparable: its (r, g, b, a) if it is a colour, else its
@@ -1208,7 +1219,7 @@ def test_the_dark_palette_is_one_block_and_defines_nothing_twice():
 
 
 def test_the_dark_palette_redefines_every_name_the_light_one_defines():
-    missing = sorted(set(light_properties()) - set(dark_properties()))
+    missing = sorted(set(light_properties()) - set(dark_properties()) - set(LAYOUT_TOKENS))
 
     assert missing == [], f"theme-dark.css leaves {missing} at their light values: those parts of a dark page stay light"
 
@@ -1256,11 +1267,23 @@ def test_a_light_value_is_what_master_had(name):
 
 
 def test_every_light_token_is_pinned_to_a_literal_master_had():
-    unpinned = sorted(set(light_properties()) - set(PINNED_LIGHT))
+    unpinned = sorted(set(light_properties()) - set(PINNED_LIGHT) - set(LAYOUT_TOKENS))
     stale = sorted(set(PINNED_LIGHT) - set(light_properties()))
 
     assert unpinned == [], f"{unpinned}: add the literal on master each replaces to MASTER_LIGHT, or the token changes the light pages without a record"
     assert stale == []
+
+
+def test_the_layout_tokens_are_sizes_defined_once_for_both_themes():
+    """A colour among them would escape the dark palette, and a dark value for one would mean
+    the controls change size with the theme."""
+    light = light_properties()
+
+    assert {name: light.get(name) for name in LAYOUT_TOKENS} == LAYOUT_TOKENS
+    assert set(LAYOUT_TOKENS).isdisjoint(dark_properties())
+    for name, value in LAYOUT_TOKENS.items():
+        with pytest.raises(ValueError):
+            parse_colour(value, themeCss.resolver(light))
 
 
 @functools.cache

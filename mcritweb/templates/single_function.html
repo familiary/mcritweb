@@ -279,11 +279,11 @@ Function: {{ function_id }}
               <span id="function_xcfg"></span>
               <span style="float:right"><a href="#top">go to top</a></span>
               {# disabled until the graph is drawn, which enables them: what they act on is not there yet #}
-              <input style=" margin: 3px;" type="button" id="showCycles" class="cfg-graph-control" value="Show Cycles" disabled/>
-              <input style=" margin: 3px;" type="button" id="showLoops" class="cfg-graph-control" value="Show Loops" disabled/>
-              <label style=" margin:3px; background-color:var(--cfg-loop-label); padding:1px"><input style=" margin: 3px;" type="checkbox" id="loopBgFill" class="cfg-graph-control" value="loopBgFill" checked disabled>Show Loop Boundaries</label>
+              <input type="button" id="showCycles" class="btn btn-outline-secondary btn-sm cfg-graph-control" value="Show Cycles" disabled/>
+              <input type="button" id="showLoops" class="btn btn-outline-secondary btn-sm cfg-graph-control" value="Show Loops" disabled/>
+              <label class="form-check form-check-inline cfg-loop-check"><input class="form-check-input cfg-graph-control" type="checkbox" id="loopBgFill" value="loopBgFill" checked disabled>Show Loop Boundaries</label>
               <!-- <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableNodeDrag" value="enableNodeDrag">Enable Node Dragging</label> -->
-              <label style=" margin:3px; padding: 3px;"><input style=" margin: 3px;" type="checkbox" id="enableTooltip" class="cfg-graph-control" value="enableTooltip" disabled>Enable Tooltip</label>
+              <label class="form-check form-check-inline"><input class="form-check-input cfg-graph-control" type="checkbox" id="enableTooltip" value="enableTooltip" disabled>Enable Tooltip</label>
           </div>
           {# main.js says here when loop analysis was skipped; empty, it takes no space #}
           <div id="loopAnalysisNote" role="status"></div>

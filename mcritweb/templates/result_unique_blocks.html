@@ -1,6 +1,6 @@
 {% from 'table/links.html' import format_pichash, format_function_id, format_sample_id, format_family_name %}
 {% from 'table/pagination_widget.html' import pagination_widget, pagination_js, set_pagination_params %}
-{% from 'table/filter_fields.html' import filter_field %}
+{% from 'table/filter_fields.html' import filter_field, filter_buttons %}
 {% extends 'base.html' %}
 
 {# Click-to-sort for a table that is already fully in memory, so no round trip and
@@ -202,7 +202,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
           {{ filter_field("min_block_length", "Min. block length", request.args.get('min_block_length', ''), cols="col-6 col-sm-4", kind="count") }}
           {{ filter_field("max_block_length", "Max. block length", request.args.get('max_block_length', ''), cols="col-6 col-sm-4", kind="count") }}
           <input type="hidden" name="tab" value="blocks">{{ carry_yara_rule_params() }}
-          <button type="submit" class="btn btn-primary">Filter</button>
+          {{ filter_buttons(clear=false, named=false) }}
         </div>
     </form>
     
@@ -256,7 +256,7 @@ Unique Blocks for {{ sample_ids|length }} Samples
           {{ filter_field("required_per_sample", "Blocks per sample", yara_params['required_per_sample'], cols="col-6 col-sm-4", kind="count") }}
           {{ filter_field("condition_required", "Strings required", yara_params['condition_required'], cols="col-6 col-sm-4", kind="count") }}
           <input type="hidden" name="tab" value="yara">{{ carry_block_filter_params() }}
-          <button type="submit" class="btn btn-primary">Regenerate Rule</button>
+          {{ filter_buttons(clear=false, named=false, label="Regenerate Rule") }}
         </div>
     </form>
     {# keyed on the rule rather than on the cover's has_rule flag, so the warning appears
