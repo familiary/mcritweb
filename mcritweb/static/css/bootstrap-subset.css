@@ -524,6 +524,7 @@ textarea.form-control{min-height:calc(1.5em + (0.75rem + 2px))}
 .px-2{padding-right:0.5rem!important;padding-left:0.5rem!important}
 .py-1{padding-top:0.25rem!important;padding-bottom:0.25rem!important}
 .font-monospace{font-family:var(--bs-font-monospace)!important}
+.fs-6{font-size:1rem!important}
 .text-start{text-align:left!important}
 .text-end{text-align:right!important}
 .text-center{text-align:center!important}
