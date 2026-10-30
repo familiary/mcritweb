@@ -75,8 +75,9 @@ def exports_requested(fake_mcrit):
         (lambda client: client.post("/data/export", data={"samples": ""}), None),
         (lambda client: client.post("/data/export", data={"samples": "3, 12"}), [3, 12]),
         (lambda client: client.get("/data/specific_export/family/1"), [3, 12]),
+        (lambda client: client.get("/data/specific_export/samples/12"), [12]),
     ],
-    ids=["all", "listed", "family"],
+    ids=["all", "listed", "family", "sample"],
 )
 def test_the_export_is_the_backends_bytes(client, as_role, fake_mcrit, request_export, sample_ids):
     as_role("contributor")
@@ -123,14 +124,34 @@ def test_an_export_the_backend_did_not_make_is_reported_not_downloaded(client, a
     assert listed.status_code == 200 and "Content-disposition" not in listed.headers
     assert "MCRIT did not export the samples" in listed.get_data(as_text=True)
 
+    sample = client.get("/data/specific_export/samples/3")
 
-def test_a_client_that_ignores_raw_mode_exports_as_before(app, client, as_role, fake_mcrit, monkeypatch):
+    assert sample.status_code == 302 and "/data/export" in sample.headers["Location"]
+    assert any('sample "3"' in message for message in flashes(client))
+
+
+def test_a_sample_the_backend_does_not_know_is_reported_from_the_bytes(client, as_role, fake_mcrit):
+    """The backend leaves out an id it does not know, and its export opens with the
+    count that says so - read off the bytes, as the export itself is passed on."""
+    empty = b'{"content": {"is_compressed": true, "num_families": 0, "num_samples": 0, "num_functions": 0}, "sample_entries": {}}'
+    fake_mcrit.answer = BackendResponse(200, b'{"status": "successful", "data": ' + empty + b"}")
+    as_role("contributor")
+
+    response = client.get("/data/specific_export/samples/9999")
+
+    assert response.status_code == 302 and "/data/export" in response.headers["Location"]
+    assert any('sample "9999"' in message for message in flashes(client))
+    assert exports_requested(fake_mcrit) == [(([9999],), {"raw": True})]
+
+
+@pytest.mark.parametrize("route", ["/data/specific_export/family/1", "/data/specific_export/samples/12"], ids=["family", "sample"])
+def test_a_client_that_ignores_raw_mode_exports_as_before(app, client, as_role, fake_mcrit, monkeypatch, route):
     """1.9.0's client answers the parsed export even in raw mode, and the file is the
     same `flask.json.dumps` of it that it always was."""
     monkeypatch.setattr(PassingThroughMcrit, "getExportData", lambda self, sample_ids=None, compress_data=True: EXPORTED)
     as_role("contributor")
 
-    response = client.get("/data/specific_export/family/1")
+    response = client.get(route)
 
     with app.app_context():
         assert response.data == flask.json.dumps(EXPORTED).encode("utf-8")
