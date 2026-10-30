@@ -212,10 +212,10 @@ Function: {{ function_id }}
                   </div>
                   {# issue #267: main.js shows this instead of laying out a large graph on load #}
                   <div id="cfgDeferred" class="hidden" style="margin: 20px;">
-                    <p id="cfgDeferredNote" role="status" aria-live="polite" tabindex="-1">This function has <span id="cfgDeferredBlocks"></span> blocks. Its code is on the right; laying out its graph can make this page unresponsive for several seconds.</p>
+                    <p id="cfgDeferredNote" role="status" aria-live="polite" tabindex="-1">This function has <span id="cfgDeferredBlocks"></span> blocks. Its code is on the right; its graph is drawn when asked, since laying out and drawing this many blocks takes a while.</p>
                     <button type="button" class="btn btn-primary" id="drawGraph">Draw the graph</button>
                   </div>
-                  <svg id="graphContainer">
+                  <svg id="graphContainer" data-layout-worker="{{ url_for('static', filename='trace_CFG/layout_worker.js') }}">
                   <g/>
                   </svg>
               </div>
