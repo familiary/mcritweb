@@ -526,11 +526,13 @@ textarea.form-control{min-height:calc(1.5em + (0.75rem + 2px))}
 .text-start{text-align:left!important}
 .text-end{text-align:right!important}
 .text-center{text-align:center!important}
+.text-decoration-none{text-decoration:none!important}
 .text-decoration-underline{text-decoration:underline!important}
 .text-primary{color:#0d6efd!important}
 .text-warning{color:#ffc107!important}
 .text-danger{color:#dc3545!important}
 .text-dark{color:#212529!important}
+.text-white{color:#fff!important}
 .text-muted{color:#6c757d!important}
 .bg-primary{background-color:#0d6efd!important}
 .bg-secondary{background-color:#6c757d!important}
@@ -545,6 +547,7 @@ textarea.form-control{min-height:calc(1.5em + (0.75rem + 2px))}
 .bg-transparent{background-color:transparent!important}
 .bg-gradient{background-image:var(--bs-gradient)!important}
 .rounded{border-radius:0.25rem!important}
+.rounded-pill{border-radius:50rem!important}
 .visible{visibility:visible!important}
 .invisible{visibility:hidden!important}
 @media (min-width:768px){.d-md-block{display:block!important}.d-md-none{display:none!important}.mt-md-auto{margin-top:auto!important}}
