@@ -89,7 +89,7 @@ def test_an_unknown_screenshot_is_a_404_not_a_500(client):
 
 def test_the_image_route_does_not_serve_files_outside_the_manual(client):
     """send_from_directory refuses traversal; this pins that it stays that way."""
-    assert client.get("/help/images/../../setup.py").status_code in (301, 308, 400, 404)
+    assert client.get("/help/images/../../pyproject.toml").status_code in (301, 308, 400, 404)
 
 
 # --- the duplicate stays gone -----------------------------------------------------

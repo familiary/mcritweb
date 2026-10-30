@@ -1,0 +1,101 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcritweb"
+version = "1.7.0"
+description = "Web frontend for the MinHash-based Code Relationship & Investigation Toolkit (MCRIT)"
+readme = "README.md"
+# inherited, not intrinsic: nothing in mcritweb's own source needs 3.12, but mcrit has
+# declared ">=3.12" since v1.10.0 and the dependency below is >=1.12.0, so no satisfiable
+# mcrit exists any lower. Undeclared, an install on 3.11 fails with a resolver error
+# about mcrit that names neither Python nor the version the reader needs (#166).
+requires-python = ">=3.12"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Daniel Plohmann", email = "daniel.plohmann@fkie.fraunhofer.de" },
+    { name = "Daniel Enders" },
+    { name = "Manuel Blatt" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: Flask",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Security",
+]
+# requirements.txt carries the same list for deployments that install from a checkout without
+# building the package (docker-mcrit does); tests/testPackaging.py keeps the two identical.
+dependencies = [
+    "requests",
+    "Flask>=3.0",
+    "werkzeug>=3.0",
+    "flask_dropzone",
+    "click",
+    "Pillow",
+    "numpy",
+    "scipy",
+    "fastcluster",
+    "networkx",
+    "mcrit>=1.12.0",
+    "levenshtein",
+    "markdown",
+]
+
+[project.optional-dependencies]
+dev = [
+    # pinned, like ruff below and for the same reason: CI and `make init` install these
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    # pinned: a ruff release can add rules and redden an unchanged tree on someone else's schedule
+    "ruff==0.16.0",
+    # what scripts/minify_dropzone.py writes dropzone-patched.min.js with, so that
+    # tests/testAssetDiet.py can check the file still matches dropzone.js
+    "rjsmin==1.3.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/fkie-cad/mcritweb"
+Repository = "https://github.com/fkie-cad/mcritweb"
+Issues = "https://github.com/fkie-cad/mcritweb/issues"
+Changelog = "https://github.com/fkie-cad/mcritweb/blob/master/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+include = ["mcritweb*"]
+
+# MCRITweb is deployed from a checkout, but the release workflow builds a wheel and installs it
+# to prove the package is complete; the templates, static assets and schema are what a plain
+# package discovery would leave behind.
+[tool.setuptools.package-data]
+mcritweb = ["templates/**/*", "static/**/*", "sql/*.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# the existing suite uses testFoo.py rather than pytest's default test_foo.py
+python_files = ["test*.py"]
+
+[tool.ruff]
+# the declared floor - see requires-python above and tests/testPythonFloor.py
+target-version = "py312"
+line-length = 180
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP"]
+ignore = [
+    "UP006",
+    "UP007",
+    "UP008",
+    "UP009",
+    "UP031",
+    "UP032",
+    "UP034",
+    "UP035",
+    "UP036",
+    "UP045",
+]

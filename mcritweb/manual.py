@@ -14,7 +14,7 @@ the file's mtime, so in practice it happens once per edit.
 
 The manual lives outside the package because its primary audience reads it on
 GitHub. Reaching up out of `mcritweb/` for it follows what
-`get_mcritweb_version_from_setup()` already does for `setup.py`, and holds for the
+`get_mcritweb_version()` already does for `pyproject.toml`, and holds for the
 same reason: MCRITweb is deployed from a checkout, never from a built wheel.
 """
 

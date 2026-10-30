@@ -33,8 +33,8 @@ def fake_mcrit(corpus_mcrit):
 # MatchReportRenderer doubles as a command line tool - `python MatchReportRenderer.py`
 # renders a report to the terminal. Printing is the entire point of all four, and
 # none of them is reachable from a view: `printInfo` is called only by `main`, and
-# `renderText` and `_getSampleMatchScores` only by `printInfo`. setup.py declares no
-# console_scripts, so this half of the module is dead in a deployment and alive only for
+# `renderText` and `_getSampleMatchScores` only by `printInfo`. pyproject.toml declares no
+# console scripts, so this half of the module is dead in a deployment and alive only for
 # whoever is debugging one.
 PRINTS_ON_PURPOSE = {
     "MatchReportRenderer.py": {"main", "printInfo", "renderText", "_getSampleMatchScores"},

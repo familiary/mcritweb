@@ -1,3 +1,5 @@
+# Mirrors [project].dependencies in pyproject.toml, for deployments that install from a checkout
+# without building the package; tests/testPackaging.py keeps the two identical.
 requests
 Flask>=3.0
 werkzeug>=3.0
