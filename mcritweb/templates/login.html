@@ -4,7 +4,7 @@
 Login
 {% endblock %}
 {% block style %}  <link href="{{ url_for('static', filename='signin.css') }}" rel="stylesheet">
-<script>later({{ url_for('static', filename='form_fields.js')|tojson }})</script>{% endblock %}
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='form_fields.js')|tojson }})</script>{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-center">
     <form class="form-signin" method='POST' aria-describedby="login-required">

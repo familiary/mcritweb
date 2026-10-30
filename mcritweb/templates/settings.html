@@ -23,7 +23,7 @@ Settings
 {% if can_use_api %}
 <script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='show_apitoken.js')|tojson }})</script>
 {% endif %}
-<script>later({{ url_for('static', filename='form_fields.js')|tojson }})</script>
+<script nonce="{{ csp_nonce() }}">later({{ url_for('static', filename='form_fields.js')|tojson }})</script>
 <script>later({{ url_for('static', filename='reorder_list.js')|tojson }})</script>
 <style>
     .list-group.col {
