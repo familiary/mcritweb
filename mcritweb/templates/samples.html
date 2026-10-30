@@ -15,14 +15,16 @@ Samples
 {% block content %}
 <h1>Overview of Samples</h1>
   <div class="d-flex align-items-center" style="width:100%">
-    <form class="flex-grow-1 me-3" method="GET" required action="#">
-    <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" autofocus autocomplete="on">
+    <form class="flex-grow-1 me-3" method="GET" required action="#" data-live-search="sample-list">
+    <input type="text" class="form-control shadow-none" name="query" value="{{ query or '' }}" id="query" placeholder="Search" aria-label="Search samples" aria-controls="sample-list" autofocus autocomplete="on">
     <input type='submit' hidden>
   </form>
     <div class="d-flex align-items-center">
       <a href="{{ url_for('help') }}#search"><i class="fas fa-book"></i> Search Syntax</a>
     </div>
   </div>
+  <p id="sample-list-status" class="visually-hidden" role="status"></p>
+  <div id="sample-list">
 
 
 {{ sample_table(samples, job_collection=job_collection, show_export=True, show_edit=True, sort_pagination=pagination, column_setup=user_column_setup, row_decorations=row_decorations,
@@ -30,5 +32,7 @@ Samples
 {% if samples %}
 {{ pagination_widget(pagination) }}
 {% endif %}
+  </div>
+<script>later({{ url_for('static', filename='live_search.js')|tojson }})</script>
 {% include 'js/ac_family_names.html' %}
 {% endblock %}
