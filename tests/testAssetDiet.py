@@ -85,9 +85,11 @@ def test_the_subset_keeps_the_font_faces_and_the_style_classes():
 
 # --- what base.html loads --------------------------------------------------------
 
-def test_base_loads_the_minified_bootstrap_and_the_icon_subset():
+def test_base_loads_the_bootstrap_subset_and_the_icon_subset():
+    """The minified Bootstrap build stays as the source scripts/subset_bootstrap.py cuts
+    the subset from."""
     base = (TEMPLATES / "base.html").read_text()
-    assert "bootstrap-5.0.2-dist/css/bootstrap.min.css" in base
+    assert "css/bootstrap-subset.css" in base
     assert "css/fontawesome-subset.css" in base
     assert (STATIC / "bootstrap-5.0.2-dist" / "css" / "bootstrap.min.css").exists()
 
