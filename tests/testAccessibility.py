@@ -359,8 +359,13 @@ def test_the_static_images_declare_their_own_size():
     mcritweb = Path(__file__).resolve().parent.parent / "mcritweb"
     base = (mcritweb / "templates" / "base.html").read_text()
     for name in ("d20_mcrit_cabaret.png", "fkie_190x52.gif"):
-        tags = re.findall(r"<img[^>]*filename='" + re.escape(name) + r"'[^>]*>", base)
-        assert tags, f"base.html no longer shows {name}"
+        # the logos go through themed_img (#70), which writes the <img> from its arguments:
+        # the light file first, the dark variant second, then the attributes
+        calls = re.findall(r"themed_img\(url_for\('static', filename='" + re.escape(name)
+                           + r"'\), url_for\('static', filename='([^']+)'\)([^)]*)\)", base)
+        assert calls, f"base.html no longer shows {name}"
         width, height = Image.open(mcritweb / "static" / name).size
-        for tag in tags:
-            assert f'width="{width}"' in tag and f'height="{height}"' in tag, tag
+        for dark_name, attributes in calls:
+            assert f'width="{width}"' in attributes and f'height="{height}"' in attributes, attributes
+            # the <source> swaps the file under the same box, so the variant must match it
+            assert Image.open(mcritweb / "static" / dark_name).size == (width, height), dark_name

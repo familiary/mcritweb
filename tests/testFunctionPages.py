@@ -19,6 +19,7 @@ import re
 import unittest
 
 import pytest
+from cfgColors import CFG_EDGES, CFG_FILLS, LIGHT_CFG_COLORS, blend, contrast, custom_properties, dark_value, hex_to_rgb, script_palette
 
 LOG = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -103,9 +104,10 @@ def test_an_unknown_function_still_redirects(client, as_role):
 # --- the block comparison (#74) ----------------------------------------------------
 
 def test_identical_functions_match_block_for_block(app):
+    from mcritweb.views.functiondiff import COLOR_UNMATCHED
     diff = diff_of(app, *IDENTICAL_PAIR)
     assert len(diff["node_colors"]["a"]) == len(diff["node_colors"]["b"])
-    unmatched = [node for node, color in diff["node_colors"]["a"].items() if color == "#FFA0A0"]
+    unmatched = [node for node, color in diff["node_colors"]["a"].items() if color == COLOR_UNMATCHED]
     assert unmatched == []
     # one partner per block, both ways
     assert len(diff["pairs"]) == len(diff["node_colors"]["a"])
@@ -114,13 +116,14 @@ def test_identical_functions_match_block_for_block(app):
 
 
 def test_node_matches_are_consistent_with_the_pairs(app):
+    from mcritweb.views.functiondiff import COLOR_UNMATCHED
     diff = diff_of(app, *DIFFERENT_PAIR)
     for offset_a, offset_b in diff["pairs"]:
         assert f"Node0x{offset_b:x}" in diff["node_matches"]["a"][f"Node0x{offset_a:x}"]
         assert f"Node0x{offset_a:x}" in diff["node_matches"]["b"][f"Node0x{offset_b:x}"]
     # a matched block is never drawn in the unmatched colour
     for node in diff["node_matches"]["a"]:
-        assert diff["node_colors"]["a"][node] != "#FFA0A0"
+        assert diff["node_colors"]["a"][node] != COLOR_UNMATCHED
 
 
 def test_the_combined_graph_holds_both_functions(app, fake_mcrit):
@@ -656,9 +659,9 @@ def test_a_reused_id_is_not_served_its_predecessors_comparison(client, as_role, 
 
 def test_a_combined_graph_weighs_more_in_the_memo():
     """The memo is bounded by bytes, and a drawn graph counts towards them."""
-    from mcritweb.views.functiondiff import _estimated_size
+    from mcritweb.views.functiondiff import COLOR_UNMATCHED, _estimated_size
     from mcritweb.views.memo import BoundedMemo
-    colors = {f"Node0x{offset:x}": "#FFA0A0" for offset in range(10)}
+    colors = {f"Node0x{offset:x}": COLOR_UNMATCHED for offset in range(10)}
     entry = {"node_colors": {"a": colors, "b": colors}, "node_matches": {"a": {}, "b": {}}, "pairs": [], "combined_dot": None}
     size = _estimated_size(entry)
     memo = BoundedMemo(3 * size, weigh=_estimated_size)
@@ -809,3 +812,105 @@ def test_the_code_panel_is_built_once_per_page():
     assert re.search(r"if\s*\(\s*isCodePanelRequested\s*\)\s*\{\s*return;\s*\}", build[:first_lookup])
     assert re.search(r"isCodePanelRequested\s*=\s*true;", build[:first_lookup])
     assert re.search(r"isCodePanelRequested\s*=\s*false;", _main_js_function("initialize"))
+
+
+# --- the block colours are names, so each theme can paint them (#70) ---------------------
+
+def _functiondiff_colors():
+    from mcritweb.views import functiondiff
+    return [
+        functiondiff.COLOR_UNMATCHED, functiondiff.COLOR_ESCAPED_MATCH, functiondiff.COLOR_ADHOC_PICBLOCK_MATCH,
+        functiondiff.COLOR_FULL_PICBLOCK_MATCH, functiondiff.COLOR_ONLY_IN_B, *functiondiff.LEVENSHTEIN_COLORS.values(),
+        functiondiff.EDGE_COLOR_BOTH, functiondiff.EDGE_COLOR_ONLY_A, functiondiff.EDGE_COLOR_ONLY_B,
+    ]
+
+
+def _var_name(color):
+    match = re.fullmatch(r"var\((--cfg-[a-z0-9-]+)\)", color)
+    assert match, f"{color!r} is not a reference to a --cfg-* property"
+    return match.group(1)
+
+
+def test_functiondiff_hands_out_the_names_of_the_twelve_colors():
+    names = [_var_name(color) for color in _functiondiff_colors()]
+    assert sorted(names) == sorted(LIGHT_CFG_COLORS)
+
+
+def test_the_light_values_are_the_colors_the_graphs_always_had():
+    light = custom_properties("style.css")
+    for name, value in LIGHT_CFG_COLORS.items():
+        assert light.get(name) == value, name
+
+
+def test_the_dark_theme_gives_every_color_a_value_of_its_own():
+    light, dark = custom_properties("style.css"), custom_properties("theme-dark.css")
+    for name in LIGHT_CFG_COLORS:
+        assert name in dark, f"{name} has no dark value"
+        assert dark[name].lower() != light[name].lower(), f"{name} is the same in both themes"
+    # two blocks that look alike are two kinds of block nobody can tell apart
+    fills = [dark[name].lower() for name in CFG_FILLS]
+    assert len(set(fills)) == len(fills)
+
+
+def test_the_dark_blocks_keep_their_text_readable_and_their_edges_visible():
+    """WCAG 2.2: 4.5:1 for the text on a block, 3:1 for what is drawn on the canvas."""
+    text = hex_to_rgb(dark_value("--text-body"))
+    canvas = hex_to_rgb(dark_value("--cfg-canvas"))
+    for name in CFG_FILLS:
+        assert contrast(hex_to_rgb(dark_value(name)), text) >= 4.5, f"{name}: {dark_value(name)}"
+    for name in CFG_EDGES + ["--cfg-highlight", "--cfg-matched", "--cfg-backedge"]:
+        assert contrast(hex_to_rgb(dark_value(name)), canvas) >= 3, f"{name}: {dark_value(name)}"
+
+
+def test_the_graphs_carry_names_and_no_hex(app):
+    from mcritweb.views.functiondiff import get_combined_dot_graph
+    diff = diff_of(app, *DIFFERENT_PAIR)
+    with app.test_request_context("/"):
+        dot = get_combined_dot_graph(*DIFFERENT_PAIR)
+    colors = [color for side in diff["node_colors"].values() for color in side.values()]
+    colors += re.findall(r'(?:fillcolor|color)="([^"]*)"', dot)
+    assert colors, "the comparison has no colours to check"
+    for color in colors:
+        assert _var_name(color) in LIGHT_CFG_COLORS
+
+
+def test_the_legend_names_what_the_graphs_use(client, as_role):
+    as_role("visitor")
+    page = client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}").data.decode()
+    legend = re.search(r'<span class="cfg-legend".*?</div>', page, re.S).group(0)
+    assert re.search(r"#[0-9a-fA-F]{3,6}\b", legend) is None, "the legend writes a colour of its own"
+    assert sorted(set(re.findall(r"var\((--cfg-[a-z0-9-]+)\)", legend))) == sorted(LIGHT_CFG_COLORS)
+
+
+@pytest.mark.parametrize("script", ["main.js", "main_duo.js"])
+def test_every_cycle_color_keeps_the_text_readable_in_the_dark_theme(script):
+    """`Show Cycles` gives a block one of these inline and the text on it is the dark
+    theme's own, so the dark rule shows them at --cfg-cycle-opacity over the canvas."""
+    palette = script_palette(script, r"^\s*var colores_g = \[")
+    assert len(palette) == 16
+    opacity = float(dark_value("--cfg-cycle-opacity"))
+    canvas = hex_to_rgb(dark_value("--cfg-canvas"))
+    text = hex_to_rgb(dark_value("--text-body"))
+    for color in palette:
+        assert contrast(blend(hex_to_rgb(color), opacity, canvas), text) >= 4.5, color
+
+
+def test_the_loop_label_is_the_first_loop_color_in_both_themes():
+    """The label of "Show Loop Boundaries" is the colour the outermost loop is drawn in:
+    the first entry of the two scripts' palettes in the light theme, and that colour at the
+    boundary opacity over the canvas in the dark one."""
+    first = {script_palette("main_duo.js", r"^\s*var loopBgColors = \[")[0], script_palette("loopify_dagre.js", r"^\s*var colors = \[")[0]}
+    assert len(first) == 1, "the two scripts disagree on the first loop colour"
+    color = first.pop()
+    assert custom_properties("style.css")["--cfg-loop-label"].lower() == color
+    label = custom_properties("theme-dark.css")["--cfg-loop-label"]
+    assert color in label and "var(--cfg-hull-opacity)" in label and "var(--cfg-canvas)" in label
+
+
+def test_the_hovered_line_of_code_is_a_lift_of_the_accent_not_a_band():
+    """The line under the pointer in the code panel keeps the body text at 7:1."""
+    lift = custom_properties("theme-dark.css")["--cfg-code-active"]
+    strength = int(re.fullmatch(r"color-mix\(in srgb, var\(--accent\) (\d+)%, transparent\)", lift).group(1)) / 100
+    shown = blend(hex_to_rgb(dark_value("--accent")), strength, hex_to_rgb(dark_value("--cfg-canvas")))
+    assert strength <= 0.2
+    assert contrast(shown, hex_to_rgb(dark_value("--text-body"))) >= 7

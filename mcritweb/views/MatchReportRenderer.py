@@ -23,6 +23,41 @@ STACK_INTERVAL = 1
 #: blocks. Same threshold _calculateOutputMap sets "is_matchable" by.
 MIN_MATCHABLE_INSTRUCTIONS = 10
 
+#: The palettes the diagram can be drawn in (#70). "ground" is the canvas and also the
+#: colour of a cell that has no match, so that "nothing here" stays the colour of the
+#: page the diagram sits on. "frame" is the border and the separators between functions.
+#: "hue_strength" is how much of itself each data colour (the maps on MatchReportRenderer)
+#: keeps: it is pulled toward the ground by mix_toward_ground, one constant for all of
+#: them so that their order and their relative differences stay. The saturated hues are
+#: as bright as the text of a dark page or brighter - pure yellow, green and cyan are -
+#: and on a dark ground they glow, so the dark palette keeps 78% of each. At 1 a hue is
+#: drawn exactly as it is. tests/testMatchDiagramThemes.py checks that the brightest of
+#: them stays dimmer than the dark page's body text and that neighbouring levels stay
+#: apart.
+#: The light palette is what the diagram has always been drawn with, and its files are
+#: cached by job id and never invalidated: do not change it. The dark one repeats
+#: --surface-page and --border-control of static/theme-dark.css, which
+#: tests/testMatchDiagramThemes.py compares against that file.
+DIAGRAM_PALETTES = {
+    "light": {"ground": (0xff, 0xff, 0xff), "frame": (0x22, 0x22, 0x22), "hue_strength": 1.0},
+    "dark": {"ground": (0x14, 0x1a, 0x21), "frame": (0x65, 0x77, 0x90), "hue_strength": 0.78},
+}
+DEFAULT_DIAGRAM_VARIANT = "light"
+
+
+def diagram_palette(variant):
+    """The colours of the palette `variant` names, or a ValueError if there is none."""
+    try:
+        return DIAGRAM_PALETTES[variant]
+    except (KeyError, TypeError):
+        raise ValueError(f"No diagram palette named {variant!r}") from None
+
+
+def mix_toward_ground(hue, ground, strength):
+    """`hue` pulled toward `ground`: ground + strength * (hue - ground) in each channel,
+    rounded. A strength of 1 gives the hue back, 0 gives the ground."""
+    return tuple(round(ground_channel + strength * (hue_channel - ground_channel)) for ground_channel, hue_channel in zip(ground, hue))
+
 
 def count_diagram_blocks(num_instructions_per_function, instruction_block_size=10):
     """How many blocks renderStackedDiagram lays out for functions of these sizes.
@@ -101,6 +136,17 @@ class MatchReportRenderer:
         6: (0xfe, 0x82, 0x25),
         # red
         7: (0xfd, 0x1a, 0x20),
+    }
+    # the library band: the match class of a function, see _calculateOutputMap
+    library_color_map = {
+        # red
+        "M": (0xfd, 0x1a, 0x20),
+        # green
+        "S": (0x1f, 0xfe, 0x28),
+        # light red
+        "FM": (0xfd, 0x8b, 0x8e),
+        # light green
+        "FS": (0x91, 0xfe, 0x95),
     }
     top_color_map = {
         "b": (0x10, 0x7f, 0xfc),
@@ -181,22 +227,22 @@ class MatchReportRenderer:
         self.matches_by_function_id = {}
 
 
-    def _mapConfidence(self, score):
+    def _mapConfidence(self, score, color_map):
         if score > 100:
-            return self.matching_color_map_50[1]
+            return color_map[1]
         elif score == 100:
-            return self.matching_color_map_50[2]
+            return color_map[2]
         elif score >= 90:
-            return self.matching_color_map_50[3]
+            return color_map[3]
         elif score >= 80:
-            return self.matching_color_map_50[4]
+            return color_map[4]
         elif score >= 70:
-            return self.matching_color_map_50[5]
+            return color_map[5]
         elif score >= 60:
-            return self.matching_color_map_50[6]
+            return color_map[6]
         elif score >= 50:
-            return self.matching_color_map_50[7]
-        return self.frequency_color_map[0]
+            return color_map[7]
+        return color_map[0]
 
     def _calculateLogScore(self, cluster_size):
         if cluster_size == 0:
@@ -367,16 +413,30 @@ class MatchReportRenderer:
         # later, and the one-pixel gaps between their columns, are what leave the border
         draw.rectangle((x1 - block_size, y1 - block_size, x2 + block_size - 1, y2 + block_size - 1), fill=color)
 
-    def drawFamilyLegend(self, image, x, y):
+    def drawFamilyLegend(self, image, x, y, variant=DEFAULT_DIAGRAM_VARIANT):
         # TODO we can use this to draw boxes and scores, via ImageDraw.Draw(image).text(...)
-        border_color_tuple = (0x22, 0x22, 0x22)
+        palette = diagram_palette(variant)
         draw = ImageDraw.Draw(image)
-        self.drawBlock(draw, x, y, 13, border_color_tuple)
-        self.drawBlock(draw, x + 1, y + 1, 11, self.frequency_color_map[0])
+        self.drawBlock(draw, x, y, 13, palette["frame"])
+        self.drawBlock(draw, x + 1, y + 1, 11, palette["ground"])
 
-    def renderStackedDiagram(self, filtered_family_id=None, filtered_sample_id=None, filtered_function_id=None):
-        background_color_tuple = (0xff, 0xff, 0xff)
-        border_color_tuple = (0x22, 0x22, 0x22)
+    def renderStackedDiagram(self, filtered_family_id=None, filtered_sample_id=None, filtered_function_id=None, variant=DEFAULT_DIAGRAM_VARIANT):
+        """Draw the diagram in the palette `variant` names (see DIAGRAM_PALETTES).
+
+        The variant changes colours and nothing else: the image has the same size and
+        the same blocks in the same places in every palette.
+        """
+        palette = diagram_palette(variant)
+        background_color_tuple = palette["ground"]
+        border_color_tuple = palette["frame"]
+        # every data colour as this palette draws it. The ground is also what "no match"
+        # is painted, in all three bands, so it takes the place of the white that the
+        # maps hold at index 0.
+        frequency_color_map = {level: mix_toward_ground(color, background_color_tuple, palette["hue_strength"]) for level, color in self.frequency_color_map.items()}
+        frequency_color_map[0] = background_color_tuple
+        matching_color_map = {level: mix_toward_ground(color, background_color_tuple, palette["hue_strength"]) for level, color in self.matching_color_map_50.items()}
+        matching_color_map[0] = background_color_tuple
+        library_color_map = {match_class: mix_toward_ground(color, background_color_tuple, palette["hue_strength"]) for match_class, color in self.library_color_map.items()}
         # additional line where top X families or family clusters are highlighted in flavors of the same color?
         output_map = self._calculateOutputMap(filtered_family_id=filtered_family_id, filtered_sample_id=filtered_sample_id, filtered_function_id=filtered_function_id)
         num_blocks = count_diagram_blocks([item["num_instructions"] for item in output_map.values()])
@@ -401,39 +461,32 @@ class MatchReportRenderer:
         block_index = 0
         function_index = 0
         for function_id, function_output in sorted(output_map.items()):
-            top_color_tuple = (255, 255, 255)
+            top_color_tuple = background_color_tuple
             # determine confidence color based on filter preferences
-            bottom_color_tuple = self._mapConfidence(function_output["best_non_family_score"])
+            bottom_color_tuple = self._mapConfidence(function_output["best_non_family_score"], matching_color_map)
             if filtered_family_id is not None:
-                bottom_color_tuple = self._mapConfidence(function_output["best_target_family_score"])
+                bottom_color_tuple = self._mapConfidence(function_output["best_target_family_score"], matching_color_map)
             if filtered_sample_id is not None:
-                bottom_color_tuple = self._mapConfidence(function_output["best_score"])
+                bottom_color_tuple = self._mapConfidence(function_output["best_score"], matching_color_map)
             # determine family color based on filter preferences
             if filtered_family_id is None and filtered_sample_id is None:
                 if function_output["family_matches_log_score"] is not None:
-                    if function_output["family_matches_log_score"] in self.frequency_color_map:
-                        top_color_tuple = self.frequency_color_map[function_output["family_matches_log_score"]]
+                    if function_output["family_matches_log_score"] in frequency_color_map:
+                        top_color_tuple = frequency_color_map[function_output["family_matches_log_score"]]
                     else:
-                        top_color_tuple = self.frequency_color_map[max(self.frequency_color_map)]
+                        top_color_tuple = frequency_color_map[max(frequency_color_map)]
             elif filtered_family_id is not None:
                 if function_output["sample_matches_log_score"] is not None:
-                    if function_output["sample_matches_log_score"] in self.frequency_color_map:
-                        top_color_tuple = self.frequency_color_map[function_output["sample_matches_log_score"]]
+                    if function_output["sample_matches_log_score"] in frequency_color_map:
+                        top_color_tuple = frequency_color_map[function_output["sample_matches_log_score"]]
                     else:
-                        top_color_tuple = self.frequency_color_map[max(self.frequency_color_map)]
+                        top_color_tuple = frequency_color_map[max(frequency_color_map)]
             elif filtered_sample_id is not None:
                 if function_output["best_target_sample_score"] > 0:
-                    top_color_tuple = self.frequency_color_map[1]
-            library_color_tuple = (255, 255, 255)
-            if function_output["library_match_class"]:
-                if function_output["library_match_class"] == "M":
-                    library_color_tuple = (0xfd, 0x1a, 0x20)
-                elif function_output["library_match_class"] == "S":
-                    library_color_tuple = (0x1f, 0xfe, 0x28)
-                elif function_output["library_match_class"] == "FM":
-                    library_color_tuple = (0xfd, 0x8b, 0x8e)
-                elif function_output["library_match_class"] == "FS":
-                    library_color_tuple = (0x91, 0xfe, 0x95)
+                    top_color_tuple = frequency_color_map[1]
+            # a function with no library match has the class " " (or 0, when the diagram is
+            # filtered to another function), which is no key of the map: the ground
+            library_color_tuple = library_color_map.get(function_output["library_match_class"], background_color_tuple)
             if function_output["is_matchable"]:
                 if function_index:
                     xindex = int(block_index / stack_size)

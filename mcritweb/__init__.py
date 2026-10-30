@@ -94,6 +94,7 @@ def create_app(test_config=None, instance_path=None):
     from .jobnames import folded_sample_ids, job_method_name, job_task, unique_blocks_samples
     from .search_highlighting import get_highlight_terms, split_search_matches
     from .secret_key import INSECURE_DEFAULT, load_or_create_secret_key
+    from .theme import theme_context
     from .views import administration, analyze, api, authentication, data, explore
     from .views.client import get_client, get_family_entries, get_sample_entries, remember_samples
     from .views.matching_statistics import matching_statistics
@@ -372,6 +373,13 @@ def create_app(test_config=None, instance_path=None):
     def date_time(input):
         return input[:10] + ' ' + input[11:19]
     
+
+    # the colour theme (#70): load_logged_in_user resolves it onto g.theme, and every
+    # template - base.html above all - renders it from these. A page rendered before that
+    # hook ran, or without a request, gets the default.
+    @app.context_processor
+    def colour_theme():
+        return theme_context(getattr(g, "theme", db.DEFAULT_THEME))
 
     @app.template_global()
     def join_hint_strings(list_of_strings):

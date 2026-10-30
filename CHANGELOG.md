@@ -16,6 +16,10 @@ rather than reconstructing it from the commit log at release time.
 
 ### Added
 
+- A dark theme (#70). Every user picks Light, Dark or Match my system under Settings, "Change
+  theme"; accounts start on Light, so nothing changes until someone picks another. **BREAKS DB ->
+  the `user` table gains a `theme` column**, added on first start by an idempotent migration that
+  leaves existing rows NULL, which reads as Light.
 - Pushing a `vX.Y.Z` tag now cuts the release. The workflow refuses to continue unless the tag
   matches `pyproject.toml`, `CHANGELOG.md` has a section for it, the commit is on `master` and CI
   passed there; it then builds the sdist and wheel, checks their metadata, installs the wheel into a

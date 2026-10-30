@@ -20,8 +20,8 @@ Jobs
    The DataTables JS and CSS that base.html loaded for it on every page are gone too (#63). #}
 
 <style>
-  .black {
-    color: black;
+  .count-link {
+    color: var(--text-strong);
   }
   .table-bordered {
     border-collapse: collapse;
@@ -31,7 +31,7 @@ Jobs
 
   .table-bordered td,
   .table-bordered th {
-    border: 1px solid #333; /* You can adjust the color as needed */
+    border: 1px solid var(--border-strong); /* You can adjust the color as needed */
   }
 
   .table-bordered td {
@@ -39,7 +39,7 @@ Jobs
   }
 
   .table-bordered td + td {
-    border-right: 1px solid #333; /* Add right border for adjacent cells */
+    border-right: 1px solid var(--border-strong); /* Add right border for adjacent cells */
   }
 </style>
 
@@ -53,35 +53,35 @@ Jobs
     <tr>
       <td class="table-secondary text-end">
         {% if menu_configuration['statistics']['totals']['queued'] %}
-          <a class="black" href="{{ url_for('data.jobs', state='queued') }}">{{ menu_configuration['statistics']['totals']['queued'] }} queued</a>
+          <a class="count-link" href="{{ url_for('data.jobs', state='queued') }}">{{ menu_configuration['statistics']['totals']['queued'] }} queued</a>
         {% else %}
           {{ menu_configuration['statistics']['totals']['queued'] }} queued
         {% endif %}
       </td>
       <td class="table-primary text-end">
         {% if menu_configuration['statistics']['totals']['in_progress'] %}
-          <a class="black" href="{{ url_for('data.jobs', state='in_progress') }}">{{ menu_configuration['statistics']['totals']['in_progress'] }} in progress</a>
+          <a class="count-link" href="{{ url_for('data.jobs', state='in_progress') }}">{{ menu_configuration['statistics']['totals']['in_progress'] }} in progress</a>
         {% else %}
           {{ menu_configuration['statistics']['totals']['in_progress'] }} in progress
         {% endif %}
       </td>
       <td class="table-success text-end">
         {% if menu_configuration['statistics']['totals']['finished'] %}
-          <a class="black" href="{{ url_for('data.jobs', state='finished') }}">{{ menu_configuration['statistics']['totals']['finished'] }} finished</a>
+          <a class="count-link" href="{{ url_for('data.jobs', state='finished') }}">{{ menu_configuration['statistics']['totals']['finished'] }} finished</a>
         {% else %}
           {{ menu_configuration['statistics']['totals']['finished'] }} finished
         {% endif %}
       </td>
       <td class="table-warning text-end">
         {% if menu_configuration['statistics']['totals']['failed'] %}
-          <a class="black" href="{{ url_for('data.jobs', state='failed') }}">{{ menu_configuration['statistics']['totals']['failed'] }} failed</a>
+          <a class="count-link" href="{{ url_for('data.jobs', state='failed') }}">{{ menu_configuration['statistics']['totals']['failed'] }} failed</a>
         {% else %}
           {{ menu_configuration['statistics']['totals']['failed'] }} failed
         {% endif %}
       </td>
       <td class="table-danger text-end">
         {% if menu_configuration['statistics']['totals']['terminated'] %}
-          <a class="black" href="{{ url_for('data.jobs', state='terminated') }}">{{ menu_configuration['statistics']['totals']['terminated'] }} terminated</a>
+          <a class="count-link" href="{{ url_for('data.jobs', state='terminated') }}">{{ menu_configuration['statistics']['totals']['terminated'] }} terminated</a>
         {% else %}
           {{ menu_configuration['statistics']['totals']['terminated'] }} terminated
         {% endif %}

@@ -18,15 +18,17 @@ Compare
   var selected = {{ cached|tojson }}.map(String);
   console.log(selected)
   whenReady(function(){
+    // a row the URL already selected carries the class `row-selected` (row_decoration.html)
+    // and is skipped here; the others toggle `row-pending`. Both are painted from style.css
     $("tr.parent").click(function(){
-      if(this.style.backgroundColor != "yellowgreen")
+      if(!this.classList.contains("row-selected"))
       {
         if(selected.indexOf($(this).children("th.id").text()) == -1){
-        this.style.backgroundColor = "rgb(240, 240, 240)";
+        this.classList.add("row-pending");
         selected.push($(this).children("th.id").text());
         }
         else{
-          this.style.backgroundColor = "white";
+          this.classList.remove("row-pending");
           const pos = selected.indexOf($(this).children("th.id").text());
           console.log(pos);
           if(pos == 0){
@@ -184,7 +186,7 @@ function handleSliderChange(val) {
       </thead>
       <tbody>
         {% for sample in samples %}
-        <tr{{ row_tint(row_decorations, sample.sample_id) }} class="parent">
+        <tr class="parent{{ row_tint(row_decorations, sample.sample_id) }}">
           <th align="right" valign="middle" scope="row" class="id">{{ "%d"|format(sample.sample_id) }}</th>
           <td align="right" valign="middle" class="font-monospace">{{ sample.getShortSha256() }}</td>
           <td valign="middle">{{ sample.family }}</td>

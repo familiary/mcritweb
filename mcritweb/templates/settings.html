@@ -12,7 +12,7 @@ Settings
     .list-group.col {
         min-height: 50px;
         padding: 5px;
-        background-color: #f8f9fa;
+        background-color: var(--surface-subtle);
         border-radius: 5px;
     }
 </style>
@@ -37,6 +37,9 @@ Settings
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="pills-column-settings-tab" data-bs-toggle="pill" data-bs-target="#pills-column-settings" type="button" role="tab" aria-controls="pills-column-settings" aria-selected="false">Change table column settings</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="pills-theme-tab" data-bs-toggle="pill" data-bs-target="#pills-theme" type="button" role="tab" aria-controls="pills-theme" aria-selected="false">Change theme</button>
   </li>
 </ul>
 <div class="tab-content" id="pills-tabContent">
@@ -144,6 +147,22 @@ Settings
           <input class="col-4" type="checkbox" name='filter_exclude_pic' id="filter_exclude_pic" {% if user_filters.filter_exclude_pic %}checked{% endif %}>
         </div>
         <button type="submit" class="btn btn-primary">Confirm Change</button>
+    </form>
+  </div>
+  <div class="tab-pane fade" id="pills-theme" role="tabpanel" aria-labelledby="pills-theme-tab">
+    <form action="{{ url_for('admin.change_theme') }}" method="post" class="text-start d-inline-block">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <fieldset>
+        <legend class="fs-6">Colour theme for every page you open while signed in</legend>
+        {% for value, label in (('light', 'Light'), ('dark', 'Dark'), ('system', 'Match my system')) %}
+        <div class="form-check">
+          <input class="form-check-input" type="radio" name="theme" id="theme_{{ value }}" value="{{ value }}" {% if user_info.theme == value %}checked{% endif %}>
+          <label class="form-check-label" for="theme_{{ value }}">{{ label }}
+            {%- if value == 'system' %} <span class="text-muted"><span class="system-scheme-light">(currently light)</span><span class="system-scheme-dark">(currently dark)</span></span>{% endif %}</label>
+        </div>
+        {% endfor %}
+      </fieldset>
+      <button type="submit" class="btn btn-primary mt-3">Confirm change</button>
     </form>
   </div>
   <div class="tab-pane fade" id="pills-column-settings" role="tabpanel" aria-labelledby="pills-column-settings-tab">

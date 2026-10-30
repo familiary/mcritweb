@@ -39,7 +39,8 @@ var mcritwebPageLoading = (function () {
       /* over the Bootstrap modal layer, which ends at 1055 */
       "z-index:2000",
       "display:flex", "align-items:center", "justify-content:center",
-      "background:rgba(255,255,255,0.6)"
+      /* the page ground at 60%, from the palette in style.css (#70) */
+      "background:var(--surface-veil)"
     ].join(";");
     /* .spinner-border and .visually-hidden are Bootstrap 5; the vendored
      * stylesheet already slows the animation under prefers-reduced-motion */
