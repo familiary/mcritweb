@@ -304,7 +304,7 @@ def column(response, anchor, header):
     return [parser.cells[row + index] for row in range(0, len(parser.cells), width)]
 
 
-def offsets(response, anchor="function-matches", header="offset"):
+def offsets(response, anchor="function-matches", header="Offset"):
     return [int(value, 16) for value in column(response, anchor, header)]
 
 
@@ -325,7 +325,7 @@ def test_a_sorted_function_table_is_sorted_across_its_pages(client, as_role):
 
     def rows(query):
         response = client.get(f"/data/result/{job_id}?{query}")
-        sizes = [int(value) for value in column(response, "function-matches", "num_bytes")]
+        sizes = [int(value) for value in column(response, "function-matches", "Bytes")]
         return list(zip(sizes, column(response, "function-matches", "Function ID")))
 
     unsorted = [row for page in range(1, 5) for row in rows(f"funl=250&funp={page}")]
@@ -385,10 +385,10 @@ def test_the_family_table_sorts_on_its_own(client, as_role):
     ascending = client.get(f"/data/result/{job_id}?fampsort=family_name&fampasc=true")
     descending = client.get(f"/data/result/{job_id}?fampsort=family_name&fampasc=false")
 
-    names = column(ascending, "family-matches", "")
+    names = column(ascending, "family-matches", "Family")
     assert len(names) > 1
     assert [name.lower() for name in names] == sorted(name.lower() for name in names)
-    assert column(descending, "family-matches", "") == names[::-1]
+    assert column(descending, "family-matches", "Family") == names[::-1]
     assert offsets(ascending) == offsets(plain)
 
 
