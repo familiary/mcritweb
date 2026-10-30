@@ -1277,6 +1277,7 @@ def use_theme(app, theme):
 
 def open_comparison(page, live_server):
     page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    scroll_to_the_graphs(page)
     for panel in ("a", "b"):
         page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
 
