@@ -462,6 +462,9 @@ def drive_type_ahead(sync_api, app, live_url, user_id, path, lookup, expected_it
             page = context.new_page()
             page.goto(live_url + path)
             page.wait_for_selector(FIELD_SELECTOR, state="attached", timeout=15000)
+            # the type-ahead is attached once the page's scripts have run, after its first
+            # paint, which can come after load
+            page.evaluate("() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })")
 
             page.evaluate(TYPE_INTO_FIELD, [FIELD_SELECTOR, lookup])
             page.wait_for_function(HAS_SUGGESTION, arg=[FIELD_SELECTOR, expected_items], timeout=10000)
@@ -602,6 +605,7 @@ def test_the_drop_overlay_suggests_without_doubling_the_modal_widgets(app, poiso
             page = context.new_page()
             page.goto(live_url + "/explore/samples")
             page.wait_for_selector("#family", state="attached", timeout=15000)
+            page.evaluate("() => new Promise((resolve, reject) => { whenReady(() => resolve(true)); setTimeout(() => reject(new Error('the queued scripts did not run')), 10000); })")
 
             page.evaluate(TYPE_INTO_FIELD, ["#family", LOOKUP])
             page.wait_for_function(HAS_SUGGESTION, arg=["#family", len(PAYLOADS)], timeout=10000)

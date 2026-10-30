@@ -17,7 +17,7 @@ Compare
   // cell, and indexOf compares strictly: kept as strings, a row the URL tinted clicks off
   var selected = {{ cached|tojson }}.map(String);
   console.log(selected)
-  $(document).ready(function(){
+  whenReady(function(){
     $("tr.parent").click(function(){
       if(this.style.backgroundColor != "yellowgreen")
       {
@@ -40,23 +40,29 @@ Compare
 
     });
 
-    $('#cross_search_form').submit(function(eventObj) {
-      eventObj.preventDefault();
-      eventObj.stopPropagation();
-      const base_url = window.location.href;
-      const args = fetchState();
-      args.cache = null;
-      args["query"] = $("#Search").val();
-      args["_anchor"] = "Search"
-      const null_keys = {{ pagination.params_list|tojson }};
-      for(var i = 0, size = null_keys.length; i < size ; i++){
-        args[null_keys[i]] = null;
-      }
-      // overwrites base_link with args and forwards to the resulting url
-      pagination_js_helper(base_url, args);
-      return true;
-    });
+  });
 
+  // The search form is the box a page opens with focus in, so Enter can come before the
+  // deferred jQuery has run. Bound from whenReady, the submit was a plain one until then
+  // and kept only the query; bound here, to document, while the page parses - the form is
+  // not there yet - it carries the rest of the state from the first paint on (ADR-0018).
+  document.addEventListener("submit", function(eventObj) {
+    if (eventObj.target.id !== "cross_search_form") {
+      return;
+    }
+    eventObj.preventDefault();
+    eventObj.stopPropagation();
+    const base_url = window.location.href;
+    const args = fetchState();
+    args.cache = null;
+    args["query"] = document.getElementById("Search").value;
+    args["_anchor"] = "Search"
+    const null_keys = {{ pagination.params_list|tojson }};
+    for(var i = 0, size = null_keys.length; i < size ; i++){
+      args[null_keys[i]] = null;
+    }
+    // overwrites base_link with args and forwards to the resulting url
+    pagination_js_helper(base_url, args);
   });
 
   // The full selection is what the URL carried (selected_ids) plus what has been clicked
@@ -82,8 +88,11 @@ Compare
   function goInitCrossFromHashlist() {
     window.location.href="/analyze/cross_compare_from_hash_list";
   }
+  // deleteSample, and fetchState below, which createJob, setSelected and the pagination
+  // and sort links call, run from onclick= - which a click can reach before the deferred
+  // jQuery has run, so both read the page without it (ADR-0018)
   function deleteSample(element) {
-    var del = $(element).parent().parent().children("th.id").text();
+    var del = element.closest("tr").querySelector("th.id").textContent;
     var params = fetchState();
     params.samples = {{ selected_ids|tojson }}.filter(function(e) { return e.toString() !== del }).join(",");
     pagination_js_helper(window.location.href, params);
@@ -95,8 +104,8 @@ Compare
   }
   function fetchState() {
     var string = selected.join(',');
-    var force_rematch_value = $("#force_rematch").is(":checked");
-    var only_selected_value = $("#only_selected").is(":checked");
+    var force_rematch_value = document.getElementById("force_rematch").checked;
+    var only_selected_value = document.getElementById("only_selected").checked;
     var minhashBandRange = document.getElementById('minhashBandRange').value;
     return {
       "rematch": force_rematch_value,

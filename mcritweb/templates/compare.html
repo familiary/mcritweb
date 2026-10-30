@@ -13,7 +13,7 @@ Compare
 <script>
 var selected = {{ (selected or "")|tojson }}
 var selected_column = null;
-$(document).ready(function(){
+whenReady(function(){
   var table = document.getElementsByClassName("parent_table_sample");
 
   for (var i = 0; i < table.length; i++) {
@@ -42,19 +42,25 @@ $(document).ready(function(){
     this.style.backgroundColor = "rgb(240, 240, 240)";
   });
 
-  $('#compare_search_form').submit(function(eventObj) {
-    var params = fetchState();
-    $("<input />").attr("type", "hidden")
-        .attr("name", "rematch")
-        .attr("value", params.rematch)
-        .appendTo("#compare_search_form");
-    $("<input />").attr("type", "hidden")
-        .attr("name", "minhashBandRange")
-        .attr("value", params.minhashBandRange)
-        .appendTo("#compare_search_form");
-    return true;
-  });
+});
 
+// The search form is the box the page opens with focus in, so Enter can come before the
+// deferred jQuery has run. Bound from whenReady, the submit lost the rematch flag and the
+// MinHash setting until then; bound here, to document, while the page parses - the form
+// is not there yet - it adds them from the first paint on (ADR-0018).
+document.addEventListener("submit", function(eventObj) {
+  var form = eventObj.target;
+  if (form.id !== "compare_search_form") {
+    return;
+  }
+  var params = fetchState();
+  ["rematch", "minhashBandRange"].forEach(function(name) {
+    var field = document.createElement("input");
+    field.type = "hidden";
+    field.name = name;
+    field.value = params[name];
+    form.appendChild(field);
+  });
 });
 
 function createJob() {
@@ -62,8 +68,10 @@ function createJob() {
   window.location.href="/analyze/compare/"+params.selected+"?rematch="+params.rematch+"&minhashBandRange="+params.minhashBandRange;
 }
 
+// the pagination and sort links call this from onclick=, which a click can reach before
+// the deferred jQuery has run, so it reads the page without it (ADR-0018)
 function fetchState() {
-  var checkedValue = $("#force_rematch").is(":checked");
+  var checkedValue = document.getElementById("force_rematch").checked;
   var minhashBandRange = document.getElementById('minhashBandRange').value;
   return {
     "rematch": checkedValue,

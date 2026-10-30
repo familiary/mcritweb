@@ -12,7 +12,7 @@ Unique Blocks
   // ids clicked on this page, on top of what the URL already carries
   var selected = [];
 
-  $(document).ready(function(){
+  whenReady(function(){
     $("tr.parent").click(function(){
       var id = $(this).children("th.id").text().trim();
       // a row the URL already selected is removed with the x in the table above, not by
@@ -30,20 +30,27 @@ Unique Blocks
       }
     });
 
-    $('#unique_blocks_search_form').submit(function(eventObj) {
-      eventObj.preventDefault();
-      eventObj.stopPropagation();
-      var args = fetchState();
-      args["query"] = $("#Search").val();
-      args["_anchor"] = "Search";
-      var null_keys = {{ pagination.params_list|tojson }};
-      for (var i = 0, size = null_keys.length; i < size; i++) {
-        args[null_keys[i]] = null;
-      }
-      // overwrites base_link with args and forwards to the resulting url
-      pagination_js_helper(window.location.href, args);
-      return true;
-    });
+  });
+
+  // The search form is the box a page opens with focus in, so Enter can come before the
+  // deferred jQuery has run. Bound from whenReady, the submit was a plain one until then
+  // and kept only the query; bound here, to document, while the page parses - the form is
+  // not there yet - it carries the rest of the state from the first paint on (ADR-0018).
+  document.addEventListener("submit", function(eventObj) {
+    if (eventObj.target.id !== "unique_blocks_search_form") {
+      return;
+    }
+    eventObj.preventDefault();
+    eventObj.stopPropagation();
+    var args = fetchState();
+    args["query"] = document.getElementById("Search").value;
+    args["_anchor"] = "Search";
+    var null_keys = {{ pagination.params_list|tojson }};
+    for (var i = 0, size = null_keys.length; i < size; i++) {
+      args[null_keys[i]] = null;
+    }
+    // overwrites base_link with args and forwards to the resulting url
+    pagination_js_helper(window.location.href, args);
   });
 
   // The full selection is what the URL carried plus what has been clicked here. Either
@@ -60,8 +67,10 @@ Unique Blocks
     params.samples = joinSampleIds();
     pagination_js_helper(window.location.href, params);
   }
+  // reached from onclick=, which a click can reach before the deferred jQuery has run,
+  // so it reads the page without it (ADR-0018)
   function deleteSample(element) {
-    var removed = $(element).parent().parent().children("th.id").text().trim();
+    var removed = element.closest("tr").querySelector("th.id").textContent.trim();
     var params = fetchState();
     params.samples = {{ selected_ids|tojson }}.filter(function(id) { return id.toString() !== removed; }).join(",");
     pagination_js_helper(window.location.href, params);
