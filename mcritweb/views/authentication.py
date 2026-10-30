@@ -592,13 +592,11 @@ def delete_account():
         flash(LAST_ADMIN_KEPT, category='error')
         return redirect(url_for('authentication.settings'))
     if _throttled(user_info.username):
-        flash(TOO_MANY_ATTEMPTS, category='error')
-        return redirect(url_for('authentication.settings'))
+        return refuse_settings_form('delete-account', ['delete_account_password'], TOO_MANY_ATTEMPTS)
     password = request.form.get('password', '')
     if not password or not check_password_hash(user_info.password, password):
         db.record_failed_login(request.remote_addr, user_info.username)
-        flash('Incorrect password. Your account was not deleted.', category='error')
-        return redirect(url_for('authentication.settings'))
+        return refuse_settings_form('delete-account', ['delete_account_password'], 'Incorrect password. Your account was not deleted.')
     db.delete_user(user_info.user_id)
     db.clear_login_failures(request.remote_addr, user_info.username)
     # with the row gone, every other session of the account, a copied cookie included,

@@ -349,7 +349,8 @@ def test_a_form_whose_fields_are_all_required_says_so_once(app, client, as_role,
     as_role("contributor")
     pages.append(required_notes(page_of(client, "/settings")))
     found = [note for page in pages for note in page.values()]
-    assert found == [("All fields are required.", True)] * 4, found
+    # sign-in, registration, and the settings page's rename, password and account deletion
+    assert found == [("All fields are required.", True)] * 5, found
 
 
 def test_a_page_that_edits_samples_still_has_its_dialog(client, as_role):

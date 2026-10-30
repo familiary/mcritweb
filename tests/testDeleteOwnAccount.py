@@ -180,6 +180,21 @@ def test_a_wrong_password_deletes_nothing(app, carol):
     assert is_logged_in(owner)
 
 
+def test_a_wrong_password_is_shown_beside_the_field_on_its_tab(app, carol):
+    """The settings forms say what was wrong beside the field it concerns and open on their
+    own tab. A refused deletion came back on the information tab, with the reason only in
+    the flash above it and the form it concerned out of sight."""
+    owner = logged_in(app)
+    delete_account(owner, password="not the password")
+
+    page = owner.get("/settings").get_data(as_text=True)
+
+    assert 'class="nav-link active" id="pills-delete-account-tab"' in page
+    assert 'class="tab-pane fade show active" id="pills-delete-account"' in page
+    assert 'aria-invalid="true" data-server-invalid aria-describedby="delete_account_effect delete_account_password-error"' in page
+    assert 'id="delete_account_password-error"' in page and "Your account was not deleted." in page
+
+
 def test_a_wrong_password_is_counted_as_a_guess(app, carol):
     """Someone holding a stolen session does not know the password. Unmetered, this
     route would let them guess at it as often as they liked."""
