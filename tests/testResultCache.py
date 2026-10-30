@@ -64,8 +64,8 @@ def test_another_jobs_report_is_not_served_for_a_partial_id(app):
 
 
 def test_a_partial_uuid_job_id_does_not_match_on_a_dash_boundary(app):
-    """A local queue hands out uuid4 job ids, so a tail of one is itself preceded by
-    a dash in the filename - a suffix test alone would accept it."""
+    """A local queue handed out uuid4 job ids before mcrit 1.14, so a tail of one is
+    itself preceded by a dash in the filename - a suffix test alone would accept it."""
     uuid_job_id = "2f1a9b04-1f6d-4a1e-9a1c-0c5f2f9b8e77"
     write_cached(app, f"20260806-104636-{uuid_job_id}.json", {"report": "someone else's"})
     with app.app_context():

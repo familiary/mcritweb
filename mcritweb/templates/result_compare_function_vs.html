@@ -82,6 +82,9 @@ Function: {{ function_id_a }} vs {{ function_id_b }}
         </div>
         <div class="mb-1">{{ cfg_legend(combined=True) }}</div>
         <div style="font-size: 0.85em; color: #6c757d;">Hover a block to outline its matches, click to centre the other graph on the first match. In the combined view, hovering a block that differs shows B's code.</div>
+        {# main_duo.js says here when a panel's loop analysis was skipped; empty, they take no space #}
+        <div id="loopAnalysisNote_a" role="status"></div>
+        <div id="loopAnalysisNote_b" role="status"></div>
     </div>
     <div id="xcfg_container">
         <div id="xcfg_left">
