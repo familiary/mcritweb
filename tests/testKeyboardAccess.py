@@ -305,8 +305,9 @@ def test_every_score_of_the_cross_compare_matrix_is_named_and_the_matrix_is_one_
     pane = html[html.index('id="pills-unweighted"'):html.index('id="cross-lazy-panes"')]
     tags = start_tags(pane)
 
-    assert re.search(r"<table>\s*(?:\{#.*?#\}\s*)?<caption class=\"visually-hidden\">MCRIT score of each pair", pane, re.S)
-    assert [attrs.get("class") == "matrix-col" and attrs.get("scope") for tag, attrs, _ in tags if tag == "th" and attrs.get("class") == "matrix-col"] == ["col"] * len(order)
+    assert re.search(r"<table[^>]*>\s*(?:\{#.*?#\}\s*)?<caption class=\"visually-hidden\">MCRIT score of each pair", pane, re.S)
+    columns = [attrs for tag, attrs, _ in tags if tag == "th" and "matrix-col" in (attrs.get("class") or "").split()]
+    assert [attrs.get("scope") for attrs in columns] == ["col"] * len(order)
     assert len([attrs for tag, attrs, _ in tags if tag == "th" and attrs.get("scope") == "row"]) == len(order)
     scores = [(tag, attrs) for tag, attrs, _ in tags if "score-swatch" in (attrs.get("class") or "").split()]
     assert len(scores) == len(order) ** 2

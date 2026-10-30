@@ -212,7 +212,7 @@ def test_the_rendered_matrix_has_the_shape_the_script_clones_from(client, as_rol
     assert "sample-row" not in rows[0]["attrs"].get("class", "")
     columns = [cell for cell in rows[1]["cells"] if "matrix-col" in cell["attrs"].get("class", "")]
     assert [cell["text"].strip() for cell in columns] == order
-    shown = [cell["text"].strip() for cell in columns if "style" in cell["attrs"]]
+    shown = [cell["text"].strip() for cell in columns if "cross-index" in cell["attrs"].get("class", "").split()]
     assert shown == [order[(k + 1) * 5 - 1] for k in range(len(order) // 5)]
     sample_rows = rows[2:]
     assert [row["attrs"].get("class") for row in sample_rows] == ["sample-row"] * len(order)
