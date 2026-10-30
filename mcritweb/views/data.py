@@ -670,8 +670,8 @@ def match_functions(function_id_a, function_id_b):
         sample_entry_b = SampleEntry.fromDict(match_info["sample_entry_b"])
         pichash_matches_b = client.getMatchesForPicHash(other_function_entry.pichash, summary=True)
         matched_function_entry = MatchedFunctionEntry(match_info["match_entry"]["fid"], match_info["match_entry"]["num_bytes"], match_info["match_entry"]["offset"], match_info["match_entry"]["matches"])
-        # the entries in match_info carry their xcfg, so the diff need not fetch them again
-        function_diff = get_function_diff(function_id_a, function_id_b, function_entry, other_function_entry)
+        # the graphs' block colours and matches are not on the page: its viewer fetches
+        # them from match_functions_diff once the graphs are wanted
         return render_template(
             "result_compare_function_vs.html",
             entry_a=function_entry,
@@ -681,13 +681,33 @@ def match_functions(function_id_a, function_id_b):
             pichash_matches_a=pichash_matches_a,
             pichash_matches_b=pichash_matches_b,
             match_result=matched_function_entry,
-            # the template serialises these with |tojson, which escapes for a script
-            # context - pre-serialising here would hand it a string to re-encode
-            node_colors=function_diff["node_colors"],
-            node_matches=function_diff["node_matches"],
         )
     flash("One of the function_ids is not valid.", category='error')
     return render_template("index.html")
+
+
+@bp.route('/matches/function/<int(signed=True):function_id_a>/<int(signed=True):function_id_b>/diff')
+@visitor_required
+@mcrit_server_required
+def match_functions_diff(function_id_a, function_id_b):
+    """The comparison's block colours and matches, for the graph viewer of the page above.
+
+    They were part of the page, as JSON in a script, one entry per block and per match, so
+    they grew with the two functions. Only the viewer reads them, and it starts once the
+    graphs are wanted. Memoized with the comparison (get_function_diff); a function without
+    its disassembly answers empty maps.
+
+    The page was rendered from both functions, so a function the backend does not give
+    back here is one it failed to answer for, or one deleted since. That is a 404, which the
+    viewer reports, rather than empty maps, which it would draw as uncoloured graphs.
+    """
+    client = get_client()
+    function_entry = client.getFunctionById(function_id_a, with_xcfg=True)
+    other_function_entry = client.getFunctionById(function_id_b, with_xcfg=True)
+    if function_entry is None or other_function_entry is None:
+        return {"error": "One of the function_ids is not valid."}, 404
+    diff = get_function_diff(function_id_a, function_id_b, function_entry, other_function_entry)
+    return {"node_colors": diff["node_colors"], "node_matches": diff["node_matches"]}
 
 ################################################################
 # Result presentation

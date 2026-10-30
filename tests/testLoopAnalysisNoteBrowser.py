@@ -91,6 +91,8 @@ def open_function(page, live_server, function_id=FUNCTION_A):
 
 def open_comparison(page, live_server):
     page.goto(f"{live_server}/data/matches/function/{FUNCTION_A}/{FUNCTION_B}")
+    # the comparison draws its graphs once they come into view (#308)
+    page.evaluate("document.getElementById('xcfg_container').scrollIntoView()")
     for panel in ("a", "b"):
         page.wait_for_selector(f"#graphContainer_{panel} g.node", state="attached")
 

@@ -168,9 +168,41 @@ def test_the_comparison_page_renders_with_the_match_data(client, as_role):
     assert "Side by side" in page and "Combined" in page
     assert 'id="syncGraphs"' in page
     assert f"/explore/fetchCombinedDotGraph/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}" in page
-    assert "nodeMatches" in page
-    assert "function_compare.js" in page
+    assert f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}/diff" in page
+    # the script itself comes with the rest of the graph viewer, once the graphs are wanted
+    assert '"/static/function_compare.js"' in page
     assert f"/api/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}" in page
+
+
+def test_the_comparison_graphs_name_the_layout_worker(client, as_role):
+    """Each graph is laid out in the worker its svg names (`layOutGraph()` in main_duo.js);
+    without one the page lays them out itself, as it did before."""
+    import os
+    as_role("visitor")
+    page = client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}").get_data(as_text=True)
+    for panel in ("a", "b", "c"):
+        svg = re.search(rf'<svg id="graphContainer_{panel}"[^>]*>', page)
+        assert svg and 'data-layout-worker="/static/trace_CFG/layout_worker.js"' in svg.group(0), panel
+    assert os.path.isfile(os.path.join(os.path.dirname(__file__), "..", "mcritweb", "static", "trace_CFG", "layout_worker.js"))
+
+
+def test_the_comparison_graphs_are_drawn_from_the_worker_s_layout():
+    """The two graphs side by side and the combined one are drawn from the layout
+    `layOutGraph()` calls back with; a refresh of main_duo.js from upstream would lay them out
+    on the page again. The browser tests (testFunctionVsBrowser.py) check the drawing itself."""
+    import os
+    static = os.path.join(os.path.dirname(__file__), "..", "mcritweb", "static")
+    with open(os.path.join(static, "trace_CFG", "main_duo.js")) as f:
+        main_duo = f.read()
+    with open(os.path.join(static, "function_compare.js")) as f:
+        function_compare = f.read()
+    for panel in ("a", "b"):
+        assert re.search(rf'layOutGraph\(cfgPanels\.{panel}\.rendered, cfgPanels\.{panel}\.container, function\(laidOut\) \{{\s*'
+                         rf'showGraph\("{panel}", node_colors, laidOut\);', main_duo), panel
+    assert "renderer.layout({ run: function() { return laidOut; } });" in main_duo
+    assert re.search(r'layOutGraph\(graph, "#graphContainer_c", function \(laidOut\) \{\s*onceCombinedShown\(function \(\) \{'
+                     r'[^}]*renderCombined\(graph, laidOut\);', function_compare)
+    assert "renderer.layout({ run: function () { return laidOut; } });" in function_compare
 
 
 def test_the_comparison_page_asks_for_the_pair_without_checking_the_ids_first(client, as_role, fake_mcrit):
@@ -183,6 +215,59 @@ def test_the_comparison_page_asks_for_the_pair_without_checking_the_ids_first(cl
     called = [name for name, _, _ in fake_mcrit.calls]
     assert "isFunctionId" not in called
     assert called.count("getMatchFunctionVs") == 1
+
+
+def test_the_comparison_page_leaves_the_block_data_to_its_viewer(client, as_role, fake_mcrit):
+    """The colours and matches are an entry per block and per match, and only the graph
+    viewer reads them: the page neither carries them nor computes them, the viewer fetches
+    them from match_functions_diff once the graphs are wanted."""
+    as_role("visitor")
+    fake_mcrit.calls.clear()
+    page = client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}").data.decode()
+    assert "Node0x" not in page
+    assert _diff_calls(fake_mcrit) == []
+
+
+def test_the_block_data_route_answers_the_comparison(client, as_role, app):
+    from mcritweb.views.functiondiff import get_function_diff
+    as_role("visitor")
+    response = client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}/diff")
+    assert response.status_code == 200 and response.mimetype == "application/json"
+    with app.test_request_context("/"):
+        diff = get_function_diff(*DIFFERENT_PAIR)
+    assert response.get_json() == {"node_colors": diff["node_colors"], "node_matches": diff["node_matches"]}
+    assert any(response.get_json()["node_matches"]["a"].values())
+
+
+def test_the_block_data_route_answers_404_for_an_unknown_function(client, as_role):
+    as_role("visitor")
+    response = client.get("/data/matches/function/98/987654321/diff")
+    assert response.status_code == 404
+    # the route's own answer, not the 404 of a route that is not there
+    assert response.get_json() == {"error": "One of the function_ids is not valid."}
+
+
+class _UnansweringClient:
+    """A backend that fails the function lookups: the client answers None for a 500."""
+
+    def __init__(self, corpus):
+        self._corpus = corpus
+
+    def getFunctionById(self, *args, **kwargs):
+        return None
+
+    def __getattr__(self, name):
+        return getattr(self._corpus, name)
+
+
+def test_the_block_data_route_answers_404_when_the_backend_does_not_give_the_functions(client, as_role, app, fake_mcrit):
+    """The page was rendered from both functions, so this is a failure the viewer has to
+    report, not a comparison with nothing in it."""
+    as_role("visitor")
+    app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: _UnansweringClient(fake_mcrit)
+    response = client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}/diff")
+    assert response.status_code == 404
+    assert response.get_json() == {"error": "One of the function_ids is not valid."}
 
 
 def test_the_comparison_page_reports_an_unknown_function_id(client, as_role):
@@ -313,6 +398,9 @@ class _DroppedDisassemblyClient:
     def getFunctionById(self, function_id, *args, **kwargs):
         entry = self._corpus.getFunctionById(function_id, *args, **kwargs)
         if entry is not None:
+            # a copy: the corpus hands out the entries it keeps, and the next client is a
+            # backend that still has the disassembly
+            entry = copy.copy(entry)
             entry.xcfg = {}
         return entry
 
@@ -368,25 +456,34 @@ def _diff_calls(fake_mcrit, names=("getFunctionById", "getSampleById")):
     return [name for name, _, _ in fake_mcrit.calls if name in names]
 
 
-def _page_colors(page):
-    return re.search(r"var js_node_colors = (.*);", page).group(1), re.search(r"nodeMatches: (.*),\n", page).group(1)
+def _diff_url(function_id_a, function_id_b):
+    """Where the comparison page's viewer fetches the colours and matches."""
+    return f"/data/matches/function/{function_id_a}/{function_id_b}/diff"
+
+
+def _colors_of(response):
+    """The colours and the matches a fetch of the comparison answered, each as JSON text."""
+    assert response.status_code == 200
+    answer = response.get_json()
+    return json.dumps(answer["node_colors"]), json.dumps(answer["node_matches"])
 
 
 def test_a_repeated_comparison_is_not_recomputed(client, as_role, fake_mcrit):
     as_role("visitor")
-    url = f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}"
-    first = client.get(url).data.decode()
-    assert _diff_calls(fake_mcrit), "the first view has to compute the comparison"
+    url = _diff_url(*DIFFERENT_PAIR)
+    first = _colors_of(client.get(url))
+    assert "getSampleById" in _diff_calls(fake_mcrit), "the first fetch has to compute the comparison"
     fake_mcrit.calls.clear()
-    second = client.get(url).data.decode()
-    assert _diff_calls(fake_mcrit) == []
-    assert _page_colors(second) == _page_colors(first)
+    second = _colors_of(client.get(url))
+    # the two entries are fetched for the memo key, and nothing else
+    assert _diff_calls(fake_mcrit) == ["getFunctionById", "getFunctionById"]
+    assert second == first
 
 
-def test_the_combined_graph_reuses_the_comparison_of_the_page(client, as_role, app, fake_mcrit):
+def test_the_combined_graph_reuses_the_comparison_the_viewer_fetched(client, as_role, app, fake_mcrit):
     from mcritweb.views.functiondiff import build_combined_dot_graph, get_function_diff
     as_role("visitor")
-    client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}")
+    client.get(_diff_url(*DIFFERENT_PAIR))
     url = f"/explore/fetchCombinedDotGraph/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}"
     for _ in range(2):
         fake_mcrit.calls.clear()
@@ -405,8 +502,8 @@ def test_recalculated_picblockhashes_give_fresh_colours(client, as_role, fake_mc
     under the same function ids - layer 3 then colours differently."""
     from mcritweb.views.functiondiff import COLOR_FULL_PICBLOCK_MATCH, node_id
     as_role("visitor")
-    url = f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}"
-    first = _page_colors(client.get(url).data.decode())
+    url = _diff_url(*DIFFERENT_PAIR)
+    first = _colors_of(client.get(url))
     # the recalculation now finds the first blocks of both functions to be equal
     first_blocks = []
     for function_id in DIFFERENT_PAIR:
@@ -414,7 +511,7 @@ def test_recalculated_picblockhashes_give_fresh_colours(client, as_role, fake_mc
         offset = entry.toSmdaFunction().getBlocks()[0].offset
         first_blocks.append(node_id(offset))
         entry.picblockhashes = [{"offset": offset, "hash": 0x186, "size": 4}]
-    second = _page_colors(client.get(url).data.decode())
+    second = _colors_of(client.get(url))
     assert second != first
     colors = json.loads(second[0])
     assert colors["a"][first_blocks[0]] == colors["b"][first_blocks[1]] == COLOR_FULL_PICBLOCK_MATCH
@@ -428,8 +525,7 @@ def test_a_dropped_disassembly_is_not_drawn_from_memory(client, as_role, app, fa
     assert client.get(url).data.startswith(b'digraph "Combined CFG')
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: _DroppedDisassemblyClient(fake_mcrit)
     assert client.get(url).data == b""
-    page = client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}").data.decode()
-    assert _page_colors(page)[0] == '{"a": {}, "b": {}}'
+    assert _colors_of(client.get(_diff_url(*DIFFERENT_PAIR)))[0] == '{"a": {}, "b": {}}'
 
 
 def test_layer_4_tells_a_jz_from_a_jnz():
@@ -500,7 +596,7 @@ def test_the_cache_is_per_backend(client, as_role, app, fake_mcrit):
     """Pointed at another backend, the same ids are other functions."""
     from mcritweb.db import ServerInfo
     as_role("visitor")
-    url = f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}"
+    url = _diff_url(*DIFFERENT_PAIR)
     client.get(url)
     with app.app_context():
         server_info = ServerInfo.fromDb()
@@ -508,14 +604,14 @@ def test_the_cache_is_per_backend(client, as_role, app, fake_mcrit):
         server_info.saveToDb()
     fake_mcrit.calls.clear()
     client.get(url)
-    assert _diff_calls(fake_mcrit)
+    assert "getSampleById" in _diff_calls(fake_mcrit)
 
 
 def test_a_backend_reset_clears_the_function_diff_memo(client, as_role, app, fake_mcrit):
     from mcritweb.views.functiondiff import _function_diff_memo
     fake_mcrit.respawn = lambda: None
     as_role("admin")
-    client.get(f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}")
+    client.get(_diff_url(*DIFFERENT_PAIR))
     with app.app_context():
         assert len(_function_diff_memo()) == 1
     assert client.post("/admin/reset_server", data={"reset_server": "RESET"}).status_code == 302
@@ -526,11 +622,11 @@ def test_a_backend_reset_clears_the_function_diff_memo(client, as_role, app, fak
 def test_an_empty_comparison_is_not_kept(client, as_role, app, fake_mcrit):
     """Without both xcfgs there is nothing to keep; the next view must try again."""
     as_role("visitor")
-    url = f"/data/matches/function/{DIFFERENT_PAIR[0]}/{DIFFERENT_PAIR[1]}"
+    url = _diff_url(*DIFFERENT_PAIR)
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: _DroppedDisassemblyClient(fake_mcrit)
     client.get(url)
     app.config["MCRIT_CLIENT_FACTORY"] = lambda **kwargs: fake_mcrit
-    colors, _ = _page_colors(client.get(url).data.decode())
+    colors, _ = _colors_of(client.get(url))
     assert "Node0x" in colors
 
 
@@ -543,18 +639,18 @@ def test_a_reused_id_is_not_served_its_predecessors_comparison(client, as_role, 
     function_id_a, function_id_b = DIFFERENT_PAIR
     for function_id in (function_id_a, function_id_b, IDENTICAL_PAIR[1]):
         fake_mcrit._functions[function_id].picblockhashes = []
-    page_url = f"/data/matches/function/{function_id_a}/{function_id_b}"
+    diff_url = _diff_url(function_id_a, function_id_b)
     combined_url = f"/explore/fetchCombinedDotGraph/{function_id_a}/{function_id_b}"
-    first_page = _page_colors(client.get(page_url).data.decode())
+    first_diff = _colors_of(client.get(diff_url))
     first_dot = client.get(combined_url).data.decode()
     # after the reset, the id of B names a copy of A's identical twin
     reused = copy.deepcopy(fake_mcrit._functions[IDENTICAL_PAIR[1]])
     reused.function_id = function_id_b
     fake_mcrit._functions[function_id_b] = reused
-    second_page = _page_colors(client.get(page_url).data.decode())
+    second_diff = _colors_of(client.get(diff_url))
     second_dot = client.get(combined_url).data.decode()
-    assert second_page != first_page and second_dot != first_dot
-    assert COLOR_UNMATCHED not in json.loads(second_page[0])["a"].values()
+    assert second_diff != first_diff and second_dot != first_dot
+    assert COLOR_UNMATCHED not in json.loads(second_diff[0])["a"].values()
     assert 'side="b"' not in second_dot
 
 
@@ -602,3 +698,81 @@ def test_the_cfg_scripts_make_no_synchronous_request(script):
         source = f.read()
     assert not re.search(r"\.open\s*\([^;]*,\s*false\s*\)", source)
     assert 'fetch("../getPicBlockMatches/" + hash_only)' in source
+
+
+def _main_js_function(name):
+    """The source of `function <name>(...)` in main.js, up to the next function at the
+    same indentation; functions nested inside it are indented deeper and stay in."""
+    import os
+    path = os.path.join(os.path.dirname(__file__), "..", "mcritweb", "static", "trace_CFG", "main.js")
+    with open(path) as f:
+        source = f.read()
+    start = re.search(r"\n(\s*)function " + re.escape(name) + r"\(", source)
+    assert start, name
+    end = source.find("\n" + start.group(1) + "function ", start.end())
+    return source[start.start():end]
+
+
+def _calls(source, call):
+    """Where `call(...)` appears in `source`, whitespace inside it ignored."""
+    return [m.start() for m in re.finditer(re.escape(call).replace(r"\ ", r"\s*") + r"\s*\(", source)]
+
+
+def test_the_function_page_carries_the_deferred_graph_prompt(client, as_role):
+    """main.js shows `#cfgDeferred` and toggles `.cfg-graph-control` for a large graph (#267);
+    without them in the template the page would neither offer the graph nor block its controls."""
+    as_role("visitor")
+    page = client.get(f"/explore/functions/{MULTI_BLOCK_FUNCTION}").get_data(as_text=True)
+    deferred = re.search(r'<div id="cfgDeferred"[^>]*>', page)
+    assert deferred and re.search(r'class="[^"]*\bhidden\b', deferred.group(0))
+    note = re.search(r'<p id="cfgDeferredNote"[^>]*>', page)
+    assert note and 'role="status"' in note.group(0) and 'aria-live="polite"' in note.group(0)
+    assert 'id="cfgDeferredBlocks"' in page
+    assert re.search(r'<button type="button"[^>]*id="drawGraph"', page)
+    for control in ("showCycles", "showLoops", "loopBgFill", "enableTooltip"):
+        tag = re.search(r'<input\b[^>]*\bid="' + control + r'"[^>]*>', page)
+        assert tag and re.search(r'class="[^"]*\bcfg-graph-control\b', tag.group(0)), control
+
+
+def test_a_large_graph_is_offered_rather_than_laid_out_on_load():
+    """dagre's layout froze the page for seconds on large functions (#267): above
+    CFG_CODE_FIRST_BLOCKS the code panel is shown at once and the graph follows from the
+    layout worker; above CFG_DEFERRED_LAYOUT_BLOCKS it waits for a click."""
+    load = _main_js_function("loadWithDotGraphAndFunctionId")
+    branch = re.search(r"if\s*\(\s*num_blocks\s*>\s*CFG_CODE_FIRST_BLOCKS\s*\|\|\s*num_blocks\s*>\s*CFG_DEFERRED_LAYOUT_BLOCKS\s*\)", load)
+    otherwise = re.search(r"\}\s*else\s*\{", load[branch.end():])
+    large, small = load[branch.end():branch.end() + otherwise.start()], load[branch.end() + otherwise.end():]
+    assert _calls(large, "getCodefromGraph") and _calls(large, "offerDeferredGraph")
+    assert re.search(r"if\s*\(\s*num_blocks\s*<=\s*CFG_DEFERRED_LAYOUT_BLOCKS\s*\)\s*\{\s*drawDeferredGraph\(", large)
+    assert not _calls(large, "findLoopsAndShowGraph") and _calls(small, "findLoopsAndShowGraph")
+
+
+def test_every_failure_to_draw_the_graph_is_reported():
+    """A failed loop request, an answer that is not loop data, a graph that cannot be
+    measured or laid out, or a drawing that throws must bring the prompt and its button
+    back rather than leave a page waiting (#267)."""
+    draw = _main_js_function("findLoopsAndShowGraph")
+    assert re.search(r"if\s*\(\s*err\s*\|\|\s*!result\s*\)\s*\{\s*graphNotDrawn\(", draw)
+    # parsing the answer, measuring the graph and drawing it each fail into graphNotDrawn()
+    attempts = re.findall(r"try\s*\{(.*?)\}\s*catch\s*\(error\)\s*\{(.*?)\}", draw, re.S)
+    assert [bool(_calls(t, "JSON.parse")) for t, _ in attempts] == [True, False, False]
+    assert [bool(_calls(t, "measureGraph")) for t, _ in attempts] == [False, True, False]
+    assert [bool(_calls(t, "showGraph")) for t, _ in attempts] == [False, False, True]
+    assert all(_calls(c, "graphNotDrawn") for _, c in attempts)
+    # and a layout the worker could not make
+    assert re.search(r"layOutInWorker\(.*function\s*\(reason,\s*error\)\s*\{\s*graphNotDrawn\(reason", draw, re.S)
+    failed = _main_js_function("graphNotDrawn")
+    assert re.search(r'd3\.select\("#drawGraph"\)\.property\("disabled",\s*false\)', failed)
+    assert re.search(r'd3\.select\("#cfgDeferred"\)\.classed\("hidden",\s*false\)', failed)
+    assert _calls(failed, "getCodefromGraph")
+
+
+def test_the_code_panel_is_built_once_per_page():
+    """A deferred graph's code panel exists before the graph, and a failed layout can ask for
+    it after showGraph() did; a second build would send every block lookup again (#267).
+    getCodefromGraph() returns before its first lookup when it has already run."""
+    build = re.sub(r"(?m)^\s*//.*$", "", _main_js_function("getCodefromGraph"))
+    first_lookup = build.find("var nodes")
+    assert re.search(r"if\s*\(\s*isCodePanelRequested\s*\)\s*\{\s*return;\s*\}", build[:first_lookup])
+    assert re.search(r"isCodePanelRequested\s*=\s*true;", build[:first_lookup])
+    assert re.search(r"isCodePanelRequested\s*=\s*false;", _main_js_function("initialize"))
