@@ -72,6 +72,11 @@ rather than reconstructing it from the commit log at release time.
 - Control flow graphs are laid out about three times faster on large functions, with the same
   result: 5.6 s instead of 21.7 s for a 971-block function. A patch to the vendored dagre builds the
   graph of each rank in one pass instead of walking the whole graph once per rank.
+- The clipboard buttons' tooltips and the report of a copy, which every page carried in an inline
+  script, are in `status_message.js`, queued after the first paint, next to the status message they
+  use rather than in a file of their own, which cost a phone 40 ms of blocking time on every page. The
+  page keeps only the part that copies, so a press right after the first paint still copies, and
+  every page is about 190 bytes smaller gzipped.
 - The browser keeps the static files from one page to the next instead of asking for each of them
   again. Their URLs carry a digest of the file (`?v=`), which changes when the file does, and a URL
   with the current digest may be kept for a year; on a phone at 150 ms round trips the next page
@@ -118,6 +123,35 @@ rather than reconstructing it from the commit log at release time.
   its longest instruction and stays inside its pane and the window; it was sized from the drawn
   block, so most instructions ran out of the box, and the combined view's "B's code" tooltip was not
   held inside the pane at all.
+- The tooltips of scores, matrix squares and "Total (since queued)" wrap and stay inside the
+  window. They were one line long, so on a phone or tablet they ran off the screen, and the matrix
+  pane cut off the top of those on its first rows at any width. Where the browser can anchor a box
+  to another, a tooltip opens above or below its element, whichever side has room; a phone without
+  that shows it across the foot of the window. A hidden tooltip is no longer laid out at all: it
+  made the cross compare pages 1120px wide in any narrower window, and the two hidden boxes behind
+  every matrix square were most of the time a large matrix took to draw, so loading one and
+  switching its tabs now take about half the layout work. The rules that do this are written to be
+  cheap to match, and the message box of the copy buttons is on the page from the start instead of
+  being added to it once it has loaded, so a 100 by 100 cross compare matrix styles as fast as it
+  did before the tooltips changed, rather than 250 ms slower.
+- What the tooltips say no longer needs a mouse. The byte counts behind each score, a sample's
+  details in the sample pickers and the families an aggregated function matched follow their cell
+  as text a screen reader reads; "Total (since queued)", "(whole job)" and the cross compare
+  order buttons take the keyboard focus, show their tooltip there, and are described by it. A
+  tooltip's element is underlined with dots, Escape puts a tooltip away, and the pointer can move
+  onto one without it closing.
+- A file let go beside the drop zone no longer replaces the page. The overlay opens under the
+  pointer on the first drag, and a file dropped a little off the zone, on the overlay or the page,
+  was opened by the browser in place of the page (a `.smda` report as JSON) or downloaded. Only the
+  zone takes a dragged file now; elsewhere the pointer shows that it cannot be dropped. The query,
+  submit and import pages, where the zone is the page's own content, are covered the same way.
+- A copy says whether it worked in a message at the foot of the window, which screen readers
+  announce. The YARA rule and the registration URL answered with an alert dialog, which took the
+  focus until it was dismissed, and the other copy buttons only with a "Copied!" tooltip, which a
+  screen reader was not told about. On a page served over plain HTTP, where browsers withhold the
+  clipboard API, the copy buttons and the registration URL now copy all the same; they threw
+  there, silently. Where a copy cannot be made at all, the text is left selected for Ctrl+C. The
+  registration URL is copied by a button the keyboard reaches, not by a bare icon.
 - Four markup slips in forms. The sample page's edit dialog had a stray quote after its form's
   `action`, the settings page gave all seven column lists the same id, and the 1 vs 1 page printed
   the sample edit dialog twice, so the second copy's labels named the first copy's fields. That

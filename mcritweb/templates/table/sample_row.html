@@ -1,5 +1,5 @@
 {% from 'table/pagination_widget.html' import sortable_header_col %}
-{% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id, mark %}
+{% from 'table/links.html' import format_pichash, format_offset, format_family_name, format_family_id, format_sample_id, format_function_id, mark, hint_copy %}
 {% from 'table/row_decoration.html' import row_tint, badge_column_header, badge_column_cell %}
 
 {% macro sample_row_std_js() %}
@@ -136,7 +136,8 @@
     {% endfor %}
     {% if show_hint %}
       <td>
-        <span class="hint--left" data-hint="Sample_ID: {{ sample.sample_id }}&#10;SHA256: {{ sample.sha256 }}&#10;Family: {{ sample.family }}&#10;Version: {{ sample.version }}&#10;Filename: {{ sample.filename }} &#10;Architecture: {{ sample.architecture }}&#10;Bitness: {{ sample.bitness }} &#10;Base_Address: 0x{{ '%0x' % sample.base_addr }}&#10;Binary_Size: {{ '{:,.0f}'.format(sample.binary_size) }}&#10;Binweight: {{ '{:,.0f}'.format(sample.binweight) }}"><i class="fa-solid fa-circle-info"></i></span>
+        {% set hint %}Sample_ID: {{ sample.sample_id }}&#10;SHA256: {{ sample.sha256 }}&#10;Family: {{ sample.family }}&#10;Version: {{ sample.version }}&#10;Filename: {{ sample.filename }} &#10;Architecture: {{ sample.architecture }}&#10;Bitness: {{ sample.bitness }} &#10;Base_Address: 0x{{ '%0x' % sample.base_addr }}&#10;Binary_Size: {{ '{:,.0f}'.format(sample.binary_size) }}&#10;Binweight: {{ '{:,.0f}'.format(sample.binweight) }}{% endset %}
+        <span class="hint--left" data-hint="{{ hint }}"><i class="fa-solid fa-circle-info"></i></span>{{ hint_copy(hint) }}
       </td>
     {% endif %}
     {% if (show_export or show_analyze) %}

@@ -19,7 +19,6 @@ what CI keeps; these are the tests that exercise the behaviour.
 
 import logging
 import threading
-import time
 
 import pytest
 from conftest import session_cookie_for
@@ -114,12 +113,13 @@ def browser_page(app, live_server, make_user):
 
 
 @pytest.fixture
-def alerts(browser_page):
-    """Every alert() the page raised, dismissed as it arrives.
+def dialogs(browser_page):
+    """Every dialog the page opened, dismissed as it arrives. The copy reported through
+    alert(), which takes the focus and holds the page until it is answered; it reports in
+    the status message now, so this should stay empty.
 
     Playwright only dismisses dialogs by itself while nothing is listening, and a
-    listener that does not dismiss deadlocks the click that opened it - alert()
-    blocks the page until it is answered.
+    listener that does not dismiss deadlocks the click that opened it.
     """
     messages = []
 
@@ -137,33 +137,55 @@ def open_unique_blocks(page, live_server, tab="stats"):
     return page
 
 
-def click_and_wait_for_alert(page, selector, alerts):
-    """Click, and hand back what the copy helper reported when it was done.
+#: The status message of static/status_message.js.
+STATUS = ".status-message [role=status]"
 
-    The helper alerts on both outcomes, and on the secure-context path it does so
-    from a promise callback - so the alert is also the signal that the copy has
-    finished and the clipboard can be read.
+
+def click_and_wait_for_status(page, selector):
+    """Click, and hand back what the copy said when it was done.
+
+    The helper reports both outcomes in the status message, and on the secure-context path
+    it does so from a promise callback - so the message is also the signal that the copy
+    has finished and the clipboard can be read.
     """
-    already_seen = len(alerts)
+    page.evaluate("() => new Promise((resolve) => whenReady(() => resolve(true)))")
     page.click(selector)
-    deadline = time.monotonic() + SCRIPT_TIMEOUT_MS / 1000
-    while len(alerts) == already_seen:
-        assert time.monotonic() < deadline, "the copy helper never reported an outcome"
-        page.wait_for_timeout(25)
-    return alerts[-1]
+    page.wait_for_function(f"() => document.querySelector('{STATUS}').textContent !== ''", timeout=SCRIPT_TIMEOUT_MS)
+    return page.inner_text(STATUS)
 
 
-def test_the_copy_icon_puts_the_textareas_current_value_on_the_clipboard(browser_page, live_server, alerts):
+def test_the_copy_icon_puts_the_textareas_current_value_on_the_clipboard(browser_page, live_server, dialogs):
     """Issue #80. The rule is editable, so the clipboard has to get the value, not
     the markup: the old helper copied `$(element).html()` out of a detached
     textarea, which threw away every edit and handed back HTML entities."""
     page = open_unique_blocks(browser_page, live_server, tab="yara")
     page.fill("#yara_text", EDITED_RULE)
 
-    message = click_and_wait_for_alert(page, "#pills-yara i.fa-copy", alerts)
+    message = click_and_wait_for_status(page, "#pills-yara i.fa-copy")
 
     assert "Copied" in message, f"the copy reported failure: {message}"
     assert page.evaluate("navigator.clipboard.readText()") == EDITED_RULE
+    assert dialogs == [], f"the copy opened a dialog: {dialogs}"
+
+
+def test_a_copy_that_cannot_be_made_leaves_the_rule_selected(browser_page, live_server, dialogs):
+    """On a page served over plain HTTP there is no `navigator.clipboard`, and a browser
+    can refuse to copy a selection as well. The copy then says so, and leaves the whole
+    rule selected in its text area for Ctrl+C, instead of an alert() asking the reader to
+    select it."""
+    browser_page.add_init_script(
+        'Object.defineProperty(Navigator.prototype, "clipboard", {get: () => undefined, configurable: true});'
+        'Document.prototype.execCommand = function () { return false; };'
+    )
+    page = open_unique_blocks(browser_page, live_server, tab="yara")
+    page.fill("#yara_text", EDITED_RULE)
+
+    message = click_and_wait_for_status(page, "#pills-yara i.fa-copy")
+
+    assert "Ctrl+C" in message, message
+    assert page.evaluate("document.activeElement.id") == "yara_text"
+    assert page.evaluate("(() => { const area = document.getElementById('yara_text'); return area.value.slice(area.selectionStart, area.selectionEnd); })()") == EDITED_RULE
+    assert dialogs == [], f"the copy opened a dialog: {dialogs}"
 
 
 def statistics_column(page, column):

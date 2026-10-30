@@ -324,6 +324,32 @@ if (typeof window.handleSliderChange_dropzone !== "function") {
     };
 }
 
+// A file let go anywhere but on the zone is the browser's to handle, and it opens the file in
+// place of the page, or downloads it. On the overlay pages the overlay opens under the
+// pointer, so a drop a little off the zone is easy to make; on the query, submit and import
+// pages the zone is the content, with the rest of the page around it. A drag that carries a
+// file is refused there; the zone's own handlers take it, and stop it on the zone. This file
+// is queued by every page that has a zone (the import page has no form, so the block below
+// leaves it alone), which is what keeps the guard in one place.
+(function () {
+    function aFileBesideTheZone(e) {
+        var types = (e.dataTransfer && e.dataTransfer.types) || [];
+        var target = e.target.closest ? e.target.closest("#myDropzone") : null;
+        return Array.prototype.indexOf.call(types, "Files") >= 0 && target === null;
+    }
+    window.addEventListener('dragover', function (e) {
+        if (aFileBesideTheZone(e)) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "none";
+        }
+    });
+    window.addEventListener('drop', function (e) {
+        if (aFileBesideTheZone(e)) {
+            e.preventDefault();
+        }
+    });
+})();
+
 // The family type-ahead of the overlay's form. A page whose edit modals have one already
 // queued static/family_names.js, which attaches to the field on its first focus; any other
 // page gets it now, and it attaches at once.

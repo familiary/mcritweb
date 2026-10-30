@@ -304,12 +304,19 @@
          only elapsed time there is. #}
       {% set job_total_duration = job_info|total_duration(child_jobs) %}
       {% if job_total_duration is not none %}
+        {% if job_info.finished_at %}
+          {% set total_explained = "Measured from when this job was queued. A job that fans out is queued just after the children it waits on, so this is a lower bound by that enqueue interval - 10ms for five children." %}
+        {% else %}
+          {% set total_explained = "Measured from when this job was queued to the latest time the backend recorded on it or its sub-jobs, since the backend's clock need not be this server's. From there it counts on in the browser, so it is a lower bound." %}
+        {% endif %}
+        {# the label takes the focus, so that its tooltip shows for the keyboard as well, and
+           is described by the same text, below the table, for a screen reader #}
         <tr>
           {% if job_info.finished_at %}
-            <td valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued. A job that fans out is queued just after the children it waits on, so this is a lower bound by that enqueue interval - 10ms for five children.">Total (since queued): </span></td>
+            <td valign="middle"><span class="hint--right" tabindex="0" aria-describedby="job-total-explained" data-hint="{{ total_explained }}">Total (since queued): </span></td>
             <td valign="middle">{{ job_total_duration }}</td>
           {% else %}
-            <td valign="middle"><span class="hint--right" data-hint="Measured from when this job was queued to the latest time the backend recorded on it or its sub-jobs, since the backend's clock need not be this server's. From there it counts on in the browser, so it is a lower bound.">Total (since queued): </span></td>
+            <td valign="middle"><span class="hint--right" tabindex="0" aria-describedby="job-total-explained" data-hint="{{ total_explained }}">Total (since queued): </span></td>
             <td valign="middle"><span data-elapsed-seconds="{{ job_total_duration.total_seconds()|int }}">{{ job_total_duration }}</span> and counting</td>
           {% endif %}
         </tr>
@@ -388,6 +395,9 @@
       {% endif %}
     </tbody>
   </table>
+  {% if job_total_duration is not none %}
+    <span hidden id="job-total-explained">{{ total_explained }}</span>
+  {% endif %}
 {% endmacro %}
 
 
