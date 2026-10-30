@@ -51,6 +51,12 @@ from mcritweb.views.params import (
     parseIsDumpFromFilename,
     slider_position_for_band_range,
 )
+from mcritweb.views.result_sorting import (
+    AGGREGATED_FUNCTION_SORT_KEYS,
+    FAMILY_SAMPLE_SORT_KEYS,
+    MATCHED_FUNCTION_SORT_KEYS,
+    sorted_page,
+)
 from mcritweb.views.ScoreColorProvider import ScoreColorProvider
 from mcritweb.views.utility import (
     describable_jobs,
@@ -1272,6 +1278,29 @@ def aggregate_function_matches_page(matching_result: MatchingResult, pagination:
     return page_result.getAggregatedFunctionMatches()
 
 
+def aggregated_function_rows(matching_result: MatchingResult, pagination: Pagination):
+    """The aggregated function table's page, sorted as `pagination` asks.
+
+    A sort has to see every row, so a sorted page aggregates the whole (filtered)
+    report and slices it. Without a sort the page comes from
+    `aggregate_function_matches_page`, which aggregates only the functions on it.
+    """
+    return sorted_page(
+        pagination, AGGREGATED_FUNCTION_SORT_KEYS, matching_result,
+        all_rows=matching_result.getAggregatedFunctionMatches,
+        page_rows=lambda: aggregate_function_matches_page(matching_result, pagination),
+    )
+
+
+def matched_function_rows(matching_result: MatchingResult, pagination: Pagination):
+    """The function-to-function table's page, sorted as `pagination` asks."""
+    return sorted_page(
+        pagination, MATCHED_FUNCTION_SORT_KEYS, matching_result,
+        all_rows=lambda: matching_result.filtered_function_matches,
+        page_rows=lambda: matching_result.getFunctionsSlice(pagination.start_index, pagination.limit),
+    )
+
+
 def recover_score_divisors(matching_result):
     """The two totals the sample score columns are percentages of.
 
@@ -1443,7 +1472,12 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         # if both sides count the same thing, so the total goes in aggregated too - taken off
         # the raw match count, it read as a four-figure "filtered" with no filter applied.
         num_original_aggregated_functions = count_aggregated_function_matches(matching_result, unfiltered=True)
-        return render_template("result_compare_family.html", diagram_size=diagram_size, divisors=score_divisors, famid=filtered_family_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, function_rows=aggregate_function_matches_page(matching_result, function_pagination), num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all)
+        sample_rows = sorted_page(
+            sample_pagination, FAMILY_SAMPLE_SORT_KEYS, matching_result,
+            all_rows=matching_result.getSampleMatches,
+            page_rows=lambda: matching_result.getSampleMatches(sample_pagination.start_index, sample_pagination.limit),
+        )
+        return render_template("result_compare_family.html", diagram_size=diagram_size, divisors=score_divisors, famid=filtered_family_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, sample_rows=sample_rows, function_rows=aggregated_function_rows(matching_result, function_pagination), num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all)
     # filtered for sample
     elif filtered_sample_id is not None and (filtered_sample_entry := client.getSampleById(filtered_sample_id)) is not None:
         matching_result.filterToSampleId(filtered_sample_id)
@@ -1458,7 +1492,7 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         # this sample that one query function can match, and paginating over that count left the
         # tail of the table on no page at all.
         function_pagination = Pagination(request, matching_result.num_function_matches, limit=100, query_param="funp", limit_param="funl")
-        return render_template("result_compare_sample.html", diagram_size=diagram_size, divisors=score_divisors, samid=filtered_sample_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_sample) 
+        return render_template("result_compare_sample.html", diagram_size=diagram_size, divisors=score_divisors, samid=filtered_sample_id, job_info=job_info, samp=sample_pagination, funp=function_pagination, function_rows=matched_function_rows(matching_result, function_pagination), matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_sample)
     # filter for function - treat family/sample part as if there was no filter
     elif filtered_function_id is not None and filtered_function_id in matching_result.function_id_to_family_ids_matched:
         matching_result.filterToFunctionId(filtered_function_id)
@@ -1469,7 +1503,7 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         # set up pagination
         family_pagination = Pagination(request, matching_result.num_family_matches, limit=10, query_param="famp", limit_param="fampl")
         function_pagination = Pagination(request, matching_result.num_function_matches, limit=100, query_param="funp", limit_param="funl")
-        return render_template("result_compare_function.html", diagram_size=diagram_size, funid=filtered_function_id, job_info=job_info, famp=family_pagination, funp=function_pagination, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_function) 
+        return render_template("result_compare_function.html", diagram_size=diagram_size, funid=filtered_function_id, job_info=job_info, famp=family_pagination, funp=function_pagination, function_rows=matched_function_rows(matching_result, function_pagination), matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_function)
     # 1 vs 1 result
     elif job_info.parameters.startswith("getMatchesForSampleVs("):
         # get offsets for matched functions
@@ -1477,7 +1511,7 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
             return render_template("result_corrupted.html", reason=MISSING_ENTRIES_REASON, job_info=job_info)
         # we need to slice function matches ourselves based on pagination
         function_pagination = Pagination(request, matching_result.num_function_matches, limit=100, query_param="funp", limit_param="funl")
-        return render_template("result_compare_vs.html", divisors=score_divisors, job_info=job_info, matching_result=matching_result, funp=function_pagination, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_sample)
+        return render_template("result_compare_vs.html", divisors=score_divisors, job_info=job_info, matching_result=matching_result, funp=function_pagination, function_rows=matched_function_rows(matching_result, function_pagination), scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_sample)
     # unfiltered / default -> also 1 vs group
     else:
         family_pagination = Pagination(request, matching_result.num_family_matches, limit=10, query_param="famp", limit_param="fampl")
@@ -1489,7 +1523,17 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
         # was run for is still on this host - the page has to say which it is. The file
         # is filed under the job's own id, so this costs no round trip either
         is_query_result = job_info.method in QUERY_UPLOAD_KINDS
-        return render_template("result_compare_all.html", diagram_size=diagram_size, divisors=score_divisors, job_info=job_info, famp=family_pagination, libp=library_pagination, funp=function_pagination, function_rows=aggregate_function_matches_page(matching_result, function_pagination), num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all, is_query_result=is_query_result, can_promote_query=is_query_result and query_upload_exists(current_app, job_info.job_id))
+        family_rows = sorted_page(
+            family_pagination, FAMILY_SAMPLE_SORT_KEYS, matching_result,
+            all_rows=lambda: matching_result.getBestSampleMatchesPerFamily(malware_only=True),
+            page_rows=lambda: matching_result.getBestSampleMatchesPerFamily(family_pagination.start_index, family_pagination.limit, malware_only=True),
+        )
+        library_rows = sorted_page(
+            library_pagination, FAMILY_SAMPLE_SORT_KEYS, matching_result,
+            all_rows=lambda: matching_result.getBestSampleMatchesPerFamily(library_only=True),
+            page_rows=lambda: matching_result.getBestSampleMatchesPerFamily(library_pagination.start_index, library_pagination.limit, library_only=True),
+        )
+        return render_template("result_compare_all.html", diagram_size=diagram_size, divisors=score_divisors, job_info=job_info, famp=family_pagination, libp=library_pagination, funp=function_pagination, family_rows=family_rows, library_rows=library_rows, function_rows=aggregated_function_rows(matching_result, function_pagination), num_original_aggregated_functions=num_original_aggregated_functions, matching_result=matching_result, scp=score_color_provider, ucs_famlib=user_column_setup_family_library, ucs_functions=user_column_setup_function_all, is_query_result=is_query_result, can_promote_query=is_query_result and query_upload_exists(current_app, job_info.job_id))
 
 
 def order_samples(samples, order):
