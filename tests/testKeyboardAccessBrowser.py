@@ -317,11 +317,11 @@ def test_the_arrow_keys_move_between_tabs_and_show_them(open_as):
     assert tab_list_state(page) == ["pills-username-tab", ["pills-username-tab"], ["pills-username-tab"]]
 
     page.keyboard.press("End")
-    wait_until_shown(page, "pills-theme-tab")
+    wait_until_shown(page, "pills-delete-account-tab")
     page.keyboard.press("ArrowRight")
     wait_until_shown(page, "pills-info-tab")
     page.keyboard.press("ArrowLeft")
-    wait_until_shown(page, "pills-theme-tab")
+    wait_until_shown(page, "pills-delete-account-tab")
     page.keyboard.press("Home")
     wait_until_shown(page, "pills-info-tab")
     assert tab_list_state(page) == ["pills-info-tab", ["pills-info-tab"], ["pills-info-tab"]]
