@@ -187,6 +187,7 @@ ROUTE_POLICY = {
     "data.download_result": (VISITOR, READ_ONLY),
     "data.linkhunt": (VISITOR, READ_ONLY),
     "data.match_functions": (VISITOR, READ_ONLY),
+    "data.match_functions_diff": (VISITOR, READ_ONLY),
     # serves instance/cache/diagrams, and since issue #68 renders the diagram when it
     # is not cached yet - which reads the report and draws it, so the visitor gate now
     # also keeps that work behind a session rather than only keeping a cached diagram
