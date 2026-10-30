@@ -14,8 +14,8 @@
     <thead class="table-light">
       <tr>
         <th scope="col">Field</th>
-        <th style="text-align: right;" scope="col">MinHash</th>
-        <th style="text-align: right;" scope="col">PicHash</th>
+        <th class="text-end" scope="col">MinHash</th>
+        <th class="text-end" scope="col">PicHash</th>
       </tr>
     </thead>
     <tbody>
@@ -26,8 +26,8 @@
           {%- else %}
           <td valign="middle">{{ field }}: </td>
           {%- endif %}
-          <td style="text-align: right;" valign="middle">{{ statistics["minhash"][field] }}</td>
-          <td style="text-align: right;" valign="middle">{{ statistics["pichash"][field] }}</td>
+          <td class="text-end" valign="middle">{{ statistics["minhash"][field] }}</td>
+          <td class="text-end" valign="middle">{{ statistics["pichash"][field] }}</td>
         </tr>
       {% endfor %}
     </tbody>

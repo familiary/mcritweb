@@ -25,6 +25,7 @@ logging.disable(logging.CRITICAL)
 
 STYLESHEET = pathlib.Path(__file__).resolve().parents[1] / "mcritweb" / "static" / "style.css"
 JOB_ROW = pathlib.Path(__file__).resolve().parents[1] / "mcritweb" / "templates" / "table" / "job_row.html"
+TEMPLATES = JOB_ROW.parents[1]
 
 
 @pytest.fixture
@@ -119,14 +120,45 @@ if __name__ == "__main__":
 # scrollWidth out - so it is invisible to an element-overflow scan and very visible to a
 # reader. That is why it survived the first pass.
 
-def test_the_content_headings_can_break_a_long_token():
+def test_the_headings_can_break_a_long_token():
     """job_overview.html and job_in_progress.html print the raw job.parameters as their
-    <h1>. Scoped to section.content so the navbar brand and the manual are untouched."""
+    <h1>; the search page prints the term searched for, a SHA-256 more often than not, and a
+    family's page its name. Every heading and the empty-table message, which echoes a
+    search, break a token too long for their line."""
     css = STYLESHEET.read_text()
 
-    assert "section.content h1 {" in css
-    rule = css.split("section.content h1 {", 1)[1].split("}", 1)[0]
-    assert "overflow-wrap: anywhere" in rule
+    assert re.search(r"\n\s*h1, h2, h3, h4, h5, h6, \.empty-state, \.alert\s*\{\s*overflow-wrap:\s*anywhere;", css)
+
+
+def test_every_rule_that_breaks_a_long_token_names_something_a_template_renders():
+    """The heading rule used to be `section.content h1`, and no template renders a
+    <section>: the content region is <main class="content">. A test that read the rule
+    back passed, and the rule matched nothing - a searched SHA-256 made the page 1,434px
+    wide at 1280px. Each rule has to name at least one thing the templates render (the
+    manual's headings come from markdown, so not every heading level is in a template)."""
+    css = re.sub(r"/\*.*?\*/", "", STYLESHEET.read_text(), flags=re.S)
+    templates = "\n".join(path.read_text() for path in TEMPLATES.rglob("*.html"))
+    # the project's own scripts build some elements, such as static/status_message.js's
+    # message; the vendored ones live in folders or are minified
+    scripts = "\n".join(path.read_text() for path in STYLESHEET.parent.glob("*.js") if not path.name.endswith(".min.js"))
+
+    def rendered(selector):
+        tags = re.findall(r"(?:^|[\s>+~(])([a-z][a-z0-9]*)", selector)
+        names = re.findall(r"\.([\w-]+)", selector)
+        return all(f"<{tag}" in templates or f'createElement("{tag}")' in scripts for tag in tags) and all(
+            re.search(rf'class="[^"]*\b{name}\b', templates) or re.search(rf'className = "[^"]*\b{name}\b', scripts) for name in names)
+
+    rules = re.findall(r"([^{}]*)\{[^{}]*overflow-wrap:\s*anywhere", css)
+    assert len(rules) >= 4
+    for selectors in rules:
+        assert any(rendered(selector.strip()) for selector in selectors.split(",")), f"{selectors.strip()!r} matches nothing a template renders"
+
+
+def test_the_empty_table_message_carries_the_class(client, as_role):
+    as_role("visitor")
+    page = client.get("/explore/samples?query=" + "a" * 64).get_data(as_text=True)
+
+    assert 'class="text-center my-3 empty-state"' in page
 
 
 def test_the_error_message_is_not_wrapped_in_invalid_markup():

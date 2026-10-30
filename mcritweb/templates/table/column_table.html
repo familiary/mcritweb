@@ -14,6 +14,7 @@
   {% for name_and_sample in varargs %}
     {% if name_and_sample[1].sample_id is not none and name_and_sample[1].sample_id >= 0 %}{% set identity.is_stored = true %}{% endif %}
   {% endfor %}
+  <div class="table-scroll table-wrap">
   <table class="table table-hover">
     <thead class="table-light">
       <tr>
@@ -41,7 +42,7 @@
           <td valign="middle">
             {{ name_and_sample[1].version or "-" }} | 
             {{ name_and_sample[1].component or "-" }} | 
-            <i {% if name_and_sample[1].is_library %} style="color: var(--status-yes);" class="fa-solid fa-square-check" {% else %} style="color: var(--status-no);" class="fa-solid fa-times-circle" {% endif %}></i></td>
+            <i {% if name_and_sample[1].is_library %} class="status-yes fa-solid fa-square-check" {% else %} class="status-no fa-solid fa-times-circle" {% endif %}></i></td>
           {% else %}
           {# a query has none of these; an empty cell keeps the row aligned without
              claiming the queried binary is not a library, which we do not know #}
@@ -86,10 +87,12 @@
       </tr>
     </tbody>
   </table>
+  </div>
 {% endmacro %}
 
 
 {% macro function_column_table()%}
+  <div class="table-scroll table-wrap">
   <table class="table table-hover">
     <thead class="table-light">
       <tr>
@@ -186,11 +189,11 @@
         {% for name_fe_se_ph in varargs %}
           <td valign="middle">
             {% if name_fe_se_ph[1].minhash|length > 0 %}
-              <i style="color: var(--status-yes);" class="fa-solid fa-square-check" title="MinHash available"></i>
+              <i class="status-yes fa-solid fa-square-check" title="MinHash available"></i>
               <span class="font-monospace">{{ name_fe_se_ph[1].minhash.hex()[:16] }}&hellip;</span> {{ clipboard_btn(name_fe_se_ph[1].minhash.hex()) }}
               ({{ name_fe_se_ph[1].minhash|length // 4 }} x 32 bit)
             {% else %}
-              <i style="color: var(--status-no);" class="fa-solid fa-times-circle" title="No MinHash"></i> not calculated
+              <i class="status-no fa-solid fa-times-circle" title="No MinHash"></i> not calculated
               <span style="font-size: 0.8em; color: var(--text-muted);">(too small to be minhashed, or the MinHash job has not run yet)</span>
             {% endif %}
           </td>
@@ -198,6 +201,7 @@
       </tr>
     </tbody>
   </table>
+  </div>
 {% endmacro %}
 
 

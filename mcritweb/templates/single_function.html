@@ -254,13 +254,13 @@ Function: {{ function_id }}
           </div>
           {# main.js says here when loop analysis was skipped; empty, it takes no space #}
           <div id="loopAnalysisNote" role="status"></div>
-          <div id="viewer_error" role="alert" hidden style="margin: 20px; color: var(--status-no);">Part of the graph viewer could not be loaded. Reload the page to try again.</div>
+          <div id="viewer_error" role="alert" hidden class="status-no" style="margin: 20px;">Part of the graph viewer could not be loaded. Reload the page to try again.</div>
           <div id="xcfg_container">
               <div id="xcfg_left">
                   <div id="tooltip" class="hidden">
                   <p><span id="value"></span></p>
                   </div>
-                  <div id="loading" class="hidden" style="margin-left: 20px; margin-top:400px; font-size: x-large; color:var(--text-progress); ">
+                  <div id="loading" class="hidden graph-note">
                   Loading. Please Wait!
                   </div>
                   {# issue #267: main.js shows this instead of laying out a large graph on load #}

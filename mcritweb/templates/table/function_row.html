@@ -38,9 +38,9 @@
           <i class="fa-solid fa-virus " title="Sample ID" aria-hidden="true"></i><span class="visually-hidden">Sample ID</span>
         {% endcall %}
       {% elif column_type == "pic_hash" %}
-        <th style="text-align: right;" scope="col">Pichash</th>
+        <th class="text-end" scope="col">Pichash</th>
       {% elif column_type == "has_minhash" %}
-        <th style="text-align: center;" scope="col">Minhash</th>
+        <th class="text-center" scope="col">Minhash</th>
       {% elif column_type == "offset" %}
         {% call sortable_header_col(sort_pagination, "offset", align="right") %}
           Offset
@@ -80,7 +80,7 @@
       {% elif column_type == "pic_hash" %}
         <td align="right" valign="middle" class="font-monospace">{{ format_pichash(function.pichash) }}</td>
       {% elif column_type == "has_minhash" %}
-        <td align="center" valign="middle"><i {% if function.minhash|length > 0 %}style="color: var(--status-yes);" class="fa-solid fa-square-check" title="MinHash present"{% else %}style="color: var(--status-no);" class="fa-solid fa-times-circle" title="No MinHash"{% endif %}></i></td>
+        <td align="center" valign="middle"><i {% if function.minhash|length > 0 %}class="status-yes fa-solid fa-square-check" title="MinHash present"{% else %}class="status-no fa-solid fa-times-circle" title="No MinHash"{% endif %}></i></td>
       {% elif column_type == "offset" %}
         <td align="right" valign="middle" class="font-monospace">{{ format_offset(function.offset) }}</td>
       {% elif column_type == "function_name" %}

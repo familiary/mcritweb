@@ -92,7 +92,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
   {% if function_entry.minhash|length > 0 %}
     {% set num_slots = function_entry.minhash|length // 4 %}
     <p class="mb-1">
-      <i style="color:var(--status-yes);" class="fa-solid fa-square-check"></i>
+      <i class="status-yes fa-solid fa-square-check"></i>
       MinHash available, {{ num_slots }} x 32 bit:
     </p>
     <div class="font-monospace" style="word-break: break-all; font-size: 0.85em;">{{ function_entry.minhash.hex() }} {{ clipboard_btn(function_entry.minhash.hex()) }}</div>
@@ -101,18 +101,18 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
       <h6 class="mt-3">Shingle composition</h6>
       <table class="table table-sm mb-0" style="width: auto;">
         <thead class="table-light">
-          <tr><th scope="col">Shingler</th><th scope="col" style="text-align: right;">Signature slots</th><th scope="col" style="text-align: right;">Shingles extracted</th></tr>
+          <tr><th scope="col">Shingler</th><th class="text-end" scope="col">Signature slots</th><th class="text-end" scope="col">Shingles extracted</th></tr>
         </thead>
         <tbody>
         {% for shingler_name, entry in composition.items()|sort %}
           <tr>
             <td>{{ shingler_name }}</td>
             {% if entry is mapping %}
-              <td style="text-align: right;">{{ entry.get("count", "-") }}</td>
-              <td style="text-align: right;">{{ entry.get("size", "-") }}</td>
+              <td class="text-end">{{ entry.get("count", "-") }}</td>
+              <td class="text-end">{{ entry.get("size", "-") }}</td>
             {% else %}
-              <td style="text-align: right;">{{ entry }}</td>
-              <td style="text-align: right;">-</td>
+              <td class="text-end">{{ entry }}</td>
+              <td class="text-end">-</td>
             {% endif %}
           </tr>
         {% endfor %}
@@ -123,7 +123,7 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
     {% endif %}
   {% else %}
     <p class="mb-0">
-      <i style="color:var(--status-no);" class="fa-solid fa-times-circle"></i>
+      <i class="status-no fa-solid fa-times-circle"></i>
       No MinHash - the function is below the size threshold for minhashing, or the MinHash job has not run yet. Only PicHash matching applies.
     </p>
   {% endif %}
@@ -137,8 +137,8 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
       <thead class="table-light">
         <tr>
           <th scope="col">Offset</th>
-          <th scope="col" style="text-align: right;">Instructions</th>
-          <th scope="col" style="text-align: right;">Bytes</th>
+          <th class="text-end" scope="col">Instructions</th>
+          <th class="text-end" scope="col">Bytes</th>
           <th scope="col">PicBlockHash</th>
         </tr>
       </thead>
@@ -146,8 +146,8 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
       {% for picblock in function_entry.picblockhashes|sort(attribute="offset") %}
         <tr>
           <td class="font-monospace">0x{{ "%x"|format(picblock.offset) }}</td>
-          <td style="text-align: right;">{{ picblock.length }}</td>
-          <td style="text-align: right;">{{ picblock.size }}</td>
+          <td class="text-end">{{ picblock.length }}</td>
+          <td class="text-end">{{ picblock.size }}</td>
           <td class="font-monospace">0x{{ "%016x"|format(picblock.hash) }} {{ clipboard_btn("0x%016x"|format(picblock.hash)) }}</td>
         </tr>
       {% endfor %}

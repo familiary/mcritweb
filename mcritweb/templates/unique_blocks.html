@@ -102,6 +102,7 @@ Unique Blocks
   result page without running the analysis again. At most {{ max_selected }} samples per request.
 </p>
 <div>
+  <div class="table-scroll">
   <table class="table table-hover">
     <thead class="table-light">
       <tr>
@@ -140,6 +141,7 @@ Unique Blocks
     </tbody>
     {% endif %}
   </table>
+  </div>
   {% if not selected_ids %}
   <div class="text-center">
   <h2 class="h4">Selected samples will show here</h2>
@@ -155,6 +157,7 @@ Unique Blocks
 
   {% if samples %}
   {{ set_pagination_params(pagination, _anchor="Search", _js_argument_provider="fetchState") }}
+  <div class="table-scroll">
   <table class="table table-hover">
       <thead class="table-light">
         {{ sample_header(show_analyze=False, sort_pagination=pagination) }}
@@ -174,6 +177,7 @@ Unique Blocks
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {{ pagination_widget(pagination) }}
     <div class="text-center">
       <button type="button" onclick="setSelected()" class="btn btn-outline-primary">Add</button>
