@@ -353,3 +353,37 @@ def test_a_control_with_text_or_a_title_of_its_own_keeps_its_title(page, live_se
     assert page.locator('.pagination a[aria-label^="Page "]').first.get_attribute("title") is None
     assert page.locator('.pagination a[aria-label^="First page"]').first.get_attribute("title") == "First page"
     assert page.errors == []
+
+
+@pytest.mark.parametrize("width", [390, 820])
+@pytest.mark.parametrize("path", [
+    "/data/result/{cross_compare}",
+    "/data/result/{matches_for_sample}?famid=1",
+    "/data/result/{matches_for_sample_vs}?funid=880",
+], ids=["cross", "sample-famid", "vs-funid"])
+def test_a_hidden_tooltip_does_not_widen_the_page(page, live_server, path, width, request):
+    """The labels that became bold <th> carry tooltips written on one line (white-space: pre),
+    up to 960px. hint.css only hides a tooltip it does not show, and a hidden box still takes
+    its room, so the result pages scrolled sideways by that much in a phone. A tooltip is laid
+    out only while it is shown, and the page is no wider than the window for them."""
+    page.set_viewport_size({"width": width, "height": 900})
+    ids = {name: job_id_of(name) for name in ("cross_compare", "matches_for_sample", "matches_for_sample_vs")}
+    open_page(page, live_server + path.format(**ids))
+    hint = page.locator("th [data-hint], th[data-hint]").first
+    assert hint.count() == 1, "the page has no tooltip on a heading cell to measure"
+    assert hint.evaluate("el => getComputedStyle(el, '::after').display") == "none"
+    hint.hover()
+    assert hint.evaluate("el => getComputedStyle(el, '::after').display") == "block"
+    page.mouse.move(0, 0)
+    reach = page.evaluate("""() => {
+        const wide = [];
+        for (const el of document.querySelectorAll('[data-hint]')) {
+            if (el.closest('.table-scroll, .overflow-auto')) continue;
+            const after = getComputedStyle(el, '::after');
+            if (after.display !== 'none') wide.push(el.textContent.trim().slice(0, 30));
+        }
+        return wide;
+    }""")
+    assert reach == [], f"tooltips laid out while hidden: {reach}"
+    if "cross" in request.node.callspec.id:
+        assert page.evaluate("() => document.documentElement.scrollWidth") <= width

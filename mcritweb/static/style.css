@@ -440,3 +440,21 @@ form.form-inline input {
 .accordion-collapse[hidden="until-found"] {
   display: block !important;
 }
+
+/* hint.css tooltips (the data-hint attribute) are laid out only while they are shown. hint.css
+   merely hides the others, and a hidden box still takes its room: the labels that became
+   <th> carry hints written on one line (white-space: pre), up to 960px, and the cross compare
+   pages scrolled sideways by that much in a phone. The idle state is one plain selector, and
+   the rules for a shown tooltip start with :hover or :focus-visible, so that on a matrix of
+   tens of thousands of hints all but one fail at once. */
+[data-hint]::before,
+[data-hint]::after {
+  display: none;
+}
+
+[data-hint]:hover::before,
+[data-hint]:hover::after,
+[data-hint]:focus-visible::before,
+[data-hint]:focus-visible::after {
+  display: block;
+}
