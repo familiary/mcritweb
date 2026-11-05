@@ -2353,3 +2353,27 @@ def promote_query(job_id):
         return redirect(result_page)
     flash('The query was promoted to a sample.', category='success')
     return redirect(url_for('data.job_by_id', job_id=new_job_id, refresh=3, forward=1))
+
+
+@bp.route('/ingest')
+@bp.route('/ingest/<tab>')
+@visitor_required
+@mcrit_server_required
+def ingest(tab="query"):
+    """Consolidated Ingestion Hub view.
+
+    Provides a unified tabbed interface for:
+    - Similarity queries (query against corpus)
+    - Corpus submissions (add sample to corpus)
+    - Whole-corpus package imports
+    """
+    allowed_tabs = ("query", "submit", "import")
+    if tab not in allowed_tabs:
+        tab = "query"
+    return render_template(
+        "ingest.html",
+        active_tab=tab,
+        select_form_type=True,
+        show_submit_fields=True,
+    )
+

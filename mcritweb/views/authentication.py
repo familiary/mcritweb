@@ -560,10 +560,11 @@ def settings():
 
 
 @bp.route('/profile')
+@bp.route('/profile/<path:username>')
 @login_required
-def profile():
-    """The signed-in user's own page: the account, what the role may do, the jobs and
-    submissions the backend recorded under the username, the query uploads this
+def profile(username=None):
+    """The signed-in user's own page (or peer profile): the account, what the role may do,
+    the jobs and submissions the backend recorded under the username, the query uploads this
     instance kept for the account, and the API token behind a button.
 
     A page of this app's own data first: no reachability probe, so it renders with the
@@ -576,7 +577,19 @@ def profile():
     request (ADR-0007): a renamed account's earlier jobs stay under the old name.
     The uploads are this instance's, keyed by the account's id, and follow a rename.
     """
-    user_info = g.user
+    is_own_profile = username is None or username == g.user.username
+    if is_own_profile:
+        user_info = g.user
+    else:
+        user_info = UserInfo.fromDb(username=username)
+        if user_info is None:
+            abort(404)
+        if user_info.role == 'pending' and g.user.role != 'admin':
+            abort(403)
+        # sanitize credentials for peer viewers
+        user_info.apitoken = ""
+        user_info.password = ""
+
     client = get_client()
     username = user_info.username
 
@@ -615,8 +628,8 @@ def profile():
     uploads_pagination = Pagination(request, len(query_uploads), limit=25, query_param="up", limit_param="ulimit")
     uploads_page = query_uploads[uploads_pagination.start_index:uploads_pagination.end_index]
 
-    can_use_api = user_info.role in API_ROLES
-    tabs = [tab for tab in PROFILE_TABS if tab != "developer" or can_use_api]
+    can_use_api = (user_info.role in API_ROLES) and is_own_profile
+    tabs = [tab for tab in PROFILE_TABS if (tab != "developer" or can_use_api) and (tab != "uploads" or is_own_profile or g.user.role == 'admin')]
     active_tab = request.args.get('tab', 'overview')
     if active_tab not in tabs:
         active_tab = 'overview'
@@ -626,6 +639,7 @@ def profile():
         tabs=tabs,
         active_tab=active_tab,
         user_info=user_info,
+        is_own_profile=is_own_profile,
         registered_relative=format_relative_time(user_info.registered),
         last_login_relative=format_relative_time(user_info.last_login) if has_login else None,
         can_use_api=can_use_api,

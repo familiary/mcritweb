@@ -3,7 +3,7 @@ import re
 import time
 
 import requests
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 from mcrit.queue.JobCollection import JobCollection
 from mcrit.storage.FamilyEntry import FamilyEntry
 from mcrit.storage.SampleEntry import SampleEntry
@@ -11,8 +11,9 @@ from mcrit.storage.SampleEntry import SampleEntry
 import mcritweb.views.cfg_explorer_detector as cfg_explorer_detector
 from mcritweb.autocomplete import autocomplete_items
 from mcritweb.backend_errors import BACKEND_FAILURES, require_result, with_server_errors
+from mcritweb.db import get_all_user_info
 from mcritweb.statistics import statistics_page
-from mcritweb.views.authentication import contributor_required, visitor_required
+from mcritweb.views.authentication import contributor_required, multi_user, visitor_required
 from mcritweb.views.client import backend_version, get_client, get_sample_entries, remember_samples
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.data import JOB_ID_PATTERN
@@ -1070,3 +1071,33 @@ def search():
         sample_decorations=sample_decorations,
         function_decorations=function_decorations
     )
+
+
+@bp.route('/users')
+@visitor_required
+@mcrit_server_required
+@multi_user
+def users():
+    """Public user discovery directory in multi-user mode."""
+    all_users = get_all_user_info()
+    users_list = [u for u in all_users if g.user.role == 'admin' or u.role != 'pending']
+
+    user_stats = {}
+    try:
+        client = get_client()
+        queue_data = client.getQueueData()
+        if queue_data:
+            for job in queue_data:
+                uname = getattr(job, "username", "")
+                method = getattr(job, "method", "")
+                if uname and method == "addBinarySample":
+                    user_stats[uname] = user_stats.get(uname, 0) + 1
+    except Exception as e:
+        current_app.logger.warning("Could not calculate user submission metrics: %s", e)
+
+    return render_template(
+        "community_users.html",
+        users=users_list,
+        user_stats=user_stats,
+    )
+

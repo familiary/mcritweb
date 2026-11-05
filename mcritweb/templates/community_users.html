@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Users{% endblock %}
+
+{% block content %}
+<div class="container-fluid my-3">
+  <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+    <h1 class="h2 mb-0">Researchers &amp; Users</h1>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+      <thead>
+        <tr>
+          <th scope="col">Username</th>
+          <th scope="col" class="text-center">Role</th>
+          <th scope="col">Joined</th>
+          <th scope="col" class="text-center">Submissions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td><a href="{{ url_for('authentication.profile', username=u.username) }}" class="fw-bold">{{ u.username }}</a></td>
+          <td class="text-center">
+            {% if u.role == 'admin' %}
+              <span class="badge bg-danger">Administrator</span>
+            {% elif u.role == 'contributor' %}
+              <span class="badge bg-primary">Contributor</span>
+            {% elif u.role == 'visitor' %}
+              <span class="badge bg-info text-dark">Visitor</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">Pending</span>
+            {% endif %}
+          </td>
+          <td>
+            {{ u.registration_date }}
+          </td>
+          <td class="text-center">
+            <span class="badge bg-secondary">{{ user_stats.get(u.username, 0) }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
