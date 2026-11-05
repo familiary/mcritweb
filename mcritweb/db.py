@@ -118,7 +118,7 @@ class UserInfo:
             user_info.role = record["role"]
             user_info.registered = parse_timestamp(record["registered"])
             user_info.last_login = "no login"
-            if record["last_login"] and record["last_login"] != "no login":
+            if record["last_login"] != "no login":
                 user_info.last_login = parse_timestamp(record["last_login"])
             user_info.apitoken = record["apitoken"]
             user_info._stored = {column: getattr(user_info, column) for column in cls.COLUMNS}

@@ -330,7 +330,7 @@ def test_profile_token_rotation_redirects_back_to_profile(client, app):
 
     response = client.post(
         "/admin/regenerate_apitoken",
-        environ_base={"HTTP_REFERER": "http://localhost/profile"},
+        data={"next": "profile"},
     )
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/profile#developer")

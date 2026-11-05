@@ -68,7 +68,7 @@ FILLERS = {
     "sample_id_a": "9999", "sample_id_b": "9998", "function_id_a": "9999", "function_id_b": "9998",
     "job_id": "0123456789abcdef", "role": "visitor", "tab": "overview",
     "filename": "nothing.png", "picblockhash": "0123456789abcdef",
-    "type": "sample", "item_id": "9999", "api_path": "version", "username": "testuser",
+    "type": "sample", "item_id": "9999", "api_path": "version",
 }
 
 # At least this many routes must run to completion in the write detector. A fake

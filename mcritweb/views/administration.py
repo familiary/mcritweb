@@ -1,7 +1,7 @@
 import json
 import sqlite3
 
-from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
@@ -203,8 +203,9 @@ def regenerate_apitoken():
     user_info.apitoken = generate_apitoken()
     user_info.saveToDb()
     flash('A new API token was generated. Anything using the old one has to be updated.', category='success')
-    referrer = request.referrer
-    if referrer and "/profile" in referrer:
+    # back to the page the button was on: the settings page or the profile's developer
+    # tab. The form names it, and only those two names are followed.
+    if request.form.get('next') == 'profile':
         return redirect(url_for('authentication.profile') + '#developer')
     return redirect(url_for('authentication.settings'))
 
@@ -266,51 +267,21 @@ def group_users_by_role(user_infos):
 def change_user_role(user_id, role, tab):
     # root user is always admin
     if user_id == 1:
-        if tab == 'profile':
-            user = UserInfo.fromDb(user_id=1)
-            target = user.username if user else ""
-            return redirect(url_for('authentication.profile', username=target) if target else url_for('explore.users'))
         return redirect(url_for('admin.users', tab=tab))
     # an unrecognised role is written straight into the column and then fails every
     # decorator, leaving an account that can reach nothing for no visible reason
     if role not in KNOWN_ROLES:
         flash(f'"{role}" is not a role.', category='error')
-        if tab == 'profile':
-            user_info = UserInfo.fromDb(user_id=user_id)
-            if user_info:
-                return redirect(url_for('authentication.profile', username=user_info.username))
-            return redirect(url_for('explore.users'))
         return redirect(url_for('admin.users', tab=tab))
     # others can be changed - but the account may have been deleted since this page
     # was rendered, and fromDb answers None rather than raising. See issue #95.
     user_info = UserInfo.fromDb(user_id=user_id)
     if user_info is None:
         flash('That user no longer exists.', category='error')
-        if tab in ('profile', 'explore'):
-            return redirect(url_for('explore.users'))
         return redirect(url_for('admin.users', tab=tab))
     user_info.role = role
     user_info.saveToDb()
-    if tab == 'profile':
-        flash(f"User {user_info.username}'s role updated to {role}.", category='success')
-        return redirect(url_for('authentication.profile', username=user_info.username))
-    if tab == 'explore':
-        flash(f"User {user_info.username}'s role updated to {role}.", category='success')
-        return redirect(url_for('explore.users'))
     return redirect(url_for('admin.users', tab=tab))
-
-
-@bp.route('/regenerate_user_apitoken/<int:user_id>', methods=('POST',))
-@admin_required
-@mcrit_server_required
-def regenerate_user_apitoken(user_id):
-    user_info = UserInfo.fromDb(user_id=user_id)
-    if user_info is None:
-        abort(404)
-    user_info.apitoken = generate_apitoken()
-    user_info.saveToDb()
-    flash(f"API token regenerated for {user_info.username}.", category="success")
-    return redirect(url_for('authentication.profile', username=user_info.username))
 
 
 @bp.route('/delete_user/<int:user_id>', methods=('POST',))
@@ -319,10 +290,6 @@ def regenerate_user_apitoken(user_id):
 def delete_user(user_id, tab = None):
     # root user is not deletable
     if user_id == 1:
-        if tab == 'profile':
-            user = UserInfo.fromDb(user_id=1)
-            target = user.username if user else ""
-            return redirect(url_for('authentication.profile', username=target) if target else url_for('explore.users'))
         return redirect(url_for('admin.users', tab=tab))
     # others can be deleted, along with everything keyed to them
     database = db.get_db()
@@ -330,9 +297,6 @@ def delete_user(user_id, tab = None):
     database.execute("DELETE FROM user_column_settings WHERE user_id = ?;", (user_id,))
     database.execute("DELETE FROM user WHERE id = ?;", (user_id,))
     database.commit()
-    if tab in ('profile', 'explore'):
-        flash('User account deleted successfully.', category='success')
-        return redirect(url_for('explore.users'))
     return redirect(url_for('admin.users', tab=tab))
 
 

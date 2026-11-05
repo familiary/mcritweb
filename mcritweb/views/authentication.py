@@ -651,23 +651,12 @@ def settings():
 
 
 @bp.route('/profile')
-@bp.route('/profile/<path:username>')
 @login_required
 @mcrit_server_required
-def profile(username=None):
-    if username is None or username == g.user.username:
-        target_user = g.user
-        is_own_profile = True
-    else:
-        target_user = UserInfo.fromDb(username=username)
-        if target_user is None:
-            abort(404)
-        is_own_profile = (target_user.user_id == g.user.user_id)
-
+def profile():
+    target_user = g.user
+    is_own_profile = True
     is_admin = (g.user.role == 'admin')
-
-    if not is_own_profile and g.user.role not in ('visitor', 'contributor', 'admin'):
-        abort(403)
     reg = target_user.registered
     if isinstance(reg, str):
         try:
