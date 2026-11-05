@@ -222,7 +222,7 @@
                 {% set job = submission.job %}
                 <tr>
                   <td><span class="font-monospace">{{ job.job_id }}</span></td>
-                  <td>{{ job.filename or '-' }}</td>
+                  <td class="submission-filename">{{ job.filename or '-' }}</td>
                   <td>{% if job.sha256 %}<span class="font-monospace">{{ job.sha256[:16] }}</span> {{ clipboard_btn(job.sha256) }}{% else %}-{% endif %}</td>
                   <td>
                     {% if job.is_finished %}

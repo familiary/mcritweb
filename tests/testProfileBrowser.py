@@ -132,6 +132,28 @@ def test_the_capability_table_is_read_without_swiping(open_profile, width):
         assert row["description"] and row["description"] in row["visible"], f"at {width}px the description is not on screen: {row}"
 
 
+@pytest.mark.parametrize("width", [1280, 1920])
+def test_the_submissions_table_fits_its_box_on_a_desktop(open_profile, width):
+    """A submitted file's name is a hash with underscores, one word 80 characters long. It
+    had no break opportunity, so at 1280px the table grew past its box and the last
+    column, the link to the sample, was cut off at the right edge. The name wraps now."""
+    def use(page):
+        page.click("#tab-submissions")
+        page.wait_for_selector("#pane-submissions.show.active")
+        return page.evaluate("""() => {
+            const box = document.querySelector('#pane-submissions .table-responsive');
+            const links = Array.from(document.querySelectorAll('#pane-submissions td.text-end a'));
+            return {overflow: box.scrollWidth - box.clientWidth,
+                    rows: links.length,
+                    clipped: links.filter(a => a.getBoundingClientRect().right > box.getBoundingClientRect().right).length};
+        }""")
+
+    seen = open_profile(use, width=width)
+    assert seen["rows"] > 0
+    assert seen["overflow"] == 0, f"at {width}px the submissions table is {seen['overflow']}px wider than its box"
+    assert seen["clipped"] == 0
+
+
 def test_the_arrow_keys_move_between_the_tabs_and_the_hash_follows(open_profile):
     def use(page):
         page.focus("#tab-overview")
