@@ -3,7 +3,7 @@ import re
 import time
 
 import requests
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 from mcrit.queue.JobCollection import JobCollection
 from mcrit.storage.FamilyEntry import FamilyEntry
 from mcrit.storage.SampleEntry import SampleEntry
@@ -11,13 +11,14 @@ from mcrit.storage.SampleEntry import SampleEntry
 import mcritweb.views.cfg_explorer_detector as cfg_explorer_detector
 from mcritweb.autocomplete import autocomplete_items
 from mcritweb.backend_errors import BACKEND_FAILURES, require_result, with_server_errors
+from mcritweb.db import get_all_user_info
 from mcritweb.statistics import statistics_page
-from mcritweb.views.authentication import contributor_required, visitor_required
+from mcritweb.views.authentication import contributor_required, multi_user, visitor_required
 from mcritweb.views.client import backend_version, get_client, get_sample_entries, remember_samples
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.data import JOB_ID_PATTERN
 from mcritweb.views.functiondiff import get_combined_dot_graph
-from mcritweb.views.pagination import request_args_for_link_building
+from mcritweb.views.pagination import Pagination, request_args_for_link_building
 from mcritweb.views.search import search_page
 from mcritweb.views.utility import describable_jobs, get_user_column_setup, mcrit_server_required
 
@@ -1070,3 +1071,28 @@ def search():
         sample_decorations=sample_decorations,
         function_decorations=function_decorations
     )
+
+
+@bp.route('/users')
+@visitor_required
+@mcrit_server_required
+@multi_user
+def users():
+    """Who has an account here: the directory a visitor, a contributor and an admin may
+    browse in multi-user mode, each account linking to its profile.
+
+    For everyone: the username, the role and how many submissions the backend recorded
+    under that username (ADR-0007: the name at the time of the request, so the count
+    moves with a renamed name). An admin also sees the pending accounts, marked, and
+    the registration date and last login, which master shows on the admin page only.
+    Paged 25 a page, and the counts are one getQueueCount per listed account, so a
+    view costs at most 25 queue requests rather than the whole queue.
+    """
+    listed = [user_info for user_info in get_all_user_info() if g.user.role == 'admin' or user_info.role != 'pending']
+    listed.sort(key=lambda user_info: user_info.username.casefold())
+    pagination = Pagination(request, len(listed), limit=25, query_param="p", limit_param="plimit")
+    page = listed[pagination.start_index:pagination.end_index]
+    client = get_client()
+    # None for a failed read: the row then shows a dash rather than a 0 it cannot vouch for
+    submission_counts = {user_info.username: client.getQueueCount(method="addBinarySample", username=user_info.username) for user_info in page}
+    return render_template("community_users.html", users=page, submission_counts=submission_counts, pagination=pagination)

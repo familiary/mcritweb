@@ -576,24 +576,40 @@ def profile():
     request (ADR-0007): a renamed account's earlier jobs stay under the old name.
     The uploads are this instance's, keyed by the account's id, and follow a rename.
     """
-    user_info = g.user
+    return render_profile(g.user, own=True)
+
+
+def render_profile(user_info, own):
+    """The profile of `user_info`, as the signed-in user may see it: whole for the
+    holder and for an admin, the public part for anyone else. The context carries only
+    what the viewer may see, so a template change cannot show more."""
+    full_view = own or g.user.role == 'admin'
     client = get_client()
     username = user_info.username
 
-    # the jobs tab: every job under the username, newest first, a page at a time
-    job_count = client.getQueueCount(username=username)
-    jobs_unavailable = job_count is None
-    if jobs_unavailable:
-        flash("Ups, reading MCRIT's job queue failed - the jobs could not be listed.", category="error")
-        job_count = 0
-    jobs_pagination = Pagination(request, job_count, limit=25, query_param="jp", limit_param="jlimit")
+    # the jobs tab, for the holder and an admin: every job under the username, newest
+    # first, a page at a time
+    jobs_unavailable = False
+    job_count = 0
     jobs = []
-    if job_count:
-        jobs = client.getQueueData(start=jobs_pagination.start_index, limit=jobs_pagination.limit, username=username, ascending=False) or []
+    jobs_pagination = None
+    if full_view:
+        job_count = client.getQueueCount(username=username)
+        jobs_unavailable = job_count is None
+        if jobs_unavailable:
+            flash("Ups, reading MCRIT's job queue failed - the jobs could not be listed.", category="error")
+            job_count = 0
+        jobs_pagination = Pagination(request, job_count, limit=25, query_param="jp", limit_param="jlimit")
+        if job_count:
+            jobs = client.getQueueData(start=jobs_pagination.start_index, limit=jobs_pagination.limit, username=username, ascending=False) or []
 
-    # the submissions tab: the addBinarySample jobs among them, with the sample each
-    # finished one produced, read from its result - one lookup per shown row at most
-    submission_count = 0 if jobs_unavailable else (client.getQueueCount(method="addBinarySample", username=username) or 0)
+    # the submissions tab, the public ledger: the addBinarySample jobs under the
+    # username, with the sample each finished one produced, read from its result -
+    # one lookup per shown row at most
+    submission_count = client.getQueueCount(method="addBinarySample", username=username)
+    if submission_count is None:
+        jobs_unavailable = True
+        submission_count = 0
     submissions_pagination = Pagination(request, submission_count, limit=25, query_param="sp", limit_param="slimit")
     submissions = []
     if submission_count:
@@ -601,37 +617,50 @@ def profile():
             sample_id = _sample_id_of_submission(client.getResultForJob(job.job_id)) if job.is_finished else None
             submissions.append({"job": job, "sample_id": sample_id})
 
-    # the uploads tab: what analyze.query kept for this account (every account's for an
-    # admin, the files nobody else can list), with what is still on disk
+    # the uploads tab, for the holder and an admin: what analyze.query kept for this
+    # account (every account's on an admin's own page, the files nobody else can
+    # list), with what is still on disk
     query_uploads = []
-    for job_id, filename in get_query_uploads(None if user_info.role == 'admin' else user_info.user_id):
-        upload_path = query_upload_path(current_app, job_id)
-        upload = {"job_id": job_id, "filename": filename, "size": None, "stored_at": None}
-        if upload_path is not None and os.path.isfile(upload_path):
-            stat = os.stat(upload_path)
-            upload["size"] = format_file_size(stat.st_size)
-            upload["stored_at"] = datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.UTC)
-        query_uploads.append(upload)
+    if full_view:
+        for job_id, filename in get_query_uploads(None if own and user_info.role == 'admin' else user_info.user_id):
+            upload_path = query_upload_path(current_app, job_id)
+            upload = {"job_id": job_id, "filename": filename, "size": None, "stored_at": None}
+            if upload_path is not None and os.path.isfile(upload_path):
+                stat = os.stat(upload_path)
+                upload["size"] = format_file_size(stat.st_size)
+                upload["stored_at"] = datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.UTC)
+            query_uploads.append(upload)
     uploads_pagination = Pagination(request, len(query_uploads), limit=25, query_param="up", limit_param="ulimit")
-    uploads_page = query_uploads[uploads_pagination.start_index:uploads_pagination.end_index]
 
-    can_use_api = user_info.role in API_ROLES
-    tabs = [tab for tab in PROFILE_TABS if tab != "developer" or can_use_api]
-    active_tab = request.args.get('tab', 'overview')
+    # the account as the viewer may see it: the name and the role for everyone, the
+    # rest for the holder and an admin
+    account = {"username": user_info.username, "role": user_info.role}
+    if full_view:
+        has_login = user_info.last_login != "no login"
+        account.update({
+            "user_id": user_info.user_id,
+            "registered": user_info.registered,
+            "registered_relative": format_relative_time(user_info.registered),
+            "last_login": user_info.last_login if has_login else None,
+            "last_login_relative": format_relative_time(user_info.last_login) if has_login else None,
+        })
+
+    can_use_api = own and user_info.role in API_ROLES
+    tabs = [tab for tab in PROFILE_TABS if tab == "submissions" or (full_view and tab != "developer") or (tab == "developer" and can_use_api)]
+    active_tab = request.args.get('tab', tabs[0])
     if active_tab not in tabs:
-        active_tab = 'overview'
-    has_login = user_info.last_login != "no login"
+        active_tab = tabs[0]
     return render_template(
         'profile.html',
         tabs=tabs,
         active_tab=active_tab,
-        user_info=user_info,
-        registered_relative=format_relative_time(user_info.registered),
-        last_login_relative=format_relative_time(user_info.last_login) if has_login else None,
+        account=account,
+        own=own,
+        full_view=full_view,
         can_use_api=can_use_api,
-        legacy_apitoken=is_legacy_apitoken(user_info.apitoken),
+        legacy_apitoken=is_legacy_apitoken(user_info.apitoken) if can_use_api else False,
         api_base_url=f"{request.host_url.rstrip('/')}/api",
-        capabilities=get_role_capabilities(),
+        capabilities=get_role_capabilities() if full_view else None,
         jobs=jobs,
         job_count=job_count,
         jobs_pagination=jobs_pagination,
@@ -639,10 +668,11 @@ def profile():
         submissions=submissions,
         submission_count=submission_count,
         submissions_pagination=submissions_pagination,
-        query_uploads=uploads_page,
+        query_uploads=query_uploads[uploads_pagination.start_index:uploads_pagination.end_index],
         upload_count=len(query_uploads),
         uploads_pagination=uploads_pagination,
     )
+
 
 def admin_required(view):
     @functools.wraps(view)
@@ -716,3 +746,24 @@ def logout():
     session.clear()
     flash('You\'re logged out now', category='success')
     return redirect(url_for('index'))
+
+
+@bp.route('/profile/<path:username>')
+@visitor_required
+def profile_of(username):
+    """Another account's page. A route of its own, so the role it asks for is on the
+    decorator: a pending account has its own profile and nobody else's.
+
+    What a viewer sees of another account is decided in render_profile, not by the
+    template: a visitor or a contributor gets the username, the role and the
+    submissions ledger, which the jobs page shows them already; an admin gets the
+    page the holder sees, minus the token tab and the settings button. An unknown name
+    and, to anyone but an admin, a pending account are both a 404, so the directory's
+    hiding of pending accounts cannot be undone by guessing names.
+    """
+    if username == g.user.username:
+        return redirect(url_for('authentication.profile'))
+    target = UserInfo.fromDb(username=username)
+    if target is None or (target.role == 'pending' and g.user.role != 'admin'):
+        abort(404)
+    return render_profile(target, own=False)

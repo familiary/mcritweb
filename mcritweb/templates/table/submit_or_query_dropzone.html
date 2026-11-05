@@ -103,7 +103,9 @@
       // a JSON body carries no form field, so the token travels as a header
       xhr.setRequestHeader("X-CSRFToken", csrfToken());
 
-      xhr.onload = () => fill_form(xhr.responseText);
+      // the route is a contributor's; a visitor's query page gets a 403 page back, which
+      // is not JSON and has nothing to fill the form with
+      xhr.onload = () => { if (xhr.status === 200) { fill_form(xhr.responseText); } };
 
       myDropzone.processQueue();
       var form_data = $('#dropzone-additional-fields-form').serializeArray();

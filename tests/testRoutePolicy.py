@@ -69,6 +69,8 @@ FILLERS = {
     "job_id": "0123456789abcdef", "role": "visitor", "tab": "overview",
     "filename": "nothing.png", "picblockhash": "0123456789abcdef",
     "type": "sample", "item_id": "9999", "api_path": "version",
+    # an account the smoke test creates, so /profile/<username> is a real other account
+    "username": "smokecontributor",
 }
 
 # At least this many routes must run to completion in the write detector. A fake

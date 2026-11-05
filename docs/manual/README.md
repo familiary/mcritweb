@@ -395,6 +395,12 @@ The data section bundles import and export of data, including the upload of samp
 The import section allows you to push previously exported data into your MCRIT instance.
 The data is integrated as seamlessly as possible, sorting samples under same family names if possible.
 
+#### Ingest
+
+*Ingest* in the Data menu puts the three upload forms behind one tab row: *Query* matches a binary, a memory dump or an SMDA report against the corpus without adding it, *Submit Binary* adds a sample under a family and a version, and *Import* loads an export from another instance.
+Each form posts where its own page posts, so a visitor can query and is told on the other two tabs that they need a contributor account.
+The query, submit and import pages stay as they are.
+
 #### Export
 
 This functionality allows to export samples by ID or everything at once.
@@ -435,6 +441,13 @@ At this time, there are 4 user roles with different access rights implemented.
 The backend records the name at the time of the request, so a renamed account's earlier jobs stay under the old name.
 *Query uploads* lists the files this instance kept of your queries, so one can be promoted to a sample; they follow the account, not its name, and an administrator sees every account's.
 *API token* holds a *Show token* button, which fetches the token when asked rather than printing it into the page, a button to rotate it, and two examples (the `mcrit` client and `curl`) with this instance's address filled in and the token once shown.
+
+#### Users
+
+*Users* in the Explore menu, in multi-user mode, lists who has an account here: the username, the role and how many submissions the MCRIT backend recorded under that username, 25 to a page, each name opening that account's profile.
+The backend records the name at the time of the request, so a renamed account's earlier submissions stay under the old name.
+An administrator also sees the pending accounts, the registration date and the last login, which the admin page shows as well.
+Another account's profile shows a visitor or a contributor its name, its role and its submissions; an administrator sees the page the holder sees, apart from the API token.
 
 #### User Settings
 

@@ -6,7 +6,7 @@ import types
 import uuid
 from urllib.parse import quote, urlencode
 
-from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Blueprint, Response, abort, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
 from mcrit.libs.utility import decode_two_complement
 from mcrit.queue.LocalQueue import Job
 from mcrit.queue.QueueRemoteCalls import to_binary as canonicalise_queue_json
@@ -2353,3 +2353,24 @@ def promote_query(job_id):
         return redirect(result_page)
     flash('The query was promoted to a sample.', category='success')
     return redirect(url_for('data.job_by_id', job_id=new_job_id, refresh=3, forward=1))
+
+
+#: the tabs of the ingest page, each a page of its own
+INGEST_TABS = ('query', 'submit', 'import')
+
+
+@bp.route('/ingest')
+@bp.route('/ingest/<tab>')
+@visitor_required
+@mcrit_server_required
+def ingest(tab="query"):
+    """The query, submit and import forms behind one tab row.
+
+    A reading route: each form posts where its own page posts (analyze.query,
+    data.submit, data.import_view), so the role checks stay on those routes'
+    decorators. A visitor gets the query form and, on the other two tabs, a notice
+    saying what the role lacks rather than a form that would be refused.
+    """
+    if tab not in INGEST_TABS:
+        abort(404)
+    return render_template("ingest.html", active_tab=tab)

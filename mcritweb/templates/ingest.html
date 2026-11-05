@@ -1,0 +1,59 @@
+{% from 'table/import_dropzone.html' import import_dropzone, import_dropzone_style with context %}
+{% extends 'base.html' %}
+{% block title %}Ingest - {{ active_tab|capitalize }}{% endblock %}
+{% block style %}
+  {# each tab is its own page, so only its zone's script is loaded - and none where the
+     tab shows a visitor a notice instead of the zone: the head script of the upload
+     macro reaches for Dropzone, which only the zone's own script defines #}
+  {% set can_submit = g.user.role in ('contributor', 'admin') %}
+  {% if active_tab == 'query' or can_submit %}
+    {% if active_tab == 'import' %}
+      {{ import_dropzone_style() }}
+    {% else %}
+      {{ submit_or_query_dropzone_js(select_form_type=False) }}
+    {% endif %}
+  {% endif %}
+{% endblock %}
+{% set suppress_dropzone_overlay = true %}
+{% block content %}
+{% set can_submit = g.user.role in ('contributor', 'admin') %}
+<h1>Ingest</h1>
+<p class="text-muted">Query a sample against the corpus, submit a binary to it, or import an export. {% if can_submit %}The <a href="{{ url_for('analyze.query') }}">query</a>, <a href="{{ url_for('data.submit') }}">submit</a> and <a href="{{ url_for('data.import_view') }}">import</a> pages do the same, one each.{% else %}The <a href="{{ url_for('analyze.query') }}">query</a> page does the same on its own.{% endif %}</p>
+{# three pages behind one tab row. Each tab is a link to its own URL, so the tab a reader
+   is on survives a reload and can be sent to someone; the forms post where the query,
+   submit and import pages post, with the same role checks on those routes. #}
+<ul class="nav nav-tabs mb-4">
+  {% for tab, label in (('query', 'Query'), ('submit', 'Submit Binary'), ('import', 'Import')) %}
+  <li class="nav-item">
+    <a class="nav-link{% if active_tab == tab %} active{% endif %}" href="{{ url_for('data.ingest', tab=tab) }}"{% if active_tab == tab %} aria-current="page"{% endif %}>{{ label }}</a>
+  </li>
+  {% endfor %}
+</ul>
+{% if active_tab == 'query' %}
+  <h2 class="h4">Query a sample</h2>
+  <p class="text-muted">Match a binary, a memory dump or an SMDA report against the corpus. Nothing is added to it.</p>
+  {{ submit_or_query_dropzone(select_form_type=False, show_submit_fields=False) }}
+{% elif active_tab == 'submit' %}
+  <h2 class="h4">Submit a binary</h2>
+  <p class="text-muted">Add a sample to the corpus under a family and a version.</p>
+  {% if can_submit %}
+    {{ submit_or_query_dropzone(select_form_type=False, show_submit_fields=True) }}
+  {% else %}
+    <div class="alert alert-warning" role="alert">
+      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+      Submitting to the corpus needs a contributor account. A visitor can <a href="{{ url_for('data.ingest', tab='query') }}" class="alert-link">query</a> a sample against it.
+    </div>
+  {% endif %}
+{% else %}
+  <h2 class="h4">Import an export</h2>
+  <p class="text-muted">Load a whole-database or per-family export from another MCRIT instance into this one.</p>
+  {% if can_submit %}
+    {{ import_dropzone() }}
+  {% else %}
+    <div class="alert alert-warning" role="alert">
+      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+      Importing needs a contributor account. A visitor can <a href="{{ url_for('data.ingest', tab='query') }}" class="alert-link">query</a> a sample against the corpus.
+    </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

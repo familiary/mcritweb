@@ -147,6 +147,10 @@ ROUTE_POLICY = {
     "explore.getPicBlockMatches": (VISITOR, READ_ONLY),
     "explore.search": (VISITOR, READ_ONLY),
     "explore.statistics": (VISITOR, READ_ONLY),
+    "explore.users": (VISITOR, READ_ONLY),
+    # another account's profile: its name, role and submissions for a visitor and up,
+    # the whole page for an admin. The own page is authentication.profile, LOGGED_IN
+    "authentication.profile_of": (VISITOR, READ_ONLY),
     "analyze.compare": (VISITOR, READ_ONLY),
     "analyze.compare_versus": (VISITOR, READ_ONLY),
     "analyze.compare_submit_query": (VISITOR, READ_ONLY),
@@ -182,6 +186,7 @@ ROUTE_POLICY = {
     "analyze.start_unique_blocks": (VISITOR, WRITES_ON_GET),
     "analyze.start_cross_compare": (VISITOR, WRITES_ON_GET),
     "analyze.query": (VISITOR, WRITES_ON_POST),
+    "data.ingest": (VISITOR, READ_ONLY),
     "data.jobs": (VISITOR, READ_ONLY),
     "data.job_by_id": (VISITOR, READ_ONLY),
     "data.job_status": (VISITOR, READ_ONLY),
