@@ -71,12 +71,13 @@
 </head>
 <body style="font-family: sans-serif">
   <header>
+    <a href="#main-content" class="visually-hidden-focusable btn btn-sm btn-outline-primary position-absolute top-0 start-0 m-2" style="z-index: 1050;">Skip to main content</a>
     <noscript>Please enable JavaScript to use all features of this site. </noscript>
-<nav class="navbar navbar-expand-lg navbar-light">
-  <a class="navbar-brand d-none d-md-block" href="{{ url_for('index') }}">
+<nav class="navbar navbar-expand-lg navbar-light" aria-label="Main navigation">
+  <a class="navbar-brand d-none d-md-block" href="{{ url_for('index') }}"{% if request.endpoint == 'index' %} aria-current="page"{% endif %}>
     <img src="{{ url_for('static', filename='d20_mcrit_cabaret.png') }}" class="img-fluid" alt="MCRIT home" width="459" height="150" fetchpriority="high">
   </a>
-  <a class="navbar-brand d-md-none" href="{{ url_for('index') }}">
+  <a class="navbar-brand d-md-none" href="{{ url_for('index') }}"{% if request.endpoint == 'index' %} aria-current="page"{% endif %}>
     <img src="{{ url_for('static', filename='d20_mcrit_cabaret.png') }}" class="img-fluid" alt="MCRIT home" width="459" height="150">
   </a>
   <button class="navbar-toggler navbar-toggler-end float-end" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -90,79 +91,83 @@
   <div class="collapse navbar-collapse mt-md-auto flex-column ms-lg-auto" id="navbarSupportedContent">
   <ul class="navbar-nav ms-lg-auto mt-lg-auto">
     {% if g.user %}
-    <li><hr class="dropdown-divider"></li>
     <li class="nav-item dropdown">
-      <a class="nav-link" href="#" id="navbarDropdownExplore" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" {% if g.user.role == 'pending' %} disabled{% endif %}>Explore</a>
+      <a class="nav-link dropdown-toggle{% if request.blueprint == 'explore' %} active{% endif %}{% if g.user.role == 'pending' %} disabled{% endif %}" href="#" id="navbarDropdownExplore" role="button"{% if g.user.role == 'pending' %} tabindex="-1" aria-disabled="true"{% else %} data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"{% endif %}{% if request.blueprint == 'explore' %} aria-current="true"{% endif %}>Explore</a>
       <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownExplore">
-        <a class="dropdown-item" href="{{ url_for('explore.search') }}"><i class="fa-solid fa-search "></i>&nbsp;Search</a>
+        <a class="dropdown-item{% if request.endpoint == 'explore.search' %} active{% endif %}" href="{{ url_for('explore.search') }}"{% if request.endpoint == 'explore.search' %} aria-current="page"{% endif %}><i class="fa-solid fa-search fa-fw me-2" aria-hidden="true"></i>Search</a>
         <div class="dropdown-divider"></div>
-        <a class="dropdown-item" href="{{ url_for('explore.families') }}"><i class="fa-solid fa-bug "></i>&nbsp;Families</a>
-        <a class="dropdown-item" href="{{ url_for('explore.samples') }}"><i class="fa-solid fa-virus "></i>&nbsp;Samples</a>
-        <a class="dropdown-item" href="{{ url_for('explore.functions') }}"><i class="fa-solid fa-project-diagram "></i>&nbsp;Functions</a>
-        <a class="dropdown-item" href="{{ url_for('explore.statistics') }}"><i class="fa-solid fa-chart-line "></i>&nbsp;Statistics</a>
+        <a class="dropdown-item{% if request.endpoint in ('explore.families', 'explore.family_by_id') %} active{% endif %}" href="{{ url_for('explore.families') }}"{% if request.endpoint in ('explore.families', 'explore.family_by_id') %} aria-current="page"{% endif %}><i class="fa-solid fa-bug fa-fw me-2" aria-hidden="true"></i>Families</a>
+        <a class="dropdown-item{% if request.endpoint in ('explore.samples', 'explore.sample_by_id') %} active{% endif %}" href="{{ url_for('explore.samples') }}"{% if request.endpoint in ('explore.samples', 'explore.sample_by_id') %} aria-current="page"{% endif %}><i class="fa-solid fa-virus fa-fw me-2" aria-hidden="true"></i>Samples</a>
+        <a class="dropdown-item{% if request.endpoint in ('explore.functions', 'explore.function_by_id') %} active{% endif %}" href="{{ url_for('explore.functions') }}"{% if request.endpoint in ('explore.functions', 'explore.function_by_id') %} aria-current="page"{% endif %}><i class="fa-solid fa-project-diagram fa-fw me-2" aria-hidden="true"></i>Functions</a>
+        <a class="dropdown-item{% if request.endpoint == 'explore.statistics' %} active{% endif %}" href="{{ url_for('explore.statistics') }}"{% if request.endpoint == 'explore.statistics' %} aria-current="page"{% endif %}><i class="fa-solid fa-chart-line fa-fw me-2" aria-hidden="true"></i>Statistics</a>
         {% if g.operation_mode == 'multi' %}
         <div class="dropdown-divider"></div>
-        <a class="dropdown-item" href="{{ url_for('explore.users') }}"><i class="fa-solid fa-users "></i>&nbsp;Users</a>
+        <a class="dropdown-item{% if request.endpoint == 'explore.users' %} active{% endif %}" href="{{ url_for('explore.users') }}"{% if request.endpoint == 'explore.users' %} aria-current="page"{% endif %}><i class="fa-solid fa-users fa-fw me-2" aria-hidden="true"></i>Researchers &amp; Users</a>
         {% endif %}
       </div>
     </li>
     <li class="nav-item dropdown">
-      <a class="nav-link" href="{% if not g.user %}{{ url_for('authentication.login') }}{% endif %}" id="navbarDropdownAnalyze" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" {% if g.user.role == 'pending' %} disabled{% endif %}>
+      <a class="nav-link dropdown-toggle{% if request.blueprint == 'analyze' %} active{% endif %}{% if g.user.role == 'pending' %} disabled{% endif %}" href="#" id="navbarDropdownAnalyze" role="button"{% if g.user.role == 'pending' %} tabindex="-1" aria-disabled="true"{% else %} data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"{% endif %}{% if request.blueprint == 'analyze' %} aria-current="true"{% endif %}>
         Analyze
       </a>
       <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownAnalyze">
-        <a class="dropdown-item" href="{{ url_for('analyze.compare') }}" >Compare 1vsN</a>
-        <a class="dropdown-item" href="{{ url_for('analyze.compare_versus') }}" >Compare 1vs1</a>
-        <a class="dropdown-item" href="{{ url_for('analyze.cross_compare') }}">Cross-Compare</a>
-        <a class="dropdown-item" href="{{ url_for('analyze.unique_blocks') }}">Unique Blocks</a>
+        <a class="dropdown-item{% if request.endpoint in ('analyze.compare', 'analyze.compare_all') %} active{% endif %}" href="{{ url_for('analyze.compare') }}"{% if request.endpoint in ('analyze.compare', 'analyze.compare_all') %} aria-current="page"{% endif %}><i class="fa-solid fa-network-wired fa-fw me-2" aria-hidden="true"></i>Compare 1vsN</a>
+        <a class="dropdown-item{% if request.endpoint in ('analyze.compare_versus', 'analyze.compare_vs') %} active{% endif %}" href="{{ url_for('analyze.compare_versus') }}"{% if request.endpoint in ('analyze.compare_versus', 'analyze.compare_vs') %} aria-current="page"{% endif %}><i class="fa-solid fa-arrows-split-up-and-left fa-fw me-2" aria-hidden="true"></i>Compare 1vs1</a>
+        <a class="dropdown-item{% if request.endpoint in ('analyze.cross_compare', 'analyze.cross_compare_from_hash_list', 'analyze.start_cross_compare') %} active{% endif %}" href="{{ url_for('analyze.cross_compare') }}"{% if request.endpoint in ('analyze.cross_compare', 'analyze.cross_compare_from_hash_list', 'analyze.start_cross_compare') %} aria-current="page"{% endif %}><i class="fa-solid fa-table-cells fa-fw me-2" aria-hidden="true"></i>Cross-Compare</a>
+        <a class="dropdown-item{% if request.endpoint in ('analyze.unique_blocks', 'analyze.blocks_family', 'analyze.blocks_sample', 'analyze.start_unique_blocks') %} active{% endif %}" href="{{ url_for('analyze.unique_blocks') }}"{% if request.endpoint in ('analyze.unique_blocks', 'analyze.blocks_family', 'analyze.blocks_sample', 'analyze.start_unique_blocks') %} aria-current="page"{% endif %}><i class="fa-solid fa-cubes fa-fw me-2" aria-hidden="true"></i>Unique Blocks</a>
         <div class="dropdown-divider"></div>
-        <a class="dropdown-item" href="{{ url_for('analyze.query') }}">Query</a>
+        <a class="dropdown-item{% if request.endpoint == 'analyze.query' %} active{% endif %}" href="{{ url_for('analyze.query') }}"{% if request.endpoint == 'analyze.query' %} aria-current="page"{% endif %}><i class="fa-solid fa-magnifying-glass fa-fw me-2" aria-hidden="true"></i>Query by Upload</a>
       </div>
     </li>
     <li class="nav-item dropdown">
-      <a class="nav-link" href="{% if not g.user %}{{ url_for('authentication.login') }}{% endif %}" id="navbarDropdownData" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" {% if g.user.role == 'pending' %} disabled{% endif %}>
+      <a class="nav-link dropdown-toggle{% if request.blueprint == 'data' %} active{% endif %}{% if g.user.role == 'pending' %} disabled{% endif %}" href="#" id="navbarDropdownData" role="button"{% if g.user.role == 'pending' %} tabindex="-1" aria-disabled="true"{% else %} data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"{% endif %}{% if request.blueprint == 'data' %} aria-current="true"{% endif %}>
         Data
       </a>
       <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownData">
-        <a class="dropdown-item" href="{{ url_for('data.ingest') }}">Ingestion Hub</a>
+        <a class="dropdown-item{% if request.endpoint == 'data.ingest' %} active{% endif %}" href="{{ url_for('data.ingest') }}"{% if request.endpoint == 'data.ingest' %} aria-current="page"{% endif %}><i class="fa-solid fa-cloud-arrow-up fa-fw me-2" aria-hidden="true"></i>Ingestion &amp; Submission</a>
         <div class="dropdown-divider"></div>
         {% if g.user.role == 'admin' or g.user.role == 'contributor' %}
-        <a class="dropdown-item" href="{{ url_for('data.import_view') }}">Import</a>
-        <a class="dropdown-item" href="{{ url_for('data.export_view') }}">Export</a>
-        <a class="dropdown-item" href="{{ url_for('data.submit') }}">Submit Binary</a>
+        <a class="dropdown-item{% if request.endpoint == 'data.submit' %} active{% endif %}" href="{{ url_for('data.submit') }}"{% if request.endpoint == 'data.submit' %} aria-current="page"{% endif %}><i class="fa-solid fa-file-circle-plus fa-fw me-2" aria-hidden="true"></i>Submit Binary</a>
+        <a class="dropdown-item{% if request.endpoint in ('data.import_view', 'data.import_complete') %} active{% endif %}" href="{{ url_for('data.import_view') }}"{% if request.endpoint in ('data.import_view', 'data.import_complete') %} aria-current="page"{% endif %}><i class="fa-solid fa-file-import fa-fw me-2" aria-hidden="true"></i>Import Data</a>
+        <a class="dropdown-item{% if request.endpoint in ('data.export_view', 'data.specific_export') %} active{% endif %}" href="{{ url_for('data.export_view') }}"{% if request.endpoint in ('data.export_view', 'data.specific_export') %} aria-current="page"{% endif %}><i class="fa-solid fa-file-export fa-fw me-2" aria-hidden="true"></i>Export Data</a>
         <div class="dropdown-divider"></div>
         {% endif %}
-        <a class="dropdown-item" href="{{ url_for('data.jobs') }}">Jobs/Results</a>
+        <a class="dropdown-item{% if request.endpoint in ('data.jobs', 'data.job_by_id', 'data.result', 'data.linkhunt') %} active{% endif %}" href="{{ url_for('data.jobs') }}"{% if request.endpoint in ('data.jobs', 'data.job_by_id', 'data.result', 'data.linkhunt') %} aria-current="page"{% endif %}><i class="fa-solid fa-tasks fa-fw me-2" aria-hidden="true"></i>Jobs/Results</a>
       </div>
     </li>
     {% endif %}
-    <li class="nav-item dropdown">
-      {% if not g.user %}
-      <a class="nav-link" href="{{ url_for('authentication.login') }}">Login</a>
-      {% else %}
-      <a class="nav-link"  href="#" id="navbarDropdownUser" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">{{g.user.username}}</a>
-      <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownUser">
-        {% if g.user.role == 'admin'%}
-          <a class="dropdown-item" href="{{ url_for('admin.server') }}">Server</a>
-          {% if g.operation_mode == 'multi' %}
-            <a class="dropdown-item" href="{{ url_for('admin.users', tab='pending') }}">Users</a>
-          {% endif %}
-          <hr class="dropdown-divider">
-        {% endif %}
-        <a class="dropdown-item" href="{{ url_for('authentication.profile') }}">View profile</a>
-        <a class="dropdown-item" href="{{ url_for('authentication.settings') }}">Settings</a>
-        <a class="dropdown-item" href="{{ url_for('authentication.logout') }}">Logout</a>
-      </div>
-      {% endif %}
-    </li>
+    {% if not g.user %}
     <li class="nav-item">
-      <a class="nav-link" href="{{ url_for('help') }}" aria-label="Documentation" title="Documentation"><i class="fas fa-question-circle"></i></a>
+      <a class="nav-link{% if request.endpoint == 'authentication.login' %} active{% endif %}" href="{{ url_for('authentication.login') }}"{% if request.endpoint == 'authentication.login' %} aria-current="page"{% endif %}>Login</a>
+    </li>
+    {% else %}
+    <li class="nav-item dropdown">
+      <a class="nav-link dropdown-toggle{% if request.blueprint == 'admin' or (request.blueprint == 'authentication' and request.endpoint in ('authentication.profile', 'authentication.settings')) %} active{% endif %}" href="#" id="navbarDropdownUser" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"{% if request.blueprint == 'admin' or (request.blueprint == 'authentication' and request.endpoint in ('authentication.profile', 'authentication.settings')) %} aria-current="true"{% endif %}>{{ g.user.username }}</a>
+      <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownUser">
+        {% if g.user.role == 'admin' %}
+          <a class="dropdown-item{% if request.endpoint in ('admin.server', 'admin.change_server') %} active{% endif %}" href="{{ url_for('admin.server') }}"{% if request.endpoint in ('admin.server', 'admin.change_server') %} aria-current="page"{% endif %}><i class="fa-solid fa-server fa-fw me-2" aria-hidden="true"></i>Server</a>
+          {% if g.operation_mode == 'multi' %}
+            <a class="dropdown-item{% if request.endpoint == 'admin.users' %} active{% endif %}" href="{{ url_for('admin.users', tab='pending') }}"{% if request.endpoint == 'admin.users' %} aria-current="page"{% endif %}><i class="fa-solid fa-user-gear fa-fw me-2" aria-hidden="true"></i>User Management</a>
+          {% endif %}
+          <div class="dropdown-divider"></div>
+        {% endif %}
+        <a class="dropdown-item{% if request.endpoint == 'authentication.profile' %} active{% endif %}" href="{{ url_for('authentication.profile') }}"{% if request.endpoint == 'authentication.profile' %} aria-current="page"{% endif %}><i class="fa-solid fa-id-badge fa-fw me-2" aria-hidden="true"></i>View profile</a>
+        <a class="dropdown-item{% if request.endpoint == 'authentication.settings' %} active{% endif %}" href="{{ url_for('authentication.settings') }}"{% if request.endpoint == 'authentication.settings' %} aria-current="page"{% endif %}><i class="fa-solid fa-gear fa-fw me-2" aria-hidden="true"></i>Settings</a>
+        <div class="dropdown-divider"></div>
+        <a class="dropdown-item" href="{{ url_for('authentication.logout') }}"><i class="fa-solid fa-right-from-bracket fa-fw me-2" aria-hidden="true"></i>Logout</a>
+      </div>
+    </li>
+    {% endif %}
+    <li class="nav-item">
+      <a class="nav-link{% if request.endpoint == 'help' %} active{% endif %}" href="{{ url_for('help') }}" aria-label="Documentation" title="Documentation"{% if request.endpoint == 'help' %} aria-current="page"{% endif %}><i class="fas fa-question-circle" aria-hidden="true"></i></a>
     </li>
   </ul>
+  </div>
 </nav>
 
   </header>
   <main class="content">
+      <div id="main-content" tabindex="-1"></div>
       {% for category, message in get_flashed_messages(with_categories=true) %}
         {% if category == 'error' %}
           <div class="alert alert-danger mt-3" role="alert">{{ message }}</div>
