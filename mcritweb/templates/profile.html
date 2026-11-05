@@ -74,19 +74,24 @@
         <div class="profile-card p-4 h-100">
           <h2 class="h4">What this account may do</h2>
           <div class="table-responsive">
-            <table class="table table-sm table-striped align-middle">
+            {# on a phone the description sits under the capability's name, so the table
+               keeps to two columns and nothing has to be swiped sideways to be read #}
+            <table class="table table-sm table-striped align-middle capability-table">
               <thead>
                 <tr>
                   <th scope="col">Capability</th>
                   <th scope="col">As {{ user_info.role }}</th>
-                  <th scope="col">What it covers</th>
+                  <th scope="col" class="d-none d-sm-table-cell">What it covers</th>
                 </tr>
               </thead>
               <tbody>
                 {% for capability in capabilities %}
                   {% set cell = capability[user_info.role] %}
                   <tr>
-                    <th scope="row">{{ capability.name }}</th>
+                    <th scope="row">
+                      {{ capability.name }}
+                      <div class="fw-normal small text-muted d-sm-none">{{ capability.description }}</div>
+                    </th>
                     <td>
                       {% if cell.kind == 'allowed' %}
                         <span class="badge bg-success">{{ cell.label }}</span>
@@ -96,7 +101,7 @@
                         <span class="badge bg-secondary">{{ cell.label }}</span>
                       {% endif %}
                     </td>
-                    <td class="text-muted">{{ capability.description }}</td>
+                    <td class="text-muted d-none d-sm-table-cell">{{ capability.description }}</td>
                   </tr>
                 {% endfor %}
               </tbody>

@@ -104,6 +104,34 @@ def test_no_tab_scrolls_the_page_sideways(open_profile, width):
     assert all(scroll_width == width for scroll_width in widths.values()), f"at {width}px the page is {widths} wide"
 
 
+@pytest.mark.parametrize("width", WIDTHS)
+def test_the_capability_table_is_read_without_swiping(open_profile, width):
+    """At 390px the three-column table scrolled inside its box, so the descriptions could
+    only be read after a sideways swipe within the table. On a phone the description now
+    sits under the capability's name; from 576px up it is the third column. Either way
+    the table fits its box and every description is on screen."""
+    def use(page):
+        page.click("#tab-overview")
+        page.wait_for_selector("#pane-overview.show.active")
+        return page.evaluate("""() => {
+            const box = document.querySelector('.capability-table').closest('.table-responsive');
+            const rows = Array.from(document.querySelectorAll('.capability-table tbody tr')).map(row => {
+                const visible = Array.from(row.querySelectorAll('th, td, th > div'))
+                    .filter(cell => cell.offsetParent !== null)
+                    .map(cell => cell.textContent.trim()).join(' ');
+                const description = row.querySelector('td:last-child').textContent.trim();
+                return {description, visible};
+            });
+            return {overflow: box.scrollWidth - box.clientWidth, rows};
+        }""")
+
+    seen = open_profile(use, width=width)
+    assert seen["overflow"] == 0, f"at {width}px the capability table is {seen['overflow']}px wider than its box"
+    assert len(seen["rows"]) == 7
+    for row in seen["rows"]:
+        assert row["description"] and row["description"] in row["visible"], f"at {width}px the description is not on screen: {row}"
+
+
 def test_the_arrow_keys_move_between_the_tabs_and_the_hash_follows(open_profile):
     def use(page):
         page.focus("#tab-overview")

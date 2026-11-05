@@ -225,7 +225,8 @@ def test_every_cell_renders_as_a_badge_the_template_knows(client, as_role, role)
     not recognise fell through to "Restricted"."""
     as_role(role)
     table = pane(client.get("/profile").get_data(as_text=True), "overview")
-    badges = re.findall(r'<th scope="row">([^<]+)</th>\s*<td>\s*<span class="badge ([^"]+)">([^<]+)</span>', table)
+    # the name cell also carries the description for phones, in a div after the name
+    badges = re.findall(r'<th scope="row">\s*([^<]+?)\s*<div[^>]*>[^<]*</div>\s*</th>\s*<td>\s*<span class="badge ([^"]+)">([^<]+)</span>', table)
     assert sorted(name for name, _, _ in badges) == sorted(CAPABILITY_LEVELS)
     for name, classes, label in badges:
         assert (label != "Restricted") == may(role, CAPABILITY_LEVELS[name]), (name, label)
