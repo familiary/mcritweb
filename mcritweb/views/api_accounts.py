@@ -27,6 +27,20 @@ def text_fields(allowed, required=()):
     return fields
 
 
+def require_json_body():
+    """Refuse anything but an application/json body on a route that needs no token.
+
+    /api is exempt from CSRF because a cross-site request cannot supply an apitoken
+    header. auth/token and auth/register take no token, so that argument does not
+    cover them: an HTML form on any site can post urlencoded or multipart fields to
+    them, and on a fresh instance that is enough to configure it with the form's
+    author as admin. A browser sends application/json cross-site only after a CORS
+    preflight, which this app never grants.
+    """
+    if request.mimetype != 'application/json':
+        abort(415, 'Send this request as application/json.')
+
+
 def credentials(allowed, required):
     if request.content_length is None or request.content_length > 65536:
         abort(413, 'Credential requests must declare at most 64 KiB.')
@@ -37,6 +51,7 @@ def credentials(allowed, required):
 
 
 def login():
+    require_json_body()
     fields = credentials(('username', 'password'), ('username', 'password'))
     username, password = fields['username'], fields['password']
     if authentication._throttled(username):
@@ -66,6 +81,7 @@ def login():
 
 
 def register():
+    require_json_body()
     fields = credentials(('username', 'password', 'password_confirm', 'registration_token', 'mcrit_server_url',
                           'mcrit_server_token', 'operation_mode', 'registration_token_new'), ('username', 'password', 'password_confirm'))
     username, password = fields['username'], fields['password']

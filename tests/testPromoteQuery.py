@@ -444,6 +444,20 @@ def test_promotion_of_a_job_that_is_not_a_query_writes_nothing(client, as_role, 
     assert response.headers["Location"].endswith(f"/data/result/{job_id}"), response.headers["Location"]
 
 
+def test_a_refused_promotion_returns_to_the_job_the_backend_named(client, as_role, fake_mcrit):
+    """The job id in the URL is looked up case-insensitively, so it can arrive in any
+    casing. The result page to return to is the one for the backend's id, not for
+    whatever was typed, which is a different URL and a different cache entry."""
+    as_role("contributor")
+    job_id = job_id_of("matches_for_sample")
+    assert job_id == job_id.lower() != job_id.upper()
+
+    response = promote(client, job_id=job_id.upper())
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(f"/data/result/{job_id}"), response.headers["Location"]
+
+
 def test_promotion_of_a_job_nobody_knows_writes_nothing(client, as_role, fake_mcrit):
     as_role("contributor")
 

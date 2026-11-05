@@ -66,6 +66,7 @@ CASES = [
     ("GET", "matches/sample/1/2", {}),
     ("GET", "matches/sample/cross/1,2", {}),
     ("GET", "matches/function/1/2", {}),
+    ("GET", "matches/function/1", {}),
     ("GET", "uniqueblocks/samples/1,2", {}),
     ("GET", "uniqueblocks/family/1", {}),
     ("GET", "search/families", {}),
@@ -84,7 +85,11 @@ CASES = [
     ("GET", "tags", {"query_string": {"entity": "sample"}}),
     ("POST", f"jobs/{JOB}/rerun", {}),
 ]
-CONTRIBUTOR_CASES = [case for case in CASES if case[0] in ("PUT", "DELETE") or case[1].endswith('/tags') or case[1] in ("samples", "samples/binary", "import", "export", "export/1,2")]
+CONTRIBUTOR_CASES = [case for case in CASES if case[0] in ("PUT", "DELETE") or case[1].endswith('/tags')
+                     or case[1] in ("samples", "samples/binary", "import", "export", "export/1,2", "samples/1/smda", "samples/1/binary")]
+# Where the wire path is not the API path. McritClient.getMatchFunctionVs always
+# writes a second id, and the single-id path has always been forwarded through it.
+WIRE_PATHS = {"matches/function/1": "/matches/function/1/None"}
 MUTATIONS = [case for case in CONTRIBUTOR_CASES if case[0] != "GET"]
 
 
@@ -142,7 +147,7 @@ def test_every_route_forwards_the_backend_answer(client, make_user, wire, method
     assert response.mimetype == ("application/octet-stream" if route.binary_response else "application/json")
     assert "Set-Cookie" not in response.headers
     assert wire.calls[-1].method == method
-    assert urlsplit(wire.calls[-1].url).path.rstrip("/") == f"/{path}"
+    assert urlsplit(wire.calls[-1].url).path.rstrip("/") == WIRE_PATHS.get(path, f"/{path}")
     assert wire.calls[-1].headers["username"] == "contributoruser"
 
 
@@ -167,6 +172,36 @@ def test_mutations_use_the_ui_role(client, make_user, wire, app, method, path, b
     if response.status_code == 403:
         assert wire.calls == []
         assert probes == []
+
+
+@pytest.mark.parametrize("path", ["samples/1/smda", "samples/1/binary"], ids=["smda", "binary"])
+@pytest.mark.parametrize("role", ["pending", "visitor"])
+def test_sample_downloads_need_a_contributor_as_the_corpus_export_does(client, make_user, wire, path, role):
+    """Below contributor, the UI offers no way to download what a sample was
+    submitted as: corpus export is contributor_required. The token must not be one."""
+    make_user(role)
+    response = client.get(f"/api/{path}", headers=headers(role))
+    assert response.status_code == 403
+    assert wire.calls == []
+
+
+def test_the_single_function_match_path_is_forwarded_and_queues_nothing(client, make_user, wire):
+    """GET matches/function/<id> has always been forwarded to the backend as
+    getMatchFunctionVs(id, None). It must not become a whole-sample matching job."""
+    make_user("visitor")
+    response = client.get("/api/matches/function/1", headers=headers("visitor"))
+    assert response.status_code == 200 and response.data == ANSWER
+    assert [(call.method, urlsplit(call.url).path) for call in wire.calls] == [("GET", "/matches/function/1/None")]
+
+
+@pytest.mark.parametrize("query", ["start=wat", "limit=1.5", "start=", "limit=ten"], ids=["word-start", "fraction-limit", "empty-start", "word-limit"])
+def test_malformed_queue_integers_are_refused_rather_than_defaulted(client, make_user, wire, query):
+    """A malformed start or limit used to become 0, so a typo silently read a
+    different page of the queue than the one asked for."""
+    make_user("visitor")
+    response = client.get(f"/api/jobs?{query}", headers=headers("visitor"))
+    assert response.status_code == 400 and response.is_json
+    assert wire.calls == []
 
 
 @pytest.mark.parametrize("method,path,body", [case for case in CASES if case not in CONTRIBUTOR_CASES])

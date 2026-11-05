@@ -113,9 +113,9 @@ def test_a_visitor_token_can_still_submit_a_job(client, make_user):
 #
 # `re.match` is not a full match, so an unanchored branch claimed every path *beginning*
 # with its pattern: `status_whatever` dispatched to `getStatus()`. Harmless while every
-# branch re-parses its own groups, but it belongs with the role tests, because the gate
-# in `CONTRIBUTOR_ONLY` is itself a `re.match` - `samples$` - and an unanchored write
-# branch added later would be reachable by a path the gate does not recognise.
+# branch re-parses its own groups, but it belongs with the role tests, because the role
+# gate is chosen by the same match: `ROUTES` in api.py pairs each pattern with its
+# role, and an unanchored write pattern would be reachable by a path it does not name.
 #
 # A path the router does not implement falls through to `Response(status=501)` without
 # reaching the backend, so 501 here means "did not dispatch" and is distinguishable from

@@ -141,10 +141,23 @@ def query_options(match, client, **defaults):
         if isinstance(default, bool):
             options[name] = query_boolean(name, default)
         elif isinstance(default, int):
-            options[name] = request.args.get(name, default, type=int)
+            value = parse_integer_query_param(request, name)
+            if name in request.args and value is None:
+                abort(400, f"{name} must be an integer.")
+            options[name] = default if value is None else value
         else:
             options[name] = request.args.get(name, default)
     return args, options
+
+
+def band_df_cutoff_arguments(match, client):
+    """The cutoff to evaluate, checked as the matching options' band_df_cutoff is;
+    absent, the backend evaluates its configured one."""
+    args, _ = path_arguments(match, client)
+    value = parse_integer_query_param(request, "band_df_cutoff")
+    if "band_df_cutoff" in request.args and (value is None or not 0 <= value <= 2**63 - 1):
+        abort(400, "band_df_cutoff must be a nonnegative 63-bit integer.")
+    return args, {"band_df_cutoff": value}
 
 
 def listing(match, client):
@@ -270,6 +283,10 @@ def matching_options():
 
 def matching_arguments(match, client):
     return path_arguments(match, client)[0], matching_options()
+
+
+def single_function_arguments(match, client):
+    return (*path_arguments(match, client)[0], None), {}
 
 
 def binary_query_arguments(match, client):
@@ -457,10 +474,13 @@ def rerun_arguments(match, client):
                                  'getMatchesForSmdaReport', 'getMatchesForMappedBinary', 'getMatchesForUnmappedBinary', 'getUniqueBlocks')
         if not allowed or not (job.is_finished or job.is_failed or job.is_terminated):
             abort(409, 'Only a completed, failed or terminated analysis may be rerun.')
+        # A rerun resubmits a query's upload without the caller sending it, so for
+        # someone else's upload it bypasses the role's upload cap. Whose upload it was
+        # cannot be told: a job records only a username, and usernames are renamed and
+        # reused (ADR-0007), so whoever holds a name now would pass an ownership test.
         if job.method in ('getMatchesForSmdaReport', 'getMatchesForMappedBinary', 'getMatchesForUnmappedBinary') \
-                and current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.api_user.role) is not None \
-                and job.username != g.api_user.username:
-            abort(403, 'A role with a query upload cap may only rerun its own queries.')
+                and current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.api_user.role) is not None:
+            abort(403, 'A role with a query upload cap cannot rerun query jobs.')
     except (ValueError, TypeError, AttributeError, KeyError):
         abort(409, 'The job has unreadable parameters.')
     return (job.job_id,), {}
@@ -498,8 +518,10 @@ ROUTES = (
     ApiRoute(r"samples/(?P<sample_id>-?\d+)", "DELETE", "deleteSample", path_arguments, role="contributor"),
     ApiRoute(r"samples/sha256/(?P<sample_sha256>[0-9a-fA-F]{64})", "GET", "getSampleBySha256", path_arguments, role="visitor"),
     ApiRoute(r"samples/(?P<sample_id>-?\d+)/functions", "GET", "getFunctionsBySampleId", path_arguments, role="visitor"),
-    ApiRoute(r"samples/(?P<sample_id>-?\d+)/smda", "GET", "getSmdaReportForSample", path_arguments, role="visitor"),
-    ApiRoute(r"samples/(?P<sample_id>-?\d+)/binary", "GET", "getSampleBinary", path_arguments, binary_response=True, role="visitor"),
+    # Downloading what a sample was submitted as is the UI's corpus export, which is
+    # contributor_required (data.export_view, data.specific_export).
+    ApiRoute(r"samples/(?P<sample_id>-?\d+)/smda", "GET", "getSmdaReportForSample", path_arguments, role="contributor"),
+    ApiRoute(r"samples/(?P<sample_id>-?\d+)/binary", "GET", "getSampleBinary", path_arguments, binary_response=True, role="contributor"),
     ApiRoute(r"families", "GET", "getFamilies", role="visitor"),
     ApiRoute(r"families/ids", "POST", "getFamiliesByIds", partial(batch_arguments, collection="families"), role="visitor"),
     ApiRoute(r"families/(?P<family_id>\d+)", "GET", "getFamily", partial(query_options, with_samples=False), role="visitor"),
@@ -530,7 +552,8 @@ ROUTES = (
     ApiRoute(r"matches/sample/(?P<sample_id>\d+)/(?P<other_sample_id>\d+)", "GET", "requestMatchesForSampleVs", matching_arguments, role="visitor"),
     ApiRoute(r"matches/sample/cross/(?P<sample_ids>[^/]+)", "GET", "requestMatchesCross", cross_arguments, role="visitor"),
     ApiRoute(r"matches/function/(?P<function_id>\d+)/(?P<other_function_id>\d+)", "GET", "getMatchFunctionVs", path_arguments, role="visitor"),
-    ApiRoute(r"matches/function/(?P<function_id>-?\d+)", "GET", "", local_handler=api_workflows.function_analysis, role="visitor"),
+    # The single-id form forwards as it always has, to getMatchFunctionVs(id, None).
+    ApiRoute(r"matches/function/(?P<function_id>\d+)", "GET", "getMatchFunctionVs", single_function_arguments, role="visitor"),
     ApiRoute(r"uniqueblocks/samples/(?P<sample_ids>[^/]+)", "GET", "requestUniqueBlocksForSamples", unique_samples_arguments, role="visitor"),
     ApiRoute(r"uniqueblocks/family/(?P<family_id>\d+)", "GET", "requestUniqueBlocksForFamily", unique_family_arguments, role="visitor"),
     ApiRoute(r"uniqueblocks/samples/(?P<sample_ids>[^/]+)", "POST", "requestUniqueBlocksForSamples", unique_samples_arguments, required_parameters=('exclude_picblockhashes',), role="visitor"),
@@ -552,7 +575,7 @@ ROUTES = (
     ApiRoute(r"complete_minhashes", "POST", "completeMinhashes", role="admin"),
     ApiRoute(r"rebuild_function_range_index", "POST", "rebuildFunctionRangeIndex", role="admin"),
     ApiRoute(r"rebuild_band_df_index", "POST", "rebuildBandDfIndex", role="admin"),
-    ApiRoute(r"band_df_cutoff_coverage", "POST", "requestBandDfCutoffCoverage", partial(query_options, band_df_cutoff=None), role="admin"),
+    ApiRoute(r"band_df_cutoff_coverage", "POST", "requestBandDfCutoffCoverage", band_df_cutoff_arguments, role="admin"),
     ApiRoute(r"delete_orphaned_queue_files", "POST", "deleteOrphanedQueueFiles", partial(query_options, dry_run=False), role="admin"),
     ApiRoute(r"admin/users", "GET", "", role="admin", local_handler=api_admin.list_users),
     ApiRoute(r"admin/users/(?P<user_id>[0-9]{1,18})/role", "PUT", "", role="admin", local_handler=api_admin.user_role),
@@ -593,9 +616,6 @@ ROUTES = (
     ApiRoute(r"capabilities", "GET", "", role="user", local_handler=api_workflows.capabilities),
 )
 
-# Derived from the table, never maintained as a second, potentially weaker policy.
-CONTRIBUTOR_ONLY = [(re.compile(route.path + r"\Z"), route.method) for route in ROUTES if route.role == "contributor"]
-
 # Every backend operation currently used by a view has an API counterpart.
 # Any future exception must include its reason and pass the parity audit.
 UI_ONLY_CLIENT_METHODS = {}
@@ -628,10 +648,6 @@ CLIENT_CONFIGURATION_METHODS = {
     'setApitoken': 'Client-side credential configuration; the API authenticates its apitoken header.',
     'setUsername': 'Client-side attribution configuration; the API derives identity from the authenticated account.',
 }
-
-
-def requires_contributor(api_path, method):
-    return any(pattern.fullmatch(api_path) and method == verb for pattern, verb in CONTRIBUTOR_ONLY)
 
 
 def route_available(route):

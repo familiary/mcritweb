@@ -1,5 +1,6 @@
 """Self-service account API mirrors settings without using browser cookies."""
 
+import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
@@ -212,3 +213,36 @@ def test_credential_bodies_are_bounded_before_parsing(client, make_user, path):
     method = 'POST' if path.startswith('auth/') else 'PUT'
     response = client.open('/api/' + path, method=method, headers=token(), data=b'x' * 65537, content_type='application/json')
     assert response.status_code == 413
+
+
+#: What an HTML form on another site can send without a CORS preflight: the three
+#: enctypes a <form> supports.
+CROSS_SITE_BODIES = [
+    pytest.param(lambda fields: {'data': fields}, id='urlencoded'),
+    pytest.param(lambda fields: {'data': fields, 'content_type': 'multipart/form-data'}, id='multipart'),
+    pytest.param(lambda fields: {'data': json.dumps(fields), 'content_type': 'text/plain'}, id='text-plain'),
+]
+
+
+@pytest.mark.parametrize('encode', CROSS_SITE_BODIES)
+def test_first_user_setup_cannot_be_posted_by_a_cross_site_form(app, client, encode):
+    """/api is exempt from CSRF because a forged request cannot carry an apitoken, but
+    auth/register takes none. On a fresh instance a form on any page could otherwise
+    create the admin and point the instance at a backend of the form author's choice."""
+    fields = {'username': 'attacker', 'password': 'password', 'password_confirm': 'password',
+              'mcrit_server_url': 'http://backend.example', 'operation_mode': 'multi'}
+    response = client.post('/api/auth/register', headers={'Origin': 'https://elsewhere.example'}, **encode(fields))
+    assert response.status_code == 415 and response.is_json
+    with app.app_context():
+        assert db.get_all_user_info() == []
+        assert db.get_server_info().url != 'http://backend.example'
+
+
+@pytest.mark.parametrize('encode', CROSS_SITE_BODIES)
+def test_password_authentication_cannot_be_posted_by_a_cross_site_form(client, make_user, encode):
+    """auth/token takes no token either, so it is held to the same JSON-only rule."""
+    make_user('visitor')
+    response = client.post('/api/auth/token', headers={'Origin': 'https://elsewhere.example'},
+                           **encode({'username': 'visitoruser', 'password': 'password'}))
+    assert response.status_code == 415 and response.is_json
+    assert b'apitoken-visitor' not in response.data

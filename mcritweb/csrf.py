@@ -103,7 +103,9 @@ class CsrfProtect:
 
         Only correct for endpoints that do **not** authenticate through the session
         cookie - the `/api` blueprint authenticates by `apitoken` header, which a
-        cross-site request cannot supply, so it has nothing to forge.
+        cross-site request cannot supply, so it has nothing to forge. Its two
+        tokenless routes, `auth/token` and `auth/register`, refuse any body but
+        `application/json` instead (`api_accounts.require_json_body`).
         """
         if isinstance(view, Blueprint):
             self._exempt_blueprints.add(view.name)

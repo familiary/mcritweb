@@ -99,15 +99,15 @@ def test_queue_counts_forward_the_same_selectors_without_pagination(client, make
 
 
 def test_binary_downloads_preserve_errors_without_forwarding_html(client, make_user, wire):
-    make_user('visitor')
+    make_user('contributor')
     if not hasattr(McritClient, 'getSampleBinary'):
-        assert client.get('/api/samples/1/binary', headers=headers('visitor')).status_code == 501
+        assert client.get('/api/samples/1/binary', headers=headers()).status_code == 501
         return
     wire.answers['GET', '/samples/1/binary'] = 403, ANSWER
-    response = client.get('/api/samples/1/binary', headers=headers('visitor'))
+    response = client.get('/api/samples/1/binary', headers=headers())
     assert response.status_code == 403 and response.data == ANSWER
     wire.answers['GET', '/samples/1/binary'] = 200, b'<html>unexpected</html>'
-    assert client.get('/api/samples/1/binary', headers=headers('visitor')).status_code == 502
+    assert client.get('/api/samples/1/binary', headers=headers()).status_code == 502
 
 
 def test_unique_blocks_support_optional_cover_controls_and_negative_sets(client, make_user, wire):
@@ -155,10 +155,23 @@ def test_api_query_submission_can_be_promoted_without_uploading_it_again(app, cl
     assert parse_qs(urlsplit(submitted[0].url).query)['family'] == ['api_family']
 
 
-@pytest.mark.parametrize('owner,expected', [('visitoruser', 200), ('another_user', 403), (None, 403)])
-def test_query_reruns_cannot_bypass_a_roles_upload_cap(app, client, make_user, owner, expected):
-    make_user('visitor')
-    document = copy.deepcopy(load('matches_for_query.job'))
+RERUNS = [
+    pytest.param('visitor', 'matches_for_query', 'visitoruser', 403, id='capped-own-name'),
+    pytest.param('visitor', 'matches_for_query', 'another_user', 403, id='capped-other-name'),
+    pytest.param('visitor', 'matches_for_query', None, 403, id='capped-no-name'),
+    pytest.param('contributor', 'matches_for_query', 'another_user', 200, id='uncapped-query'),
+    pytest.param('visitor', 'matches_for_sample', 'another_user', 200, id='capped-corpus-analysis'),
+]
+
+
+@pytest.mark.parametrize('role,fixture,owner,expected', RERUNS)
+def test_query_reruns_cannot_bypass_a_roles_upload_cap(app, client, make_user, role, fixture, owner, expected):
+    """A rerun resubmits a query's upload without the caller sending it. A job names
+    its submitter only by username, and usernames are renamed and reused (ADR-0007),
+    so a capped role may not rerun a query even under its own current name. Reruns
+    of corpus analyses upload nothing and stay open to it."""
+    make_user(role)
+    document = copy.deepcopy(load(f'{fixture}.job'))
     document['_id'] = JOB
     document['username'] = owner
     submitted = []
@@ -175,9 +188,11 @@ def test_query_reruns_cannot_bypass_a_roles_upload_cap(app, client, make_user, o
             submitted.append(job_id)
             return raw(NEW_JOB_ID)
     app.config['MCRIT_CLIENT_FACTORY'] = lambda **kwargs: Rerunner()
-    response = client.post(f'/api/jobs/{JOB}/rerun', headers=headers('visitor'))
-    assert response.status_code == expected
+    response = client.post(f'/api/jobs/{JOB}/rerun', headers=headers(role))
+    assert response.status_code == expected, response.data
     assert submitted == ([JOB] if expected == 200 else [])
+    if expected == 403:
+        assert response.json['data']['message'] == 'A role with a query upload cap cannot rerun query jobs.'
 
 
 def test_tag_capability_and_contributor_boundary(client, make_user, wire):

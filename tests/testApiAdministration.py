@@ -254,3 +254,23 @@ def test_every_admin_ui_action_has_an_api_counterpart():
         if route.role == "admin":
             assert any(method == route.method and re.fullmatch(route.path, path) for method, path in api.ADMIN_UI_PARITY.values()) \
                 or any(route.method == 'POST' and re.fullmatch(route.path, path) for path, _ in MAINTENANCE), route
+
+
+@pytest.mark.parametrize("query,expected", [
+    ("", None),
+    ("?band_df_cutoff=500", ["500"]),
+], ids=["configured cutoff", "another cutoff"])
+def test_the_band_df_cutoff_coverage_forwards_the_cutoff_it_was_given(client, admin_users, wire, query, expected):
+    response = client.post(f"/api/band_df_cutoff_coverage{query}", headers=headers("admin"))
+
+    assert response.status_code == 200, response.data
+    assert parse_qs(urlsplit(wire.calls[-1].url).query).get("band_df_cutoff") == expected
+
+
+@pytest.mark.parametrize("value", ["many", "-1", "1.5", str(2**63)], ids=["word", "negative", "fraction", "too large"])
+def test_a_malformed_band_df_cutoff_is_refused_before_the_backend(client, admin_users, wire, value):
+    """As the matching options' band_df_cutoff is: it was forwarded as typed."""
+    response = client.post(f"/api/band_df_cutoff_coverage?band_df_cutoff={value}", headers=headers("admin"))
+
+    assert response.status_code == 400
+    assert wire.calls == []

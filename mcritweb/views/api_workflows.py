@@ -129,9 +129,14 @@ def diagram(match):
     for _, value in selected:
         if value is not None:
             identifier(value)
-    family, sample, function = [value for _, value in selected]
-    data.create_match_diagram(current_app, job.job_id, result, family, sample, function)
-    suffix = next((f'-{name}_{value}' for name, value in selected if value is not None), '')
+    # the first scope given is the one drawn, in create_match_diagram's order
+    kind, value = next(((name, value) for name, value in selected if value is not None), (None, None))
+    # the same gate as data.diagram_file: only a scope the report matched is rendered,
+    # so an arbitrary id cannot add a file to the unbounded diagram cache
+    if not data.diagram_filter_in_report(result, kind, value):
+        abort(404, 'The report did not match that family, sample or function.')
+    data.create_match_diagram(current_app, job.job_id, result, *(value if name == kind else None for name, _ in selected))
+    suffix = f'-{kind}_{value}' if kind is not None else ''
     path = Path(current_app.instance_path) / 'cache' / 'diagrams' / f'{job.job_id}{suffix}.png'
     return send_file(path, mimetype='image/png')
 
@@ -230,17 +235,8 @@ def specific_export(match):
     if match['kind'] == 'sample':
         ids = [int(match['entry_id'])]
     else:
-        normal = client()
-        if match['kind'] == 'family':
-            samples = require_result(with_server_errors(normal).getSamplesByFamilyId(int(match['entry_id'])), 'the family samples')
-            ids = [sample.sample_id for sample in (samples.values() if isinstance(samples, Mapping) else samples)]
-        else:
-            job, method, result = job_result(match['entry_id'])
-            if method == 'combineMatchesToCross':
-                ids = [int(value) for value in next(iter(result.values()))['clustered_sequence']]
-            else:
-                _, matching_result = matching(job.job_id)
-                ids = sorted({matching_result.reference_sample_entry.sample_id, *(sample.sample_id for sample in matching_result.sample_matches)})
+        samples = require_result(with_server_errors(client()).getSamplesByFamilyId(int(match['entry_id'])), 'the family samples')
+        ids = [sample.sample_id for sample in (samples.values() if isinstance(samples, Mapping) else samples)]
     if not ids:
         abort(400, 'There are no samples to export.')
     return handle_raw_response(backend.getExportData(ids))

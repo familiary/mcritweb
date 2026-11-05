@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 from fixtureData import job_id_of, load
 from flask import template_rendered
+from mcrit.storage.MatchingResult import MatchingResult
 
 from mcritweb.views import api_workflows
 
@@ -119,6 +120,41 @@ def test_result_and_diagram_downloads_work_without_a_browser_session(client, mak
     image = client.get(f'/api/jobs/{job}/diagram', headers=token())
     assert image.status_code == 200, image.data[:200]
     assert image.mimetype == 'image/png' and image.data.startswith(b'\x89PNG')
+
+
+def matched_report():
+    return MatchingResult.fromDict(load('matches_for_sample.result'))
+
+
+DIAGRAM_SCOPES = [
+    ('famid', lambda report: next(sample.family_id for sample in report.sample_matches)),
+    ('samid', lambda report: next(sample.sample_id for sample in report.sample_matches)),
+    ('funid', lambda report: next(iter(report.function_id_to_family_ids_matched))),
+]
+
+
+@pytest.mark.parametrize('scope', ['famid', 'samid', 'funid'], ids=['family', 'sample', 'function'])
+def test_a_diagram_scope_the_report_did_not_match_is_refused_without_a_file(app, client, make_user, scope):
+    """The diagram cache is unbounded, so the browser's diagram route draws only a
+    family, sample or function the report matched (#145). The API writes into the
+    same cache and must apply the same gate, or every id is a new file there."""
+    make_user('visitor')
+    job = job_id_of('matches_for_sample')
+    response = client.get(f'/api/jobs/{job}/diagram', headers=token(), query_string={scope: 10**12})
+    assert response.status_code == 404 and response.is_json
+    diagrams = Path(app.instance_path) / 'cache' / 'diagrams'
+    assert not diagrams.exists() or list(diagrams.iterdir()) == []
+
+
+@pytest.mark.parametrize('scope,matched', DIAGRAM_SCOPES, ids=['family', 'sample', 'function'])
+def test_a_diagram_scope_the_report_matched_is_rendered(app, client, make_user, scope, matched):
+    """The gate above refuses only what the result page could never link to."""
+    make_user('visitor')
+    job = job_id_of('matches_for_sample')
+    value = matched(matched_report())
+    response = client.get(f'/api/jobs/{job}/diagram', headers=token(), query_string={scope: value})
+    assert response.status_code == 200 and response.data.startswith(b'\x89PNG')
+    assert (Path(app.instance_path) / 'cache' / 'diagrams' / f'{job}-{scope}_{value}.png').is_file()
 
 
 def test_cfg_and_diff_endpoints_return_data(client, make_user, fake_mcrit):

@@ -15,7 +15,7 @@ backend endpoint uses GET; use an HTTP client for these admin requests.
 | Visitor | `GET status`, `GET version` | Backend status/version |
 | Visitor | `GET families`, `GET families/<id>` | Families; `with_samples=true` includes samples |
 | Visitor | `GET samples`, `GET samples/<id>`, `GET samples/sha256/<sha256>` | Samples; collections accept `start`/`limit` |
-| Visitor | `GET samples/<id>/functions`, `GET samples/<id>/smda` | Functions or reconstructed SMDA report |
+| Visitor | `GET samples/<id>/functions` | Functions of a sample |
 | Visitor | `GET functions`, `GET functions/<id>` | Functions; `with_xcfg=true` includes the graph |
 | Visitor | `POST samples/ids`, `POST families/ids`, `POST functions` | Comma-separated IDs in the raw body; samples may have negative query IDs |
 | Visitor | `GET search/families`, `GET search/samples`, `GET search/functions` | `query`, `cursor`, `sort_by`, `is_ascending`, `limit` |
@@ -23,7 +23,7 @@ backend endpoint uses GET; use an HTTP client for these admin requests.
 | Visitor | `GET jobs/<id>`, `GET jobs/<id>/result`, `GET results/<id>`, `GET results/<id>/job` | Jobs/results; job results accept `compact` |
 | Visitor | `GET matches/sample/<id>`, `GET matches/sample/<id>/<other_id>` | 1vsN / 1vs1 matching |
 | Visitor | `GET matches/sample/cross/<ids>` | Cross-compare; `sample_group_only` selects within the group |
-| Visitor | `GET matches/function/<id>/<other_id>` | Compare functions |
+| Visitor | `GET matches/function/<id>/<other_id>`, `GET matches/function/<id>` | Compare functions; the single-id form is forwarded to the backend's `getMatchFunctionVs` with no second id, unchanged from earlier releases |
 | Visitor | `GET uniqueblocks/family/<id>`, `GET uniqueblocks/samples/<ids>` | Unique blocks; optional `covers_required` and `min_instructions` |
 | Visitor | `POST query`, `POST query/function` | SMDA JSON report / single-function query |
 | Visitor | `POST query/binary`, `POST query/binary/mapped/<decimal_base_address>` | Query bytes without adding them to the corpus |
@@ -33,6 +33,7 @@ backend endpoint uses GET; use an HTTP client for these admin requests.
 | Contributor | `PUT samples/<id>`, `PUT families/<id>`, `PUT functions/<id>` | Edit metadata / rename a function |
 | Contributor | `DELETE samples/<id>`, `DELETE families/<id>`, `DELETE jobs/<24-hex-id>` | Delete an entry or job; family deletion accepts `keep_samples` |
 | Contributor | `POST import`, `GET export`, `GET export/<ids>` | Import a JSON export / export the corpus or a selection; `compress=false` disables compression |
+| Contributor | `GET samples/<id>/smda` | The sample's SMDA report, reconstructed by the backend |
 | Admin | `POST rebuild_index`, `POST rebuild_picblockhash_index` | Rebuild indexes |
 | Admin | `POST recalculate_pichashes`, `POST recalculate_minhashes`, `POST repair_minhashes`, `POST recompute_family_stats` | Corpus maintenance |
 | Admin | `POST respawn` | Reset the backend and clear local cached state; requires `{"reset_server":"RESET"}` |
@@ -43,11 +44,13 @@ backend endpoint uses GET; use an HTTP client for these admin requests.
 | Admin | `GET admin/server`, `PUT admin/server` | Read/update the local backend connection settings |
 
 Admin includes contributor and visitor permissions. Contributor includes visitor
-permissions. Import/export have the same contributor requirement as the web UI.
+permissions. Import/export have the same contributor requirement as the web UI, and
+so do `samples/<id>/smda` and `samples/<id>/binary`: in the UI, only the corpus
+export hands out what a sample was submitted as.
 The root account (user 1) cannot be deleted or have its role changed.
 
-PUT requests accept a JSON object or form fields. Sample edits accept `family_name`,
-`version`, `component`, `is_library`; family edits accept `family_name`, `is_library`, `actors` (up to 64 short names);
+Token-authenticated PUT requests accept a JSON object or form fields. Sample edits
+accept `family_name`, `version`, `component`, `is_library`; family edits accept `family_name`, `is_library`, `actors` (up to 64 short names);
 function edits accept `function_name` (up to 256 printable ASCII characters, empty
 clears it). Omitted fields stay unchanged, empty strings and `false` are preserved,
 and unknown fields or malformed types receive 400. Account, preference, metadata
@@ -70,7 +73,8 @@ wire name `minhash_score` is also accepted for `minhash_threshold`; conflicting
 values receive 400. Cross-compare and 1vs1 do not accept a shortlist. Single-function
 SMDA queries also accept `exclude_self_matches`. Boolean inputs are `true`, `false`,
 `1`, `0` (case-insensitive). Invalid booleans/integers receive 400 rather than silently
-changing the request. Unique-block sample sets are sorted and deduplicated and
+changing the request; that includes `start` and `limit` on `GET jobs`, which no longer
+fall back to their defaults. Unique-block sample sets are sorted and deduplicated and
 capped at the UI's 250 distinct IDs before backend lookups. Missing samples and empty
 families cannot queue a unique-block job. Backend errors during validation are
 returned without removing IDs or submitting a partial set.
@@ -103,17 +107,24 @@ curl -X POST -H "apitoken: $MCRITWEB_API_TOKEN" \
 
 ## Accounts and first-user setup
 
-`POST /api/auth/token` accepts `username` and `password` as JSON or form fields. It
+`POST /api/auth/token` and `POST /api/auth/register` need no token, so they accept
+only an `application/json` body and answer anything else with 415. `/api` is exempt
+from CSRF because a cross-site request cannot supply an `apitoken` header, and that
+does not hold for these two: an HTML form on another site can post form fields to
+them, but cannot send `application/json` without a CORS preflight.
+
+`POST /api/auth/token` accepts `username` and `password` as a JSON object. It
 returns the account's API token without creating a browser session. Unknown names
 and wrong passwords have the same 401 response and share the UI login throttle;
 a spent budget receives 429. Password proof can replace a legacy token when a
 deployment has retired it. Credentials are bounded to a 64 KiB declared body and
 4096 characters per field, before password hashing.
 
-`POST /api/auth/register` accepts `username`, `password`, `password_confirm` and,
-when required, `registration_token`. Normal registrations and duplicate names
-receive the same generic 202 message. New accounts are pending and cannot read or
-change the corpus until approved. Single-user mode blocks further registrations.
+`POST /api/auth/register` accepts a JSON object of `username`, `password`,
+`password_confirm` and, when required, `registration_token`. Normal registrations
+and duplicate names receive the same generic 202 message. New accounts are pending
+and cannot read or change the corpus until approved. Single-user mode blocks further
+registrations.
 
 For the first account only, registration also requires `mcrit_server_url` and
 `operation_mode` (`single` or `multi`), and optionally accepts `mcrit_server_token`
@@ -153,17 +164,17 @@ YARA, LinkHunt, graph and cross-ordering algorithms are shared with the UI.
 | Visitor | `GET jobs/<id>/linkhunt` | LinkHunt links, clusters and filters; accepts the same `filter_*`, `clup`/`clul`, `funp`/`funl` controls as the UI |
 | Visitor | `GET jobs/<id>/yara` | Generated rule, cover, statistics and the UI's YARA parameters |
 | Visitor | `GET jobs/<id>/cross` | Matrix data and sample metadata ordered by `order=clustered|sample_id|family` or a validated `custom` list |
-| Visitor | `GET jobs/<id>/diagram` | PNG match diagram, optionally scoped by `famid`, `samid`, `funid` |
+| Visitor | `GET jobs/<id>/diagram` | PNG match diagram, optionally scoped by `famid`, `samid`, `funid`; as in the UI, only a family, sample or function the report matched can be drawn, and any other id receives 404 |
 | Visitor | `GET jobs/<id>/download` | Download the original result JSON as an attachment |
 | Visitor | `GET jobs/<id>/status` | The same progress snapshot as the overview's polling endpoint |
-| Visitor | `POST functions/<id>/analyze` or `GET matches/function/<id>` | Queue the parent sample's comparison, as the function page does; read its result with `funid=<id>` |
+| Visitor | `POST functions/<id>/analyze` | Queue the parent sample's comparison, as the function page does; read its result with `funid=<id>` |
 | Visitor | `GET functions/<id>/graph` | DOT graph as plain text |
 | Visitor | `GET functions/<id>/diff/<other_id>` | Block colours, correspondences and pairs; `format=dot` returns the combined graph |
 | Visitor | `POST graphs/loops` | DOT body to the UI's loop detector; the same byte/graph caps and skipped-analysis header apply |
 | Visitor | `POST selections/samples/by-sha256` | `{"sha256":["...", "..."]}` or newline text in that field; returns selected IDs, missing hashes and invalid lines, capped at 250 |
-| Visitor | `GET samples/<id>/binary` | Raw binary attachment, only if the backend is configured to retain and serve binaries |
 | Contributor | `POST jobs/<id>/promote` | Optional `family`/`version`; promote the verified local input of a query without another upload |
 | Contributor | `GET exports/family/<id>`, `GET exports/sample/<id>` | The UI's selected export action |
+| Contributor | `GET samples/<id>/binary` | Raw binary attachment, only if the backend is configured to retain and serve binaries |
 | Contributor | `POST uploads/metadata` | The upload form's `filename`, `file_header`, optional `file_metadata` probe, bounded to 1 MiB |
 | Contributor | `POST jobs/delete-selection` | Delete a snapshot selected by `state`, `method` or `job_ids`; at most 10000 jobs per request |
 | Contributor | `DELETE jobs` | Backend queue cleanup by `method`, `created_before`, `finished_before`; an unfiltered deletion requires `confirm=DELETE` |
@@ -195,7 +206,7 @@ identity established by its token.
 
 Additional admin POST actions are `complete_minhashes`,
 `rebuild_function_range_index`, `rebuild_band_df_index`, `band_df_cutoff_coverage`
-(optional `band_df_cutoff`), and `delete_orphaned_queue_files` (`dry_run=true` for a
+(optional `band_df_cutoff`, a nonnegative integer; anything else gets 400), and `delete_orphaned_queue_files` (`dry_run=true` for a
 count without deletion). Maintenance is POST-only at MCRITweb even where the backend
 uses legacy GET routes. Queue cleanup dates must be `YYYY-MM-DD` or
 `YYYY-MM-DDTHH:MM:SS` in the backend's UTC convention; invalid dates never silently
@@ -212,8 +223,11 @@ installed client does not support them, rather than discarding options:
   `{"exclude_picblockhashes":[12,"0xff"]}`. Negative sets are bounded to 100000
   unsigned 64-bit hashes, an 8 MiB body limit and the role's upload cap.
 - Rerun-capable clients: `POST jobs/<id>/rerun`. Only finished, failed or terminated
-  analyses may be rerun. A role with a query upload cap can rerun only its own
-  queries, so the endpoint cannot bypass that cap using another account's input.
+  analyses may be rerun. A role with a query upload cap (`QUERY_UPLOAD_LIMITS`,
+  visitor by default) cannot rerun a query job at all, and receives 403: a rerun
+  resubmits an upload without the caller sending it, and a job records only the
+  username it was submitted under, which a rename or a reused name hands to someone
+  else (ADR-0007). Uncapped roles may rerun any query.
 
 `ROUTES` owns dispatch and permission policy; its role keyword is mandatory.
 `api_coverage.UI_OPERATIONS` maps every manual UI route to concrete API operations.

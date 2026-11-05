@@ -12,9 +12,13 @@ from mcritweb.views.utility import query_upload_path
 
 
 class PromotionError(ValueError):
+    """A refused promotion. `job_id` is the backend's id for the job, once one was
+    found, so a caller can link to it rather than to the id as it was typed."""
+
     def __init__(self, message, status=400):
         super().__init__(message)
         self.status = status
+        self.job_id = None
 
 
 def promote(client, job_id, family='', version=''):
@@ -22,6 +26,15 @@ def promote(client, job_id, family='', version=''):
     job = client.getJobData(job_id.lower()) if data.JOB_ID_PATTERN.fullmatch(job_id) else None
     if job is None:
         raise PromotionError("The given Job ID doesn't exist", 404)
+    try:
+        return promote_job(client, job, family, version)
+    except PromotionError as error:
+        error.job_id = job.job_id
+        raise
+
+
+def promote_job(client, job, family, version):
+    from mcritweb.views import data
     if job.method not in data.QUERY_UPLOAD_KINDS:
         raise PromotionError('Only a query can be promoted to a sample.')
     path = query_upload_path(current_app, job.job_id)

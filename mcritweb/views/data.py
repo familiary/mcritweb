@@ -348,6 +348,28 @@ def create_match_diagram(app, job_id, matching_result, filtered_family_id=None, 
         app.logger.debug("stored new MCRIT diagram: %s", output_path)
 
 
+def diagram_filter_in_report(matching_result, filter_kind, filter_id):
+    """Whether a diagram scoped by `filter_kind`/`filter_id` is one worth rendering.
+
+    Shared by data.diagram_file and the API's diagram workflow, since both write
+    into the same unbounded diagram cache.
+    """
+    # only a family or sample this report matched, which is every filter the result
+    # page offers a link for - so a hand-written URL cannot fill the unbounded diagram
+    # cache with one render per family or sample in the corpus for each job. The
+    # report answers it without the isFamilyId/isSampleId round trips this replaced.
+    if filter_kind == "famid":
+        return filter_id in {sample_match.family_id for sample_match in matching_result.sample_matches}
+    if filter_kind == "samid":
+        return filter_id in {sample_match.sample_id for sample_match in matching_result.sample_matches}
+    # the same for a function id, which the report can answer by itself. A query
+    # report additionally has no stored functions to lay a diagram out over, so the
+    # function-filtered variant was never generated for one and still is not
+    if filter_kind == "funid":
+        return not matching_result.is_query and filter_id in matching_result.function_id_to_family_ids_matched
+    return True
+
+
 def render_missing_match_diagram(app, filename_match):
     """Render the diagram `filename_match` names, so that diagram_file can serve it.
 
@@ -373,18 +395,7 @@ def render_missing_match_diagram(app, filename_match):
     if not isinstance(result_json, dict) or not result_json:
         return
     matching_result = MatchingResult.fromDict(result_json)
-    # only a family or sample this report matched, which is every filter the result
-    # page offers a link for - so a hand-written URL cannot fill the unbounded diagram
-    # cache with one render per family or sample in the corpus for each job. The
-    # report answers it without the isFamilyId/isSampleId round trips this replaced.
-    if filter_kind == "famid" and filter_id not in {sample_match.family_id for sample_match in matching_result.sample_matches}:
-        return
-    if filter_kind == "samid" and filter_id not in {sample_match.sample_id for sample_match in matching_result.sample_matches}:
-        return
-    # the same for a function id, which the report can answer by itself. A query
-    # report additionally has no stored functions to lay a diagram out over, so the
-    # function-filtered variant was never generated for one and still is not
-    if filter_kind == "funid" and (matching_result.is_query or filter_id not in matching_result.function_id_to_family_ids_matched):
+    if not diagram_filter_in_report(matching_result, filter_kind, filter_id):
         return
     create_match_diagram(
         app,
@@ -2286,7 +2297,7 @@ def promote_query(job_id):
         flash(str(error), category='error')
         if error.status == 404:
             return redirect(url_for('data.jobs'))
-        return redirect(url_for('data.result', job_id=job_id))
+        return redirect(url_for('data.result', job_id=error.job_id))
     flash('Sample was already in database' if already_stored else 'The query was promoted to a sample.', category='warning' if already_stored else 'success')
     if sample is not None:
         return redirect(url_for('explore.sample_by_id', sample_id=sample.sample_id))

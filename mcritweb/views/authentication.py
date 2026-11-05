@@ -165,10 +165,12 @@ def _current_hash_method():
         _CURRENT_HASH_METHOD = generate_password_hash(secrets.token_urlsafe(8)).split("$", 1)[0]
     return _CURRENT_HASH_METHOD
 
-#: The roles whose API token is worth anything. `token_required` is the authority; the
+#: The roles whose API token reaches the corpus. `token_required` is the authority; the
 #: settings page reads it too, so the page cannot show a token to someone whose token
-#: does not work, or - the way it went wrong - hide one that does. `pending` gets
-#: nothing, as in the web UI.
+#: does not work, or - the way it went wrong - hide one that does. A `pending` token
+#: reaches only what `token_required(allow_pending=True)` lets through, which the
+#: /api router narrows to the caller's own account (`me/*`, `auth/token`) and
+#: `capabilities`, as the web UI gives a pending account only its settings.
 API_ROLES = ('visitor', 'contributor', 'admin')
 
 
@@ -466,7 +468,9 @@ def token_required(view=None, *, allow_pending=False):
     The API is a passthrough to the backend, so a token has to carry the same
     authority the web UI grants the same person - otherwise the quickest way past a
     role check is to stop using the browser. The token's owner lands on `g.api_user`
-    for the router to narrow further; `pending` gets nothing, as in the web UI.
+    for the router to narrow further. A `pending` token is refused unless the view is
+    wrapped with `allow_pending=True`; the /api router is, and gives such a token its
+    own account (`me/*`, `auth/token`) and `capabilities`, nothing from the corpus.
     """
     if view is None:
         return functools.partial(token_required, allow_pending=allow_pending)
