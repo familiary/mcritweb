@@ -427,6 +427,15 @@ At this time, there are 4 user roles with different access rights implemented.
 * `Contributor`: An account with full access rights
 * `Admin`: A full account that can also manage other users and the server
 
+#### User Profile
+
+*View profile* in the user menu opens your own page, `/profile`, with five tabs.
+*Overview* shows the account and what its role may do here: a table with one row per capability, each marked allowed, limited (with the limit, such as the query upload cap) or restricted.
+*Jobs* and *Submissions* list the jobs and the binary submissions the MCRIT backend recorded under your username, 25 to a page, each linking to its job or result, and a finished submission to the sample it became.
+The backend records the name at the time of the request, so a renamed account's earlier jobs stay under the old name.
+*Query uploads* lists the files this instance kept of your queries, so one can be promoted to a sample; they follow the account, not its name, and an administrator sees every account's.
+*API token* holds a *Show token* button, which fetches the token when asked rather than printing it into the page, a button to rotate it, and two examples (the `mcrit` client and `curl`) with this instance's address filled in and the token once shown.
+
 #### User Settings
 
 The user settings page allows user to edit their preferences.
