@@ -15,7 +15,7 @@ import threading
 import time
 
 import requests
-from flask import current_app, flash, g, has_app_context, redirect, session, url_for
+from flask import current_app, flash, g, has_app_context, make_response, redirect, session, url_for
 from smda.common.SmdaReport import SmdaReport
 
 from mcritweb import db
@@ -342,6 +342,23 @@ def mcrit_server_required(view):
             return redirect(url_for('index'))
         return view(**kwargs)
     return wrapped_view
+
+
+def no_store(view):
+    """Answer with `Cache-Control: no-store`, for a view that shows a secret.
+
+    Without it a browser keeps the answer in its back/forward cache, and Back after
+    logout restores it, token and all, without asking the server. no-store keeps it out
+    of that cache and the HTTP cache alike. It is the view's own header: no other page
+    gets it, and they keep the caching they have.
+    """
+    @functools.wraps(view)
+    def stored_nowhere(*args, **kwargs):
+        response = make_response(view(*args, **kwargs))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    stored_nowhere.no_store = True
+    return stored_nowhere
 
 
 def get_session_user_id():

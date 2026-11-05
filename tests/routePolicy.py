@@ -124,7 +124,10 @@ ROUTE_POLICY = {
     "admin.change_default_filter": (LOGGED_IN, WRITES_ON_POST),
     "admin.change_column_settings": (LOGGED_IN, WRITES_ON_POST),
     "admin.reset_column_settings": (LOGGED_IN, WRITES_ON_POST),
-    "admin.regenerate_apitoken": (LOGGED_IN, WRITES_ON_POST),   # only ever the caller's own row
+    "admin.regenerate_apitoken": (LOGGED_IN, WRITES_ON_POST),
+    # answers the caller's own token to the profile's "Show token" button; a POST so no
+    # link, image or prefetch fetches it, and a visitor and up, as the API is
+    "admin.show_apitoken": (VISITOR, WRITES_ON_POST),
     "admin.regenerate_legacy_apitokens": (ADMIN, WRITES_ON_POST),  # rotates every pre-1.5.0 (32-char) token - issue #250
 
     # --- visitor and above -------------------------------------------------------

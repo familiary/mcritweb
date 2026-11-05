@@ -58,7 +58,7 @@ Settings
       </tr>
       <tr>
         <td>Last Login:</td>
-        <td>{{ last_login_formatted }} {% if last_login_formatted != 'Never' %}<span class="text-muted small">({{ last_login_relative }})</span>{% endif %}</td>
+        <td>{{ last_login_formatted }} {% if last_login_relative %}<span class="text-muted small">({{ last_login_relative }})</span>{% endif %}</td>
       </tr>
       {# whoever's token the API accepts has to be able to see and replace it. This
          used to be admin-or-contributor while token_required admits visitors too, so a
@@ -90,7 +90,7 @@ Settings
     </table>
     <div class="mt-3">
       <a href="{{ url_for('authentication.profile') }}" class="btn btn-outline-primary btn-sm">
-        <i class="fa-solid fa-id-badge me-1"></i> View Full User Profile & Activity Hub
+        View profile
       </a>
     </div>
 </div>

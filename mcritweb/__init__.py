@@ -347,30 +347,14 @@ def create_app(test_config=None, instance_path=None):
 
     @app.template_filter('date_time')
     def date_time(input):
-        if not input:
-            return ""
-        if hasattr(input, 'strftime'):
-            return input.strftime("%Y-%m-%d %H:%M:%S")
-        s = str(input)
-        if len(s) >= 19:
-            return s[:10] + ' ' + s[11:19]
-        return s
+        return input[:10] + ' ' + input[11:19]
 
     @app.template_filter('duration')
-    def duration(val):
-        if val is None or val == "":
-            return "N/A"
-        if hasattr(val, "total_seconds") and callable(val.total_seconds):
-            try:
-                secs = val.total_seconds()
-                if isinstance(secs, (int, float)):
-                    return f"{secs:.2f}s"
-            except Exception:
-                pass
-        if isinstance(val, (int, float)):
-            return f"{val:.2f}s"
-        s = str(val)
-        return s if s.endswith('s') else f"{s}s"
+    def duration(value):
+        # mcrit's Job.duration is a timedelta for a finished job and None for any other
+        if isinstance(value, datetime.timedelta):
+            return f"{value.total_seconds():.2f}s"
+        return "-"
 
     @app.template_global()
     def join_hint_strings(list_of_strings):

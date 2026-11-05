@@ -505,6 +505,14 @@ class CorpusMcritClient:
                 return None
         return jobs
 
+    def record_requester(self, username, method=None):
+        """Put `username` on the captured queue documents, as mcrit 1.10+ records the
+        name of the request on each job: every job, or those of one `method`. The
+        profile lists a user's jobs through this field."""
+        for document in self._queue:
+            if method is None or document["payload"]["method"] == method:
+                document["username"] = username
+
     def getQueueCount(self, method=None, filter=None, state=None, username=None, sample_ids=None, job_ids=None):
         selectors = {name: value for name, value in (("sample_ids", sample_ids), ("job_ids", job_ids), ("username", username)) if value is not None}
         self._record("getQueueCount", method=method, filter=filter, state=state, **selectors)
