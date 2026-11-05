@@ -9,9 +9,10 @@ the CSRF token and the account's password typed again: the password check is a p
 guess like one at /login, so it is metered by the same throttle.
 
 The first account registered is the one the instance keeps as its admin: the users page
-can neither demote it nor delete it. Every other admin can go and leave it in place, so
-it is the only account whose deletion could leave the server without an admin, and it
-cannot delete itself either.
+can neither demote it nor delete it, and it cannot delete itself either. That is a
+convention about one row's id, which editing the database can undo, so the one admin
+left and the one account left stay as well, and the check is made under the write lock
+that the deletion itself holds.
 """
 
 import logging
@@ -275,10 +276,9 @@ def test_the_settings_form_carries_what_the_route_needs(app, carol):
 
 
 def test_the_first_account_cannot_delete_itself(app, boss, carol):
-    """The last admin. The first account is the one the users page will neither demote
-    nor delete, which is what keeps the server an admin however the others change; any
-    other admin can go and leave it. So it is the only account whose deletion could leave
-    no admin, and the right password does not delete it either."""
+    """The first account is the one the users page will neither demote nor delete, which
+    is what keeps the server an admin however the others change. The right password does
+    not delete it either."""
     owner = logged_in(app, "boss", "password")
 
     page = owner.get("/settings").get_data(as_text=True)
@@ -392,6 +392,157 @@ def test_the_account_s_other_logins_end_with_it(app, carol):
 
     assert not is_logged_in(phone)
     assert phone.get("/settings").headers["Location"].endswith("/login")
+
+
+def test_a_browser_whose_account_was_deleted_can_sign_in_again(app, boss, carol):
+    """The phone's cookie still names the deleted account's id. Kept, it made /login say
+    "You are logged in." and turn away every sign-in, as anyone, until it expired."""
+    laptop = logged_in(app)
+    phone = logged_in(app)
+    delete_account(laptop)
+    app.config[ENABLED_KEY] = True
+
+    page = phone.get("/login").get_data(as_text=True)
+
+    assert "You are logged in" not in page
+    token = page.split('name="csrf_token" value="', 1)[1].split('"', 1)[0]
+    response = phone.post("/login", data={"csrf_token": token, "username": "boss", "inputPassword": "password"},
+                          environ_base=HERE)
+    assert response.status_code == 302 and "/login" not in response.headers["Location"]
+    assert is_logged_in(phone, "boss")
+
+
+# --- what stays, however it is asked for ------------------------------------------
+
+def _make_other_contributor_only(app, boss):
+    """What editing the database by hand can leave: the first account gone, one
+    contributor the only account there is."""
+    user_id = _make_carol(app, "contributor")
+    connection = sqlite3.connect(app.config["DATABASE"])
+    try:
+        connection.execute("DELETE FROM user WHERE id = ?", (boss,))
+        connection.commit()
+    finally:
+        connection.close()
+    return user_id
+
+
+def test_the_only_account_left_cannot_delete_itself(app, boss):
+    """With the table empty the next registration is the first user's, and makes whoever
+    sends it an admin who sets the server the instance talks to."""
+    user_id = _make_other_contributor_only(app, boss)
+    owner = logged_in(app)
+
+    assert "It is the only account left" in owner.get("/settings").get_data(as_text=True)
+    response = delete_account(owner)
+
+    assert response.headers["Location"].endswith("/settings")
+    assert flashes(owner) == ["This account cannot be deleted: it is the only account left, and the next "
+                              "registration would make whoever sends it an administrator."]
+    assert account_rows(app, user_id)["user"] == [(user_id,)]
+    with app.app_context():
+        assert not db.is_first_user()
+
+
+def test_the_deletion_asks_again_once_the_password_is_checked(app, boss, monkeypatch):
+    """Two admins deleting themselves at once both found the other still there while
+    their passwords were checked, and both went. The deletion asks again, and the one
+    left stays."""
+    _demote_root(app, boss)
+    other = _make_other_admin(app)
+    user_id = _make_carol(app, "admin")
+    owner = logged_in(app)
+
+    import mcritweb.views.authentication as auth
+
+    def the_other_admin_goes_meanwhile(stored, password):
+        with app.app_context():
+            assert db.delete_user(other) is None
+        return True
+
+    monkeypatch.setattr(auth, "check_password_hash", the_other_admin_goes_meanwhile)
+    response = delete_account(owner)
+
+    assert response.headers["Location"].endswith("/settings")
+    assert flashes(owner) == [auth.LAST_ADMIN_KEPT]
+    assert _rows(app, "SELECT id FROM user WHERE role = 'admin'") == [(user_id,)]
+    assert is_logged_in(owner)
+
+
+@pytest.mark.parametrize("change", [lambda user_id: db.delete_user(user_id),
+                                    lambda user_id: db.change_role(user_id, "visitor")],
+                         ids=["delete", "demote"])
+def test_the_count_is_taken_under_the_write_lock(app, carol, monkeypatch, change):
+    """A count is not a lock: without the write lock held from the count to the commit,
+    a second deletion could count the same rows and go as well."""
+    counted = []
+    original = db._why_kept
+
+    def while_counting(database, user_id, new_role=None):
+        other = sqlite3.connect(app.config["DATABASE"], timeout=0)
+        try:
+            with pytest.raises(sqlite3.OperationalError, match="locked"):
+                other.execute("BEGIN IMMEDIATE;")
+        finally:
+            other.close()
+        counted.append(user_id)
+        return original(database, user_id, new_role)
+
+    monkeypatch.setattr(db, "_why_kept", while_counting)
+    with app.app_context():
+        assert change(carol) is None
+
+    assert counted == [carol]
+
+
+def _users_page(app):
+    return logged_in(app, "boss", "password")
+
+
+def test_the_users_page_cannot_delete_the_only_admin(app, boss):
+    """The admin's own account, deleted from the users page, with the first account
+    demoted by hand: the check that settings makes is in db.delete_user, so this route
+    makes it too."""
+    _demote_root(app, boss)
+    user_id = _make_carol(app, "admin")
+    admin = logged_in(app)
+
+    admin.post(f"/admin/delete_user/{user_id}/all")
+
+    assert account_rows(app, user_id)["user"] == [(user_id,)]
+    assert flashes(admin) == ["The only administrator cannot be deleted, as the instance needs one. "
+                              "Make another account an administrator first."]
+
+
+@pytest.mark.parametrize("role", ["visitor", "contributor", "pending"])
+def test_the_users_page_cannot_demote_the_only_admin(app, boss, role):
+    _demote_root(app, boss)
+    user_id = _make_carol(app, "admin")
+    admin = logged_in(app)
+
+    admin.post(f"/admin/change_user_role/{user_id}/{role}/all")
+
+    assert _rows(app, "SELECT role FROM user WHERE id = ?", (user_id,)) == [("admin",)]
+    assert flashes(admin) == ["The only administrator keeps the administrator role, as the instance needs one. "
+                              "Make another account an administrator first."]
+
+
+def test_the_users_page_can_demote_an_admin_while_another_remains(app, boss):
+    user_id = _make_carol(app, "admin")
+
+    _users_page(app).post(f"/admin/change_user_role/{user_id}/visitor/all")
+
+    assert _rows(app, "SELECT role FROM user WHERE id = ?", (user_id,)) == [("visitor",)]
+
+
+def test_the_users_page_says_why_the_first_account_stays(app, boss, carol):
+    admin = _users_page(app)
+
+    admin.post(f"/admin/delete_user/{boss}/all")
+
+    assert account_rows(app, boss)["user"] == [(boss,)]
+    assert flashes(admin) == ["The first account registered here cannot be deleted, so that the instance "
+                              "always has an administrator."]
 
 
 if __name__ == "__main__":

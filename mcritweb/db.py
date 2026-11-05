@@ -317,36 +317,99 @@ def get_all_user_info():
 ROOT_USER_ID = 1
 
 
-def is_only_admin(user_info):
-    """Whether this account is an admin and no other account is.
+#: Why delete_user or change_role left an account as it was. Both return None when they
+#: did what was asked.
+KEPT_ROOT = "root"
+KEPT_LAST_ADMIN = "last admin"
+KEPT_LAST_ACCOUNT = "last account"
+GONE = "gone"
 
-    The root account is meant to keep that from happening, but it is a convention about
-    one row's id: editing the database by hand can demote or remove it, and then the
-    last admin left must not be deleted either.
+
+def _why_kept(database, user_id, new_role=None):
+    """Why this account cannot be deleted (new_role None) or given new_role, or None.
+
+    The root account is meant to keep the instance an admin, but it is a convention about
+    one row's id: editing the database by hand can demote or remove it, and then the last
+    admin left must stay one. The last account left must stay too, whatever its role:
+    with the table empty, the next registration is the first user's and makes whoever
+    sends it an admin, with the server settings to fill in.
     """
-    if user_info.role != "admin":
-        return False
-    others = get_db().execute("SELECT COUNT(*) FROM user WHERE role = 'admin' AND id != ?;",
-                              (user_info.user_id,)).fetchone()[0]
-    return others == 0
+    if user_id == ROOT_USER_ID:
+        return KEPT_ROOT
+    row = database.execute("SELECT role FROM user WHERE id = ?;", (user_id,)).fetchone()
+    if row is None:
+        return GONE
+    if new_role == "admin":
+        return None
+    others, other_admins = database.execute(
+        "SELECT COUNT(*), COALESCE(SUM(role = 'admin'), 0) FROM user WHERE id != ?;", (user_id,)
+    ).fetchone()
+    if row["role"] == "admin" and other_admins == 0:
+        return KEPT_LAST_ADMIN
+    if new_role is None and others == 0:
+        return KEPT_LAST_ACCOUNT
+    return None
+
+
+def why_account_kept(user_id):
+    """Why this account cannot be deleted, or None: what the settings page explains
+    instead of offering the form. delete_user asks again under the write lock."""
+    return _why_kept(get_db(), user_id)
+
+
+def _under_write_lock(change):
+    """Run change(database) holding SQLite's write lock from its first read to the commit.
+
+    The checks in _why_kept count rows, and a count is not a lock: two admins deleting
+    themselves at once both found the other still there, and both went. BEGIN IMMEDIATE
+    makes the second wait until the first has committed, and then it counts again.
+    """
+    database = get_db()
+    began = not database.in_transaction
+    try:
+        if began:
+            database.execute("BEGIN IMMEDIATE;")
+        outcome = change(database)
+        database.commit()
+    except BaseException:
+        if began:
+            database.rollback()
+        raise
+    return outcome
 
 
 def delete_user(user_id):
-    """Delete an account and everything keyed to it, unless it is the root account.
+    """Delete an account and everything keyed to it, unless _why_kept says it must stay.
 
-    Returns whether it was deleted. The password, the API token and the theme are columns
-    of the row, and with the row gone every session of the account finds nobody to sign
-    in. Jobs carry no owner (ADR-0007), so there are none to delete or hand over. Both the
-    admin's delete on the users page and a user's delete of their own account come here.
+    Returns None once it is deleted, else the reason it was kept. The password, the API
+    token and the theme are columns of the row, and with the row gone every session of the
+    account finds nobody to sign in. Jobs carry no owner (ADR-0007), so there are none to
+    delete or hand over. Both the admin's delete on the users page and a user's delete of
+    their own account come here.
     """
-    if user_id == ROOT_USER_ID:
-        return False
-    database = get_db()
-    database.execute("DELETE FROM user_filters WHERE user_id = ?;", (user_id,))
-    database.execute("DELETE FROM user_column_settings WHERE user_id = ?;", (user_id,))
-    database.execute("DELETE FROM user WHERE id = ?;", (user_id,))
-    database.commit()
-    return True
+    def delete(database):
+        reason = _why_kept(database, user_id)
+        if reason is None:
+            database.execute("DELETE FROM user_filters WHERE user_id = ?;", (user_id,))
+            database.execute("DELETE FROM user_column_settings WHERE user_id = ?;", (user_id,))
+            database.execute("DELETE FROM user WHERE id = ?;", (user_id,))
+        return reason
+    return _under_write_lock(delete)
+
+
+def change_role(user_id, role):
+    """Give an account another role, unless that would take the last admin away.
+
+    Returns None once it is changed, else the reason it was kept, as delete_user does: the
+    users page's role menu could otherwise demote the one admin left, the admin's own
+    account included, and leave nobody to approve accounts or set the server.
+    """
+    def change(database):
+        reason = _why_kept(database, user_id, new_role=role)
+        if reason is None:
+            database.execute("UPDATE user SET role = ? WHERE id = ?;", (role, user_id))
+        return reason
+    return _under_write_lock(change)
 
 
 class ServerInfo:
