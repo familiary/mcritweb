@@ -540,7 +540,7 @@ def query():
         if job_id is not None:
             # a query is never stored, and no query endpoint takes a filename - so this is
             # the only record of what the uploaded file was called (#40)
-            remember_query_filename(job_id, f.filename)
+            remember_query_filename(job_id, f.filename, g.user.user_id)
             # persist the upload, so the query can later be promoted to a sample (#9).
             # It is filed under the job id and not under any hash: the id is issued by
             # the backend once the job is queued, so no part of the name comes from the

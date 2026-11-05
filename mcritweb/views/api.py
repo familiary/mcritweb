@@ -57,6 +57,21 @@ def nullable_int(x):
     except Exception:
         raise ValueError("Can't cast this to int")
 
+def job_selectors(args):
+    """The backend's job selectors in a jobs request, as getQueueData and getQueueCount
+    take them: `sample_ids` and `job_ids` as lists - an item that isn't an id is dropped,
+    as the backend drops it, and a present but empty list still selects nothing rather
+    than everything - and `username`, the name the backend recorded on the job. Each
+    only when given, so a client that does not know a selector is not refused for it."""
+    selectors = {}
+    if "sample_ids" in args:
+        selectors["sample_ids"] = int_list(args["sample_ids"])
+    if "job_ids" in args:
+        selectors["job_ids"] = [item.strip() for item in args["job_ids"].split(",") if item.strip()]
+    if "username" in args:
+        selectors["username"] = args["username"]
+    return selectors
+
 def int_list(x):
     """Comma-separated ints, parsed the way the backend's /jobs parses them: an item
     that isn't one is dropped."""
@@ -227,25 +242,25 @@ def api_router(api_path):
             forward_ascending = request.args.get("ascending", False, stringified_bool)
         except Exception:
             pass
-        # the backend's selectors, passed on as lists; an item that isn't an id is
-        # dropped, as the backend drops it, and a present but empty list still selects
-        # nothing rather than everything
-        forward_sample_ids = None
-        forward_job_ids = None
-        if "sample_ids" in request.args:
-            forward_sample_ids = int_list(request.args["sample_ids"])
-        if "job_ids" in request.args:
-            forward_job_ids = [item.strip() for item in request.args["job_ids"].split(",") if item.strip()]
         return handle_raw_response(
             client.getQueueData(
-                start=forward_start, 
-                limit=forward_limit, 
-                method=forward_method, 
-                filter=forward_filter, 
-                state=forward_state, 
+                start=forward_start,
+                limit=forward_limit,
+                method=forward_method,
+                filter=forward_filter,
+                state=forward_state,
                 ascending=forward_ascending,
-                sample_ids=forward_sample_ids,
-                job_ids=forward_job_ids
+                **job_selectors(request.args)
+            )
+        )
+    # getQueueCount: how many jobs the same selection has, for a paged listing
+    elif re_match := re.match(r"jobs/count$", api_path):
+        return handle_raw_response(
+            client.getQueueCount(
+                method=request.args.get("method", None),
+                filter=request.args.get("filter", None),
+                state=request.args.get("state", None),
+                **job_selectors(request.args)
             )
         )
     # getJobData, getResultForJob

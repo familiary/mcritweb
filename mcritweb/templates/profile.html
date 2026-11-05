@@ -1,0 +1,353 @@
+{% from 'table/links.html' import clipboard_btn %}
+{% from 'table/pagination_widget.html' import pagination_widget, pagination_js %}
+{% extends 'base.html' %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+{# the signed-in user's own page. Five panes behind one tab row: the panes are all on the
+   page, Bootstrap's pills switch them, static/profile.js keeps the keyboard and the URL
+   hash in step with them. The API token is not on the page: static/show_apitoken.js
+   fetches it into the developer pane when asked. #}
+{% set tab_labels = {'overview': 'Overview', 'jobs': 'Jobs (' ~ job_count ~ ')', 'submissions': 'Submissions (' ~ submission_count ~ ')',
+                     'uploads': 'Query uploads (' ~ upload_count ~ ')', 'developer': 'API token'} %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
+  <h1 class="h2 mb-0">Profile: {{ user_info.username }} <span class="badge bg-secondary align-middle fs-6">{{ user_info.role }}</span></h1>
+  <a href="{{ url_for('authentication.settings') }}" class="btn btn-outline-secondary btn-sm">Settings</a>
+</div>
+
+<ul class="nav nav-pills flex-wrap mb-4" id="profileTabList" role="tablist">
+  {% for tab in tabs %}
+  <li class="nav-item" role="presentation">
+    <button class="nav-link{% if active_tab == tab %} active{% endif %}" id="tab-{{ tab }}" data-bs-toggle="pill" data-bs-target="#pane-{{ tab }}" type="button" role="tab" aria-controls="pane-{{ tab }}" aria-selected="{{ 'true' if active_tab == tab else 'false' }}" tabindex="{{ '0' if active_tab == tab else '-1' }}">{{ tab_labels[tab] }}</button>
+  </li>
+  {% endfor %}
+</ul>
+
+<div class="tab-content" id="profileTabContent">
+  {# --- overview --------------------------------------------------------------------- #}
+  <div class="tab-pane fade{% if active_tab == 'overview' %} show active{% endif %}" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">
+    <div class="row g-3 mb-4">
+      <div class="col-sm-4">
+        <div class="stat-card">
+          <div class="stat-value">{{ job_count }}</div>
+          <div class="stat-label">Jobs</div>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="stat-card">
+          <div class="stat-value">{{ submission_count }}</div>
+          <div class="stat-label">Submissions</div>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="stat-card">
+          <div class="stat-value">{{ upload_count }}</div>
+          <div class="stat-label">Query uploads</div>
+        </div>
+      </div>
+    </div>
+    <div class="row g-4">
+      <div class="col-lg-5">
+        <div class="profile-card p-4 h-100">
+          <h2 class="h4">Account</h2>
+          <dl class="row mb-0">
+            <dt class="col-sm-5">User ID</dt>
+            <dd class="col-sm-7">{{ user_info.user_id }}</dd>
+            <dt class="col-sm-5">Username</dt>
+            <dd class="col-sm-7">{{ user_info.username }}</dd>
+            <dt class="col-sm-5">Role</dt>
+            <dd class="col-sm-7">{{ user_info.role }}</dd>
+            <dt class="col-sm-5">Registered</dt>
+            <dd class="col-sm-7"><time datetime="{{ user_info.registered.isoformat() }}">{{ user_info.registered.strftime("%Y-%m-%d %H:%M UTC") }}</time> <span class="text-muted">({{ registered_relative }})</span></dd>
+            <dt class="col-sm-5">Last login</dt>
+            <dd class="col-sm-7">
+              {% if last_login_relative %}
+                <time datetime="{{ user_info.last_login.isoformat() }}">{{ user_info.last_login.strftime("%Y-%m-%d %H:%M UTC") }}</time> <span class="text-muted">({{ last_login_relative }})</span>
+              {% else %}
+                <span class="text-muted">no login recorded</span>
+              {% endif %}
+            </dd>
+          </dl>
+          <a href="{{ url_for('authentication.settings') }}" class="btn btn-primary btn-sm mt-3">Change username, password or preferences</a>
+        </div>
+      </div>
+      <div class="col-lg-7">
+        <div class="profile-card p-4 h-100">
+          <h2 class="h4">What this account may do</h2>
+          <div class="table-responsive">
+            {# on a phone the description sits under the capability's name, so the table
+               keeps to two columns and nothing has to be swiped sideways to be read #}
+            <table class="table table-sm table-striped align-middle capability-table">
+              <thead>
+                <tr>
+                  <th scope="col">Capability</th>
+                  <th scope="col">As {{ user_info.role }}</th>
+                  <th scope="col" class="d-none d-sm-table-cell">What it covers</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for capability in capabilities %}
+                  {% set cell = capability[user_info.role] %}
+                  <tr>
+                    <th scope="row">
+                      {{ capability.name }}
+                      <div class="fw-normal small text-muted d-sm-none">{{ capability.description }}</div>
+                    </th>
+                    <td>
+                      {% if cell.kind == 'allowed' %}
+                        <span class="badge bg-success">{{ cell.label }}</span>
+                      {% elif cell.kind == 'limited' %}
+                        <span class="badge bg-warning text-dark">{{ cell.label }}</span>
+                      {% else %}
+                        <span class="badge bg-secondary">{{ cell.label }}</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-muted d-none d-sm-table-cell">{{ capability.description }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# --- jobs ---------------------------------------------------------------------------- #}
+  <div class="tab-pane fade{% if active_tab == 'jobs' %} show active{% endif %}" id="pane-jobs" role="tabpanel" aria-labelledby="tab-jobs">
+    <div class="profile-card p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+          <h2 class="h4">Jobs</h2>
+          {# ADR-0007: the backend records the username of the request, not an owner #}
+          <p class="text-muted mb-0">The jobs the MCRIT backend recorded under the username <strong>{{ user_info.username }}</strong>. A renamed account's earlier jobs stay under the old name.</p>
+        </div>
+        <a href="{{ url_for('data.jobs') }}" class="btn btn-outline-secondary btn-sm">All jobs</a>
+      </div>
+      {% if jobs_unavailable %}
+        <p class="text-muted">The job queue could not be read.</p>
+      {% elif not jobs %}
+        <p class="text-muted">No job was recorded under this username yet. <a href="{{ url_for('analyze.compare') }}">Compare a sample</a> or <a href="{{ url_for('analyze.query') }}">query one</a> to start.</p>
+      {% else %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped align-middle">
+            <thead>
+              <tr>
+                <th scope="col">Job ID</th>
+                <th scope="col">Type</th>
+                <th scope="col">Status</th>
+                <th scope="col">Runtime</th>
+                <th scope="col">Created</th>
+                <th scope="col"><span class="visually-hidden">Page</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for job in jobs %}
+                <tr>
+                  <td><span class="font-monospace">{{ job.job_id }}</span></td>
+                  <td>{{ job.method|job_name }}</td>
+                  <td>
+                    {% if job.is_terminated %}
+                      <span class="badge bg-dark">Terminated</span>
+                    {% elif job.is_finished %}
+                      <span class="badge bg-success">Finished</span>
+                    {% elif job.is_failed %}
+                      <span class="badge bg-danger">Failed</span>
+                    {% else %}
+                      <span class="badge bg-info text-dark">In progress</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ job.duration|duration }}</td>
+                  <td>{% if job.created_at %}<time datetime="{{ job.created_at }}">{{ job.created_at|date_time }}</time>{% else %}-{% endif %}</td>
+                  <td class="text-end">
+                    {% if job.is_finished %}
+                      <a href="{{ url_for('data.result', job_id=job.job_id) }}" class="btn btn-sm btn-primary">Result</a>
+                    {% else %}
+                      <a href="{{ url_for('data.job_by_id', job_id=job.job_id) }}" class="btn btn-sm btn-outline-secondary">Job</a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {{ pagination_widget(jobs_pagination, tab='jobs') }}
+      {% endif %}
+    </div>
+  </div>
+
+  {# --- submissions ---------------------------------------------------------------------- #}
+  <div class="tab-pane fade{% if active_tab == 'submissions' %} show active{% endif %}" id="pane-submissions" role="tabpanel" aria-labelledby="tab-submissions">
+    <div class="profile-card p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+          <h2 class="h4">Submissions</h2>
+          <p class="text-muted mb-0">The binaries submitted to the corpus under the username <strong>{{ user_info.username }}</strong>, and the sample each finished one became.</p>
+        </div>
+        {% if user_info.role in ('admin', 'contributor') %}
+          <a href="{{ url_for('data.submit') }}" class="btn btn-primary btn-sm">Submit a binary</a>
+        {% endif %}
+      </div>
+      {% if jobs_unavailable %}
+        <p class="text-muted">The job queue could not be read.</p>
+      {% elif not submissions %}
+        <p class="text-muted">No submission was recorded under this username.{% if user_info.role not in ('admin', 'contributor') %} Contributors and administrators can submit binaries to the corpus.{% endif %}</p>
+      {% else %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped align-middle">
+            <thead>
+              <tr>
+                <th scope="col">Job ID</th>
+                <th scope="col">Filename</th>
+                <th scope="col">SHA-256</th>
+                <th scope="col">Status</th>
+                <th scope="col">Submitted</th>
+                <th scope="col"><span class="visually-hidden">Page</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for submission in submissions %}
+                {% set job = submission.job %}
+                <tr>
+                  <td><span class="font-monospace">{{ job.job_id }}</span></td>
+                  <td class="submission-filename">{{ job.filename or '-' }}</td>
+                  <td>{% if job.sha256 %}<span class="font-monospace">{{ job.sha256[:16] }}</span> {{ clipboard_btn(job.sha256) }}{% else %}-{% endif %}</td>
+                  <td>
+                    {% if job.is_finished %}
+                      <span class="badge bg-success">Indexed</span>
+                    {% elif job.is_failed %}
+                      <span class="badge bg-danger">Failed</span>
+                    {% else %}
+                      <span class="badge bg-info text-dark">In progress</span>
+                    {% endif %}
+                  </td>
+                  <td>{% if job.created_at %}<time datetime="{{ job.created_at }}">{{ job.created_at|date_time }}</time>{% else %}-{% endif %}</td>
+                  <td class="text-end">
+                    {% if submission.sample_id is not none %}
+                      <a href="{{ url_for('explore.sample_by_id', sample_id=submission.sample_id) }}" class="btn btn-sm btn-primary">Sample {{ submission.sample_id }}</a>
+                    {% else %}
+                      <a href="{{ url_for('data.job_by_id', job_id=job.job_id) }}" class="btn btn-sm btn-outline-secondary">Job</a>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {{ pagination_widget(submissions_pagination, tab='submissions') }}
+      {% endif %}
+    </div>
+  </div>
+
+  {# --- query uploads ------------------------------------------------------------------- #}
+  <div class="tab-pane fade{% if active_tab == 'uploads' %} show active{% endif %}" id="pane-uploads" role="tabpanel" aria-labelledby="tab-uploads">
+    <div class="profile-card p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+        <div>
+          <h2 class="h4">Query uploads</h2>
+          <p class="text-muted mb-0">The files this instance kept of {% if user_info.role == 'admin' %}every account's{% else %}this account's{% endif %} queries, so a query can be promoted to a sample. They follow the account, not its name.</p>
+        </div>
+        <a href="{{ url_for('analyze.query') }}" class="btn btn-outline-secondary btn-sm">Query a sample</a>
+      </div>
+      {% if not query_uploads %}
+        <p class="text-muted">No query upload is kept for this account.</p>
+      {% else %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped align-middle">
+            <thead>
+              <tr>
+                <th scope="col">Job ID</th>
+                <th scope="col">Filename</th>
+                <th scope="col">Size</th>
+                <th scope="col">Kept since</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for upload in query_uploads %}
+                <tr>
+                  <td><span class="font-monospace">{{ upload.job_id }}</span></td>
+                  <td>{{ upload.filename }}</td>
+                  <td>{% if upload.size %}{{ upload.size }}{% else %}<span class="text-muted">file no longer kept</span>{% endif %}</td>
+                  <td>{% if upload.stored_at %}<time datetime="{{ upload.stored_at.isoformat() }}">{{ upload.stored_at.strftime("%Y-%m-%d %H:%M UTC") }}</time>{% else %}-{% endif %}</td>
+                  <td class="text-end">
+                    <a href="{{ url_for('data.result', job_id=upload.job_id) }}" class="btn btn-sm btn-outline-primary">Result</a>
+                    {% if upload.size and user_info.role in ('admin', 'contributor') %}
+                      {# a write, so a button that POSTs - see post_action.js #}
+                      <button type="button" class="btn btn-sm btn-success" data-post="{{ url_for('data.promote_query', job_id=upload.job_id) }}" title="Add this query's file to the corpus as a sample">Promote</button>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {{ pagination_widget(uploads_pagination, tab='uploads') }}
+      {% endif %}
+    </div>
+  </div>
+
+  {# --- the API token ------------------------------------------------------------------- #}
+  {% if can_use_api %}
+  <div class="tab-pane fade{% if active_tab == 'developer' %} show active{% endif %}" id="pane-developer" role="tabpanel" aria-labelledby="tab-developer">
+    <div class="profile-card p-4">
+      <h2 class="h4" id="apitoken-heading">API token</h2>
+      <p class="text-muted">Authenticates requests to <span class="font-monospace">{{ api_base_url }}</span>, the passthrough to the MCRIT backend, for the <span class="font-monospace">mcrit</span> client or any HTTP client.</p>
+      {# not printed: a secret in the page is in every copy of it. show_apitoken.js fetches
+         it into apitoken-value and the two snippets when asked #}
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2" aria-labelledby="apitoken-heading" role="group">
+        <span id="apitoken-value" class="apitoken-value font-monospace"></span>
+        <span id="apitoken-copy" hidden>{{ clipboard_btn("") }}</span>
+        <button type="button" class="btn btn-outline-dark btn-sm" data-show-apitoken="{{ url_for('admin.show_apitoken') }}">Show token</button>
+        <form method="post" action="{{ url_for('admin.regenerate_apitoken') }}" class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="profile">
+          <button type="submit" class="btn {% if legacy_apitoken %}btn-danger{% else %}btn-outline-danger{% endif %} btn-sm" title="Issue a new token. Anything using the old one stops working."><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> Rotate token</button>
+        </form>
+      </div>
+      <div id="apitoken-status" role="status" class="small"></div>
+      {% if legacy_apitoken %}
+        <div class="alert alert-warning mt-3" role="alert">
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          This token was issued before MCRITweb 1.5.0 (32-character form) and is deprecated. Rotate it and update whatever uses the old one (issue #250).
+        </div>
+      {% endif %}
+
+      <h3 class="h5 mt-4">Examples</h3>
+      <p class="text-muted">With this instance's address filled in; the token once it is shown.</p>
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>Python, McritClient</span>
+              <button type="button" class="btn btn-sm btn-outline-dark" data-copy-snippet="snippetPython">Copy</button>
+            </div>
+            <pre class="code-snippet m-0" id="snippetPython"><code>from mcrit.client.McritClient import McritClient
+
+client = McritClient(
+    mcrit_server="{{ api_base_url }}",
+    apitoken="<span data-apitoken-slot>&lt;YOUR_API_TOKEN&gt;</span>",
+)
+print(client.getStatus())</code></pre>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>curl</span>
+              <button type="button" class="btn btn-sm btn-outline-dark" data-copy-snippet="snippetCurl">Copy</button>
+            </div>
+            <pre class="code-snippet m-0" id="snippetCurl"><code>curl -H "apitoken: <span data-apitoken-slot>&lt;YOUR_API_TOKEN&gt;</span>" \
+  "{{ api_base_url }}/status"</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{{ pagination_js() }}
+<script src="{{ url_for('static', filename='profile.js') }}"></script>
+{% if can_use_api %}
+<script src="{{ url_for('static', filename='show_apitoken.js') }}"></script>
+{% endif %}
+{% endblock %}

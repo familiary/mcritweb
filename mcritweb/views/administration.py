@@ -1,7 +1,7 @@
 import json
 import sqlite3
 
-from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
@@ -13,11 +13,12 @@ from mcritweb.views.authentication import (
     admin_required,
     login_required,
     multi_user,
+    visitor_required,
 )
 from mcritweb.views.client import backend_version, get_client
 from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
-from mcritweb.views.utility import forget_server_probe, get_session_user_id, mcrit_server_required
+from mcritweb.views.utility import forget_server_probe, get_session_user_id, mcrit_server_required, no_store
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -203,7 +204,27 @@ def regenerate_apitoken():
     user_info.apitoken = generate_apitoken()
     user_info.saveToDb()
     flash('A new API token was generated. Anything using the old one has to be updated.', category='success')
+    # back to the page the button was on: the settings page or the profile's developer
+    # tab. The form names it, and only those two names are followed.
+    if request.form.get('next') == 'profile':
+        return redirect(url_for('authentication.profile') + '#developer')
     return redirect(url_for('authentication.settings'))
+
+@bp.route('/show_apitoken', methods=('POST',))
+@visitor_required
+@no_store
+def show_apitoken():
+    """The caller's API token, for the profile's "Show token" button.
+
+    The profile does not print it: a secret in a page is in every copy of that page, in
+    the browser's caches and in view-source, and it keeps the page from being compressed
+    once pages are. Only this answer carries it. POST only, so it is never fetched by a
+    link, an <img> or a prefetch, and it needs the CSRF token, so another site cannot
+    have a browser post here either. The user comes from the session, so it only ever
+    answers with the caller's own token. A visitor and up, as the API is: a pending
+    account has a token the API does not accept.
+    """
+    return jsonify(apitoken=g.user.apitoken)
 
 @bp.route('/regenerate_legacy_apitokens', methods=('POST',))
 @admin_required

@@ -348,7 +348,13 @@ def create_app(test_config=None, instance_path=None):
     @app.template_filter('date_time')
     def date_time(input):
         return input[:10] + ' ' + input[11:19]
-    
+
+    @app.template_filter('duration')
+    def duration(value):
+        # mcrit's Job.duration is a timedelta for a finished job and None for any other
+        if isinstance(value, datetime.timedelta):
+            return f"{value.total_seconds():.2f}s"
+        return "-"
 
     @app.template_global()
     def join_hint_strings(list_of_strings):

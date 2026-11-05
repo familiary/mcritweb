@@ -188,6 +188,24 @@ CREATE TABLE user_column_settings (
 """
 
 
+# v1.7.0: everything, query_upload without the uploader column the profile needs
+SCHEMA_V1_7_0 = SCHEMA_V1_4_8 + """
+CREATE TABLE login_attempt (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    remote_addr VARCHAR NOT NULL,
+    username VARCHAR,
+    attempted_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_login_attempt_addr_time ON login_attempt (remote_addr, attempted_at);
+
+CREATE TABLE query_upload (
+  job_id VARCHAR PRIMARY KEY,
+  filename VARCHAR NOT NULL
+);
+"""
+
+
 # --- helpers ---------------------------------------------------------------------
 
 def _legacy_database(tmp_path, schema=None):
@@ -439,8 +457,27 @@ def test_a_v1_4_8_database_only_gains_query_upload(tmp_path):
     _run_migration(tmp_path, db_path)
 
     assert "query_upload" in _tables(db_path)
-    assert _columns(db_path, "query_upload") == ["job_id", "filename"]
+    assert _columns(db_path, "query_upload") == ["job_id", "filename", "user_id"]
     assert _query(db_path, "SELECT user_id, samples_table_sample_id FROM user_column_settings") == [(1, 6)]
+
+
+def test_a_v1_7_0_database_gains_the_uploader_column_and_keeps_its_rows(tmp_path):
+    """query_upload gains `user_id`, for the profile's list of a user's uploads. It is an
+    ALTER TABLE on a populated table: the recorded names must survive, with no uploader,
+    and create_table_query_upload.sql, which drops the table first, must not run."""
+    db_path = _legacy_database(tmp_path, SCHEMA_V1_7_0)
+    _insert_legacy_user(db_path, "olduser", with_apitoken=True)
+    _insert_legacy_server(db_path, with_server_token=True)
+    connection = sqlite3.connect(str(db_path))
+    connection.execute("INSERT INTO query_upload (job_id, filename) VALUES (?, ?)", ("0123456789abcdef01234567", "old_query.exe"))
+    connection.commit()
+    connection.close()
+
+    assert _columns(db_path, "query_upload") == ["job_id", "filename"]
+    _run_migration(tmp_path, db_path)
+
+    assert _columns(db_path, "query_upload") == ["job_id", "filename", "user_id"]
+    assert _query(db_path, "SELECT job_id, filename, user_id FROM query_upload") == [("0123456789abcdef01234567", "old_query.exe", None)]
 
 
 def test_the_current_schema_is_a_no_op(tmp_path):

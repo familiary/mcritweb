@@ -1,3 +1,4 @@
+import datetime
 import functools
 import hashlib
 import hmac
@@ -11,7 +12,10 @@ from flask import Blueprint, abort, current_app, flash, g, redirect, render_temp
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
-from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, is_legacy_apitoken, utc_now
+from mcritweb.db import ServerInfo, UserColumnSettings, UserFilters, UserInfo, generate_apitoken, get_query_uploads, is_legacy_apitoken, utc_now
+from mcritweb.views.client import get_client
+from mcritweb.views.pagination import Pagination
+from mcritweb.views.utility import query_upload_path
 
 bp = Blueprint('authentication', __name__, url_prefix='/')
 
@@ -405,6 +409,125 @@ def login_required(view):
     return wrapped_view
 
 
+def format_relative_time(dt, now=None):
+    """How long ago `dt` was, in words: "just now", "5 minutes ago", "3 months ago".
+
+    Months are 30 days and a year 365, which is as exact as the words are. The year
+    starts at 365 days: 360 to 364 days used to fall through to "0 years ago".
+    """
+    if now is None:
+        now = utc_now()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.UTC)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=datetime.UTC)
+    total_seconds = int((now - dt).total_seconds())
+    if total_seconds < 0:
+        return "in the future"
+    if total_seconds < 60:
+        return "just now"
+    minutes, hours, days = total_seconds // 60, total_seconds // 3600, total_seconds // 86400
+    if minutes < 60:
+        count, unit = minutes, "minute"
+    elif hours < 24:
+        count, unit = hours, "hour"
+    elif days < 30:
+        count, unit = days, "day"
+    elif days < 365:
+        count, unit = max(1, days // 30), "month"
+    else:
+        count, unit = days // 365, "year"
+    return f"{count} {unit}{'s' if count != 1 else ''} ago"
+
+
+def format_file_size(size_bytes):
+    """A size in B, KiB or MiB, as the upload caps are stated."""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    if size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KiB"
+    return f"{size_bytes / (1024 * 1024):.1f} MiB"
+
+
+#: the three ways the capabilities matrix on the profile says what a role may do. The
+#: template draws each as a badge; it knows these three names and nothing else.
+CAPABILITY_ALLOWED = "allowed"
+CAPABILITY_LIMITED = "limited"
+CAPABILITY_RESTRICTED = "restricted"
+
+
+def _at_least(role, needed):
+    """Whether `role` is `needed` or outranks it, in KNOWN_ROLES order."""
+    return role in KNOWN_ROLES and KNOWN_ROLES.index(role) >= KNOWN_ROLES.index(needed)
+
+
+def _capability(kind, label=None):
+    return {"kind": kind, "label": label or {CAPABILITY_ALLOWED: "Allowed", CAPABILITY_LIMITED: "Limited", CAPABILITY_RESTRICTED: "Restricted"}[kind]}
+
+
+def _allowed_from(role, needed):
+    return _capability(CAPABILITY_ALLOWED if _at_least(role, needed) else CAPABILITY_RESTRICTED)
+
+
+def get_role_capabilities():
+    """What each role may do here, as the matrix on the profile shows it.
+
+    Each row names a capability and gives every role a cell of a fixed vocabulary
+    (allowed, limited, restricted) with a label. The cells come from what enforces
+    them: the role each page's decorator asks for, the per-role query cap in
+    QUERY_UPLOAD_LIMITS (#19), and api.py's CONTRIBUTOR_ONLY list, so a deployment
+    that changes the cap and a change to the API's write list both show here.
+    """
+    # api.py imports this module's token_required; imported here to avoid the cycle
+    from mcritweb.views.api import requires_contributor
+    limits = current_app.config.get("QUERY_UPLOAD_LIMITS", {})
+
+    def query_cap(role):
+        if not _at_least(role, "visitor"):
+            return _capability(CAPABILITY_RESTRICTED)
+        cap = limits.get(role)
+        if cap is None:
+            return _capability(CAPABILITY_ALLOWED, "Uncapped")
+        if cap <= 0:
+            return _capability(CAPABILITY_RESTRICTED)
+        return _capability(CAPABILITY_LIMITED, f"Up to {format_file_size(cap)}")
+
+    def api_access(role):
+        if role not in API_ROLES:
+            return _capability(CAPABILITY_RESTRICTED)
+        # the one branch of the API that is held to contributors is adding a sample
+        if requires_contributor("samples", "POST") and not _at_least(role, "contributor"):
+            return _capability(CAPABILITY_LIMITED, "Read and query")
+        return _capability(CAPABILITY_ALLOWED, "Read, query and submit")
+
+    rows = [
+        ("Explore and match", "Browse families, samples and functions; run 1vsN, 1vs1 and cross comparisons.", lambda role: _allowed_from(role, "visitor")),
+        ("Query uploads", "Match an uploaded binary or SMDA report against the corpus without adding it.", query_cap),
+        ("Sample submissions", "Add binaries to the corpus.", lambda role: _allowed_from(role, "contributor")),
+        ("Family and function edits", "Rename functions, edit families and samples.", lambda role: _allowed_from(role, "contributor")),
+        ("Import and export", "Move corpus data between MCRIT instances.", lambda role: _allowed_from(role, "contributor")),
+        ("REST API", "Use the backend through /api with a personal token.", api_access),
+        ("Server and user administration", "Configure the backend, manage accounts and run maintenance jobs.", lambda role: _allowed_from(role, "admin")),
+    ]
+    return [{"name": name, "description": description, **{role: cell(role) for role in KNOWN_ROLES}} for name, description, cell in rows]
+
+
+#: the panes of the profile, in the order of the tab row; `developer` only for a role the API accepts
+PROFILE_TABS = ("overview", "jobs", "submissions", "uploads", "developer")
+
+
+def _sample_id_of_submission(result):
+    """The sample id a finished addBinarySample job produced, read from its result: the
+    worker answers {"sample_info": <SampleEntry dict>}. None for anything else - a job
+    that is not finished, a result the backend no longer has, a shape this version
+    does not know."""
+    if isinstance(result, dict) and isinstance(result.get("sample_info"), dict):
+        sample_id = result["sample_info"].get("sample_id")
+        if isinstance(sample_id, int):
+            return sample_id
+    return None
+
+
 @bp.route('/settings')
 @login_required
 def settings():
@@ -420,7 +543,106 @@ def settings():
     if user_column_settings is None:
         user_column_settings = UserColumnSettings.fromDict(user_id, {})
         user_column_settings.saveToDb()
-    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken))
+
+    # UserInfo.fromDb hands datetimes; last_login is one or "no login"
+    has_login = user_info.last_login != "no login"
+    return render_template(
+        'settings.html',
+        user_info=user_info,
+        user_filters=user_filters,
+        user_column_settings=user_column_settings.toUserColumnSettings(),
+        can_use_api=user_info.role in API_ROLES,
+        legacy_apitoken=is_legacy_apitoken(user_info.apitoken),
+        registered_relative=format_relative_time(user_info.registered),
+        last_login_formatted=user_info.last_login.strftime("%Y-%m-%d %H:%M UTC") if has_login else "Never",
+        last_login_relative=format_relative_time(user_info.last_login) if has_login else None,
+    )
+
+
+@bp.route('/profile')
+@login_required
+def profile():
+    """The signed-in user's own page: the account, what the role may do, the jobs and
+    submissions the backend recorded under the username, the query uploads this
+    instance kept for the account, and the API token behind a button.
+
+    A page of this app's own data first: no reachability probe, so it renders with the
+    backend down as far as SQLite carries it. The backend calls are not wrapped: a
+    transport failure is the app's 503 page (backend_errors), and a backend that
+    answers but has no jobs is the empty state. A None from the queue - a failed read,
+    not an empty one - is said so, as data.jobs says it.
+
+    The jobs are the backend's, keyed by the username it recorded at the time of the
+    request (ADR-0007): a renamed account's earlier jobs stay under the old name.
+    The uploads are this instance's, keyed by the account's id, and follow a rename.
+    """
+    user_info = g.user
+    client = get_client()
+    username = user_info.username
+
+    # the jobs tab: every job under the username, newest first, a page at a time
+    job_count = client.getQueueCount(username=username)
+    jobs_unavailable = job_count is None
+    if jobs_unavailable:
+        flash("Ups, reading MCRIT's job queue failed - the jobs could not be listed.", category="error")
+        job_count = 0
+    jobs_pagination = Pagination(request, job_count, limit=25, query_param="jp", limit_param="jlimit")
+    jobs = []
+    if job_count:
+        jobs = client.getQueueData(start=jobs_pagination.start_index, limit=jobs_pagination.limit, username=username, ascending=False) or []
+
+    # the submissions tab: the addBinarySample jobs among them, with the sample each
+    # finished one produced, read from its result - one lookup per shown row at most
+    submission_count = 0 if jobs_unavailable else (client.getQueueCount(method="addBinarySample", username=username) or 0)
+    submissions_pagination = Pagination(request, submission_count, limit=25, query_param="sp", limit_param="slimit")
+    submissions = []
+    if submission_count:
+        for job in client.getQueueData(start=submissions_pagination.start_index, limit=submissions_pagination.limit, method="addBinarySample", username=username, ascending=False) or []:
+            sample_id = _sample_id_of_submission(client.getResultForJob(job.job_id)) if job.is_finished else None
+            submissions.append({"job": job, "sample_id": sample_id})
+
+    # the uploads tab: what analyze.query kept for this account (every account's for an
+    # admin, the files nobody else can list), with what is still on disk
+    query_uploads = []
+    for job_id, filename in get_query_uploads(None if user_info.role == 'admin' else user_info.user_id):
+        upload_path = query_upload_path(current_app, job_id)
+        upload = {"job_id": job_id, "filename": filename, "size": None, "stored_at": None}
+        if upload_path is not None and os.path.isfile(upload_path):
+            stat = os.stat(upload_path)
+            upload["size"] = format_file_size(stat.st_size)
+            upload["stored_at"] = datetime.datetime.fromtimestamp(stat.st_mtime, tz=datetime.UTC)
+        query_uploads.append(upload)
+    uploads_pagination = Pagination(request, len(query_uploads), limit=25, query_param="up", limit_param="ulimit")
+    uploads_page = query_uploads[uploads_pagination.start_index:uploads_pagination.end_index]
+
+    can_use_api = user_info.role in API_ROLES
+    tabs = [tab for tab in PROFILE_TABS if tab != "developer" or can_use_api]
+    active_tab = request.args.get('tab', 'overview')
+    if active_tab not in tabs:
+        active_tab = 'overview'
+    has_login = user_info.last_login != "no login"
+    return render_template(
+        'profile.html',
+        tabs=tabs,
+        active_tab=active_tab,
+        user_info=user_info,
+        registered_relative=format_relative_time(user_info.registered),
+        last_login_relative=format_relative_time(user_info.last_login) if has_login else None,
+        can_use_api=can_use_api,
+        legacy_apitoken=is_legacy_apitoken(user_info.apitoken),
+        api_base_url=f"{request.host_url.rstrip('/')}/api",
+        capabilities=get_role_capabilities(),
+        jobs=jobs,
+        job_count=job_count,
+        jobs_pagination=jobs_pagination,
+        jobs_unavailable=jobs_unavailable,
+        submissions=submissions,
+        submission_count=submission_count,
+        submissions_pagination=submissions_pagination,
+        query_uploads=uploads_page,
+        upload_count=len(query_uploads),
+        uploads_pagination=uploads_pagination,
+    )
 
 def admin_required(view):
     @functools.wraps(view)

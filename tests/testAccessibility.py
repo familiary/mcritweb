@@ -52,6 +52,7 @@ VISITOR_PAGES = [
     "/analyze/cross_compare?samples=0,1",
     "/analyze/unique_blocks?samples=0,1",
     "/settings",
+    "/profile",
     "/help",
     f"/data/jobs/{job_id_of('matches_for_sample')}",
     f"/data/linkhunt/{job_id_of('matches_for_sample')}",

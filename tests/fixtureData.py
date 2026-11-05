@@ -452,7 +452,7 @@ class CorpusMcritClient:
         entry = self._jobs.get(job_id)
         return entry[1] if entry else None
 
-    def getQueueData(self, start=0, limit=0, method=None, filter=None, state=None, ascending=False, sample_ids=None, job_ids=None):
+    def getQueueData(self, start=0, limit=0, method=None, filter=None, state=None, ascending=False, sample_ids=None, job_ids=None, username=None):
         """The queue, narrowed the way mcrit narrows it - including where it does so
         badly, because callers have to cope with that.
 
@@ -473,13 +473,15 @@ class CorpusMcritClient:
         # assertion should not depend on which ones this line happened to forward
         # positionally. The two selectors only when given, so the assertions written
         # before they existed still describe the calls that don't use them.
-        selectors = {name: value for name, value in (("sample_ids", sample_ids), ("job_ids", job_ids)) if value is not None}
+        selectors = {name: value for name, value in (("sample_ids", sample_ids), ("job_ids", job_ids), ("username", username)) if value is not None}
         self._record("getQueueData", start=start, limit=limit, method=method, filter=filter, state=state, ascending=ascending, **selectors)
         if sample_ids is not None and method is None:
             return None
         documents = self._queue if not ascending else list(reversed(self._queue))
         if method is not None:
             documents = [entry for entry in documents if entry["payload"]["method"] == method]
+        if username is not None:
+            documents = [entry for entry in documents if entry.get("username") == username or entry.get("payload", {}).get("username") == username]
         if sample_ids is not None:
             # matched on payload.descriptor the way mcrit's _sample_ids_condition does, not
             # by parsing each job - a job whose params cannot be parsed is still answered
@@ -502,6 +504,22 @@ class CorpusMcritClient:
             except Exception:
                 return None
         return jobs
+
+    def record_requester(self, username, method=None):
+        """Put `username` on the captured queue documents, as mcrit 1.10+ records the
+        name of the request on each job: every job, or those of one `method`. The
+        profile lists a user's jobs through this field."""
+        for document in self._queue:
+            if method is None or document["payload"]["method"] == method:
+                document["username"] = username
+
+    def getQueueCount(self, method=None, filter=None, state=None, username=None, sample_ids=None, job_ids=None):
+        selectors = {name: value for name, value in (("sample_ids", sample_ids), ("job_ids", job_ids), ("username", username)) if value is not None}
+        self._record("getQueueCount", method=method, filter=filter, state=state, **selectors)
+        jobs = self.getQueueData(method=method, filter=filter, state=state, username=username, sample_ids=sample_ids, job_ids=job_ids)
+        if getattr(self, "raw", False):
+            return RawResponse(200, json={"count": len(jobs) if jobs is not None else 0})
+        return len(jobs) if jobs is not None else 0
 
     def getQueueStatistics(self, *args, **kwargs):
         self._record("getQueueStatistics", *args, **kwargs)

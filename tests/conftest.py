@@ -77,6 +77,10 @@ class FakeMcritClient:
         self._record("getQueueData", *args, **kwargs)
         return []
 
+    def getQueueCount(self, *args, **kwargs):
+        self._record("getQueueCount", *args, **kwargs)
+        return 0
+
     def search_samples(self, *args, **kwargs):
         self._record("search_samples", *args, **kwargs)
         return self.empty_search_result()
