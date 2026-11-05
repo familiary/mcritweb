@@ -113,7 +113,7 @@
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
           <h2 class="h4">Jobs</h2>
-          {# docs/adr/0007: the backend records the username of the request, not an owner #}
+          {# ADR-0007: the backend records the username of the request, not an owner #}
           <p class="text-muted mb-0">The jobs the MCRIT backend recorded under the username <strong>{{ user_info.username }}</strong>. A renamed account's earlier jobs stay under the old name.</p>
         </div>
         <a href="{{ url_for('data.jobs') }}" class="btn btn-outline-secondary btn-sm">All jobs</a>

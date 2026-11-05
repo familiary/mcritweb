@@ -1015,7 +1015,7 @@ def remember_query_filename(job_id, filename, user_id=None):
     place the name is ever kept. Keyed by job id: the backend deduplicates a repeated
     query onto the job it already has, and the name kept is the first one seen for it.
     The uploader is the account's local id, not its username: a username is renamed
-    and freed here (docs/adr/0007), so keyed on it a renamed account would lose its
+    and freed here (ADR-0007), so keyed on it a renamed account would lose its
     uploads and the next holder of a freed name would be shown the old holder's.
     """
     filename = _displayable_filename(filename)

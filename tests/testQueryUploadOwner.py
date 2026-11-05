@@ -2,7 +2,7 @@
 """Who a query upload belongs to: the local account id, recorded when the upload is kept.
 
 The profile lists a user's query uploads. The first version found them through the
-backend's jobs for the username, which docs/adr/0007 rules out as an owner: a username is
+backend's jobs for the username, which ADR-0007 rules out as an owner: a username is
 renamed by its holder and freed by a delete, so a renamed account lost its uploads and the
 next holder of a freed name was shown the old holder's. The `query_upload` table, the one
 `get_query_filename` already reads, now records the uploader's id next to the name, and

@@ -261,7 +261,7 @@ def test_the_hand_written_matrix_is_gone():
 # --- the jobs -------------------------------------------------------------------------------------
 
 def test_the_jobs_pane_lists_the_jobs_under_the_username_and_names_what_that_is(client, as_requester):
-    """The jobs are the backend's, keyed by the username it recorded (docs/adr/0007):
+    """The jobs are the backend's, keyed by the username it recorded (ADR-0007):
     the page says so in words, so nobody reads the list as an account's history."""
     as_requester()
     html = client.get("/profile").get_data(as_text=True)
@@ -396,7 +396,7 @@ def test_an_admin_is_shown_every_upload(client, as_role, app):
 
 
 def test_a_renamed_account_still_sees_its_uploads(client, as_role, app):
-    """docs/adr/0007: the username is renamed by its holder, so keyed on it the uploads
+    """ADR-0007: the username is renamed by its holder, so keyed on it the uploads
     would have vanished at the rename. They are keyed on the account's id."""
     user_id = as_role("visitor", username="before")
     keep_upload(app, user_id, "mine.exe")
@@ -409,7 +409,7 @@ def test_a_renamed_account_still_sees_its_uploads(client, as_role, app):
 
 
 def test_the_next_holder_of_a_freed_name_sees_nothing_of_the_old_one(client, as_role, app, make_user):
-    """docs/adr/0007: a delete frees the name for the next registration, which must
+    """ADR-0007: a delete frees the name for the next registration, which must
     not inherit the old holder's uploads."""
     old_id = as_role("visitor", username="reused")
     keep_upload(app, old_id, "old_holders.exe")

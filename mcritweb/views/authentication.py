@@ -573,7 +573,7 @@ def profile():
     not an empty one - is said so, as data.jobs says it.
 
     The jobs are the backend's, keyed by the username it recorded at the time of the
-    request (docs/adr/0007): a renamed account's earlier jobs stay under the old name.
+    request (ADR-0007): a renamed account's earlier jobs stay under the old name.
     The uploads are this instance's, keyed by the account's id, and follow a rename.
     """
     user_info = g.user
