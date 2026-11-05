@@ -3,7 +3,7 @@ import re
 import time
 
 import requests
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
 from mcrit.queue.JobCollection import JobCollection
 from mcrit.storage.FamilyEntry import FamilyEntry
 from mcrit.storage.SampleEntry import SampleEntry
@@ -11,8 +11,9 @@ from mcrit.storage.SampleEntry import SampleEntry
 import mcritweb.views.cfg_explorer_detector as cfg_explorer_detector
 from mcritweb.autocomplete import autocomplete_items
 from mcritweb.backend_errors import BACKEND_FAILURES, require_result, with_server_errors
+from mcritweb.db import ServerInfo, get_all_user_info, is_legacy_apitoken
 from mcritweb.statistics import statistics_page
-from mcritweb.views.authentication import contributor_required, visitor_required
+from mcritweb.views.authentication import KNOWN_ROLES, contributor_required, visitor_required
 from mcritweb.views.client import backend_version, get_client, get_sample_entries, remember_samples
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.data import JOB_ID_PATTERN
@@ -1069,4 +1070,66 @@ def search():
         family_decorations=family_decorations,
         sample_decorations=sample_decorations,
         function_decorations=function_decorations
+    )
+
+
+@bp.route('/users')
+@visitor_required
+@mcrit_server_required
+def users():
+    all_users = get_all_user_info()
+
+    server_info = ServerInfo.fromDb()
+    is_single = bool(server_info and server_info.operation_mode == 'single')
+
+    users_by_role = {role: [] for role in KNOWN_ROLES}
+    for user_info in all_users:
+        if user_info.role in users_by_role:
+            users_by_role[user_info.role].append(user_info)
+
+    g.all_users = all_users
+    g.users_by_role = users_by_role
+
+    user_stats = {}
+    try:
+        client = get_client()
+        for u in all_users:
+            count = 0
+            try:
+                raw_jobs = client.getQueueData(username=u.username, filter="addBinarySample")
+                if raw_jobs:
+                    for job in raw_jobs:
+                        method = (
+                            getattr(job, "method", "")
+                            if hasattr(job, "method")
+                            else (job.get("method", "") if isinstance(job, dict) else "")
+                        )
+                        if not method or method in ("addBinarySample", "addReport", "addSample"):
+                            count += 1
+            except Exception as e:
+                current_app.logger.debug("Failed to fetch queue submissions for %s: %s", u.username, e)
+                count = 0
+            user_stats[u.username] = count
+    except Exception as e:
+        current_app.logger.warning("Could not reach backend for queue submissions: %s", e)
+        user_stats = {u.username: 0 for u in all_users}
+
+    legacy_token_user_ids = {
+        user_info.user_id for user_info in all_users if is_legacy_apitoken(user_info.apitoken)
+    }
+
+    active_tab = request.args.get("tab", "all")
+    if active_tab not in (*KNOWN_ROLES, "all", "visitors", "contributors", "admins"):
+        active_tab = "all"
+
+    return render_template(
+        "users.html",
+        users=all_users,
+        user_stats=user_stats,
+        submission_counts=user_stats,
+        is_single=is_single,
+        is_single_user=is_single,
+        users_by_role=users_by_role,
+        legacy_token_user_ids=legacy_token_user_ids,
+        active=active_tab,
     )

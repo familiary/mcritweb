@@ -6,7 +6,7 @@ import types
 import uuid
 from urllib.parse import quote, urlencode
 
-from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Blueprint, Response, abort, current_app, flash, g, json, redirect, render_template, request, send_from_directory, session, url_for
 from mcrit.libs.utility import decode_two_complement
 from mcrit.queue.LocalQueue import Job
 from mcrit.queue.QueueRemoteCalls import to_binary as canonicalise_queue_json
@@ -1999,7 +1999,7 @@ def delete_job_by_id(job_id):
 ################################################################
 
 @bp.route('/request_filename_info', methods=['POST'])
-@contributor_required
+@visitor_required
 @mcrit_server_required
 def request_filename_info():
     try:
@@ -2050,17 +2050,19 @@ def request_filename_info():
 
 
 @bp.route('/submit_or_query', methods=('POST',))
-@contributor_required
+@visitor_required
 @mcrit_server_required
 def submit_or_query():
-    form_type = request.form['form_type']
+    form_type = request.form.get('form_type')
     # NOTE: we do not use redirect to prevent resending of large file data
-    if form_type == "query_form":
-        return analyze_query()
-        # return redirect(url_for("analyze.query"), code=307)
-    elif form_type == "submit_form":
+    if form_type == "submit_form":
+        if g.user is None or g.user.role not in ('contributor', 'admin'):
+            abort(403)
         return submit()
         # return redirect(url_for("data.submit"), code=307)
+    elif form_type == "query_form":
+        return analyze_query()
+        # return redirect(url_for("analyze.query"), code=307)
     # the view returned nothing for any other form_type, which Flask turns into a 500
     return "", 400 # Bad Request
 
@@ -2144,6 +2146,68 @@ def submit():
             flash('Sample was already in database', category='warning')
             return url_for('explore.sample_by_id', sample_id=sample_entry.sample_id), 202 # Accepted
     return render_template('submit.html', show_submit_fields=True)
+
+
+#: Valid tab identifiers for the consolidated Ingestion Hub
+VALID_INGEST_TABS = ('query', 'submit', 'import')
+
+
+@bp.route('/ingest', methods=('GET', 'POST'))
+@bp.route('/ingest/<tab>', methods=('GET', 'POST'))
+@visitor_required
+@mcrit_server_required
+def ingest(tab="query"):
+    """Consolidated Ingestion Hub view.
+
+    Provides a unified tabbed interface for:
+    - Similarity queries (query against corpus) - accessible to visitor, contributor, admin
+    - Corpus submissions (add sample to corpus) - accessible to contributor, admin (visitor read-only notice)
+    - Database imports (import export bundle) - accessible to contributor, admin (visitor read-only notice)
+    """
+    if tab not in VALID_INGEST_TABS:
+        return redirect(url_for('data.ingest', tab='query'))
+
+    if request.method == 'POST':
+        if tab == 'query':
+            return analyze_query()
+        elif tab == 'submit':
+            if g.user is None or g.user.role not in ('contributor', 'admin'):
+                abort(403)
+            return submit()
+        elif tab == 'import':
+            if g.user is None or g.user.role not in ('contributor', 'admin'):
+                abort(403)
+            return import_view()
+        return "", 400
+
+    # GET request: compile context variables
+    role_limit = current_app.config.get('QUERY_UPLOAD_LIMITS', {}).get(g.user.role if g.user else None)
+    upload_limit_mb = round(role_limit / (1024 * 1024), 1) if role_limit else None
+    upload_limits = {
+        'role_limit': role_limit,
+        'role_limit_mb': upload_limit_mb,
+        'max_content_length': current_app.config.get('MAX_CONTENT_LENGTH'),
+    }
+
+    form_defaults = {
+        'options': 'unmapped',
+        'bitness': '32',
+        'base_addr': '',
+        'minhash_band_range': 2,
+        'version': '',
+        'family': '',
+    }
+
+    return render_template(
+        'ingest.html',
+        active_tab=tab,
+        user_role=g.user.role if g.user else 'visitor',
+        upload_limits=upload_limits,
+        form_defaults=form_defaults,
+        family_names_url=url_for('explore.family_names'),
+        show_submit_fields=(tab == 'submit'),
+        select_form_type=False,
+    )
 
 
 ################################################################

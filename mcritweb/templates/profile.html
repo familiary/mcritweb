@@ -2,142 +2,6 @@
 {% extends 'base.html' %}
 {% block title %}User Profile - {{ user_info.username }}{% endblock %}
 
-{% block style %}
-<style>
-  .profile-container {
-    max-width: 1400px;
-    margin: 0 auto;
-  }
-  .profile-card {
-    border: 1px solid var(--border-subtle, #dee2e6);
-    border-radius: 0.5rem;
-    background-color: var(--surface-page, #ffffff);
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
-  }
-  .stat-card {
-    border: 1px solid var(--border-subtle, #e9ecef);
-    border-radius: 0.375rem;
-    padding: 1rem;
-    background: var(--surface-subtle, #f8f9fa);
-    text-align: center;
-  }
-  .stat-card .stat-value {
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--accent, #377ba8);
-    line-height: 1.2;
-  }
-  .stat-card .stat-label {
-    font-size: 0.85rem;
-    color: var(--text-muted, #6c757d);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .code-snippet-box {
-    position: relative;
-    background-color: #212529;
-    color: #f8f9fa;
-    border-radius: 0.375rem;
-    padding: 1rem;
-    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    font-size: 0.875rem;
-    overflow-x: auto;
-  }
-  .code-snippet-copy {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    z-index: 2;
-  }
-  /* Container Query Responsive Data Tables */
-  .profile-table-container {
-    container-type: inline-size;
-    max-width: 100%;
-    overflow-x: auto;
-  }
-  .profile-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-  }
-  .profile-table thead th {
-    position: sticky;
-    top: 0;
-    background-color: var(--surface-subtle, #f8f9fa);
-    color: var(--text-strong, #212529);
-    z-index: 2;
-    border-bottom: 2px solid var(--border-subtle, #dee2e6);
-    white-space: nowrap;
-  }
-  @media (prefers-color-scheme: dark) {
-    .profile-card {
-      background-color: var(--surface-page, #1e1e1e);
-      border-color: var(--border-subtle, #333333);
-    }
-    .stat-card {
-      background: var(--surface-subtle, #252525);
-      border-color: var(--border-subtle, #333333);
-    }
-    .profile-table thead th {
-      background-color: var(--surface-subtle, #252525);
-      border-bottom-color: var(--border-subtle, #333333);
-      color: var(--text-strong, #f8f9fa);
-    }
-    .responsive-card-table tr {
-      background-color: var(--surface-page, #1e1e1e);
-      border-color: var(--border-subtle, #333333);
-    }
-    .token-display-box {
-      background-color: var(--surface-subtle, #252525) !important;
-      border-color: var(--border-subtle, #333333) !important;
-    }
-  }
-  @container (max-width: 680px) {
-    .responsive-card-table,
-    .responsive-card-table thead,
-    .responsive-card-table tbody,
-    .responsive-card-table tr,
-    .responsive-card-table th,
-    .responsive-card-table td {
-      display: block;
-    }
-    .responsive-card-table thead {
-      display: none;
-    }
-    .responsive-card-table tr {
-      margin-bottom: 1rem;
-      border: 1px solid var(--border-subtle, #dee2e6);
-      border-radius: 0.375rem;
-      padding: 0.75rem;
-      background-color: var(--surface-page, #ffffff);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .responsive-card-table td {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.45rem 0;
-      border: none;
-      border-bottom: 1px dashed var(--border-subtle, #e9ecef);
-      text-align: right;
-    }
-    .responsive-card-table td:last-child {
-      border-bottom: none;
-      padding-top: 0.6rem;
-      justify-content: flex-end;
-    }
-    .responsive-card-table td::before {
-      content: attr(data-label);
-      font-weight: 600;
-      text-align: left;
-      margin-right: 1rem;
-      color: var(--text-muted, #495057);
-      flex-shrink: 0;
-    }
-  }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="profile-container my-3">
   <!-- Heading Hierarchy: Page Title h1 -->
@@ -155,9 +19,15 @@
       {% endif %}
     </div>
     <div>
-      <a href="{{ url_for('authentication.settings') }}" class="btn btn-outline-secondary btn-sm">
-        <i class="fa-solid fa-gear me-1" aria-hidden="true"></i> Settings
-      </a>
+      {% if is_own_profile %}
+        <a href="{{ url_for('authentication.settings') }}" class="btn btn-outline-secondary btn-sm">
+          <i class="fa-solid fa-gear me-1" aria-hidden="true"></i> Settings
+        </a>
+      {% else %}
+        <a href="{{ url_for('explore.users') }}" class="btn btn-outline-secondary btn-sm">
+          <i class="fa-solid fa-users me-1" aria-hidden="true"></i> All Users
+        </a>
+      {% endif %}
     </div>
   </div>
 
@@ -169,32 +39,108 @@
           <i class="fa-solid fa-id-card me-1" aria-hidden="true"></i> Overview
         </button>
       </li>
+      {% if is_own_profile or is_admin %}
       <li class="nav-item" role="presentation">
         <button class="nav-link {% if active_tab == 'jobs' %}active{% endif %}" id="tab-jobs" data-bs-toggle="pill" data-bs-target="#pane-jobs" type="button" role="tab" aria-controls="pane-jobs" aria-selected="{{ 'true' if active_tab == 'jobs' else 'false' }}" tabindex="{{ '0' if active_tab == 'jobs' else '-1' }}">
           <i class="fa-solid fa-list-check me-1" aria-hidden="true"></i> Activity & Jobs ({{ job_count }})
         </button>
       </li>
+      {% endif %}
+      {% if show_ephemeral %}
       <li class="nav-item" role="presentation">
         <button class="nav-link {% if active_tab == 'uploads' %}active{% endif %}" id="tab-uploads" data-bs-toggle="pill" data-bs-target="#pane-uploads" type="button" role="tab" aria-controls="pane-uploads" aria-selected="{{ 'true' if active_tab == 'uploads' else 'false' }}" tabindex="{{ '0' if active_tab == 'uploads' else '-1' }}">
           <i class="fa-solid fa-cloud-arrow-up me-1" aria-hidden="true"></i> Ephemeral Queries ({{ query_uploads|length }})
         </button>
       </li>
+      {% endif %}
       <li class="nav-item" role="presentation">
         <button class="nav-link {% if active_tab == 'submissions' %}active{% endif %}" id="tab-submissions" data-bs-toggle="pill" data-bs-target="#pane-submissions" type="button" role="tab" aria-controls="pane-submissions" aria-selected="{{ 'true' if active_tab == 'submissions' else 'false' }}" tabindex="{{ '0' if active_tab == 'submissions' else '-1' }}">
           <i class="fa-solid fa-file-arrow-up me-1" aria-hidden="true"></i> Submissions ({{ submission_jobs|length }})
         </button>
       </li>
+      {% if show_developer_tab %}
       <li class="nav-item" role="presentation">
         <button class="nav-link {% if active_tab == 'developer' %}active{% endif %}" id="tab-developer" data-bs-toggle="pill" data-bs-target="#pane-developer" type="button" role="tab" aria-controls="pane-developer" aria-selected="{{ 'true' if active_tab == 'developer' else 'false' }}" tabindex="{{ '0' if active_tab == 'developer' else '-1' }}">
           <i class="fa-solid fa-code me-1" aria-hidden="true"></i> Developer & API
         </button>
       </li>
+      {% endif %}
     </ul>
   </nav>
 
   <div class="tab-content" id="profileTabContent">
     <!-- PANE 1: OVERVIEW -->
     <div class="tab-pane fade {% if active_tab == 'overview' %}show active{% endif %}" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">
+      {% if is_admin and not is_own_profile and user_info.user_id != 1 %}
+      <div class="card border-danger mb-4">
+        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+          <span class="fw-bold"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i> Administrative Management</span>
+          <span class="badge bg-light text-dark">Admin View</span>
+        </div>
+        <div class="card-body">
+          <div class="row align-items-center g-3">
+            <div class="col-md-5">
+              <label class="form-label fw-bold small text-muted mb-1">Change User Role:</label>
+              <div class="dropdown">
+                <button class="btn btn-outline-secondary btn-sm dropdown-toggle w-100 text-start d-flex justify-content-between align-items-center" type="button" id="adminRoleDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                  <span>Current: <strong class="text-capitalize">{{ user_info.role }}</strong></span>
+                </button>
+                <ul class="dropdown-menu w-100" aria-labelledby="adminRoleDropdown">
+                  {% for r in ('pending', 'visitor', 'contributor', 'admin') %}
+                    {% if r != user_info.role %}
+                      <li>
+                        <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', user_id=user_info.user_id, role=r, tab='profile') }}">
+                          <i class="fa-solid fa-user-pen me-2 text-muted" aria-hidden="true"></i>Change role to {{ r|capitalize }}
+                        </button>
+                      </li>
+                    {% endif %}
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold small text-muted mb-1">API Token Management:</label>
+              <div>
+                <button type="button" class="btn btn-outline-warning btn-sm w-100 text-start" data-post="{{ url_for('admin.regenerate_user_apitoken', user_id=user_info.user_id) }}">
+                  <i class="fa-solid fa-rotate me-1" aria-hidden="true"></i> Regenerate API Token
+                </button>
+              </div>
+            </div>
+            <div class="col-md-3 d-flex justify-content-md-end align-items-end">
+              <div>
+                <label class="form-label fw-bold small text-danger mb-1 d-block">Danger Zone:</label>
+                <button type="button" class="btn btn-outline-danger btn-sm w-100" data-post="{{ url_for('admin.delete_user', user_id=user_info.user_id, tab='profile') }}" onclick="return confirm('Are you sure you want to permanently delete user {{ user_info.username }}? This action cannot be undone.');">
+                  <i class="fa-solid fa-trash-can me-1" aria-hidden="true"></i> Delete User
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Public Contribution Statistics -->
+      <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-md-4">
+          <div class="stat-card">
+            <div class="stat-value text-primary">{{ public_submission_count }}</div>
+            <div class="stat-label">Corpus Submissions</div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-md-4">
+          <div class="stat-card">
+            <div class="stat-value text-success">{{ indexed_sample_count }}</div>
+            <div class="stat-label">Indexed Samples</div>
+          </div>
+        </div>
+        <div class="col-sm-12 col-md-4">
+          <div class="stat-card">
+            <div class="stat-value text-secondary">{{ user_info.role|capitalize }}</div>
+            <div class="stat-label">Account Tier</div>
+          </div>
+        </div>
+      </div>
+
       <div class="row g-4">
         <div class="col-lg-5">
           <div class="profile-card p-4 h-100">
@@ -232,20 +178,26 @@
 
               <dt class="col-sm-5 text-muted">Last Login:</dt>
               <dd class="col-sm-7">
-                {% if last_login_formatted != 'Never' and user_info.last_login %}
-                  <time datetime="{{ user_info.last_login.isoformat() if user_info.last_login != 'no login' else '' }}" title="{{ last_login_formatted }}">
-                    {{ last_login_formatted }} <small class="text-muted d-block">({{ last_login_relative }})</small>
-                  </time>
+                {% if is_own_profile or is_admin %}
+                  {% if last_login_formatted != 'Never' and user_info.last_login %}
+                    <time datetime="{{ user_info.last_login.isoformat() if user_info.last_login != 'no login' else '' }}" title="{{ last_login_formatted }}">
+                      {{ last_login_formatted }} <small class="text-muted d-block">({{ last_login_relative }})</small>
+                    </time>
+                  {% else %}
+                    <span class="text-muted">{{ last_login_relative }}</span>
+                  {% endif %}
                 {% else %}
-                  <span class="text-muted">{{ last_login_relative }}</span>
+                  <span class="text-muted">Private</span>
                 {% endif %}
               </dd>
             </dl>
+            {% if is_own_profile %}
             <div class="mt-4 pt-3 border-top">
               <a href="{{ url_for('authentication.settings') }}" class="btn btn-primary btn-sm">
                 <i class="fa-solid fa-user-pen me-1" aria-hidden="true"></i> Edit Credentials & Preferences
               </a>
             </div>
+            {% endif %}
           </div>
         </div>
 
@@ -272,8 +224,8 @@
                           <span class="badge bg-success"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>{{ role_status }}</span>
                         {% elif role_status == 'Uncapped' %}
                           <span class="badge bg-success"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>Uncapped</span>
-                        {% elif role_status == 'Capped (1 MiB)' %}
-                          <span class="badge bg-warning text-dark"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>Capped (1 MiB)</span>
+                        {% elif role_status.startswith('Capped') %}
+                          <span class="badge bg-warning text-dark"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>{{ role_status }}</span>
                         {% elif role_status == 'Read Only' or role_status == 'Read & Submit' %}
                           <span class="badge bg-info text-dark"><i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>{{ role_status }}</span>
                         {% else %}
@@ -291,6 +243,7 @@
       </div>
     </div>
 
+    {% if is_own_profile or is_admin %}
     <!-- PANE 2: JOBS & ACTIVITY -->
     <div class="tab-pane fade {% if active_tab == 'jobs' %}show active{% endif %}" id="pane-jobs" role="tabpanel" aria-labelledby="tab-jobs">
       <div class="profile-card p-4">
@@ -341,7 +294,7 @@
           <div class="alert alert-warning d-flex align-items-center" role="alert">
             <i class="fa-solid fa-triangle-exclamation fs-4 me-3" aria-hidden="true"></i>
             <div>
-              <strong>Queue Service Unreachable:</strong> Unable to connect to the MCRIT backend queue. The activity ledger cannot be displayed right now.
+              <strong>Queue Service Unreachable:</strong> Unable to connect to the MCRIT backend queue. The activity ledger is temporarily unavailable.
             </div>
           </div>
         {% elif analysis_jobs|length == 0 %}
@@ -385,11 +338,7 @@
                       {% endif %}
                     </td>
                     <td data-label="Runtime">
-                      {% if job.duration %}
-                        {{ job.duration|round(2) }}s
-                      {% else %}
-                        <span class="text-muted">N/A</span>
-                      {% endif %}
+                      {{ job.duration|duration }}
                     </td>
                     <td data-label="Created">
                       {% if job.created_at %}
@@ -417,7 +366,9 @@
         {% endif %}
       </div>
     </div>
+    {% endif %}
 
+    {% if show_ephemeral %}
     <!-- PANE 3: EPHEMERAL QUERIES -->
     <div class="tab-pane fade {% if active_tab == 'uploads' %}show active{% endif %}" id="pane-uploads" role="tabpanel" aria-labelledby="tab-uploads">
       <div class="profile-card p-4">
@@ -449,7 +400,6 @@
                   <th scope="col">Filename</th>
                   <th scope="col">Size</th>
                   <th scope="col">Uploaded</th>
-                  <th scope="col">Remaining TTL</th>
                   <th scope="col" class="text-end">Actions</th>
                 </tr>
               </thead>
@@ -469,15 +419,6 @@
                       <time datetime="{{ upload.created_formatted }}" title="{{ upload.created_formatted }}">
                         {{ upload.created_formatted }} <small class="text-muted">({{ upload.created_relative }})</small>
                       </time>
-                    </td>
-                    <td data-label="Remaining TTL">
-                      {% if upload.remaining_seconds > 86400 %}
-                        <span class="badge bg-success"><i class="fa-solid fa-clock me-1" aria-hidden="true"></i>{{ upload.ttl_formatted }}</span>
-                      {% elif upload.remaining_seconds > 0 %}
-                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>{{ upload.ttl_formatted }}</span>
-                      {% else %}
-                        <span class="badge bg-danger"><i class="fa-solid fa-hourglass-end me-1" aria-hidden="true"></i>Expired</span>
-                      {% endif %}
                     </td>
                     <td data-label="Actions" class="text-end">
                       <div class="d-inline-flex gap-2">
@@ -503,6 +444,7 @@
         {% endif %}
       </div>
     </div>
+    {% endif %}
 
     <!-- PANE 4: SUBMISSIONS -->
     <div class="tab-pane fade {% if active_tab == 'submissions' %}show active{% endif %}" id="pane-submissions" role="tabpanel" aria-labelledby="tab-submissions">
@@ -525,11 +467,15 @@
           <div class="text-center py-5 border rounded bg-light">
             <p class="text-muted mb-2"><i class="fa-solid fa-box-archive fa-3x" aria-hidden="true"></i></p>
             <h3 class="h5 text-dark">No Submissions Recorded</h3>
-            <p class="text-muted small">No permanent binary sample submissions were found for your account.</p>
-            {% if user_info.role in ('admin', 'contributor') %}
-              <a href="{{ url_for('data.submit') }}" class="btn btn-primary btn-sm mt-2">Submit New Binary</a>
+            {% if is_own_profile %}
+              <p class="text-muted small">No permanent binary sample submissions were found for your account.</p>
+              {% if user_info.role in ('admin', 'contributor') %}
+                <a href="{{ url_for('data.submit') }}" class="btn btn-primary btn-sm mt-2">Submit New Binary</a>
+              {% else %}
+                <p class="text-muted small"><em>Contributors and administrators can submit binary samples to the corpus.</em></p>
+              {% endif %}
             {% else %}
-              <p class="text-muted small"><em>Contributors and administrators can submit binary samples to the corpus.</em></p>
+              <p class="text-muted small">No permanent binary sample submissions were recorded for this user.</p>
             {% endif %}
           </div>
         {% else %}
@@ -598,6 +544,7 @@
       </div>
     </div>
 
+    {% if show_developer_tab %}
     <!-- PANE 5: DEVELOPER & API -->
     <div class="tab-pane fade {% if active_tab == 'developer' %}show active{% endif %}" id="pane-developer" role="tabpanel" aria-labelledby="tab-developer">
       <div class="profile-card p-4">
@@ -642,7 +589,7 @@
             <div class="col-lg-6">
               <div class="card h-100">
                 <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                  <span class="fw-bold"><i class="fa-brands fa-python me-1" aria-hidden="true"></i> Python (McritClient)</span>
+                  <span class="fw-bold"><i class="fa-solid fa-code me-1" aria-hidden="true"></i> Python (McritClient)</span>
                   <button type="button" class="btn btn-sm btn-outline-dark" onclick="copySnippet('snippetPython', this)">
                     <i class="fa-regular fa-copy me-1" aria-hidden="true"></i> Copy
                   </button>
@@ -652,7 +599,7 @@
 
 client = McritClient(
     mcrit_server="{{ api_base_url }}",
-    apitoken="{{ user_info.apitoken }}"
+    apitoken="&lt;YOUR_API_TOKEN&gt;"
 )
 
 # Verify connection and retrieve system status
@@ -672,7 +619,7 @@ print("Connected to MCRIT:", status)</code></pre>
                 </div>
                 <div class="card-body p-0">
                   <pre class="code-snippet-box m-0" id="snippetCurl"><code>curl -s -X GET \
-  -H "apitoken: {{ user_info.apitoken }}" \
+  -H "apitoken: &lt;YOUR_API_TOKEN&gt;" \
   "{{ api_base_url }}/status"</code></pre>
                 </div>
               </div>
@@ -681,6 +628,7 @@ print("Connected to MCRIT:", status)</code></pre>
         {% endif %}
       </div>
     </div>
+    {% endif %}
   </div>
 </div>
 

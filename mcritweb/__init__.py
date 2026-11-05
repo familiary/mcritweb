@@ -355,7 +355,22 @@ def create_app(test_config=None, instance_path=None):
         if len(s) >= 19:
             return s[:10] + ' ' + s[11:19]
         return s
-    
+
+    @app.template_filter('duration')
+    def duration(val):
+        if val is None or val == "":
+            return "N/A"
+        if hasattr(val, "total_seconds") and callable(val.total_seconds):
+            try:
+                secs = val.total_seconds()
+                if isinstance(secs, (int, float)):
+                    return f"{secs:.2f}s"
+            except Exception:
+                pass
+        if isinstance(val, (int, float)):
+            return f"{val:.2f}s"
+        s = str(val)
+        return s if s.endswith('s') else f"{s}s"
 
     @app.template_global()
     def join_hint_strings(list_of_strings):

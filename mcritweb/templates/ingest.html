@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+{% block title %}Ingestion Hub - {{ active_tab|capitalize }}{% endblock %}
+
+{% block style %}
+  <style>
+    .ingest-header {
+      margin-bottom: 1.5rem;
+    }
+    .ingest-tabs .nav-link {
+      font-weight: 500;
+      color: #495057;
+      padding: 0.65rem 1.25rem;
+    }
+    .ingest-tabs .nav-link.active {
+      font-weight: 600;
+      color: #0d6efd;
+      border-bottom: 2px solid #0d6efd;
+    }
+    .ingest-panel {
+      background: #ffffff;
+      border: 1px solid #e9ecef;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .ingest-notice {
+      max-width: 650px;
+      margin: 0 auto 1.5rem auto;
+    }
+  </style>
+
+  {% if active_tab in ('query', 'submit') %}
+    {{ submit_or_query_dropzone_js(select_form_type=select_form_type) }}
+  {% elif active_tab == 'import' %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
+    {{ dropzone.style('border: 2px dashed black; margin: 20px auto; width: 100%; max-width: 600px; min-height: 400px; border-radius: 25px; background: rgb(240, 240, 240);') }}
+  {% endif %}
+{% endblock %}
+
+{% set suppress_dropzone_overlay = true %}
+
+{% block content %}
+<div class="container-fluid py-2">
+  <div class="ingest-header d-flex flex-wrap align-items-center justify-content-between border-bottom pb-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1"><i class="fa-solid fa-cloud-arrow-up text-primary me-2"></i>Data Ingestion Hub</h1>
+      <p class="text-muted mb-0">Query samples against the corpus, submit new binaries, or import database export bundles.</p>
+    </div>
+    {% if upload_limits and upload_limits.role_limit_mb %}
+      <div class="mt-2 mt-md-0">
+        <span class="badge bg-light text-dark border">
+          <i class="fa-solid fa-hard-drive me-1 text-secondary"></i>Account upload cap: <strong>{{ upload_limits.role_limit_mb }} MB</strong>
+        </span>
+      </div>
+    {% endif %}
+  </div>
+
+  <ul class="nav nav-tabs ingest-tabs mb-4" id="ingestHubTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <a class="nav-link {% if active_tab == 'query' %}active{% endif %}" id="tab-query" href="{{ url_for('data.ingest', tab='query') }}" role="tab" aria-selected="{{ 'true' if active_tab == 'query' else 'false' }}">
+        <i class="fa-solid fa-magnifying-glass me-1"></i> Similarity Query
+      </a>
+    </li>
+    <li class="nav-item" role="presentation">
+      <a class="nav-link {% if active_tab == 'submit' %}active{% endif %}" id="tab-submit" href="{{ url_for('data.ingest', tab='submit') }}" role="tab" aria-selected="{{ 'true' if active_tab == 'submit' else 'false' }}">
+        <i class="fa-solid fa-file-circle-plus me-1"></i> Corpus Submission
+      </a>
+    </li>
+    <li class="nav-item" role="presentation">
+      <a class="nav-link {% if active_tab == 'import' %}active{% endif %}" id="tab-import" href="{{ url_for('data.ingest', tab='import') }}" role="tab" aria-selected="{{ 'true' if active_tab == 'import' else 'false' }}">
+        <i class="fa-solid fa-file-import me-1"></i> Database Import
+      </a>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="ingestHubContent">
+    {# ========================================================================= #}
+    {# TAB 1: SIMILARITY QUERY                                                   #}
+    {# ========================================================================= #}
+    {% if active_tab == 'query' %}
+      <div class="tab-pane fade show active" id="pane-query" role="tabpanel" aria-labelledby="tab-query">
+        <div class="ingest-panel">
+          <div class="text-center mb-3">
+            <h2 class="h5 mb-1">Query Sample Similarity</h2>
+            <p class="text-muted small mb-0">Upload a raw binary, memory dump, or SMDA report to match against the corpus without modifying database records.</p>
+          </div>
+          {{ submit_or_query_dropzone(select_form_type=false, show_submit_fields=false) }}
+        </div>
+      </div>
+
+    {# ========================================================================= #}
+    {# TAB 2: CORPUS SUBMISSION                                                  #}
+    {# ========================================================================= #}
+    {% elif active_tab == 'submit' %}
+      <div class="tab-pane fade show active" id="pane-submit" role="tabpanel" aria-labelledby="tab-submit">
+        <div class="ingest-panel">
+          <div class="text-center mb-3">
+            <h2 class="h5 mb-1">Submit Sample to Corpus</h2>
+            <p class="text-muted small mb-0">Index a new sample into the shared MCRIT corpus under a specified malware family and version.</p>
+          </div>
+
+          {% if g.user and g.user.role == 'visitor' %}
+            <div class="alert alert-warning ingest-notice d-flex align-items-center" role="alert">
+              <i class="fa-solid fa-triangle-exclamation fa-lg me-3 text-warning"></i>
+              <div>
+                <strong>Contributor Privileges Required</strong><br>
+                Submitting samples to the shared corpus requires contributor privileges. You may review the required metadata and submission parameters below, or switch to the <a href="{{ url_for('data.ingest', tab='query') }}" class="alert-link">Similarity Query</a> tab to run non-destructive matches.
+              </div>
+            </div>
+          {% endif %}
+
+          {{ submit_or_query_dropzone(select_form_type=false, show_submit_fields=true) }}
+
+          {% if g.user and g.user.role == 'visitor' %}
+            <script>
+              $(document).ready(function() {
+                var btn = $("#submit-dropzone");
+                btn.prop("disabled", true);
+                btn.attr("title", "Contributor privileges required to submit to corpus");
+              });
+            </script>
+          {% endif %}
+        </div>
+      </div>
+
+    {# ========================================================================= #}
+    {# TAB 3: DATABASE IMPORT                                                    #}
+    {# ========================================================================= #}
+    {% elif active_tab == 'import' %}
+      <div class="tab-pane fade show active" id="pane-import" role="tabpanel" aria-labelledby="tab-import">
+        <div class="ingest-panel">
+          <div class="text-center mb-3">
+            <h2 class="h5 mb-1">Import Export Bundle</h2>
+            <p class="text-muted small mb-0">Import a whole-database or family JSON export bundle into this MCRIT instance.</p>
+          </div>
+
+          {% if g.user and g.user.role == 'visitor' %}
+            <div class="alert alert-warning ingest-notice d-flex align-items-center" role="alert">
+              <i class="fa-solid fa-triangle-exclamation fa-lg me-3 text-warning"></i>
+              <div>
+                <strong>Contributor Privileges Required</strong><br>
+                Importing database export bundles requires contributor privileges. Please contact an administrator to request contributor access, or use the <a href="{{ url_for('data.ingest', tab='query') }}" class="alert-link">Similarity Query</a> tab.
+              </div>
+            </div>
+          {% else %}
+            <div class="d-flex flex-column align-items-center">
+              {{ dropzone.create(action=url_for('data.import_view')) }}
+              <div id="import-status" class="alert alert-info" role="status" aria-live="polite" style="display:none; width:60%;">
+                <span id="import-status-spinner" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                <span id="import-status-text"></span>
+              </div>
+            </div>
+            <script src="{{ url_for('static', filename='dropzone.js') }}"></script>
+            {% set import_status_js %}
+              var dz = this;
+              var statusBox = document.getElementById("import-status");
+              var statusText = document.getElementById("import-status-text");
+              var statusSpinner = document.getElementById("import-status-spinner");
+              var lastImportStatus = null;
+
+              function showImportStatus(message, busy, level) {
+                var key = level + "|" + (busy ? "1" : "0") + "|" + message;
+                if (key === lastImportStatus) { return; }
+                lastImportStatus = key;
+                statusBox.className = "alert " + level;
+                statusBox.style.display = "";
+                statusSpinner.style.display = busy ? "" : "none";
+                statusText.textContent = message;
+              }
+
+              function importFileLabel(file) {
+                var name = (file && typeof file.name === "string") ? file.name : "the file";
+                return name.length > 80 ? name.slice(0, 80) + "..." : name;
+              }
+
+              function importHasFailed() {
+                return dz.getFilesWithStatus(Dropzone.ERROR).length > 0;
+              }
+
+              dz.on("addedfile", function() {
+                dz.getFilesWithStatus(Dropzone.ERROR).forEach(function(failed) {
+                  dz.removeFile(failed);
+                });
+              });
+
+              dz.on("sending", function(file) {
+                showImportStatus("Uploading " + importFileLabel(file) + " ...", true, "alert-info");
+              });
+
+              dz.on("uploadprogress", function(file, progress) {
+                if (importHasFailed()) { return; }
+                var percent = (typeof progress === "number" && isFinite(progress))
+                  ? Math.max(0, Math.min(100, Math.floor(progress)))
+                  : null;
+                if (percent === 100) {
+                  showImportStatus("Upload complete - the MCRIT server is importing the data. A large export can take several minutes, please keep this page open.", true, "alert-info");
+                } else if (percent === null) {
+                  showImportStatus("Uploading " + importFileLabel(file) + " ...", true, "alert-info");
+                } else {
+                  showImportStatus("Uploading " + importFileLabel(file) + " ... " + percent + "%", true, "alert-info");
+                }
+              });
+
+              dz.on("error", function(file, message, xhr) {
+                var reason;
+                if (xhr && xhr.status) {
+                  reason = "the MCRIT web server answered " + xhr.status + ". The data was not imported.";
+                } else if (typeof message === "string" && message.length <= 200 && message.indexOf("<") === -1) {
+                  reason = message;
+                } else {
+                  reason = "the upload was not accepted.";
+                }
+                showImportStatus("Import failed: " + reason, false, "alert-danger");
+                if (file && file.previewElement) {
+                  var shown = file.previewElement.querySelectorAll("[data-dz-errormessage]");
+                  for (var i = 0; i < shown.length; i++) {
+                    shown[i].textContent = reason;
+                  }
+                }
+              });
+
+              dz.on("queuecomplete", function() {
+                if (importHasFailed()) { return; }
+                showImportStatus("Upload accepted - loading the import report ...", true, "alert-info");
+                window.location = {{ url_for('data.import_complete')|tojson }};
+              });
+            {% endset %}
+            {{ dropzone.config(max_file_size=100000000, redirect_view=None, custom_init=import_status_js) }}
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

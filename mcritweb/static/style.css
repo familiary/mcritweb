@@ -267,3 +267,109 @@ form.form-inline input {
   vertical-align: middle;
   margin: 0 2px 0 8px;
 }
+
+/* User Profile & Activity Hub Styles */
+.profile-container, .settings-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.profile-card {
+  border: 1px solid var(--border-subtle, #dee2e6);
+  border-radius: 0.5rem;
+  background-color: var(--surface-page, #ffffff);
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+}
+.stat-card {
+  border: 1px solid var(--border-subtle, #e9ecef);
+  border-radius: 0.375rem;
+  padding: 1rem;
+  background: var(--surface-subtle, #f8f9fa);
+  text-align: center;
+}
+.stat-card .stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--accent, #377ba8);
+  line-height: 1.2;
+}
+.stat-card .stat-label {
+  font-size: 0.85rem;
+  color: #495057;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.code-snippet-box {
+  position: relative;
+  background-color: #212529;
+  color: #f8f9fa;
+  border-radius: 0.375rem;
+  padding: 1rem;
+  font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.875rem;
+  overflow-x: auto;
+  max-width: 100%;
+  word-break: break-all;
+}
+.profile-table-container {
+  container-type: inline-size;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.profile-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.profile-table thead th {
+  background-color: var(--surface-subtle, #f8f9fa);
+  color: var(--text-strong, #212529);
+  border-bottom: 2px solid var(--border-subtle, #dee2e6);
+  white-space: nowrap;
+}
+@container (max-width: 680px) {
+  .responsive-card-table,
+  .responsive-card-table thead,
+  .responsive-card-table tbody,
+  .responsive-card-table tr,
+  .responsive-card-table th,
+  .responsive-card-table td {
+    display: block;
+  }
+  .responsive-card-table thead {
+    display: none;
+  }
+  .responsive-card-table tr {
+    margin-bottom: 1rem;
+    border: 1px solid var(--border-subtle, #dee2e6);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    background-color: var(--surface-page, #ffffff);
+  }
+  .responsive-card-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.375rem 0;
+    border: none;
+    border-bottom: 1px dashed var(--border-subtle, #e9ecef);
+  }
+  .responsive-card-table td:last-child {
+    border-bottom: none;
+    padding-top: 0.5rem;
+  }
+  .responsive-card-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-muted, #6c757d);
+    margin-right: 1rem;
+  }
+}
+
+.list-group.col {
+  min-height: 50px;
+  padding: 5px;
+  background-color: var(--surface-subtle, #f8f9fa);
+  border-radius: 5px;
+}
+

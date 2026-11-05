@@ -1,12 +1,49 @@
 {% extends 'base.html' %}
-{% block title%}
-Users
+{% block title %}
+Researchers & Platform Users
 {% endblock %}
 {% block content %}
 
+{# Single-User Mode Notice #}
+{% if is_single or is_single_user or g.operation_mode == 'single' %}
+<div class="alert alert-info d-flex align-items-center mb-3" role="alert">
+  <i class="fa-solid fa-circle-info me-2" aria-hidden="true"></i>
+  <div>
+    <strong>Single-User Mode:</strong> MCRITweb is currently operating in single-user mode. Public self-registration is disabled.
+  </div>
+</div>
+{% endif %}
+
+{# Legacy API Tokens Admin Warning #}
+{% if legacy_token_user_ids and g.user and g.user.role == 'admin' %}
+<div class="alert alert-warning" role="alert">
+  <i class="fa-solid fa-key" aria-hidden="true"></i>
+  {{ legacy_token_user_ids|length }} account{{ 's' if legacy_token_user_ids|length != 1 }} still hold{{ 's' if legacy_token_user_ids|length == 1 }} a pre-1.5.0 (32-character) API token - marked with the key icon below. These would have stayed valid forever had nobody regenerated (issue #250).
+  <button type="button" class="btn btn-outline-danger btn-sm"
+          onclick="if (confirm('Regenerate the API token of every account still holding a pre-1.5.0 (32-character) token? Anything using those tokens stops working.')) postTo('{{ url_for('admin.regenerate_legacy_apitokens') }}')">
+    Regenerate all legacy tokens
+  </button>
+</div>
+{% endif %}
+
+{# Header and Instant Filter Bar #}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <div>
+    <h1 class="h3 mb-0">Researchers &amp; Platform Users</h1>
+    <p class="text-muted small mb-0">Discover community analysts, view contribution metrics, and inspect public profiles.</p>
+  </div>
+  <div class="input-group" style="max-width: 360px;">
+    <span class="input-group-text bg-light text-muted">
+      <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    </span>
+    <input type="text" id="userDirectorySearch" class="form-control" placeholder="Search users by name or role..." aria-label="Search users by name or role">
+  </div>
+</div>
+
+{# Role Filtering Navigation #}
 <ul class="nav nav-pills mb-3 justify-content-center" id="pills-tab" role="tablist">
   <li class="nav-item" role="presentation">
-    <button class="nav-link {% if active == 'all' %}show active{% endif %}" id="pills-all-tab" data-bs-toggle="pill" data-bs-target="#pills-all" type="button" role="tab" aria-controls="pills-all" aria-selected="{{ 'true' if active == 'all' else 'false' }}">All users</button>
+    <button class="nav-link {% if active == 'all' %}active{% endif %}" id="pills-all-tab" data-bs-toggle="pill" data-bs-target="#pills-all" type="button" role="tab" aria-controls="pills-all" aria-selected="{{ 'true' if active == 'all' else 'false' }}">All users</button>
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link {% if active == 'pending' %}active{% endif %}" id="pills-pending-tab" data-bs-toggle="pill" data-bs-target="#pills-pending" type="button" role="tab" aria-controls="pills-pending" aria-selected="{{ 'true' if active == 'pending' else 'false' }}">Pending users</button>
@@ -21,204 +58,129 @@ Users
     <button class="nav-link {% if active == 'admins' %}active{% endif %}" id="pills-admins-tab" data-bs-toggle="pill" data-bs-target="#pills-admins" type="button" role="tab" aria-controls="pills-admins" aria-selected="{{ 'true' if active == 'admins' else 'false' }}">Admins</button>
   </li>
 </ul>
-{% if legacy_token_user_ids %}
-<div class="alert alert-warning" role="alert">
-  <i class="fa-solid fa-key" aria-hidden="true"></i>
-  {{ legacy_token_user_ids|length }} account{{ 's' if legacy_token_user_ids|length != 1 }} still hold{{ 's' if legacy_token_user_ids|length == 1 }} a pre-1.5.0 (32-character) API token - marked with the key icon below. These would have stayed valid forever had nobody regenerated (issue #250).
-  {# a write behind a confirmation, so postTo() runs from the confirm handler rather
-     than data-post firing unconditionally - see post_action.js #}
-  <button type="button" class="btn btn-outline-danger btn-sm"
-          onclick="if (confirm('Regenerate the API token of every account still holding a pre-1.5.0 (32-character) token? Anything using those tokens stops working.')) postTo('{{ url_for('admin.regenerate_legacy_apitokens') }}')">
-    Regenerate all legacy tokens
-  </button>
+
+{% set all_user_list = users if users is defined and users else (g.all_users if g.all_users is defined and g.all_users else []) %}
+{% set stats = user_stats if user_stats is defined and user_stats else (submission_counts if submission_counts is defined and submission_counts else {}) %}
+
+{# Reusable User Table Macro #}
+{% macro render_user_table(user_list, pane_name) %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th scope="col" style="width: 80px;">User ID</th>
+        <th scope="col">Username</th>
+        <th scope="col" style="width: 140px;">Role</th>
+        <th scope="col" style="width: 200px;">Registered</th>
+        <th scope="col" style="width: 120px;" class="text-center">Submissions</th>
+        <th scope="col" style="width: 180px;"><span class="visually-hidden">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in user_list %}
+      <tr class="user-row-item" data-username="{{ user.username }}" data-role="{{ user.role }}">
+        <th valign="middle" scope="row">{{ user.user_id }}</th>
+        <td valign="middle">
+          <a href="{{ url_for('authentication.profile', username=user.username) }}" class="fw-bold text-decoration-none">
+            {{ user.username }}
+          </a>
+          {% if legacy_token_user_ids and user.user_id in legacy_token_user_ids %}
+            <i class="fa-solid fa-key text-warning ms-1" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>
+          {% endif %}
+        </td>
+        <td valign="middle">
+          {% if user.role == 'admin' %}
+            <span class="badge bg-danger">Admin</span>
+          {% elif user.role == 'contributor' %}
+            <span class="badge bg-primary">Contributor</span>
+          {% elif user.role == 'visitor' %}
+            <span class="badge bg-info text-dark">Visitor</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Pending</span>
+          {% endif %}
+        </td>
+        <td valign="middle">{{ user.registered|date_time }}</td>
+        <td valign="middle" class="text-center">
+          <span class="badge bg-secondary font-monospace">{{ (stats or {}).get(user.username, 0) }}</span>
+        </td>
+        <td align="right" valign="middle">
+          <div class="d-flex justify-content-end align-items-center gap-1">
+            <a href="{{ url_for('authentication.profile', username=user.username) }}" class="btn btn-outline-primary btn-sm" title="View public profile">
+              <i class="fa-solid fa-user me-1" aria-hidden="true"></i>View Profile
+            </a>
+            {% if g.user and g.user.role == 'admin' %}
+            <button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
+              <i class="fas fa-user-cog fa-xs"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end">
+              {% if user.role == 'pending' %}
+              <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab=pane_name) }}">Change role to visitor</button>
+              <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab=pane_name) }}">Change role to contributor</button>
+              <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab=pane_name) }}">Change role to admin</button>
+              {% elif user.role == 'admin' %}
+              <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab=pane_name) }}">Change role to visitor</button>
+              <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab=pane_name) }}">Change role to contributor</button>
+              {% elif user.role == 'contributor' %}
+              <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab=pane_name) }}">Change role to visitor</button>
+              <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab=pane_name) }}">Change role to admin</button>
+              {% elif user.role == 'visitor' %}
+              <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab=pane_name) }}">Change role to contributor</button>
+              <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab=pane_name) }}">Change role to admin</button>
+              {% endif %}
+              <div class="dropdown-divider"></div>
+              <button type="button" class="dropdown-item text-danger" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab=pane_name) }}">Delete User</button>
+            </div>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" class="text-center text-muted py-4">No users found.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
-{% endif %}
+{% endmacro %}
+
+{# Tab Panes Content #}
 <div class="tab-content" id="pills-tabContent">
   <div class="tab-pane fade {% if active == 'pending' %}show active{% endif %}" id="pills-pending" role="tabpanel" aria-labelledby="pills-pending-tab">
-    <table class="table table-hover">
-      <thead class="table-light">
-        <tr>
-          <th scope="col">User ID</th>
-          <th scope="col">Username</th>
-          <th scope="col">Role</th>
-          <th scope="col">Registered</th>
-          <th scope="col">Last login</th>
-          <th scope="col"><span class="visually-hidden">Actions</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in g.users_by_role['pending'] %}
-        <tr>
-          <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
-          <td valign="middle">{{ user.role }}</td>
-          <td valign="middle">{{ user.registered|date }}</td>
-          <td valign="middle">{{ user.last_login|date }}</td>
-          <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
-          </button>
-          <div class="dropdown-menu">
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='pending') }}">Change role to admin</button>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='pending') }}">Change role to contributor</button>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab='pending') }}">Change role to visitor</button>
-            <button type="button" class="dropdown-item text-danger" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='pending') }}">Delete User</button>
-          </div>
-        </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {{ render_user_table(g.users_by_role['pending'] if g.users_by_role is defined and 'pending' in g.users_by_role else [], 'pending') }}
   </div>
   <div class="tab-pane fade {% if active == 'contributors' %}show active{% endif %}" id="pills-contributors" role="tabpanel" aria-labelledby="pills-contributors-tab">
-    <table class="table table-hover">
-      <thead class="table-light">
-        <tr>
-          <th scope="col">User ID</th>
-          <th scope="col">Username</th>
-          <th scope="col">Role</th>
-          <th scope="col">Registered</th>
-          <th scope="col">Last login</th>
-          <th scope="col"><span class="visually-hidden">Actions</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in g.users_by_role['contributor'] %}
-        <tr>
-          <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
-          <td valign="middle">{{ user.role }}</td>
-          <td valign="middle">{{ user.registered|date }}</td>
-          <td valign="middle">{{ user.last_login|date }}</td>
-          <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
-          </button>
-          <div class="dropdown-menu">
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='contributors') }}">Change role to admin</button>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab='contributors') }}">Change role to visitor</button>
-            <button type="button" class="dropdown-item text-danger" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='contributors') }}">Delete User</button>
-          </div>
-        </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {{ render_user_table(g.users_by_role['contributor'] if g.users_by_role is defined and 'contributor' in g.users_by_role else [], 'contributors') }}
   </div>
   <div class="tab-pane fade {% if active == 'admins' %}show active{% endif %}" id="pills-admins" role="tabpanel" aria-labelledby="pills-admins-tab">
-    <table class="table table-hover">
-      <thead class="table-light">
-        <tr>
-          <th scope="col">User ID</th>
-          <th scope="col">Username</th>
-          <th scope="col">Role</th>
-          <th scope="col">Registered</th>
-          <th scope="col">Last login</th>
-          <th scope="col"><span class="visually-hidden">Actions</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in g.users_by_role['admin'] %}
-        <tr>
-          <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
-          <td valign="middle">{{ user.role }}</td>
-          <td valign="middle">{{ user.registered|date }}</td>
-          <td valign="middle">{{ user.last_login|date }}</td>
-          <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
-          </button>
-          <div class="dropdown-menu">
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='admins') }}">Change role to contributor</button>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab='admins') }}">Change role to visitor</button>
-            <button type="button" class="dropdown-item text-danger" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='admins') }}">Delete User</button>
-          </div>
-        </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {{ render_user_table(g.users_by_role['admin'] if g.users_by_role is defined and 'admin' in g.users_by_role else [], 'admins') }}
   </div>
   <div class="tab-pane fade {% if active == 'all' %}show active{% endif %}" id="pills-all" role="tabpanel" aria-labelledby="pills-all-tab">
-    <table class="table table-hover">
-      <thead class="table-light">
-        <tr>
-          <th scope="col">User ID</th>
-          <th scope="col">Username</th>
-          <th scope="col">Role</th>
-          <th scope="col">Registered</th>
-          <th scope="col">Last login</th>
-          <th scope="col"><span class="visually-hidden">Actions</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in g.all_users %}
-        <tr>
-          <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
-          <td valign="middle">{{ user.role }}</td>
-          <td valign="middle">{{ user.registered|date }}</td>
-          <td valign="middle">{{ user.last_login|date }}</td>
-          <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
-          </button>
-          <div class="dropdown-menu">
-            {% if user.role == 'pending' %}
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab='all') }}">Change role to visitor</button>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='all') }}">Change role to contributor</button>
-            <button type="button" class="dropdown-item" data-post="{{url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='all')}}">Change role to admin</button>
-            {% endif %}
-            {% if user.role == 'admin' %}
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab='all') }}">Change role to visitor</button>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='all') }}">Change role to contributor</button>
-            {% endif %}
-            {% if user.role == 'contributor' %}
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='visitor', user_id=user.user_id, tab='all') }}">Change role to visitor</button>
-            <button type="button" class="dropdown-item" data-post="{{url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='all')}}">Change role to admin</button>
-            {% endif %}
-            {% if user.role == 'visitor' %}
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='all') }}">Change role to contributor</button>
-            <button type="button" class="dropdown-item" data-post="{{url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='all')}}">Change role to admin</button>
-            {% endif %}
-            <button type="button" class="dropdown-item text-danger" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='all') }}">Delete User</button>
-          </div>
-        </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {{ render_user_table(all_user_list, 'all') }}
   </div>
   <div class="tab-pane fade {% if active == 'visitors' %}show active{% endif %}" id="pills-visitors" role="tabpanel" aria-labelledby="pills-visitors-tab">
-    <table class="table table-hover">
-      <thead class="table-light">
-        <tr>
-          <th scope="col">User ID</th>
-          <th scope="col">Username</th>
-          <th scope="col">Role</th>
-          <th scope="col">Registered</th>
-          <th scope="col">Last login</th>
-          <th scope="col"><span class="visually-hidden">Actions</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for user in g.users_by_role['visitor'] %}
-        <tr>
-          <th valign="middle" scope="row">{{ user.user_id }}</th>
-          <td valign="middle">{{ user.username }}{% if user.user_id in legacy_token_user_ids %} <i class="fa-solid fa-key text-warning" title="Still holds a pre-1.5.0 (32-character) API token" aria-label="Still holds a pre-1.5.0 API token"></i>{% endif %}</td>
-          <td valign="middle">{{ user.role }}</td>
-          <td valign="middle">{{ user.registered|date }}</td>
-          <td valign="middle">{{ user.last_login|date }}</td>
-          <td align="right"><button type="button" title="User actions" class="btn btn-outline-dark btn-sm" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Actions for user {{ user.username }}">
-            <i class="fas fa-user-cog fa-xs"></i>
-          </button>
-          <div class="dropdown-menu">
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='admin', user_id=user.user_id, tab='visitors') }}">Change role to admin</button>
-            <button type="button" class="dropdown-item" data-post="{{ url_for('admin.change_user_role', role='contributor', user_id=user.user_id, tab='visitors') }}">Change role to contributor</button>
-            <button type="button" class="dropdown-item text-danger" data-post="{{ url_for('admin.delete_user', user_id=user.user_id, tab='visitors') }}">Delete User</button>
-          </div>
-        </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {{ render_user_table(g.users_by_role['visitor'] if g.users_by_role is defined and 'visitor' in g.users_by_role else [], 'visitors') }}
   </div>
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var searchInput = document.getElementById('userDirectorySearch');
+    if (searchInput) {
+      searchInput.addEventListener('input', function() {
+        var query = this.value.toLowerCase().trim();
+        var rows = document.querySelectorAll('.user-row-item');
+        rows.forEach(function(row) {
+          var username = (row.getAttribute('data-username') || '').toLowerCase();
+          var role = (row.getAttribute('data-role') || '').toLowerCase();
+          if (!query || username.includes(query) || role.includes(query)) {
+            row.style.display = '';
+          } else {
+            row.style.display = 'none';
+          }
+        });
+      });
+    }
+  });
+</script>
 {% endblock %}

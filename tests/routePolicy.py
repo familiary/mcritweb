@@ -128,6 +128,7 @@ ROUTE_POLICY = {
     "admin.regenerate_legacy_apitokens": (ADMIN, WRITES_ON_POST),  # rotates every pre-1.5.0 (32-char) token - issue #250
 
     # --- visitor and above -------------------------------------------------------
+    "explore.users": (VISITOR, READ_ONLY),
     "explore.families": (VISITOR, READ_ONLY),
     # the family type-ahead behind the edit modals (#77), and since #192 behind the
     # submit form and the drop overlay too. Visitors already read every family name
@@ -195,10 +196,12 @@ ROUTE_POLICY = {
     # pages carry the session cookie, so gating it costs nothing. Still read-only:
     # what it writes is the local image cache, not the database or the backend.
     "data.diagram_file": (VISITOR, READ_ONLY),
+    "data.submit_or_query": (VISITOR, WRITES_ON_POST),
+    "data.request_filename_info": (VISITOR, READ_ONLY),   # classifies a posted filename
+    "data.ingest": (VISITOR, WRITES_ON_POST),
 
     # --- contributor and above ---------------------------------------------------
     "data.submit": (CONTRIBUTOR, WRITES_ON_POST),
-    "data.submit_or_query": (CONTRIBUTOR, WRITES_ON_POST),
     # adds the file a query was run for to the corpus - the same write data.submit
     # performs, from a copy already on disk instead of a fresh upload. See issue #9.
     "data.promote_query": (CONTRIBUTOR, WRITES_ON_POST),
@@ -206,7 +209,6 @@ ROUTE_POLICY = {
     "data.import_complete": (CONTRIBUTOR, READ_ONLY),
     "data.export_view": (CONTRIBUTOR, READ_ONLY),
     "data.specific_export": (CONTRIBUTOR, READ_ONLY),
-    "data.request_filename_info": (CONTRIBUTOR, READ_ONLY),   # classifies a posted filename
     "data.delete_job_by_id": (CONTRIBUTOR, WRITES_ON_POST),
     "explore.modifyFamily": (CONTRIBUTOR, WRITES_ON_POST),
     "explore.modifyFunction": (CONTRIBUTOR, WRITES_ON_POST),
@@ -217,6 +219,7 @@ ROUTE_POLICY = {
     "admin.server": (ADMIN, READ_ONLY),
     "admin.delete_user": (ADMIN, WRITES_ON_POST),
     "admin.change_user_role": (ADMIN, WRITES_ON_POST),
+    "admin.regenerate_user_apitoken": (ADMIN, WRITES_ON_POST),
     "admin.change_server": (ADMIN, WRITES_ON_POST),
     "admin.reset_server": (ADMIN, WRITES_ON_POST),
     "admin.schedule_rebuild_index": (ADMIN, WRITES_ON_POST),
