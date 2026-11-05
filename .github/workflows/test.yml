@@ -62,7 +62,10 @@ jobs:
           # pytest is not a runtime dependency, so it is deliberately not in
           # requirements.txt. It used to arrive with mcrit; mcrit declares it under its
           # `dev` extra now, so it has to be installed here - pinned, like ruff above.
-          python -m pip install "pytest==9.1.1" "pytest-cov==7.1.0"
+          python -m pip install "pytest==9.1.1" "pytest-cov==7.1.0" "pytest-xdist==3.8.0"
 
+      # -n auto spreads the suite over the runner's cores. Run one test at a time it
+      # takes about 13 minutes here, and with the open PRs merged it outgrows the
+      # default job timeout; the tests do not depend on each other or on their order.
       - name: Run unit tests
-        run: python -m pytest
+        run: python -m pytest -n auto
