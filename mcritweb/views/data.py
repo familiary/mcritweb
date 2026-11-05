@@ -6,7 +6,7 @@ import types
 import uuid
 from urllib.parse import quote, urlencode
 
-from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Blueprint, Response, abort, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
 from mcrit.libs.utility import decode_two_complement
 from mcrit.queue.LocalQueue import Job
 from mcrit.queue.QueueRemoteCalls import to_binary as canonicalise_queue_json
@@ -2355,25 +2355,22 @@ def promote_query(job_id):
     return redirect(url_for('data.job_by_id', job_id=new_job_id, refresh=3, forward=1))
 
 
+#: the tabs of the ingest page, each a page of its own
+INGEST_TABS = ('query', 'submit', 'import')
+
+
 @bp.route('/ingest')
 @bp.route('/ingest/<tab>')
 @visitor_required
 @mcrit_server_required
 def ingest(tab="query"):
-    """Consolidated Ingestion Hub view.
+    """The query, submit and import forms behind one tab row.
 
-    Provides a unified tabbed interface for:
-    - Similarity queries (query against corpus)
-    - Corpus submissions (add sample to corpus)
-    - Whole-corpus package imports
+    A reading route: each form posts where its own page posts (analyze.query,
+    data.submit, data.import_view), so the role checks stay on those routes'
+    decorators. A visitor gets the query form and, on the other two tabs, a notice
+    saying what the role lacks rather than a form that would be refused.
     """
-    allowed_tabs = ("query", "submit", "import")
-    if tab not in allowed_tabs:
-        tab = "query"
-    return render_template(
-        "ingest.html",
-        active_tab=tab,
-        select_form_type=True,
-        show_submit_fields=True,
-    )
-
+    if tab not in INGEST_TABS:
+        abort(404)
+    return render_template("ingest.html", active_tab=tab)

@@ -1,87 +1,59 @@
-{% from 'table/submit_or_query_dropzone.html' import submit_or_query_dropzone, submit_or_query_dropzone_js %}
+{% from 'table/import_dropzone.html' import import_dropzone, import_dropzone_style with context %}
 {% extends 'base.html' %}
-{% block title %}Ingestion Hub{% endblock %}
-
+{% block title %}Ingest - {{ active_tab|capitalize }}{% endblock %}
 {% block style %}
-{{ submit_or_query_dropzone_js(select_form_type=select_form_type) }}
-<link rel="stylesheet" href="{{ url_for('static', filename='dropzone.min.css') }}">
-{{ dropzone.style('border: 2px dashed black; margin: 20px auto; width: 100%; max-width: 600px; min-height: 400px; border-radius: 25px; background: rgb(240, 240, 240);') }}
-{% endblock %}
-
-{% set suppress_dropzone_overlay=true %}
-
-{% block content %}
-<div class="container-fluid my-3">
-  <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
-    <h1 class="h2 mb-0">Ingestion Hub</h1>
-  </div>
-
-  <nav aria-label="Ingestion Hub Navigation" class="mb-4">
-    <ul class="nav nav-pills justify-content-center flex-wrap" id="ingestTabList" role="tablist">
-      <li class="nav-item" role="presentation">
-        <a class="nav-link {% if active_tab == 'query' %}active{% endif %}" id="tab-query" href="{{ url_for('data.ingest', tab='query') }}" role="tab" aria-controls="pane-query" aria-selected="{{ 'true' if active_tab == 'query' else 'false' }}">
-          <i class="fa-solid fa-magnifying-glass me-1" aria-hidden="true"></i> Query Sample
-        </a>
-      </li>
-      <li class="nav-item" role="presentation">
-        <a class="nav-link {% if active_tab == 'submit' %}active{% endif %}" id="tab-submit" href="{{ url_for('data.ingest', tab='submit') }}" role="tab" aria-controls="pane-submit" aria-selected="{{ 'true' if active_tab == 'submit' else 'false' }}">
-          <i class="fa-solid fa-file-arrow-up me-1" aria-hidden="true"></i> Submit to Corpus
-        </a>
-      </li>
-      <li class="nav-item" role="presentation">
-        <a class="nav-link {% if active_tab == 'import' %}active{% endif %}" id="tab-import" href="{{ url_for('data.ingest', tab='import') }}" role="tab" aria-controls="pane-import" aria-selected="{{ 'true' if active_tab == 'import' else 'false' }}">
-          <i class="fa-solid fa-box-archive me-1" aria-hidden="true"></i> Import Package
-        </a>
-      </li>
-    </ul>
-  </nav>
-
-  <div class="tab-content" id="ingestTabContent">
-    {% if active_tab == 'query' %}
-    <div class="tab-pane fade show active" id="pane-query" role="tabpanel" aria-labelledby="tab-query">
-      <div class="text-center mb-3">
-        <p class="text-muted">Upload a binary or SMDA disassembly report to query similarity against the stored corpus.</p>
-      </div>
-      {{ submit_or_query_dropzone(select_form_type=True, show_submit_fields=False) }}
-    </div>
-    {% elif active_tab == 'submit' %}
-    <div class="tab-pane fade show active" id="pane-submit" role="tabpanel" aria-labelledby="tab-submit">
-      {% if g.user.role in ('contributor', 'admin') %}
-      <div class="text-center mb-3">
-        <p class="text-muted">Submit a new binary sample or SMDA disassembly report to be indexed in the corpus.</p>
-      </div>
-      {{ submit_or_query_dropzone(select_form_type=False, show_submit_fields=True) }}
-      {% else %}
-      <div class="alert alert-info text-center max-w-600 mx-auto" role="alert">
-        <h4 class="alert-heading"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i> Contributor Role Required</h4>
-        <p>Binary sample submissions to the permanent corpus require contributor or administrator privileges.</p>
-        <hr>
-        <p class="mb-0">You can run similarity queries against existing samples from the <a href="{{ url_for('data.ingest', tab='query') }}" class="alert-link">Query Sample</a> tab.</p>
-      </div>
-      {% endif %}
-    </div>
-    {% elif active_tab == 'import' %}
-    <div class="tab-pane fade show active" id="pane-import" role="tabpanel" aria-labelledby="tab-import">
-      {% if g.user.role in ('contributor', 'admin') %}
-      <div class="text-center mb-3">
-        <p class="text-muted">Import a complete or partial MCRIT corpus archive package (.zip or .tar.gz).</p>
-      </div>
-      <div class="d-flex flex-column align-items-center">
-        {{ dropzone.create(action=url_for('data.import_view')) }}
-        <div id="import-status" class="alert alert-info" role="status" aria-live="polite" style="display:none; width:60%;">
-          <span id="import-status-spinner" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-          <span id="import-status-text"></span>
-        </div>
-      </div>
-      <script src="{{ url_for('static', filename='dropzone.js') }}"></script>
-      {% else %}
-      <div class="alert alert-info text-center max-w-600 mx-auto" role="alert">
-        <h4 class="alert-heading"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i> Contributor Role Required</h4>
-        <p>Importing corpus archives requires contributor or administrator privileges.</p>
-      </div>
-      {% endif %}
-    </div>
+  {# each tab is its own page, so only its zone's script is loaded - and none where the
+     tab shows a visitor a notice instead of the zone: the head script of the upload
+     macro reaches for Dropzone, which only the zone's own script defines #}
+  {% set can_submit = g.user.role in ('contributor', 'admin') %}
+  {% if active_tab == 'query' or can_submit %}
+    {% if active_tab == 'import' %}
+      {{ import_dropzone_style() }}
+    {% else %}
+      {{ submit_or_query_dropzone_js(select_form_type=False) }}
     {% endif %}
-  </div>
-</div>
+  {% endif %}
+{% endblock %}
+{% set suppress_dropzone_overlay = true %}
+{% block content %}
+{% set can_submit = g.user.role in ('contributor', 'admin') %}
+<h1>Ingest</h1>
+<p class="text-muted">Query a sample against the corpus, submit a binary to it, or import an export. The <a href="{{ url_for('analyze.query') }}">query</a>{% if can_submit %}, <a href="{{ url_for('data.submit') }}">submit</a> and <a href="{{ url_for('data.import_view') }}">import</a> pages{% else %} page{% endif %} do the same on a page each.</p>
+{# three pages behind one tab row. Each tab is a link to its own URL, so the tab a reader
+   is on survives a reload and can be sent to someone; the forms post where the query,
+   submit and import pages post, with the same role checks on those routes. #}
+<ul class="nav nav-tabs mb-4">
+  {% for tab, label in (('query', 'Query'), ('submit', 'Submit Binary'), ('import', 'Import')) %}
+  <li class="nav-item">
+    <a class="nav-link{% if active_tab == tab %} active{% endif %}" href="{{ url_for('data.ingest', tab=tab) }}"{% if active_tab == tab %} aria-current="page"{% endif %}>{{ label }}</a>
+  </li>
+  {% endfor %}
+</ul>
+{% if active_tab == 'query' %}
+  <h2 class="h4">Query a sample</h2>
+  <p class="text-muted">Match a binary, a memory dump or an SMDA report against the corpus. Nothing is added to it.</p>
+  {{ submit_or_query_dropzone(select_form_type=False, show_submit_fields=False) }}
+{% elif active_tab == 'submit' %}
+  <h2 class="h4">Submit a binary</h2>
+  <p class="text-muted">Add a sample to the corpus under a family and a version.</p>
+  {% if can_submit %}
+    {{ submit_or_query_dropzone(select_form_type=False, show_submit_fields=True) }}
+  {% else %}
+    <div class="alert alert-warning" role="alert">
+      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+      Submitting to the corpus needs a contributor account. A visitor can <a href="{{ url_for('data.ingest', tab='query') }}" class="alert-link">query</a> a sample against it.
+    </div>
+  {% endif %}
+{% else %}
+  <h2 class="h4">Import an export</h2>
+  <p class="text-muted">Load a whole-database or per-family export from another MCRIT instance into this one.</p>
+  {% if can_submit %}
+    {{ import_dropzone() }}
+  {% else %}
+    <div class="alert alert-warning" role="alert">
+      <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+      Importing needs a contributor account. A visitor can <a href="{{ url_for('data.ingest', tab='query') }}" class="alert-link">query</a> a sample against the corpus.
+    </div>
+  {% endif %}
+{% endif %}
 {% endblock %}
