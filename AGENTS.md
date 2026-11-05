@@ -38,12 +38,12 @@ This repository owns **no analysis data of its own**. Families, samples, functio
 The README states Python 3.12+ - inherited from mcrit, which has declared it since v1.10.0 (v1.5.0 to v1.9.x declared 3.11); the reference deployment (`docker-mcrit`) runs **Python 3.12**. Target 3.12 for anything new.
 
 ```bash
-make init   # requirements.txt, plus pytest/pytest-cov/ruff at the versions CI pins
+make init   # requirements.txt, plus pytest/pytest-cov/pytest-xdist/ruff at the versions CI pins
 ```
 
-`pytest`, `pytest-cov` and `ruff` are not runtime dependencies, so they are not in
-`requirements.txt`; `mcrit` declares the first two under its `dev` extra, so they do
-not arrive with it either.
+`pytest`, `pytest-cov`, `pytest-xdist` and `ruff` are not runtime dependencies, so they
+are not in `requirements.txt`; `mcrit` declares the first two under its `dev` extra, so
+they do not arrive with it either.
 
 A running MCRIT backend (server + worker + MongoDB) is required for essentially every page beyond login/register. Without it, `mcrit_server_required` flashes an error and redirects to the index.
 
@@ -53,7 +53,7 @@ A running MCRIT backend (server + worker + MongoDB) is required for essentially 
 source ./flask_env.sh     # sets FLASK_APP=mcritweb, FLASK_DEBUG=1
 flask init-db             # once, before first use — creates instance/mcritweb.sqlite
 flask run                 # http://127.0.0.1:5000/
-python -m pytest          # the offline suite, no backend needed
+python -m pytest -n auto  # the offline suite, no backend needed, on every core
 ruff check .              # config in ruff.toml; CI runs exactly this
 ```
 
@@ -127,7 +127,7 @@ Adding a **table column setting** additionally means updating `UserColumnSetting
 
 ## Testing
 
-`python -m pytest` runs the suite with **no backend and no network** — pagination, user filters, the app-factory fixtures in `tests/conftest.py`, and `testMigrations.py`, which upgrades databases built in historical schemas (transcribed from release tags, not read from git — a CI checkout has no tags). `pytest.ini` maps the existing `test*.py` naming; keep it rather than renaming to `test_foo.py`. `make test` and `make lint` run exactly what CI runs (`python3 -m pytest`, `python3 -m ruff check .`) — they used to call `nose` and a `.pylintrc` that has never existed in this repository, fixed in v1.4.7.
+`python -m pytest` runs the suite with **no backend and no network** — pagination, user filters, the app-factory fixtures in `tests/conftest.py`, and `testMigrations.py`, which upgrades databases built in historical schemas (transcribed from release tags, not read from git — a CI checkout has no tags). `pytest.ini` maps the existing `test*.py` naming; keep it rather than renaming to `test_foo.py`. `make test` and `make lint` run exactly what CI runs (`python3 -m pytest -n auto`, `python3 -m ruff check .`) — they used to call `nose` and a `.pylintrc` that has never existed in this repository, fixed in v1.4.7.
 
 Three backends are available to tests, all offline. `fake_mcrit` is strict — an unknown method raises `NotImplementedError` naming itself, so gaps surface as actionable failures. `recording_mcrit` never raises, for asking "did this request write anything". `corpus_mcrit` serves real captured reports from `tests/fixtures/` and is what makes result pages renderable; see the README there.
 
