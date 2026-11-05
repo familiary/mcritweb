@@ -3,22 +3,26 @@
 {% extends 'base.html' %}
 {% block title %}Profile{% endblock %}
 {% block content %}
-{# the signed-in user's own page. Five panes behind one tab row: the panes are all on the
-   page, Bootstrap's pills switch them, static/profile.js keeps the keyboard and the URL
-   hash in step with them. The API token is not on the page: static/show_apitoken.js
-   fetches it into the developer pane when asked. #}
+{# an account's page: the signed-in user's own, or another account's. Up to five panes
+   behind one tab row: the panes are all on the page, Bootstrap's pills switch them,
+   static/profile.js keeps the keyboard and the URL hash in step with them. The view hands
+   over only what the viewer may see (render_profile): `account` carries the id and the
+   dates, and the jobs, the uploads and the capabilities are there, for the holder and an
+   admin only; anyone else gets the name, the role and the submissions ledger. The API
+   token is not on the page: static/show_apitoken.js fetches it into the developer pane
+   when asked, on the holder's own page. #}
 {% set tab_labels = {'overview': 'Overview', 'jobs': 'Jobs (' ~ job_count ~ ')', 'submissions': 'Submissions (' ~ submission_count ~ ')',
                      'uploads': 'Query uploads (' ~ upload_count ~ ')', 'developer': 'API token'} %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
-  <h1 class="h2 mb-0">Profile: {{ user_info.username }} <span class="badge bg-secondary align-middle fs-6">{{ user_info.role }}</span></h1>
-  {% if is_own_profile %}
+  <h1 class="h2 mb-0">Profile: {{ account.username }} <span class="badge bg-secondary align-middle fs-6">{{ account.role }}</span></h1>
+  {% if own %}
   <a href="{{ url_for('authentication.settings') }}" class="btn btn-outline-secondary btn-sm">Settings</a>
   {% elif g.operation_mode == 'multi' %}
-  <a href="{{ url_for('explore.users') }}" class="btn btn-outline-secondary btn-sm">All Users</a>
+  <a href="{{ url_for('explore.users') }}" class="btn btn-outline-secondary btn-sm">All users</a>
   {% endif %}
 </div>
 
-<ul class="nav nav-pills flex-wrap mb-4" id="profileTabList" role="tablist">
+<ul class="nav nav-pills flex-wrap mb-4{% if tabs|length == 1 %} visually-hidden{% endif %}" id="profileTabList" role="tablist">
   {% for tab in tabs %}
   <li class="nav-item" role="presentation">
     <button class="nav-link{% if active_tab == tab %} active{% endif %}" id="tab-{{ tab }}" data-bs-toggle="pill" data-bs-target="#pane-{{ tab }}" type="button" role="tab" aria-controls="pane-{{ tab }}" aria-selected="{{ 'true' if active_tab == tab else 'false' }}" tabindex="{{ '0' if active_tab == tab else '-1' }}">{{ tab_labels[tab] }}</button>
@@ -27,6 +31,7 @@
 </ul>
 
 <div class="tab-content" id="profileTabContent">
+  {% if full_view %}
   {# --- overview --------------------------------------------------------------------- #}
   <div class="tab-pane fade{% if active_tab == 'overview' %} show active{% endif %}" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">
     <div class="row g-3 mb-4">
@@ -55,23 +60,25 @@
           <h2 class="h4">Account</h2>
           <dl class="row mb-0">
             <dt class="col-sm-5">User ID</dt>
-            <dd class="col-sm-7">{{ user_info.user_id }}</dd>
+            <dd class="col-sm-7">{{ account.user_id }}</dd>
             <dt class="col-sm-5">Username</dt>
-            <dd class="col-sm-7">{{ user_info.username }}</dd>
+            <dd class="col-sm-7">{{ account.username }}</dd>
             <dt class="col-sm-5">Role</dt>
-            <dd class="col-sm-7">{{ user_info.role }}</dd>
+            <dd class="col-sm-7">{{ account.role }}</dd>
             <dt class="col-sm-5">Registered</dt>
-            <dd class="col-sm-7"><time datetime="{{ user_info.registered.isoformat() }}">{{ user_info.registered.strftime("%Y-%m-%d %H:%M UTC") }}</time> <span class="text-muted">({{ registered_relative }})</span></dd>
+            <dd class="col-sm-7"><time datetime="{{ account.registered.isoformat() }}">{{ account.registered.strftime("%Y-%m-%d %H:%M UTC") }}</time> <span class="text-muted">({{ account.registered_relative }})</span></dd>
             <dt class="col-sm-5">Last login</dt>
             <dd class="col-sm-7">
-              {% if last_login_relative %}
-                <time datetime="{{ user_info.last_login.isoformat() }}">{{ user_info.last_login.strftime("%Y-%m-%d %H:%M UTC") }}</time> <span class="text-muted">({{ last_login_relative }})</span>
+              {% if account.last_login %}
+                <time datetime="{{ account.last_login.isoformat() }}">{{ account.last_login.strftime("%Y-%m-%d %H:%M UTC") }}</time> <span class="text-muted">({{ account.last_login_relative }})</span>
               {% else %}
                 <span class="text-muted">no login recorded</span>
               {% endif %}
             </dd>
           </dl>
+          {% if own %}
           <a href="{{ url_for('authentication.settings') }}" class="btn btn-primary btn-sm mt-3">Change username, password or preferences</a>
+          {% endif %}
         </div>
       </div>
       <div class="col-lg-7">
@@ -84,13 +91,13 @@
               <thead>
                 <tr>
                   <th scope="col">Capability</th>
-                  <th scope="col">As {{ user_info.role }}</th>
+                  <th scope="col">As {{ account.role }}</th>
                   <th scope="col" class="d-none d-sm-table-cell">What it covers</th>
                 </tr>
               </thead>
               <tbody>
                 {% for capability in capabilities %}
-                  {% set cell = capability[user_info.role] %}
+                  {% set cell = capability[account.role] %}
                   <tr>
                     <th scope="row">
                       {{ capability.name }}
@@ -116,14 +123,14 @@
     </div>
   </div>
 
-  {# --- jobs ---------------------------------------------------------------------------- #}
+  {# --- jobs, for the holder and an admin ------------------------------------------------- #}
   <div class="tab-pane fade{% if active_tab == 'jobs' %} show active{% endif %}" id="pane-jobs" role="tabpanel" aria-labelledby="tab-jobs">
     <div class="profile-card p-4">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
           <h2 class="h4">Jobs</h2>
           {# ADR-0007: the backend records the username of the request, not an owner #}
-          <p class="text-muted mb-0">The jobs the MCRIT backend recorded under the username <strong>{{ user_info.username }}</strong>. A renamed account's earlier jobs stay under the old name.</p>
+          <p class="text-muted mb-0">The jobs the MCRIT backend recorded under the username <strong>{{ account.username }}</strong>. A renamed account's earlier jobs stay under the old name.</p>
         </div>
         <a href="{{ url_for('data.jobs') }}" class="btn btn-outline-secondary btn-sm">All jobs</a>
       </div>
@@ -179,22 +186,24 @@
     </div>
   </div>
 
-  {# --- submissions ---------------------------------------------------------------------- #}
+  {% endif %}
+
+  {# --- submissions, the public ledger ---------------------------------------------------- #}
   <div class="tab-pane fade{% if active_tab == 'submissions' %} show active{% endif %}" id="pane-submissions" role="tabpanel" aria-labelledby="tab-submissions">
     <div class="profile-card p-4">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
           <h2 class="h4">Submissions</h2>
-          <p class="text-muted mb-0">The binaries submitted to the corpus under the username <strong>{{ user_info.username }}</strong>, and the sample each finished one became.</p>
+          <p class="text-muted mb-0">The binaries submitted to the corpus as the MCRIT backend recorded them under the username <strong>{{ account.username }}</strong>, and the sample each finished one became. A renamed account's earlier submissions stay under the old name.</p>
         </div>
-        {% if user_info.role in ('admin', 'contributor') %}
+        {% if own and account.role in ('admin', 'contributor') %}
           <a href="{{ url_for('data.submit') }}" class="btn btn-primary btn-sm">Submit a binary</a>
         {% endif %}
       </div>
       {% if jobs_unavailable %}
         <p class="text-muted">The job queue could not be read.</p>
       {% elif not submissions %}
-        <p class="text-muted">No submission was recorded under this username.{% if user_info.role not in ('admin', 'contributor') %} Contributors and administrators can submit binaries to the corpus.{% endif %}</p>
+        <p class="text-muted">No submission was recorded under this username.{% if own and account.role not in ('admin', 'contributor') %} Contributors and administrators can submit binaries to the corpus.{% endif %}</p>
       {% else %}
         <div class="table-responsive">
           <table class="table table-hover table-striped align-middle">
@@ -242,13 +251,14 @@
     </div>
   </div>
 
-  {# --- query uploads ------------------------------------------------------------------- #}
+  {% if full_view %}
+  {# --- query uploads, for the holder and an admin --------------------------------------- #}
   <div class="tab-pane fade{% if active_tab == 'uploads' %} show active{% endif %}" id="pane-uploads" role="tabpanel" aria-labelledby="tab-uploads">
     <div class="profile-card p-4">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
           <h2 class="h4">Query uploads</h2>
-          <p class="text-muted mb-0">The files this instance kept of {% if user_info.role == 'admin' %}every account's{% else %}this account's{% endif %} queries, so a query can be promoted to a sample. They follow the account, not its name.</p>
+          <p class="text-muted mb-0">The files this instance kept of {% if own and account.role == 'admin' %}every account's{% else %}this account's{% endif %} queries, so a query can be promoted to a sample. They follow the account, not its name.</p>
         </div>
         <a href="{{ url_for('analyze.query') }}" class="btn btn-outline-secondary btn-sm">Query a sample</a>
       </div>
@@ -275,7 +285,7 @@
                   <td>{% if upload.stored_at %}<time datetime="{{ upload.stored_at.isoformat() }}">{{ upload.stored_at.strftime("%Y-%m-%d %H:%M UTC") }}</time>{% else %}-{% endif %}</td>
                   <td class="text-end">
                     <a href="{{ url_for('data.result', job_id=upload.job_id) }}" class="btn btn-sm btn-outline-primary">Result</a>
-                    {% if upload.size and user_info.role in ('admin', 'contributor') %}
+                    {% if upload.size and g.user.role in ('admin', 'contributor') %}
                       {# a write, so a button that POSTs - see post_action.js #}
                       <button type="button" class="btn btn-sm btn-success" data-post="{{ url_for('data.promote_query', job_id=upload.job_id) }}" title="Add this query's file to the corpus as a sample">Promote</button>
                     {% endif %}
@@ -290,7 +300,9 @@
     </div>
   </div>
 
-  {# --- the API token ------------------------------------------------------------------- #}
+  {% endif %}
+
+  {# --- the API token, on the holder's own page ------------------------------------------- #}
   {% if can_use_api %}
   <div class="tab-pane fade{% if active_tab == 'developer' %} show active{% endif %}" id="pane-developer" role="tabpanel" aria-labelledby="tab-developer">
     <div class="profile-card p-4">

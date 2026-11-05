@@ -148,6 +148,9 @@ ROUTE_POLICY = {
     "explore.search": (VISITOR, READ_ONLY),
     "explore.statistics": (VISITOR, READ_ONLY),
     "explore.users": (VISITOR, READ_ONLY),
+    # another account's profile: its name, role and submissions for a visitor and up,
+    # the whole page for an admin. The own page is authentication.profile, LOGGED_IN
+    "authentication.profile_of": (VISITOR, READ_ONLY),
     "analyze.compare": (VISITOR, READ_ONLY),
     "analyze.compare_versus": (VISITOR, READ_ONLY),
     "analyze.compare_submit_query": (VISITOR, READ_ONLY),

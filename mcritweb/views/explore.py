@@ -18,7 +18,7 @@ from mcritweb.views.client import backend_version, get_client, get_sample_entrie
 from mcritweb.views.cursor_pagination import CursorPagination
 from mcritweb.views.data import JOB_ID_PATTERN
 from mcritweb.views.functiondiff import get_combined_dot_graph
-from mcritweb.views.pagination import request_args_for_link_building
+from mcritweb.views.pagination import Pagination, request_args_for_link_building
 from mcritweb.views.search import search_page
 from mcritweb.views.utility import describable_jobs, get_user_column_setup, mcrit_server_required
 
@@ -1078,26 +1078,21 @@ def search():
 @mcrit_server_required
 @multi_user
 def users():
-    """Public user discovery directory in multi-user mode."""
-    all_users = get_all_user_info()
-    users_list = [u for u in all_users if g.user.role == 'admin' or u.role != 'pending']
+    """Who has an account here: the directory a visitor, a contributor and an admin may
+    browse in multi-user mode, each account linking to its profile.
 
-    user_stats = {}
-    try:
-        client = get_client()
-        queue_data = client.getQueueData()
-        if queue_data:
-            for job in queue_data:
-                uname = getattr(job, "username", "")
-                method = getattr(job, "method", "")
-                if uname and method == "addBinarySample":
-                    user_stats[uname] = user_stats.get(uname, 0) + 1
-    except Exception as e:
-        current_app.logger.warning("Could not calculate user submission metrics: %s", e)
-
-    return render_template(
-        "community_users.html",
-        users=users_list,
-        user_stats=user_stats,
-    )
-
+    For everyone: the username, the role and how many submissions the backend recorded
+    under that username (ADR-0007: the name at the time of the request, so the count
+    moves with a renamed name). An admin also sees the pending accounts, marked, and
+    the registration date and last login, which master shows on the admin page only.
+    Paged 25 a page, and the counts are one getQueueCount per listed account, so a
+    view costs at most 25 queue requests rather than the whole queue.
+    """
+    listed = [user_info for user_info in get_all_user_info() if g.user.role == 'admin' or user_info.role != 'pending']
+    listed.sort(key=lambda user_info: user_info.username.casefold())
+    pagination = Pagination(request, len(listed), limit=25, query_param="p", limit_param="plimit")
+    page = listed[pagination.start_index:pagination.end_index]
+    client = get_client()
+    # None for a failed read: the row then shows a dash rather than a 0 it cannot vouch for
+    submission_counts = {user_info.username: client.getQueueCount(method="addBinarySample", username=user_info.username) for user_info in page}
+    return render_template("community_users.html", users=page, submission_counts=submission_counts, pagination=pagination)
