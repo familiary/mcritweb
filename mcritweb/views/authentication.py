@@ -1,3 +1,4 @@
+import datetime
 import functools
 import hashlib
 import hmac
@@ -5,6 +6,7 @@ import os
 import re
 import secrets
 import sqlite3
+import time
 import uuid
 
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
@@ -405,6 +407,132 @@ def login_required(view):
     return wrapped_view
 
 
+def format_relative_time(dt, now=None):
+    """Format a datetime into a human-readable relative string."""
+    if dt is None:
+        return ""
+    if isinstance(dt, str):
+        if dt == "no login" or not dt:
+            return "Never"
+        try:
+            from mcritweb.db import parse_timestamp
+            dt = parse_timestamp(dt)
+        except Exception:
+            return dt
+    if not isinstance(dt, datetime.datetime):
+        return str(dt)
+    if now is None:
+        now = utc_now()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.UTC)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=datetime.UTC)
+    delta = now - dt
+    total_seconds = int(delta.total_seconds())
+    if total_seconds < 0:
+        return "in the future"
+    if total_seconds < 60:
+        return "just now"
+    minutes = total_seconds // 60
+    if minutes < 60:
+        return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+    days = hours // 24
+    if days < 30:
+        return f"{days} day{'s' if days != 1 else ''} ago"
+    months = days // 30
+    if months < 12:
+        return f"{months} month{'s' if months != 1 else ''} ago"
+    years = days // 365
+    return f"{years} year{'s' if years != 1 else ''} ago"
+
+
+def format_file_size(size_bytes):
+    """Format byte size into human-readable B, KiB, or MiB."""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KiB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.1f} MiB"
+
+
+def format_ttl(remaining_seconds):
+    """Format remaining seconds before worker cleanup into human-readable string."""
+    if remaining_seconds <= 0:
+        return "Expired"
+    days = int(remaining_seconds // 86400)
+    hours = int((remaining_seconds % 86400) // 3600)
+    minutes = int((remaining_seconds % 3600) // 60)
+    if days > 0:
+        return f"{days}d {hours}h remaining"
+    if hours > 0:
+        return f"{hours}h {minutes}m remaining"
+    return f"{max(1, minutes)}m remaining"
+
+
+ROLE_CAPABILITIES = [
+    {
+        "name": "Corpus Exploration & Matching",
+        "description": "Browse families, samples, functions, and launch 1vsN, 1vs1, and cross-comparison analyses.",
+        "admin": "Full Access",
+        "contributor": "Full Access",
+        "visitor": "Full Access",
+        "pending": "None",
+    },
+    {
+        "name": "Ephemeral Query Uploads",
+        "description": "Upload binary files or SMDA reports for on-the-fly similarity matching without adding to corpus.",
+        "admin": "Uncapped",
+        "contributor": "Uncapped",
+        "visitor": "Capped (1 MiB)",
+        "pending": "None",
+    },
+    {
+        "name": "Binary Sample Submissions",
+        "description": "Permanently submit binary samples to be indexed and stored into the MCRIT corpus.",
+        "admin": "Allowed",
+        "contributor": "Allowed",
+        "visitor": "Restricted",
+        "pending": "Restricted",
+    },
+    {
+        "name": "Function & Family Curation",
+        "description": "Rename functions and modify family assignments across stored corpus samples.",
+        "admin": "Allowed",
+        "contributor": "Allowed",
+        "visitor": "Restricted",
+        "pending": "Restricted",
+    },
+    {
+        "name": "Corpus Import & Export",
+        "description": "Export analysis data and import full or partial MCRIT corpus packages.",
+        "admin": "Allowed",
+        "contributor": "Allowed",
+        "visitor": "Restricted",
+        "pending": "Restricted",
+    },
+    {
+        "name": "REST API Access",
+        "description": "Query and interact programmatically with the backend using a personal API token.",
+        "admin": "Full Access",
+        "contributor": "Read & Submit",
+        "visitor": "Read Only",
+        "pending": "Restricted",
+    },
+    {
+        "name": "Server & User Administration",
+        "description": "Configure backend endpoints, manage user accounts and roles, and run maintenance jobs.",
+        "admin": "Allowed",
+        "contributor": "Restricted",
+        "visitor": "Restricted",
+        "pending": "Restricted",
+    },
+]
+
+
 @bp.route('/settings')
 @login_required
 def settings():
@@ -420,7 +548,197 @@ def settings():
     if user_column_settings is None:
         user_column_settings = UserColumnSettings.fromDict(user_id, {})
         user_column_settings.saveToDb()
-    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken))
+
+    registered_formatted = user_info.registered.strftime("%Y-%m-%d %H:%M UTC") if user_info.registered else ""
+    registered_relative = format_relative_time(user_info.registered)
+    if user_info.last_login and user_info.last_login != "no login":
+        last_login_formatted = user_info.last_login.strftime("%Y-%m-%d %H:%M UTC")
+        last_login_relative = format_relative_time(user_info.last_login)
+    else:
+        last_login_formatted = "Never"
+        last_login_relative = "No prior login recorded"
+
+    return render_template(
+        'settings.html',
+        user_info=user_info,
+        user_filters=user_filters,
+        user_column_settings=user_column_settings.toUserColumnSettings(),
+        can_use_api=user_info.role in API_ROLES,
+        legacy_apitoken=is_legacy_apitoken(user_info.apitoken),
+        registered_formatted=registered_formatted,
+        registered_relative=registered_relative,
+        last_login_formatted=last_login_formatted,
+        last_login_relative=last_login_relative,
+    )
+
+
+@bp.route('/profile')
+@login_required
+def profile():
+    user_info = g.user
+    reg = user_info.registered
+    if isinstance(reg, str):
+        try:
+            from mcritweb.db import parse_timestamp
+            reg = parse_timestamp(reg)
+        except Exception:
+            reg = None
+    registered_formatted = reg.strftime("%Y-%m-%d %H:%M UTC") if hasattr(reg, "strftime") else (str(user_info.registered) if user_info.registered else "")
+    registered_relative = format_relative_time(user_info.registered)
+
+    last_login = user_info.last_login
+    if last_login and last_login != "no login":
+        if isinstance(last_login, str):
+            try:
+                from mcritweb.db import parse_timestamp
+                last_login = parse_timestamp(last_login)
+            except Exception:
+                last_login = None
+        last_login_formatted = last_login.strftime("%Y-%m-%d %H:%M UTC") if hasattr(last_login, "strftime") else str(user_info.last_login)
+        last_login_relative = format_relative_time(user_info.last_login)
+    else:
+        last_login_formatted = "Never"
+        last_login_relative = "No prior login recorded"
+
+    can_use_api = user_info.role in API_ROLES
+    legacy_token = is_legacy_apitoken(user_info.apitoken)
+    try:
+        from mcritweb.views.utility import get_server_url
+        server_url = get_server_url() or request.host_url.rstrip('/')
+    except Exception:
+        server_url = request.host_url.rstrip('/')
+    api_base_url = f"{request.host_url.rstrip('/')}/api"
+
+    # Query Activity & Job Ledger
+    user_jobs = []
+    job_count = 0
+    jobs_unavailable = False
+    try:
+        from mcritweb.views.client import get_client
+        client = get_client()
+        raw_jobs = client.getQueueData(username=user_info.username, ascending=False)
+        if raw_jobs is None:
+            jobs_unavailable = True
+        else:
+            user_jobs = list(raw_jobs)
+            try:
+                cnt = client.getQueueCount(username=user_info.username)
+                job_count = cnt if cnt is not None else len(user_jobs)
+            except Exception:
+                job_count = len(user_jobs)
+    except Exception as e:
+        current_app.logger.warning("Could not fetch jobs for profile of %s: %s", user_info.username, e)
+        jobs_unavailable = True
+
+    finished_count = 0
+    running_count = 0
+    failed_count = 0
+    submission_jobs = []
+    analysis_jobs = []
+
+    for job in user_jobs:
+        if getattr(job, "is_finished", False):
+            finished_count += 1
+        elif getattr(job, "is_failed", False):
+            failed_count += 1
+        else:
+            running_count += 1
+
+        method = getattr(job, "method", "")
+        if method == "addBinarySample":
+            filename = None
+            sha256 = None
+            try:
+                filename = job.filename
+            except Exception:
+                pass
+            try:
+                sha256 = job.sha256
+            except Exception:
+                pass
+            sample_id = None
+            try:
+                sample_id = job.sample_id
+            except Exception:
+                pass
+            submission_jobs.append({
+                "job": job,
+                "job_id": getattr(job, "job_id", ""),
+                "filename": filename,
+                "sha256": sha256,
+                "sample_id": sample_id,
+                "is_finished": getattr(job, "is_finished", False),
+                "is_failed": getattr(job, "is_failed", False),
+                "created_at": getattr(job, "created_at", None),
+            })
+        else:
+            analysis_jobs.append(job)
+
+    # Ephemeral Query Uploads workspace
+    query_uploads = []
+    uploads_dir = os.path.join(current_app.instance_path, "temp", "uploads")
+    if os.path.isdir(uploads_dir):
+        cleanup_ttl = current_app.config.get("STORAGE_MONGODB_CLEANUP_TTL", 7 * 86400)
+        now_ts = time.time()
+        user_job_ids = {str(getattr(j, "job_id", "")) for j in user_jobs}
+        from mcritweb.db import get_query_filename
+        from mcritweb.views.utility import QUERY_UPLOAD_JOB_ID
+
+        for entry in os.scandir(uploads_dir):
+            if not entry.is_file():
+                continue
+            job_id = entry.name
+            if not QUERY_UPLOAD_JOB_ID.match(job_id):
+                continue
+            if user_info.role != "admin" and job_id not in user_job_ids:
+                continue
+            try:
+                st = entry.stat()
+                created_dt = datetime.datetime.fromtimestamp(st.st_mtime, tz=datetime.UTC)
+                remaining_sec = max(0, cleanup_ttl - (now_ts - st.st_mtime))
+                orig_filename = get_query_filename(job_id)
+                query_uploads.append({
+                    "job_id": job_id,
+                    "filename": orig_filename or f"query_{job_id[:8]}",
+                    "size_bytes": st.st_size,
+                    "size_formatted": format_file_size(st.st_size),
+                    "created_dt": created_dt,
+                    "created_formatted": created_dt.strftime("%Y-%m-%d %H:%M UTC"),
+                    "created_relative": format_relative_time(created_dt),
+                    "remaining_seconds": remaining_sec,
+                    "ttl_formatted": format_ttl(remaining_sec),
+                })
+            except OSError:
+                continue
+        query_uploads.sort(key=lambda u: u["created_dt"], reverse=True)
+
+    active_tab = request.args.get('tab', 'overview').lower()
+    if active_tab not in ('overview', 'jobs', 'uploads', 'submissions', 'developer'):
+        active_tab = 'overview'
+
+    return render_template(
+        'profile.html',
+        active_tab=active_tab,
+        user_info=user_info,
+        registered_formatted=registered_formatted,
+        registered_relative=registered_relative,
+        last_login_formatted=last_login_formatted,
+        last_login_relative=last_login_relative,
+        can_use_api=can_use_api,
+        legacy_apitoken=legacy_token,
+        server_url=server_url,
+        api_base_url=api_base_url,
+        capabilities=ROLE_CAPABILITIES,
+        user_jobs=user_jobs,
+        analysis_jobs=analysis_jobs,
+        submission_jobs=submission_jobs,
+        job_count=job_count,
+        finished_count=finished_count,
+        running_count=running_count,
+        failed_count=failed_count,
+        jobs_unavailable=jobs_unavailable,
+        query_uploads=query_uploads,
+    )
 
 def admin_required(view):
     @functools.wraps(view)

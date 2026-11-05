@@ -1,0 +1,838 @@
+{% from 'table/links.html' import clipboard_btn, clipboard_js %}
+{% extends 'base.html' %}
+{% block title %}User Profile - {{ user_info.username }}{% endblock %}
+
+{% block style %}
+<style>
+  .profile-container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .profile-card {
+    border: 1px solid var(--border-subtle, #dee2e6);
+    border-radius: 0.5rem;
+    background-color: var(--surface-page, #ffffff);
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+  }
+  .stat-card {
+    border: 1px solid var(--border-subtle, #e9ecef);
+    border-radius: 0.375rem;
+    padding: 1rem;
+    background: var(--surface-subtle, #f8f9fa);
+    text-align: center;
+  }
+  .stat-card .stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--accent, #377ba8);
+    line-height: 1.2;
+  }
+  .stat-card .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted, #6c757d);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .code-snippet-box {
+    position: relative;
+    background-color: #212529;
+    color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.875rem;
+    overflow-x: auto;
+  }
+  .code-snippet-copy {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 2;
+  }
+  /* Container Query Responsive Data Tables */
+  .profile-table-container {
+    container-type: inline-size;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .profile-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .profile-table thead th {
+    position: sticky;
+    top: 0;
+    background-color: var(--surface-subtle, #f8f9fa);
+    color: var(--text-strong, #212529);
+    z-index: 2;
+    border-bottom: 2px solid var(--border-subtle, #dee2e6);
+    white-space: nowrap;
+  }
+  @media (prefers-color-scheme: dark) {
+    .profile-card {
+      background-color: var(--surface-page, #1e1e1e);
+      border-color: var(--border-subtle, #333333);
+    }
+    .stat-card {
+      background: var(--surface-subtle, #252525);
+      border-color: var(--border-subtle, #333333);
+    }
+    .profile-table thead th {
+      background-color: var(--surface-subtle, #252525);
+      border-bottom-color: var(--border-subtle, #333333);
+      color: var(--text-strong, #f8f9fa);
+    }
+    .responsive-card-table tr {
+      background-color: var(--surface-page, #1e1e1e);
+      border-color: var(--border-subtle, #333333);
+    }
+    .token-display-box {
+      background-color: var(--surface-subtle, #252525) !important;
+      border-color: var(--border-subtle, #333333) !important;
+    }
+  }
+  @container (max-width: 680px) {
+    .responsive-card-table,
+    .responsive-card-table thead,
+    .responsive-card-table tbody,
+    .responsive-card-table tr,
+    .responsive-card-table th,
+    .responsive-card-table td {
+      display: block;
+    }
+    .responsive-card-table thead {
+      display: none;
+    }
+    .responsive-card-table tr {
+      margin-bottom: 1rem;
+      border: 1px solid var(--border-subtle, #dee2e6);
+      border-radius: 0.375rem;
+      padding: 0.75rem;
+      background-color: var(--surface-page, #ffffff);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .responsive-card-table td {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.45rem 0;
+      border: none;
+      border-bottom: 1px dashed var(--border-subtle, #e9ecef);
+      text-align: right;
+    }
+    .responsive-card-table td:last-child {
+      border-bottom: none;
+      padding-top: 0.6rem;
+      justify-content: flex-end;
+    }
+    .responsive-card-table td::before {
+      content: attr(data-label);
+      font-weight: 600;
+      text-align: left;
+      margin-right: 1rem;
+      color: var(--text-muted, #495057);
+      flex-shrink: 0;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-container my-3">
+  <!-- Heading Hierarchy: Page Title h1 -->
+  <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+    <div class="d-flex align-items-center gap-3">
+      <h1 class="h2 mb-0">User Profile: {{ user_info.username }}</h1>
+      {% if user_info.role == 'admin' %}
+        <span class="badge bg-danger">Administrator</span>
+      {% elif user_info.role == 'contributor' %}
+        <span class="badge bg-primary">Contributor</span>
+      {% elif user_info.role == 'visitor' %}
+        <span class="badge bg-info text-dark">Visitor</span>
+      {% else %}
+        <span class="badge bg-warning text-dark">Pending Approval</span>
+      {% endif %}
+    </div>
+    <div>
+      <a href="{{ url_for('authentication.settings') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fa-solid fa-gear me-1" aria-hidden="true"></i> Settings
+      </a>
+    </div>
+  </div>
+
+  <!-- Accessible Tab Navigation with role="tablist" -->
+  <nav aria-label="User Profile Navigation" class="mb-4">
+    <ul class="nav nav-pills justify-content-center flex-wrap" id="profileTabList" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'overview' %}active{% endif %}" id="tab-overview" data-bs-toggle="pill" data-bs-target="#pane-overview" type="button" role="tab" aria-controls="pane-overview" aria-selected="{{ 'true' if active_tab == 'overview' else 'false' }}" tabindex="{{ '0' if active_tab == 'overview' else '-1' }}">
+          <i class="fa-solid fa-id-card me-1" aria-hidden="true"></i> Overview
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'jobs' %}active{% endif %}" id="tab-jobs" data-bs-toggle="pill" data-bs-target="#pane-jobs" type="button" role="tab" aria-controls="pane-jobs" aria-selected="{{ 'true' if active_tab == 'jobs' else 'false' }}" tabindex="{{ '0' if active_tab == 'jobs' else '-1' }}">
+          <i class="fa-solid fa-list-check me-1" aria-hidden="true"></i> Activity & Jobs ({{ job_count }})
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'uploads' %}active{% endif %}" id="tab-uploads" data-bs-toggle="pill" data-bs-target="#pane-uploads" type="button" role="tab" aria-controls="pane-uploads" aria-selected="{{ 'true' if active_tab == 'uploads' else 'false' }}" tabindex="{{ '0' if active_tab == 'uploads' else '-1' }}">
+          <i class="fa-solid fa-cloud-arrow-up me-1" aria-hidden="true"></i> Ephemeral Queries ({{ query_uploads|length }})
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'submissions' %}active{% endif %}" id="tab-submissions" data-bs-toggle="pill" data-bs-target="#pane-submissions" type="button" role="tab" aria-controls="pane-submissions" aria-selected="{{ 'true' if active_tab == 'submissions' else 'false' }}" tabindex="{{ '0' if active_tab == 'submissions' else '-1' }}">
+          <i class="fa-solid fa-file-arrow-up me-1" aria-hidden="true"></i> Submissions ({{ submission_jobs|length }})
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {% if active_tab == 'developer' %}active{% endif %}" id="tab-developer" data-bs-toggle="pill" data-bs-target="#pane-developer" type="button" role="tab" aria-controls="pane-developer" aria-selected="{{ 'true' if active_tab == 'developer' else 'false' }}" tabindex="{{ '0' if active_tab == 'developer' else '-1' }}">
+          <i class="fa-solid fa-code me-1" aria-hidden="true"></i> Developer & API
+        </button>
+      </li>
+    </ul>
+  </nav>
+
+  <div class="tab-content" id="profileTabContent">
+    <!-- PANE 1: OVERVIEW -->
+    <div class="tab-pane fade {% if active_tab == 'overview' %}show active{% endif %}" id="pane-overview" role="tabpanel" aria-labelledby="tab-overview">
+      <div class="row g-4">
+        <div class="col-lg-5">
+          <div class="profile-card p-4 h-100">
+            <h2 class="h4 mb-3 pb-2 border-bottom">Account Information</h2>
+            <dl class="row mb-0">
+              <dt class="col-sm-5 text-muted">Account ID:</dt>
+              <dd class="col-sm-7"><code>#{{ user_info.user_id }}</code></dd>
+
+              <dt class="col-sm-5 text-muted">Username:</dt>
+              <dd class="col-sm-7 fw-bold">{{ user_info.username }}</dd>
+
+              <dt class="col-sm-5 text-muted">Assigned Role:</dt>
+              <dd class="col-sm-7">
+                {% if user_info.role == 'admin' %}
+                  <span class="badge bg-danger">Administrator</span>
+                {% elif user_info.role == 'contributor' %}
+                  <span class="badge bg-primary">Contributor</span>
+                {% elif user_info.role == 'visitor' %}
+                  <span class="badge bg-info text-dark">Visitor</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">Pending Approval</span>
+                {% endif %}
+              </dd>
+
+              <dt class="col-sm-5 text-muted">Account Created:</dt>
+              <dd class="col-sm-7">
+                {% if user_info.registered %}
+                  <time datetime="{{ user_info.registered.isoformat() }}" title="{{ registered_formatted }}">
+                    {{ registered_formatted }} <small class="text-muted d-block">({{ registered_relative }})</small>
+                  </time>
+                {% else %}
+                  <span class="text-muted">N/A</span>
+                {% endif %}
+              </dd>
+
+              <dt class="col-sm-5 text-muted">Last Login:</dt>
+              <dd class="col-sm-7">
+                {% if last_login_formatted != 'Never' and user_info.last_login %}
+                  <time datetime="{{ user_info.last_login.isoformat() if user_info.last_login != 'no login' else '' }}" title="{{ last_login_formatted }}">
+                    {{ last_login_formatted }} <small class="text-muted d-block">({{ last_login_relative }})</small>
+                  </time>
+                {% else %}
+                  <span class="text-muted">{{ last_login_relative }}</span>
+                {% endif %}
+              </dd>
+            </dl>
+            <div class="mt-4 pt-3 border-top">
+              <a href="{{ url_for('authentication.settings') }}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-user-pen me-1" aria-hidden="true"></i> Edit Credentials & Preferences
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-7">
+          <div class="profile-card p-4 h-100">
+            <h2 class="h4 mb-3 pb-2 border-bottom">Role Capabilities Matrix</h2>
+            <p class="text-muted small">MCRITweb enforces hierarchical permissions across user roles. What your account is permitted to do:</p>
+            <div class="table-responsive">
+              <table class="table table-sm table-striped align-middle">
+                <thead>
+                  <tr>
+                    <th scope="col">Capability</th>
+                    <th scope="col" class="text-center">Your Status</th>
+                    <th scope="col">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for cap in capabilities %}
+                    {% set role_status = cap[user_info.role] %}
+                    <tr>
+                      <th scope="row" class="text-nowrap">{{ cap.name }}</th>
+                      <td class="text-center">
+                        {% if role_status == 'Allowed' or role_status == 'Full Access' %}
+                          <span class="badge bg-success"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>{{ role_status }}</span>
+                        {% elif role_status == 'Uncapped' %}
+                          <span class="badge bg-success"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>Uncapped</span>
+                        {% elif role_status == 'Capped (1 MiB)' %}
+                          <span class="badge bg-warning text-dark"><i class="fa-solid fa-shield-halved me-1" aria-hidden="true"></i>Capped (1 MiB)</span>
+                        {% elif role_status == 'Read Only' or role_status == 'Read & Submit' %}
+                          <span class="badge bg-info text-dark"><i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i>{{ role_status }}</span>
+                        {% else %}
+                          <span class="badge bg-secondary"><i class="fa-solid fa-ban me-1" aria-hidden="true"></i>Restricted</span>
+                        {% endif %}
+                      </td>
+                      <td class="small text-muted">{{ cap.description }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANE 2: JOBS & ACTIVITY -->
+    <div class="tab-pane fade {% if active_tab == 'jobs' %}show active{% endif %}" id="pane-jobs" role="tabpanel" aria-labelledby="tab-jobs">
+      <div class="profile-card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+          <div>
+            <h2 class="h4 mb-1">Analysis Activity & Job Ledger</h2>
+            <p class="text-muted small mb-0">Record of analysis jobs submitted by <strong>{{ user_info.username }}</strong>.</p>
+          </div>
+          <div class="d-flex gap-2">
+            <a href="{{ url_for('analyze.compare') }}" class="btn btn-outline-primary btn-sm">
+              <i class="fa-solid fa-plus me-1" aria-hidden="true"></i> New Comparison
+            </a>
+            <a href="{{ url_for('data.jobs') }}" class="btn btn-outline-secondary btn-sm">
+              <i class="fa-solid fa-table-list me-1" aria-hidden="true"></i> All System Jobs
+            </a>
+          </div>
+        </div>
+
+        <!-- Summary Stats Cards -->
+        <div class="row g-3 mb-4">
+          <div class="col-sm-6 col-md-3">
+            <div class="stat-card">
+              <div class="stat-value">{{ job_count }}</div>
+              <div class="stat-label">Total Jobs</div>
+            </div>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <div class="stat-card">
+              <div class="stat-value text-success">{{ finished_count }}</div>
+              <div class="stat-label">Completed</div>
+            </div>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <div class="stat-card">
+              <div class="stat-value text-primary">{{ running_count }}</div>
+              <div class="stat-label">Running / Queued</div>
+            </div>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <div class="stat-card">
+              <div class="stat-value text-danger">{{ failed_count }}</div>
+              <div class="stat-label">Failed</div>
+            </div>
+          </div>
+        </div>
+
+        {% if jobs_unavailable %}
+          <div class="alert alert-warning d-flex align-items-center" role="alert">
+            <i class="fa-solid fa-triangle-exclamation fs-4 me-3" aria-hidden="true"></i>
+            <div>
+              <strong>Queue Service Unreachable:</strong> Unable to connect to the MCRIT backend queue. The activity ledger cannot be displayed right now.
+            </div>
+          </div>
+        {% elif analysis_jobs|length == 0 %}
+          <div class="text-center py-5 border rounded bg-light">
+            <p class="text-muted mb-2"><i class="fa-solid fa-inbox fa-3x" aria-hidden="true"></i></p>
+            <h3 class="h5 text-dark">No Analysis Jobs Found</h3>
+            <p class="text-muted small">You haven't queued any analysis runs yet. Start comparing samples or querying binaries to see jobs listed here.</p>
+            <a href="{{ url_for('analyze.compare') }}" class="btn btn-primary btn-sm mt-2">Start Compare 1vsN</a>
+          </div>
+        {% else %}
+          <div class="table-wrapper profile-table-container" tabindex="0" role="region" aria-label="Analysis jobs ledger">
+            <table class="table table-hover table-striped responsive-card-table profile-table align-middle">
+              <thead>
+                <tr>
+                  <th scope="col">Job ID</th>
+                  <th scope="col">Method</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Runtime</th>
+                  <th scope="col">Created</th>
+                  <th scope="col" class="text-end">Result Link</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for job in analysis_jobs %}
+                  <tr>
+                    <td data-label="Job ID">
+                      <code>{{ job.job_id }}</code>
+                    </td>
+                    <td data-label="Method">
+                      <span class="badge bg-secondary font-monospace">{{ job.method|job_name }}</span>
+                    </td>
+                    <td data-label="Status">
+                      {% if job.is_finished %}
+                        <span class="badge bg-success"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>Finished</span>
+                      {% elif job.is_failed %}
+                        <span class="badge bg-danger"><i class="fa-solid fa-xmark me-1" aria-hidden="true"></i>Failed</span>
+                      {% elif job.is_terminated %}
+                        <span class="badge bg-dark"><i class="fa-solid fa-ban me-1" aria-hidden="true"></i>Terminated</span>
+                      {% else %}
+                        <span class="badge bg-info text-dark"><i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>Processing</span>
+                      {% endif %}
+                    </td>
+                    <td data-label="Runtime">
+                      {% if job.duration %}
+                        {{ job.duration|round(2) }}s
+                      {% else %}
+                        <span class="text-muted">N/A</span>
+                      {% endif %}
+                    </td>
+                    <td data-label="Created">
+                      {% if job.created_at %}
+                        <time datetime="{{ job.created_at|date_time }}">{{ job.created_at|date_time }}</time>
+                      {% else %}
+                        <span class="text-muted">N/A</span>
+                      {% endif %}
+                    </td>
+                    <td data-label="Result Link" class="text-end">
+                      {% if job.is_finished and job.is_matching_job %}
+                        <a href="{{ url_for('data.result', job_id=job.job_id) }}" class="btn btn-sm btn-primary">
+                          <i class="fa-solid fa-chart-simple me-1" aria-hidden="true"></i> View Result
+                        </a>
+                      {% else %}
+                        <a href="{{ url_for('data.job_by_id', job_id=job.job_id) }}" class="btn btn-sm btn-outline-secondary">
+                          <i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i> Job Details
+                        </a>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- PANE 3: EPHEMERAL QUERIES -->
+    <div class="tab-pane fade {% if active_tab == 'uploads' %}show active{% endif %}" id="pane-uploads" role="tabpanel" aria-labelledby="tab-uploads">
+      <div class="profile-card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+          <div>
+            <h2 class="h4 mb-1">Ephemeral Query Uploads Workspace</h2>
+            <p class="text-muted small mb-0">Ad-hoc query binaries temporarily held on server disk until worker cleanup TTL (7 days).</p>
+          </div>
+          <div>
+            <a href="{{ url_for('analyze.query') }}" class="btn btn-outline-primary btn-sm">
+              <i class="fa-solid fa-cloud-arrow-up me-1" aria-hidden="true"></i> New Query Upload
+            </a>
+          </div>
+        </div>
+
+        {% if query_uploads|length == 0 %}
+          <div class="text-center py-5 border rounded bg-light">
+            <p class="text-muted mb-2"><i class="fa-solid fa-folder-open fa-3x" aria-hidden="true"></i></p>
+            <h3 class="h5 text-dark">No Ephemeral Query Uploads</h3>
+            <p class="text-muted small">No query binary files are currently stored in the workspace cache.</p>
+            <a href="{{ url_for('analyze.query') }}" class="btn btn-primary btn-sm mt-2">Upload a Query</a>
+          </div>
+        {% else %}
+          <div class="table-wrapper profile-table-container" tabindex="0" role="region" aria-label="Ephemeral query uploads table">
+            <table class="table table-hover table-striped responsive-card-table profile-table align-middle">
+              <thead>
+                <tr>
+                  <th scope="col">Job ID</th>
+                  <th scope="col">Filename</th>
+                  <th scope="col">Size</th>
+                  <th scope="col">Uploaded</th>
+                  <th scope="col">Remaining TTL</th>
+                  <th scope="col" class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for upload in query_uploads %}
+                  <tr>
+                    <td data-label="Job ID">
+                      <code>{{ upload.job_id }}</code>
+                    </td>
+                    <td data-label="Filename">
+                      <strong>{{ upload.filename }}</strong>
+                    </td>
+                    <td data-label="Size">
+                      {{ upload.size_formatted }}
+                    </td>
+                    <td data-label="Uploaded">
+                      <time datetime="{{ upload.created_formatted }}" title="{{ upload.created_formatted }}">
+                        {{ upload.created_formatted }} <small class="text-muted">({{ upload.created_relative }})</small>
+                      </time>
+                    </td>
+                    <td data-label="Remaining TTL">
+                      {% if upload.remaining_seconds > 86400 %}
+                        <span class="badge bg-success"><i class="fa-solid fa-clock me-1" aria-hidden="true"></i>{{ upload.ttl_formatted }}</span>
+                      {% elif upload.remaining_seconds > 0 %}
+                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>{{ upload.ttl_formatted }}</span>
+                      {% else %}
+                        <span class="badge bg-danger"><i class="fa-solid fa-hourglass-end me-1" aria-hidden="true"></i>Expired</span>
+                      {% endif %}
+                    </td>
+                    <td data-label="Actions" class="text-end">
+                      <div class="d-inline-flex gap-2">
+                        <a href="{{ url_for('data.result', job_id=upload.job_id) }}" class="btn btn-sm btn-outline-primary" title="View query match result">
+                          <i class="fa-solid fa-chart-line me-1" aria-hidden="true"></i> Result
+                        </a>
+                        {% if user_info.role in ('admin', 'contributor') %}
+                          <button type="button" class="btn btn-sm btn-success" data-post="{{ url_for('data.promote_query', job_id=upload.job_id) }}" title="Promote this query into a permanent sample in the corpus">
+                            <i class="fa-solid fa-arrow-up-from-bracket me-1" aria-hidden="true"></i> Promote
+                          </button>
+                        {% else %}
+                          <span class="badge bg-light text-muted border" title="Only contributors and administrators can promote queries into corpus samples">
+                            Promotion Restricted
+                          </span>
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- PANE 4: SUBMISSIONS -->
+    <div class="tab-pane fade {% if active_tab == 'submissions' %}show active{% endif %}" id="pane-submissions" role="tabpanel" aria-labelledby="tab-submissions">
+      <div class="profile-card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+          <div>
+            <h2 class="h4 mb-1">Binary Submissions Ledger</h2>
+            <p class="text-muted small mb-0">Corpus sample submissions requested by <strong>{{ user_info.username }}</strong>.</p>
+          </div>
+          {% if user_info.role in ('admin', 'contributor') %}
+            <div>
+              <a href="{{ url_for('data.submit') }}" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-upload me-1" aria-hidden="true"></i> Submit Binary
+              </a>
+            </div>
+          {% endif %}
+        </div>
+
+        {% if submission_jobs|length == 0 %}
+          <div class="text-center py-5 border rounded bg-light">
+            <p class="text-muted mb-2"><i class="fa-solid fa-box-archive fa-3x" aria-hidden="true"></i></p>
+            <h3 class="h5 text-dark">No Submissions Recorded</h3>
+            <p class="text-muted small">No permanent binary sample submissions were found for your account.</p>
+            {% if user_info.role in ('admin', 'contributor') %}
+              <a href="{{ url_for('data.submit') }}" class="btn btn-primary btn-sm mt-2">Submit New Binary</a>
+            {% else %}
+              <p class="text-muted small"><em>Contributors and administrators can submit binary samples to the corpus.</em></p>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="table-wrapper profile-table-container" tabindex="0" role="region" aria-label="Binary submissions ledger">
+            <table class="table table-hover table-striped responsive-card-table profile-table align-middle">
+              <thead>
+                <tr>
+                  <th scope="col">Job ID</th>
+                  <th scope="col">Filename</th>
+                  <th scope="col">SHA-256</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Submitted</th>
+                  <th scope="col" class="text-end">Corpus Link</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for sub in submission_jobs %}
+                  <tr>
+                    <td data-label="Job ID">
+                      <code>{{ sub.job_id }}</code>
+                    </td>
+                    <td data-label="Filename">
+                      <strong>{{ sub.filename or 'Binary Sample' }}</strong>
+                    </td>
+                    <td data-label="SHA-256">
+                      {% if sub.sha256 %}
+                        <code class="font-monospace small text-break">{{ sub.sha256[:16] }}&hellip;</code>
+                        {{ clipboard_btn(sub.sha256) }}
+                      {% else %}
+                        <span class="text-muted">N/A</span>
+                      {% endif %}
+                    </td>
+                    <td data-label="Status">
+                      {% if sub.is_finished %}
+                        <span class="badge bg-success"><i class="fa-solid fa-check me-1" aria-hidden="true"></i>Indexed</span>
+                      {% elif sub.is_failed %}
+                        <span class="badge bg-danger"><i class="fa-solid fa-xmark me-1" aria-hidden="true"></i>Failed</span>
+                      {% else %}
+                        <span class="badge bg-info text-dark"><i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>Processing</span>
+                      {% endif %}
+                    </td>
+                    <td data-label="Submitted">
+                      {% if sub.created_at %}
+                        <time datetime="{{ sub.created_at|date_time }}">{{ sub.created_at|date_time }}</time>
+                      {% else %}
+                        <span class="text-muted">N/A</span>
+                      {% endif %}
+                    </td>
+                    <td data-label="Corpus Link" class="text-end">
+                      {% if sub.sample_id %}
+                        <a href="{{ url_for('explore.sample_by_id', sample_id=sub.sample_id) }}" class="btn btn-sm btn-primary">
+                          <i class="fa-solid fa-virus me-1" aria-hidden="true"></i> Sample #{{ sub.sample_id }}
+                        </a>
+                      {% else %}
+                        <a href="{{ url_for('data.job_by_id', job_id=sub.job_id) }}" class="btn btn-sm btn-outline-secondary">
+                          <i class="fa-solid fa-circle-info me-1" aria-hidden="true"></i> Job Details
+                        </a>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- PANE 5: DEVELOPER & API -->
+    <div class="tab-pane fade {% if active_tab == 'developer' %}show active{% endif %}" id="pane-developer" role="tabpanel" aria-labelledby="tab-developer">
+      <div class="profile-card p-4">
+        <h2 class="h4 mb-3 pb-2 border-bottom">Developer & API Token Hub</h2>
+
+        {% if not can_use_api %}
+          <div class="alert alert-warning" role="alert">
+            <i class="fa-solid fa-lock me-2" aria-hidden="true"></i>
+            <strong>API Access Restricted:</strong> Pending user accounts do not have API access until approved by an instance administrator.
+          </div>
+        {% else %}
+          <div class="mb-4">
+            <label class="form-label fw-bold mb-1" for="tokenDisplayField">Personal API Authentication Token</label>
+            <p class="text-muted small">Use this token to authenticate REST API requests or instantiate the <code>mcrit</code> client in automated scripts.</p>
+
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <div class="p-2 border rounded bg-light font-monospace d-flex align-items-center token-display-box" id="tokenDisplayField" style="min-width: 320px;">
+                <span id="tokenMasked" class="text-muted user-select-none">••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••</span>
+                <span id="tokenUnmasked" class="d-none user-select-all">{{ user_info.apitoken }}</span>
+              </div>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="btnToggleToken" aria-pressed="false" aria-label="Reveal API token" title="Reveal or hide token">
+                <i class="fa-solid fa-eye" id="iconToggleToken" aria-hidden="true"></i> <span id="labelToggleToken">Reveal</span>
+              </button>
+              {{ clipboard_btn(user_info.apitoken) }}
+              <button type="button" class="btn {% if legacy_apitoken %}btn-danger{% else %}btn-outline-danger{% endif %} btn-sm" data-post="{{ url_for('admin.regenerate_apitoken') }}" title="Rotate API token. Current token will immediately stop working.">
+                <i class="fa-solid fa-arrows-rotate me-1" aria-hidden="true"></i> Rotate Token
+              </button>
+            </div>
+
+            {% if legacy_apitoken %}
+              <div class="alert alert-warning mt-3" role="alert">
+                <i class="fa-solid fa-triangle-exclamation me-2" aria-hidden="true"></i>
+                <strong>Deprecated Token Format (Issue #250):</strong> This token was generated before MCRITweb 1.5.0 (pre-1.5.0, 32-character form) and is deprecated. Please click <strong>Rotate Token</strong> above to upgrade to the modern 64-character token.
+              </div>
+            {% endif %}
+          </div>
+
+          <h3 class="h5 mt-4 mb-2">Integration Code Snippets</h3>
+          <p class="text-muted small">Pre-populated code examples with your token and this MCRITweb instance address:</p>
+
+          <div class="row g-3">
+            <div class="col-lg-6">
+              <div class="card h-100">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                  <span class="fw-bold"><i class="fa-brands fa-python me-1" aria-hidden="true"></i> Python (McritClient)</span>
+                  <button type="button" class="btn btn-sm btn-outline-dark" onclick="copySnippet('snippetPython', this)">
+                    <i class="fa-regular fa-copy me-1" aria-hidden="true"></i> Copy
+                  </button>
+                </div>
+                <div class="card-body p-0">
+                  <pre class="code-snippet-box m-0" id="snippetPython"><code>from mcrit.client.McritClient import McritClient
+
+client = McritClient(
+    mcrit_server="{{ api_base_url }}",
+    apitoken="{{ user_info.apitoken }}"
+)
+
+# Verify connection and retrieve system status
+status = client.getStatus()
+print("Connected to MCRIT:", status)</code></pre>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="card h-100">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                  <span class="fw-bold"><i class="fa-solid fa-terminal me-1" aria-hidden="true"></i> cURL Command</span>
+                  <button type="button" class="btn btn-sm btn-outline-dark" onclick="copySnippet('snippetCurl', this)">
+                    <i class="fa-regular fa-copy me-1" aria-hidden="true"></i> Copy
+                  </button>
+                </div>
+                <div class="card-body p-0">
+                  <pre class="code-snippet-box m-0" id="snippetCurl"><code>curl -s -X GET \
+  -H "apitoken: {{ user_info.apitoken }}" \
+  "{{ api_base_url }}/status"</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ clipboard_js() }}
+
+<script>
+  // Token Mask/Reveal Toggle
+  (function() {
+    var btnToggle = document.getElementById('btnToggleToken');
+    var tokenMasked = document.getElementById('tokenMasked');
+    var tokenUnmasked = document.getElementById('tokenUnmasked');
+    var iconToggle = document.getElementById('iconToggleToken');
+    var labelToggle = document.getElementById('labelToggleToken');
+
+    if (btnToggle && tokenMasked && tokenUnmasked) {
+      btnToggle.addEventListener('click', function() {
+        var isHidden = tokenUnmasked.classList.contains('d-none');
+        if (isHidden) {
+          tokenMasked.classList.add('d-none');
+          tokenUnmasked.classList.remove('d-none');
+          iconToggle.classList.remove('fa-eye');
+          iconToggle.classList.add('fa-eye-slash');
+          labelToggle.textContent = 'Hide';
+          btnToggle.setAttribute('aria-label', 'Hide API token');
+          btnToggle.setAttribute('aria-pressed', 'true');
+        } else {
+          tokenUnmasked.classList.add('d-none');
+          tokenMasked.classList.remove('d-none');
+          iconToggle.classList.remove('fa-eye-slash');
+          iconToggle.classList.add('fa-eye');
+          labelToggle.textContent = 'Reveal';
+          btnToggle.setAttribute('aria-label', 'Reveal API token');
+          btnToggle.setAttribute('aria-pressed', 'false');
+        }
+      });
+    }
+  })();
+
+  // Copy Snippet Handler with fallback for non-secure / unsupported contexts
+  function copySnippet(elementId, btn) {
+    var el = document.getElementById(elementId);
+    if (!el) return;
+    var text = el.innerText || el.textContent;
+    function markCopied() {
+      var origHtml = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-check me-1" aria-hidden="true"></i> Copied!';
+      btn.classList.remove('btn-outline-dark');
+      btn.classList.add('btn-success');
+      setTimeout(function() {
+        btn.innerHTML = origHtml;
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-outline-dark');
+      }, 2000);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(markCopied).catch(function() {
+        fallbackCopy(text);
+        markCopied();
+      });
+    } else {
+      fallbackCopy(text);
+      markCopied();
+    }
+  }
+
+  function fallbackCopy(text) {
+    var textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+    } catch (err) {}
+    document.body.removeChild(textArea);
+  }
+
+  // Accessible Roving Tabindex & URL Fragment Deep Linking
+  (function() {
+    var tabList = document.getElementById('profileTabList');
+    if (!tabList) return;
+    var tabs = Array.from(tabList.querySelectorAll('button[role="tab"]'));
+
+    function activateTab(tabBtn, updateHash) {
+      if (!tabBtn) return;
+      var bsTab = bootstrap.Tab.getOrCreateInstance(tabBtn);
+      bsTab.show();
+
+      tabs.forEach(function(t) {
+        if (t === tabBtn) {
+          t.setAttribute('tabindex', '0');
+          t.setAttribute('aria-selected', 'true');
+        } else {
+          t.setAttribute('tabindex', '-1');
+          t.setAttribute('aria-selected', 'false');
+        }
+      });
+
+      if (updateHash) {
+        var targetId = tabBtn.getAttribute('data-bs-target') || '';
+        var hash = targetId.replace('#pane-', '');
+        if (hash && window.location.hash !== '#' + hash) {
+          history.replaceState(null, '', '#' + hash);
+        }
+      }
+    }
+
+    // Keyboard navigation (ArrowLeft, ArrowRight, Home, End)
+    tabList.addEventListener('keydown', function(e) {
+      var currentIndex = tabs.indexOf(document.activeElement);
+      if (currentIndex === -1) return;
+
+      var nextIndex = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        nextIndex = (currentIndex + 1) % tabs.length;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+      } else if (e.key === 'Home') {
+        nextIndex = 0;
+      } else if (e.key === 'End') {
+        nextIndex = tabs.length - 1;
+      }
+
+      if (nextIndex !== -1) {
+        e.preventDefault();
+        tabs[nextIndex].focus();
+        activateTab(tabs[nextIndex], true);
+      }
+    });
+
+    // Update URL hash on click / shown.bs.tab
+    tabs.forEach(function(tabBtn) {
+      tabBtn.addEventListener('shown.bs.tab', function() {
+        activateTab(tabBtn, true);
+      });
+    });
+
+    // Deep linking on load or hashchange
+    function checkUrlHash() {
+      var hash = window.location.hash.replace('#', '');
+      if (hash) {
+        var targetTab = document.getElementById('tab-' + hash);
+        if (targetTab) {
+          activateTab(targetTab, false);
+        }
+      }
+    }
+
+    checkUrlHash();
+    window.addEventListener('hashchange', checkUrlHash);
+  })();
+</script>
+{% endblock %}

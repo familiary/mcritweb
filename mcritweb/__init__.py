@@ -347,7 +347,14 @@ def create_app(test_config=None, instance_path=None):
 
     @app.template_filter('date_time')
     def date_time(input):
-        return input[:10] + ' ' + input[11:19]
+        if not input:
+            return ""
+        if hasattr(input, 'strftime'):
+            return input.strftime("%Y-%m-%d %H:%M:%S")
+        s = str(input)
+        if len(s) >= 19:
+            return s[:10] + ' ' + s[11:19]
+        return s
     
 
     @app.template_global()

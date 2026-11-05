@@ -54,7 +54,11 @@ Settings
       </tr>
       <tr>
         <td>Registration:</td>
-        <td>{{user_info.registration_date}}</td>
+        <td>{{user_info.registration_date}} <span class="text-muted small">({{ registered_relative }})</span></td>
+      </tr>
+      <tr>
+        <td>Last Login:</td>
+        <td>{{ last_login_formatted }} {% if last_login_formatted != 'Never' %}<span class="text-muted small">({{ last_login_relative }})</span>{% endif %}</td>
       </tr>
       {# whoever's token the API accepts has to be able to see and replace it. This
          used to be admin-or-contributor while token_required admits visitors too, so a
@@ -84,6 +88,11 @@ Settings
       </tr>
       {% endif %}
     </table>
+    <div class="mt-3">
+      <a href="{{ url_for('authentication.profile') }}" class="btn btn-outline-primary btn-sm">
+        <i class="fa-solid fa-id-badge me-1"></i> View Full User Profile & Activity Hub
+      </a>
+    </div>
 </div>
 {% if g.user.role == 'admin' or g.user.role == 'contributor' %}
   <div class="tab-pane fade" id="pills-username" role="tabpanel" aria-labelledby="pills-username-tab">

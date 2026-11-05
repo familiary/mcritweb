@@ -236,18 +236,42 @@ def api_router(api_path):
             forward_sample_ids = int_list(request.args["sample_ids"])
         if "job_ids" in request.args:
             forward_job_ids = [item.strip() for item in request.args["job_ids"].split(",") if item.strip()]
-        return handle_raw_response(
-            client.getQueueData(
-                start=forward_start, 
-                limit=forward_limit, 
-                method=forward_method, 
-                filter=forward_filter, 
-                state=forward_state, 
-                ascending=forward_ascending,
-                sample_ids=forward_sample_ids,
-                job_ids=forward_job_ids
-            )
-        )
+        forward_username = request.args.get("username", None)
+        queue_kwargs = {
+            "start": forward_start,
+            "limit": forward_limit,
+            "method": forward_method,
+            "filter": forward_filter,
+            "state": forward_state,
+            "ascending": forward_ascending,
+            "sample_ids": forward_sample_ids,
+            "job_ids": forward_job_ids,
+        }
+        if forward_username is not None:
+            queue_kwargs["username"] = forward_username
+        return handle_raw_response(client.getQueueData(**queue_kwargs))
+    # getQueueCount
+    elif re_match := re.match(r"jobs/count$", api_path):
+        forward_method = request.args.get("method", None)
+        forward_filter = request.args.get("filter", None)
+        forward_state = request.args.get("state", None)
+        forward_username = request.args.get("username", None)
+        forward_sample_ids = None
+        forward_job_ids = None
+        if "sample_ids" in request.args:
+            forward_sample_ids = int_list(request.args["sample_ids"])
+        if "job_ids" in request.args:
+            forward_job_ids = [item.strip() for item in request.args["job_ids"].split(",") if item.strip()]
+        count_kwargs = {
+            "method": forward_method,
+            "filter": forward_filter,
+            "state": forward_state,
+            "sample_ids": forward_sample_ids,
+            "job_ids": forward_job_ids,
+        }
+        if forward_username is not None:
+            count_kwargs["username"] = forward_username
+        return handle_raw_response(client.getQueueCount(**count_kwargs))
     # getJobData, getResultForJob
     elif re_match := re.match(r"jobs/(?P<job_id>[0-9a-fA-F]+)(?P<result_for_job>/result)?$", api_path):
         job_id = re_match.group("job_id")

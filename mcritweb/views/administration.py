@@ -203,6 +203,9 @@ def regenerate_apitoken():
     user_info.apitoken = generate_apitoken()
     user_info.saveToDb()
     flash('A new API token was generated. Anything using the old one has to be updated.', category='success')
+    referrer = request.referrer
+    if referrer and "/profile" in referrer:
+        return redirect(url_for('authentication.profile') + '#developer')
     return redirect(url_for('authentication.settings'))
 
 @bp.route('/regenerate_legacy_apitokens', methods=('POST',))
