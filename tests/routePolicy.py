@@ -232,4 +232,6 @@ ROUTE_POLICY = {
     # does, everything else is a read or a job submission at visitor level. See
     # tests/testApiTokens.py.
     "api.api_router": (APITOKEN, WRITES_ON_POST),
+    "api.login_api": (PUBLIC, WRITES_ON_POST),
+    "api.register_api": (PUBLIC, WRITES_ON_POST),
 }

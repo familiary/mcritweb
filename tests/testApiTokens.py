@@ -90,9 +90,9 @@ def test_a_contributor_token_may_rename_a_function(client, make_user, role):
 
 
 @pytest.mark.parametrize("path", ["matches/sample/1", "samples", "status", "functions/1/extra"])
-def test_put_is_refused_everywhere_but_a_function(client, make_user, path):
-    """The router accepts PUT for modifyFunction only. Every other branch ignores the
-    method, so before this a PUT /api/matches/sample/1 queued a matching job."""
+def test_put_is_refused_on_paths_without_an_update_operation(client, make_user, path):
+    """A PUT must not fall into a read or job-submission branch. Updates to individual
+    samples, families and functions are tested by testApiParity."""
     make_user("admin")
     assert client.put(f"/api/{path}", headers=token_for("admin"), json={}).status_code == 405
 
@@ -113,9 +113,9 @@ def test_a_visitor_token_can_still_submit_a_job(client, make_user):
 #
 # `re.match` is not a full match, so an unanchored branch claimed every path *beginning*
 # with its pattern: `status_whatever` dispatched to `getStatus()`. Harmless while every
-# branch re-parses its own groups, but it belongs with the role tests, because the gate
-# in `CONTRIBUTOR_ONLY` is itself a `re.match` - `samples$` - and an unanchored write
-# branch added later would be reachable by a path the gate does not recognise.
+# branch re-parses its own groups, but it belongs with the role tests, because the role
+# gate is chosen by the same match: `ROUTES` in api.py pairs each pattern with its
+# role, and an unanchored write pattern would be reachable by a path it does not name.
 #
 # A path the router does not implement falls through to `Response(status=501)` without
 # reaching the backend, so 501 here means "did not dispatch" and is distinguishable from

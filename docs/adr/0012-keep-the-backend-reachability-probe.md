@@ -146,6 +146,14 @@ Once both hold, the probe is redundant — it is a time-of-check-to-time-of-use 
 it can pass and the real call still fail, and the views need the handling regardless —
 and removing it saves the round-trip this ADR is otherwise paying to reduce.
 
+### API exception (#345)
+
+The token API satisfies both preconditions: its raw client preserves backend 401
+responses and its transport handler returns 502/504 directly. It therefore calls
+the backend without the browser probe. Reusing the browser decorator would replace
+an API failure with a redirect and create a flash session. Browser routes retain
+the cached probe; this exception does not change their failure handling.
+
 ## Consequences
 
 The cache is a module global, so it is **per worker process**. With N gunicorn workers

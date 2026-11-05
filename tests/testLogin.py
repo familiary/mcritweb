@@ -341,8 +341,8 @@ def the_row_changes_while_the_hash_is_computed(app, monkeypatch, statement, user
     """The settings routes work on `g.user`, read at the start of the request; the slow
     part of a password change is hashing the new one. Change the row in that gap."""
     from mcritweb import db
-    from mcritweb.views import administration
-    real_hash = administration.generate_password_hash
+    from mcritweb.views import account_actions
+    real_hash = account_actions.generate_password_hash
 
     def hash_while_the_row_changes(password):
         with app.app_context():
@@ -350,7 +350,7 @@ def the_row_changes_while_the_hash_is_computed(app, monkeypatch, statement, user
             database.execute(statement, (user_id,))
             database.commit()
         return real_hash(password)
-    monkeypatch.setattr(administration, "generate_password_hash", hash_while_the_row_changes)
+    monkeypatch.setattr(account_actions, "generate_password_hash", hash_while_the_row_changes)
 
 
 @pytest.mark.parametrize("column, value", [

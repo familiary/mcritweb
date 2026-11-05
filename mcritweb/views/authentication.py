@@ -7,7 +7,7 @@ import secrets
 import sqlite3
 import uuid
 
-from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
@@ -165,10 +165,12 @@ def _current_hash_method():
         _CURRENT_HASH_METHOD = generate_password_hash(secrets.token_urlsafe(8)).split("$", 1)[0]
     return _CURRENT_HASH_METHOD
 
-#: The roles whose API token is worth anything. `token_required` is the authority; the
+#: The roles whose API token reaches the corpus. `token_required` is the authority; the
 #: settings page reads it too, so the page cannot show a token to someone whose token
-#: does not work, or - the way it went wrong - hide one that does. `pending` gets
-#: nothing, as in the web UI.
+#: does not work, or - the way it went wrong - hide one that does. A `pending` token
+#: reaches only what `token_required(allow_pending=True)` lets through, which the
+#: /api router narrows to the caller's own account (`me/*`, `auth/token`) and
+#: `capabilities`, as the web UI gives a pending account only its settings.
 API_ROLES = ('visitor', 'contributor', 'admin')
 
 
@@ -365,6 +367,9 @@ def password_mark(user_info):
 
 @bp.before_app_request
 def load_logged_in_user():
+    if request.blueprint == 'api':
+        g.user = None
+        return
     user_id = session.get('user_id')
     if user_id is None:
         g.user = None
@@ -390,6 +395,8 @@ def mark_the_session_with_the_current_password(response):
     account's own password - /admin/change_password - keeps its own session, while every
     other session of the account still carries the old mark and ends on its next request.
     """
+    if request.blueprint == 'api':
+        return response
     user_info = g.get('user')
     if user_info is not None and session.get(PASSWORD_MARK) != password_mark(user_info):
         session[PASSWORD_MARK] = password_mark(user_info)
@@ -455,14 +462,19 @@ def visitor_required(view):
     return wrapped_view
 
 
-def token_required(view):
+def token_required(view=None, *, allow_pending=False):
     """Authenticate an API caller by its `apitoken` header, and apply its role.
 
     The API is a passthrough to the backend, so a token has to carry the same
     authority the web UI grants the same person - otherwise the quickest way past a
     role check is to stop using the browser. The token's owner lands on `g.api_user`
-    for the router to narrow further; `pending` gets nothing, as in the web UI.
+    for the router to narrow further. A `pending` token is refused unless the view is
+    wrapped with `allow_pending=True`; the /api router is, and gives such a token its
+    own account (`me/*`, `auth/token`) and `capabilities`, nothing from the corpus.
     """
+    if view is None:
+        return functools.partial(token_required, allow_pending=allow_pending)
+
     @functools.wraps(view)
     def wrapped_view(**kwargs):
         # requests -> {'apitoken': '{}'.format(apitoken)})
@@ -470,10 +482,10 @@ def token_required(view):
         # check for valid token via DB
         user_id = db.get_user_by_apitoken(provided_token)
         if user_id is None:
-            abort(403)
+            return Response(status=403)
         g.api_user = UserInfo.fromDb(user_id=user_id)
-        if g.api_user is None or g.api_user.role not in API_ROLES:
-            abort(403)
+        if g.api_user is None or g.api_user.role not in (KNOWN_ROLES if allow_pending else API_ROLES):
+            return Response(status=403)
         # a token that authenticates can still be one the deployment has retired. The
         # pre-1.5.0 (32-character) tokens were left valid by 1.5.0 and would have stayed
         # valid forever; the switch lets an operator pick the cutover moment once their

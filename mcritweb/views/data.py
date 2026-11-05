@@ -6,10 +6,9 @@ import types
 import uuid
 from urllib.parse import quote, urlencode
 
-from flask import Blueprint, Response, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Blueprint, Response, abort, current_app, flash, json, redirect, render_template, request, send_from_directory, session, url_for
 from mcrit.libs.utility import decode_two_complement
 from mcrit.queue.LocalQueue import Job
-from mcrit.queue.QueueRemoteCalls import to_binary as canonicalise_queue_json
 from mcrit.storage.FunctionEntry import FunctionEntry
 from mcrit.storage.MatchedFunctionEntry import MatchedFunctionEntry
 from mcrit.storage.MatchingResult import MatchingResult
@@ -349,6 +348,28 @@ def create_match_diagram(app, job_id, matching_result, filtered_family_id=None, 
         app.logger.debug("stored new MCRIT diagram: %s", output_path)
 
 
+def diagram_filter_in_report(matching_result, filter_kind, filter_id):
+    """Whether a diagram scoped by `filter_kind`/`filter_id` is one worth rendering.
+
+    Shared by data.diagram_file and the API's diagram workflow, since both write
+    into the same unbounded diagram cache.
+    """
+    # only a family or sample this report matched, which is every filter the result
+    # page offers a link for - so a hand-written URL cannot fill the unbounded diagram
+    # cache with one render per family or sample in the corpus for each job. The
+    # report answers it without the isFamilyId/isSampleId round trips this replaced.
+    if filter_kind == "famid":
+        return filter_id in {sample_match.family_id for sample_match in matching_result.sample_matches}
+    if filter_kind == "samid":
+        return filter_id in {sample_match.sample_id for sample_match in matching_result.sample_matches}
+    # the same for a function id, which the report can answer by itself. A query
+    # report additionally has no stored functions to lay a diagram out over, so the
+    # function-filtered variant was never generated for one and still is not
+    if filter_kind == "funid":
+        return not matching_result.is_query and filter_id in matching_result.function_id_to_family_ids_matched
+    return True
+
+
 def render_missing_match_diagram(app, filename_match):
     """Render the diagram `filename_match` names, so that diagram_file can serve it.
 
@@ -374,18 +395,7 @@ def render_missing_match_diagram(app, filename_match):
     if not isinstance(result_json, dict) or not result_json:
         return
     matching_result = MatchingResult.fromDict(result_json)
-    # only a family or sample this report matched, which is every filter the result
-    # page offers a link for - so a hand-written URL cannot fill the unbounded diagram
-    # cache with one render per family or sample in the corpus for each job. The
-    # report answers it without the isFamilyId/isSampleId round trips this replaced.
-    if filter_kind == "famid" and filter_id not in {sample_match.family_id for sample_match in matching_result.sample_matches}:
-        return
-    if filter_kind == "samid" and filter_id not in {sample_match.sample_id for sample_match in matching_result.sample_matches}:
-        return
-    # the same for a function id, which the report can answer by itself. A query
-    # report additionally has no stored functions to lay a diagram out over, so the
-    # function-filtered variant was never generated for one and still is not
-    if filter_kind == "funid" and (matching_result.is_query or filter_id not in matching_result.function_id_to_family_ids_matched):
+    if not diagram_filter_in_report(matching_result, filter_kind, filter_id):
         return
     create_match_diagram(
         app,
@@ -1212,7 +1222,7 @@ def name_query_sample(job_info, matching_result: MatchingResult):
         sample_entry.filename = get_query_filename(job_info.job_id) or ""
 
 
-def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult, diagram_size=None):
+def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult, diagram_size=None, as_api=False):
     name_query_sample(job_info, matching_result)
     score_color_provider = ScoreColorProvider()
     score_divisors = recover_score_divisors(matching_result)
@@ -1242,7 +1252,8 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
     if (all(flag is None for flag in [filter_direct_min_score, filter_frequency_min_score, filter_family_name,
                 filter_function_min_score, filter_function_max_score, filter_min_num_samples, filter_max_num_samples, filter_max_num_families, filter_function_offset])
             and not any([filter_unique_only, filter_exclude_own_family, filter_exclude_library, filter_exclude_pic, filter_func_unique])
-            and not filter_action == "clear"):
+            and not filter_action == "clear"
+            and not (as_api and any(name.startswith('filter_') for name in request.args))):
         # load default filters
         # adjust filters based on family/sample filtering
         user_filters = UserFilters.fromDb(user_id)
@@ -1306,6 +1317,19 @@ def result_matches_for_sample_or_query(job_info, matching_result: MatchingResult
     matching_result.applyFilterValues()
 
     client = get_client()
+
+    if as_api:
+        if filtered_family_id is not None:
+            if not client.isFamilyId(filtered_family_id):
+                abort(404)
+            matching_result.filterToFamilyId(filtered_family_id)
+        elif filtered_sample_id is not None:
+            if client.getSampleById(filtered_sample_id) is None:
+                abort(404)
+            matching_result.filterToSampleId(filtered_sample_id)
+        elif filtered_function_id is not None:
+            matching_result.filterToFunctionId(filtered_function_id)
+        return matching_result
 
     # load user column setup from database
     user_column_settings = UserColumnSettings.fromDb(user_id)
@@ -1403,7 +1427,7 @@ def order_samples(samples, order):
     return ordered_samples
 
 
-def result_matches_for_cross(job_info, result_json):
+def result_matches_for_cross(job_info, result_json, as_api=False):
     samples = []
     sample_ids = [int(id) for id in next(iter(result_json.values()))["clustered_sequence"]]
     sample_entries = get_sample_entries(sample_ids)
@@ -1413,6 +1437,8 @@ def result_matches_for_cross(job_info, result_json):
             samples.append(sample_entry)
         else:
             reason = "MCRIT was not able to retrieve information for all samples specified in the original job task. This might be a result of having deleted samples from the database since it was processed. Please consider starting a new job."
+            if as_api:
+                abort(409, reason)
             return render_template("result_corrupted.html", reason=reason, job_info=job_info)
     custom_order = request.args.get('custom','')
     # a drag-and-drop order is the more specific request, so it wins over a named one
@@ -1432,12 +1458,18 @@ def result_matches_for_cross(job_info, result_json):
                 # job_info, not result_json: the template reads job_info.job_id for
                 # its heading and for the delete link, and a result dict has neither.
                 # The sibling corrupted branch above already passes the Job.
+                if as_api:
+                    abort(409, reason)
                 return render_template("result_corrupted.html", reason=reason, job_info=job_info)
         if ordered_samples != []:
             samples_by_method[method] = ordered_samples
         else:
             samples_by_method[method] = samples
         sample_indices[method] = [x for index, x in enumerate([sample.sample_id for sample in samples_by_method[method]]) if (index+1) % 5 == 0]
+    if as_api:
+        return {'job_id': job_info.job_id, 'order': 'custom' if custom_order else ordering,
+                'samples': {method: [sample.toDict() for sample in entries] for method, entries in samples_by_method.items()},
+                'results': result_json}
     # only the tab shown on load is rendered, the others are filled from lazy_panes on first click
     rendered_method = "unweighted" if "unweighted" in result_json else next(iter(result_json))
     return render_template('result_cross.html',
@@ -1520,7 +1552,7 @@ def linkhunt(job_id):
     # genuinely still working
     return render_template("job_in_progress.html", job_info=job_info)
 
-def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
+def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult, as_api=False):
     name_query_sample(job_info, matching_result)
     client = get_client()
     score_color_provider = ScoreColorProvider()
@@ -1539,7 +1571,8 @@ def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
     if (all(flag is None for flag in [filter_min_score, filter_lib_min_score, filter_link_score, filter_min_size,
                 filter_min_offset, filter_max_offset, filter_exclude_families, filter_exclude_samples])
                 and not filter_strongest_per_family
-                and not filter_action == "clear"):
+                and not filter_action == "clear"
+                and not (as_api and any(name.startswith('filter_') for name in request.args))):
         # specify default filters
         filter_min_score = 65
         filter_lib_min_score = 80
@@ -1609,6 +1642,9 @@ def linkhunt_for_sample_or_query(job_info, matching_result: MatchingResult):
     if filter_link_score:
         link_clusters = [cluster for cluster in link_clusters if cluster["score"] > filter_link_score]
         link_hunt_result = [link for link in link_hunt_result if link.matched_link_score > filter_link_score]
+
+    if as_api:
+        return link_clusters, link_hunt_result, filter_values
 
     cluster_pagination = Pagination(request, len(link_clusters), limit=10, query_param="clup", limit_param="clul")
     function_pagination = Pagination(request, len(link_hunt_result), limit=100, query_param="funp", limit_param="funl")
@@ -2254,102 +2290,15 @@ def query_report_sample_info(client, job_info):
 @mcrit_server_required
 def promote_query(job_id):
     """Add the file a query was run for to the corpus, without a second upload."""
-    client = get_client()
-    job_info = client.getJobData(job_id.lower()) if JOB_ID_PATTERN.fullmatch(job_id) else None
-    if job_info is None:
-        flash("The given Job ID doesn't exist", category='error')
-        return redirect(url_for('data.jobs'))
-    result_page = url_for('data.result', job_id=job_info.job_id)
-    if job_info.method not in QUERY_UPLOAD_KINDS:
-        flash('Only a query can be promoted to a sample.', category='error')
-        return redirect(result_page)
-    upload_path = query_upload_path(current_app, job_info.job_id)
-    if upload_path is None:
-        flash('This job cannot be promoted.', category='error')
-        return redirect(result_page)
-    sample_info = query_report_sample_info(client, job_info)
-    # the sample's declared sha256 no longer names the stored file. It is only what the
-    # corpus is asked about below; what was actually resubmitted is checked against the
-    # job descriptor further down instead.
-    upload_sha256 = sample_info.get("sha256")
-    # an .smda query's report declares this value itself - see SMDA_SHA256
-    if isinstance(upload_sha256, str) and SMDA_SHA256.match(upload_sha256):
-        upload_sha256 = upload_sha256.lower()
-    else:
-        upload_sha256 = None
-    if upload_sha256 is None:
-        flash('The report of this query does not record which file it was run for, so it cannot be promoted.', category='error')
-        return redirect(result_page)
-    # whether the local copy survived or not, a sample that is already stored is the
-    # answer to "promote this" - so promoting twice lands on it instead of adding it.
-    # Two promotions racing past this check still make one sample, but they are not
-    # told the same thing: addReport answers a known sha256 with the entry that already
-    # exists, while SampleResource.on_post_submit_binary refuses one with 409, which
-    # handle_response turns into None - so the second promotion of a binary query says
-    # the sample could not be added. It is one sample all the same: the corpus is
-    # checked again by Worker.addBinarySample when the job runs.
-    sample_entry = client.getSampleBySha256(upload_sha256)
-    if sample_entry is not None:
-        flash('Sample was already in database', category='warning')
-        return redirect(url_for('explore.sample_by_id', sample_id=sample_entry.sample_id))
-    if not os.path.isfile(upload_path):
-        flash('The file this query was run for is no longer available on this server, so it cannot be promoted. Please submit it again.', category='error')
-        return redirect(result_page)
-    family = request.form.get('family', '').strip()
-    version = request.form.get('version', '').strip()
-    for field_name, field_value in (('family', family), ('version', version)):
-        if not PROMOTION_METADATA.match(field_value):
-            flash(f'The {field_name} may only contain up to 64 letters, digits, spaces, or any of ". _ -".', category='error')
-            return redirect(result_page)
-    with open(upload_path, "rb") as fin:
-        upload_content = fin.read()
-    upload_kind = QUERY_UPLOAD_KINDS[job_info.method]
-    smda_report = None
-    stored_sha256 = None
-    if upload_kind == "smda":
-        try:
-            # the backend was handed the report, not the file: McritClient posts
-            # toDict(), and QueueRemoteCalls hashes the canonicalisation of that
-            smda_report = SmdaReport.fromDict(json.loads(upload_content))
-            stored_sha256 = hashlib.sha256(canonicalise_queue_json(smda_report.toDict())).hexdigest()
-        except Exception:
-            # the uploads folder holds uploaded files, so a stored report that no
-            # longer reads back is normal input and has to become a message, not a 500
-            current_app.logger.warning("promote_query - could not read the stored SMDA report of job %s", job_info.job_id)
-    else:
-        stored_sha256 = hashlib.sha256(upload_content).hexdigest()
-    # the file is only this query's input if it hashes to what the backend recorded for
-    # it. Nothing weaker will do: for an .smda query the name it is filed under is one
-    # the upload chose, so it is no evidence at all about the bytes it names.
-    payload_sha256 = query_payload_sha256(job_info)
-    if stored_sha256 is None or payload_sha256 is None or stored_sha256 != payload_sha256:
-        flash('The stored copy of this query no longer matches it, so it was not promoted.', category='error')
-        return redirect(result_page)
-    if upload_kind == "smda":
-        if family:
-            smda_report.family = family
-        if version:
-            smda_report.version = version
-        # the client answers (SampleEntry, job_id), or None when the backend refused
-        added = client.addReport(smda_report)
-        new_sample_entry = added[0] if isinstance(added, tuple) and added else None
-        if new_sample_entry is None:
-            flash('The sample could not be added to the database.', category='error')
-            return redirect(result_page)
-        flash('The query was promoted to a sample.', category='success')
-        return redirect(url_for('explore.sample_by_id', sample_id=new_sample_entry.sample_id))
-    is_dump = upload_kind == "dumped"
-    base_address = None
-    bitness = None
-    if is_dump:
-        base_address = query_report_base_address(sample_info)
-        bitness = sample_info.get("bitness")
-        if base_address is None or bitness not in [32, 64]:
-            flash('The report of this query no longer records how the dump was mapped, so it cannot be promoted.', category='error')
-            return redirect(result_page)
-    new_job_id = client.addBinarySample(upload_content, family=family or None, version=version or None, is_dump=is_dump, base_addr=base_address, bitness=bitness)
-    if not new_job_id:
-        flash('The sample could not be added to the database.', category='error')
-        return redirect(result_page)
-    flash('The query was promoted to a sample.', category='success')
+    from mcritweb.views.query_promotion import PromotionError, promote
+    try:
+        sample, new_job_id, already_stored = promote(get_client(), job_id, request.form.get('family', ''), request.form.get('version', ''))
+    except PromotionError as error:
+        flash(str(error), category='error')
+        if error.status == 404:
+            return redirect(url_for('data.jobs'))
+        return redirect(url_for('data.result', job_id=error.job_id))
+    flash('Sample was already in database' if already_stored else 'The query was promoted to a sample.', category='warning' if already_stored else 'success')
+    if sample is not None:
+        return redirect(url_for('explore.sample_by_id', sample_id=sample.sample_id))
     return redirect(url_for('data.job_by_id', job_id=new_job_id, refresh=3, forward=1))

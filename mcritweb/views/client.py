@@ -15,9 +15,22 @@ from mcrit.client.McritClient import McritClient
 from mcritweb.views.utility import get_server_token, get_server_url, get_username
 
 
+class RawMcritClient(McritClient):
+    """Keep raw answers raw for methods that unconditionally call `_handle`.
+
+    mcrit 1.12 through 1.16 skip their raw flag in mutation, unique-blocks and
+    snake-case search methods. Their common response handler must not parse away
+    the HTTP status and envelope that the API needs to forward.
+    """
+
+    def _handle(self, response):
+        return response
+
+
 def default_client_factory(username=None, **kwargs):
     """Build a client from the server settings stored in the local database."""
-    client = McritClient(
+    client_type = RawMcritClient if kwargs.get("raw_responses") else McritClient
+    client = client_type(
         mcrit_server=get_server_url(),
         apitoken=get_server_token(),
         username=get_username() if username is None else username,

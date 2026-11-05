@@ -185,7 +185,12 @@ def parse_base_addr_form_param(request):
     address fitting into 64 bit, so the caller can reject the request instead of guessing
     a base address for a memory dump.
     """
-    value = request.form.get('base_addr', '').strip()
+    return parse_base_addr(request.form.get('base_addr', ''))
+
+
+def parse_base_addr(value):
+    """A hexadecimal address fitting in 64 bits, or None for malformed input."""
+    value = value.strip()
     if not re.fullmatch("(0[xX])?[0-9a-fA-F]+", value):
         return None
     base_addr = int(value, 16)
