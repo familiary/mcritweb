@@ -325,7 +325,8 @@ form.form-inline input {
 /* the token and the snippets: a 64-character word has no break opportunity, so without
    this the developer tab is 600px wide on a phone */
 .apitoken-value,
-.code-snippet {
+.code-snippet,
+.submission-filename {
   word-break: break-all;
   white-space: pre-wrap;
 }
