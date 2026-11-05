@@ -162,7 +162,7 @@ def test_removing_the_mapping_uncaps_every_role(app, client, as_role):
 # --- the same cap on the API's query routes --------------------------------------------
 
 #: Every router branch that hands an uploaded body to a backend query.
-API_QUERY_PATHS = ["query/binary", "query/binary/mapped/4194304", "query/function"]
+API_QUERY_PATHS = ["query", "query/binary", "query/binary/mapped/4194304", "query/function"]
 
 
 def post_api_query(client, path, size, role):

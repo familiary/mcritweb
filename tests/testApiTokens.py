@@ -90,9 +90,9 @@ def test_a_contributor_token_may_rename_a_function(client, make_user, role):
 
 
 @pytest.mark.parametrize("path", ["matches/sample/1", "samples", "status", "functions/1/extra"])
-def test_put_is_refused_everywhere_but_a_function(client, make_user, path):
-    """The router accepts PUT for modifyFunction only. Every other branch ignores the
-    method, so before this a PUT /api/matches/sample/1 queued a matching job."""
+def test_put_is_refused_on_paths_without_an_update_operation(client, make_user, path):
+    """A PUT must not fall into a read or job-submission branch. Updates to individual
+    samples, families and functions are tested by testApiParity."""
     make_user("admin")
     assert client.put(f"/api/{path}", headers=token_for("admin"), json={}).status_code == 405
 

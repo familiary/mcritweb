@@ -1,23 +1,23 @@
 import json
-import sqlite3
 
 from flask import Blueprint, current_app, flash, g, redirect, render_template, request, url_for
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 
 from mcritweb import db
 from mcritweb.db import UserColumnSettings, UserFilters, UserInfo, generate_apitoken, is_legacy_apitoken
+from mcritweb.views.account_actions import AccountActionError
+from mcritweb.views.account_actions import change_password as set_password
+from mcritweb.views.account_actions import rename as rename_account
+from mcritweb.views.admin_actions import change_role, clear_reset_state, delete_account, rotate_legacy_tokens, update_connection
 from mcritweb.views.authentication import (
     KNOWN_ROLES,
-    TOO_MANY_ATTEMPTS,
-    _throttled,
     admin_required,
     login_required,
     multi_user,
 )
 from mcritweb.views.client import backend_version, get_client
-from mcritweb.views.memo import clear_app_memos
 from mcritweb.views.params import parse_checkbox_post_param, parse_integer_post_param
-from mcritweb.views.utility import forget_server_probe, get_session_user_id, mcrit_server_required
+from mcritweb.views.utility import get_session_user_id, mcrit_server_required
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -45,28 +45,10 @@ def change_username():
     # g.user is the caller's row, read fresh for this request by load_logged_in_user
     user_info = g.user
     error_msg = None
-    # cheapest check first, and the password before the lookup, so that whether a
-    # name is taken is only ever answered to someone who proved who they are
-    if not db.is_well_formed_username(new_username):
-        error_msg = "Username has invalid format."
-    elif db.is_reserved_username(new_username):
-        error_msg = "Username is reserved."
-    elif _throttled(user_info.username):
-        error_msg = TOO_MANY_ATTEMPTS
-    elif not _password_checks_out(user_info, password):
-        error_msg = 'Incorrect Password!'
-    elif UserInfo.fromDb(username=new_username) is not None:
-        error_msg = 'Username is already taken!'
-    if error_msg is None:
-        old_username = user_info.username
-        user_info.username = new_username
-        try:
-            user_info.saveToDb()
-        except sqlite3.IntegrityError:
-            # the lookup above is not a lock: a registration or another rename can
-            # take the name before this write, and the UNIQUE column refuses it
-            user_info.username = old_username
-            error_msg = 'Username is already taken!'
+    try:
+        rename_account(user_info, new_username, password)
+    except AccountActionError as error:
+        error_msg = str(error)
     if error_msg is None:
         flash('Username successfully changed', category='success')
         return redirect(url_for('index'))
@@ -83,21 +65,11 @@ def change_password():
     old_password = request.form['inputPassword2']
     user_info = g.user
     error_msg = None
-    # as registration asks: an empty password would sign in with an empty password field
-    if not new_password:
-        error_msg = 'Password is required.'
-    elif not new_password == request.form['inputPassword4']:
-        error_msg = 'The entered passwords do not match!'
-    elif _throttled(user_info.username):
-        error_msg = TOO_MANY_ATTEMPTS
-    elif not _password_checks_out(user_info, old_password):
-        error_msg = 'Incorrect password!'
+    try:
+        set_password(user_info, old_password, new_password, request.form['inputPassword4'])
+    except AccountActionError as error:
+        error_msg = str(error)
     if error_msg is None:
-        user_info.password = generate_password_hash(new_password)
-        # the token is on /settings, so whoever could read that page with a stolen session
-        # could have copied it; it must not outlast the password change that ends the session
-        user_info.apitoken = generate_apitoken()
-        user_info.saveToDb()
         flash('Password successfully changed. Your API token was replaced too; anything using the old one has to be updated.', category='success')
         return redirect(url_for('index'))
     flash(error_msg, category='error')
@@ -215,12 +187,7 @@ def regenerate_legacy_apitokens():
     the cutover moment: it rotates all of them at once. That breaks whatever uses the
     tokens, which is why the button that leads here asks for confirmation first.
     """
-    rotated = 0
-    for user_info in db.get_all_user_info():
-        if is_legacy_apitoken(user_info.apitoken):
-            user_info.apitoken = generate_apitoken()
-            user_info.saveToDb()
-            rotated += 1
+    rotated = rotate_legacy_tokens()
     if rotated:
         flash(f'{rotated} pre-1.5.0 API token(s) were regenerated. Anything using them has to be updated.', category='success')
     else:
@@ -275,8 +242,7 @@ def change_user_role(user_id, role, tab):
     if user_info is None:
         flash('That user no longer exists.', category='error')
         return redirect(url_for('admin.users', tab=tab))
-    user_info.role = role
-    user_info.saveToDb()
+    change_role(user_id, role)
     return redirect(url_for('admin.users', tab=tab))
 
 
@@ -288,11 +254,7 @@ def delete_user(user_id, tab = None):
     if user_id == 1:
         return redirect(url_for('admin.users', tab=tab))
     # others can be deleted, along with everything keyed to them
-    database = db.get_db()
-    database.execute("DELETE FROM user_filters WHERE user_id = ?;", (user_id,))
-    database.execute("DELETE FROM user_column_settings WHERE user_id = ?;", (user_id,))
-    database.execute("DELETE FROM user WHERE id = ?;", (user_id,))
-    database.commit()
+    delete_account(user_id)
     return redirect(url_for('admin.users', tab=tab))
 
 
@@ -310,22 +272,13 @@ def server():
 @bp.route('/change_server' , methods=('POST',))
 @admin_required
 def change_server():
-    server_info = db.get_server_info()
     new_url = request.form.get('mcrit_server_url', '')
     new_token = request.form.get('mcrit_server_token', '')
-    if server_info.url != new_url or server_info.server_token != new_token:
-        server_info.url = new_url
-        server_info.server_token = new_token
-        server_info.saveToDb()
-        # an operator who has just corrected the URL or token should not have to wait
-        # out the reachability TTL to find out whether it worked - see issue #89. The
-        # cache is a module global, so this clears the worker that handled this request;
-        # with N gunicorn workers the other N-1 still answer from their own entry until
-        # it lapses, which the default 5s TTL bounds.
-        forget_server_probe()
+    if update_connection(new_url, new_token):
         flash('Server information successfully changed', category='success')
     else:
         flash('No information needed change', category='success')
+    server_info = db.get_server_info()
     operation_mode_str = "Multi-User" if server_info.operation_mode == "multi" else "Single-User"
     running_server_version = current_app.config['MCRITWEB_VERSION']
     client = get_client()
@@ -342,11 +295,7 @@ def reset_server():
         return redirect(url_for('admin.server'))
     client = get_client()
     client.respawn()
-    forget_server_probe()
-    from mcritweb.views.utility import ensure_local_data_paths
-    ensure_local_data_paths(current_app, clear_data=True)
-    # the reset restarts the backend's id counters, so anything memoized by id is stale
-    clear_app_memos(current_app)
+    clear_reset_state()
     flash('A reset of MCRIT was successfully performed.', category='success')
     return redirect(url_for('index'))
 

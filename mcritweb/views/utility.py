@@ -15,7 +15,7 @@ import threading
 import time
 
 import requests
-from flask import current_app, flash, g, has_app_context, redirect, session, url_for
+from flask import current_app, flash, g, has_app_context, has_request_context, redirect, session, url_for
 from smda.common.SmdaReport import SmdaReport
 
 from mcritweb import db
@@ -345,6 +345,9 @@ def mcrit_server_required(view):
 
 
 def get_session_user_id():
+    from flask import request as current_request
+    if has_request_context() and current_request.blueprint == 'api' and g.get('api_user') is not None:
+        return g.api_user.user_id
     try:
         user_id = int(session['user_id'])
         if user_id > 0:
@@ -354,6 +357,9 @@ def get_session_user_id():
 
 
 def get_username(request=None):
+    from flask import request as current_request
+    if has_request_context() and current_request.blueprint == 'api' and g.get('api_user') is not None:
+        return g.api_user.username
     username = "guest"
     if g.user is not None:
         username =  g.user.username

@@ -7,7 +7,7 @@ import secrets
 import sqlite3
 import uuid
 
-from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, session, url_for
+from flask import Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from mcritweb import db
@@ -365,6 +365,9 @@ def password_mark(user_info):
 
 @bp.before_app_request
 def load_logged_in_user():
+    if request.blueprint == 'api':
+        g.user = None
+        return
     user_id = session.get('user_id')
     if user_id is None:
         g.user = None
@@ -390,6 +393,8 @@ def mark_the_session_with_the_current_password(response):
     account's own password - /admin/change_password - keeps its own session, while every
     other session of the account still carries the old mark and ends on its next request.
     """
+    if request.blueprint == 'api':
+        return response
     user_info = g.get('user')
     if user_info is not None and session.get(PASSWORD_MARK) != password_mark(user_info):
         session[PASSWORD_MARK] = password_mark(user_info)
@@ -455,7 +460,7 @@ def visitor_required(view):
     return wrapped_view
 
 
-def token_required(view):
+def token_required(view=None, *, allow_pending=False):
     """Authenticate an API caller by its `apitoken` header, and apply its role.
 
     The API is a passthrough to the backend, so a token has to carry the same
@@ -463,6 +468,9 @@ def token_required(view):
     role check is to stop using the browser. The token's owner lands on `g.api_user`
     for the router to narrow further; `pending` gets nothing, as in the web UI.
     """
+    if view is None:
+        return functools.partial(token_required, allow_pending=allow_pending)
+
     @functools.wraps(view)
     def wrapped_view(**kwargs):
         # requests -> {'apitoken': '{}'.format(apitoken)})
@@ -470,10 +478,10 @@ def token_required(view):
         # check for valid token via DB
         user_id = db.get_user_by_apitoken(provided_token)
         if user_id is None:
-            abort(403)
+            return Response(status=403)
         g.api_user = UserInfo.fromDb(user_id=user_id)
-        if g.api_user is None or g.api_user.role not in API_ROLES:
-            abort(403)
+        if g.api_user is None or g.api_user.role not in (KNOWN_ROLES if allow_pending else API_ROLES):
+            return Response(status=403)
         # a token that authenticates can still be one the deployment has retired. The
         # pre-1.5.0 (32-character) tokens were left valid by 1.5.0 and would have stayed
         # valid forever; the switch lets an operator pick the cutover moment once their
