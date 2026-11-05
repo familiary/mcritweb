@@ -260,28 +260,30 @@ def change_user_role(user_id, role, tab):
         return redirect(url_for('admin.users', tab=tab))
     # others can be changed - but the account may have been deleted since this page
     # was rendered, and fromDb answers None rather than raising. See issue #95.
-    user_info = UserInfo.fromDb(user_id=user_id)
-    if user_info is None:
-        flash('That user no longer exists.', category='error')
-        return redirect(url_for('admin.users', tab=tab))
-    user_info.role = role
-    user_info.saveToDb()
+    # and the one admin left keeps the role, its own account included (db.change_role)
+    flash_kept(db.change_role(user_id, role), 'keeps the administrator role')
     return redirect(url_for('admin.users', tab=tab))
+
+
+def flash_kept(reason, kept):
+    """Tell the admin why db.delete_user or db.change_role left an account as it was."""
+    if reason == db.GONE:
+        flash('That user no longer exists.', category='error')
+    elif reason == db.KEPT_ROOT:
+        flash(f'The first account registered here {kept}, so that the instance always has an administrator.', category='error')
+    elif reason == db.KEPT_LAST_ADMIN:
+        flash(f'The only administrator {kept}, as the instance needs one. Make another account an administrator first.', category='error')
+    elif reason == db.KEPT_LAST_ACCOUNT:
+        flash(f'The only account left {kept}: with none, the next registration would make whoever sends it an administrator.', category='error')
 
 
 @bp.route('/delete_user/<int:user_id>', methods=('POST',))
 @bp.route('/delete_user/<int:user_id>/<tab>', methods=('POST',))
 @admin_required
 def delete_user(user_id, tab = None):
-    # root user is not deletable
-    if user_id == 1:
-        return redirect(url_for('admin.users', tab=tab))
-    # others can be deleted, along with everything keyed to them
-    database = db.get_db()
-    database.execute("DELETE FROM user_filters WHERE user_id = ?;", (user_id,))
-    database.execute("DELETE FROM user_column_settings WHERE user_id = ?;", (user_id,))
-    database.execute("DELETE FROM user WHERE id = ?;", (user_id,))
-    database.commit()
+    # the root account, the one admin left and the one account left are not deleted, which
+    # db.delete_user decides under the write lock; others go with everything keyed to them
+    flash_kept(db.delete_user(user_id), 'cannot be deleted')
     return redirect(url_for('admin.users', tab=tab))
 
 

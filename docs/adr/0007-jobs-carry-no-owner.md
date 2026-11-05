@@ -43,9 +43,13 @@ question:
   themselves with their own password - no admin involved. Every job created before the
   rename would keep the old name, so one user's history splits in two with nothing tying
   the halves together.
-- **Usernames are reusable.** `administration.delete_user` does
-  `DELETE FROM user WHERE id = ?`, which frees the name; the next registration can take
-  it. Old jobs then read as belonging to whoever holds the name now.
+- **Usernames are reusable.** `db.delete_user()` does `DELETE FROM user WHERE id = ?`, which
+  frees the name; the next registration can take it. The admin's delete on the users page and a
+  user's delete of their own account both go through it, so either frees the name the same way.
+  Old jobs then read as belonging to whoever holds the name now, and so does the one right
+  a name gives: `data.may_rerun_query` lets a role with an upload cap rerun the queries
+  requested under its own username, so the new holder may rerun the old holder's. The
+  account still has to be approved by an admin before it can.
 
 So an owner field has to key on something stable, and MCRITweb does not currently have
 one to send: `sql/create_table_user.sql` gives an autoincrement `id`, which is stable but

@@ -378,6 +378,11 @@ def load_logged_in_user():
         if user_info is not None and not (isinstance(mark, str) and hmac.compare_digest(mark, password_mark(user_info))):
             session.clear()
             user_info = None
+        # an account deleted since this session signed in, from another browser or by an
+        # admin: left in the cookie, its id made /login answer "You are logged in." and
+        # refuse every sign-in from this browser until the cookie expired
+        elif user_info is None:
+            session.clear()
         g.user = user_info
     # the colour theme every page renders with; a logged-out page has the default (#70)
     g.theme = g.user.theme if g.user is not None else db.DEFAULT_THEME
@@ -422,7 +427,7 @@ def settings():
     if user_column_settings is None:
         user_column_settings = UserColumnSettings.fromDict(user_id, {})
         user_column_settings.saveToDb()
-    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken))
+    return render_template('settings.html', user_info=user_info, user_filters=user_filters, user_column_settings=user_column_settings.toUserColumnSettings(), can_use_api=user_info.role in API_ROLES, legacy_apitoken=is_legacy_apitoken(user_info.apitoken), account_kept=db.why_account_kept(user_info.user_id))
 
 def admin_required(view):
     @functools.wraps(view)
@@ -513,3 +518,64 @@ def logout():
     else:
         flash('You\'re logged out now', category='success')
     return redirect(url_for('index'))
+
+
+#: What the root account is told if it asks to be deleted. Its settings page offers no
+#: form, so only a request made by hand gets here.
+ROOT_ACCOUNT_KEPT = ('This account cannot be deleted: it is the first one registered here, '
+                     'which stays an administrator so that the instance always has one.')
+
+#: And if the root account is gone or demoted and this is the one admin left.
+LAST_ADMIN_KEPT = ('This account cannot be deleted: it is the only administrator, and the '
+                   'instance needs one. Make another account an administrator first.')
+
+#: And if no other account is left at all, admin or not.
+LAST_ACCOUNT_KEPT = ('This account cannot be deleted: it is the only account left, and the next '
+                     'registration would make whoever sends it an administrator.')
+
+#: What each reason db.delete_user keeps an account for tells its owner.
+ACCOUNT_KEPT = {
+    db.KEPT_ROOT: ROOT_ACCOUNT_KEPT,
+    db.KEPT_LAST_ADMIN: LAST_ADMIN_KEPT,
+    db.KEPT_LAST_ACCOUNT: LAST_ACCOUNT_KEPT,
+}
+
+
+@bp.route('/delete_account', methods=('POST',))
+@login_required
+def delete_account():
+    """Delete the caller's own account, as an admin deleting it from the users page would.
+
+    The password is asked for again, so that a session left open on a shared machine, or
+    a copy of its cookie, cannot end the account on its own. That makes the check a
+    password guess like one at /login, and it is metered by the same throttle: otherwise
+    whoever holds a stolen session could guess at the password here without limit.
+    """
+    user_info = g.user
+    # the root account, the last admin and the last account stay (see db._why_kept).
+    # Refused before the password check, so that asking costs no guess; db.delete_user
+    # asks again under the write lock, as another deletion may land in between
+    reason = db.why_account_kept(user_info.user_id)
+    if reason in ACCOUNT_KEPT:
+        flash(ACCOUNT_KEPT[reason], category='error')
+        return redirect(url_for('authentication.settings'))
+    if _throttled(user_info.username):
+        flash(TOO_MANY_ATTEMPTS, category='error')
+        return redirect(url_for('authentication.settings'))
+    password = request.form.get('password', '')
+    if not password or not check_password_hash(user_info.password, password):
+        db.record_failed_login(request.remote_addr, user_info.username)
+        flash('Incorrect password. Your account was not deleted.', category='error')
+        return redirect(url_for('authentication.settings'))
+    reason = db.delete_user(user_info.user_id)
+    if reason in ACCOUNT_KEPT:
+        # another admin, or the last other account, went while the password was checked
+        flash(ACCOUNT_KEPT[reason], category='error')
+        return redirect(url_for('authentication.settings'))
+    db.clear_login_failures(request.remote_addr, user_info.username)
+    # with the row gone, every other session of the account, a copied cookie included,
+    # finds nobody to sign in on its next request. This one ends now, as a logout's does
+    g.user = None
+    session.clear()
+    flash('Your account was deleted, together with its settings and its API token.', category='success')
+    return redirect(url_for('authentication.login'))
