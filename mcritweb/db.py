@@ -857,6 +857,11 @@ def migrate(app_context):
             with app_context.open_resource('sql' + os.sep + 'create_table_query_upload.sql') as f:
                 db.executescript(f.read().decode('utf8'))
             print("EXECUTED MIGRATION: CREATED TABLE QUERY_UPLOAD")
+        # since the profile lists a user's query uploads, each upload records who made it
+        query_upload_columns = [column[0] for column in db.execute('SELECT * FROM query_upload').description]
+        if "user_id" not in query_upload_columns:
+            db.execute('ALTER TABLE query_upload ADD user_id INTEGER')
+            print("EXECUTED MIGRATION: ADD USER_ID TO TABLE QUERY_UPLOAD")
 
         db.commit()
     finally:
@@ -1002,19 +1007,35 @@ def _displayable_filename(filename):
         return ""
     return "".join(character for character in filename if character.isprintable()).strip()[:MAX_QUERY_FILENAME_LENGTH]
 
-def remember_query_filename(job_id, filename):
-    """Record the name a query was uploaded under, so its result page can show it.
+def remember_query_filename(job_id, filename, user_id=None):
+    """Record the name a query was uploaded under, so its result page can show it, and
+    who uploaded it, so their profile can list it.
 
     None of the backend's query endpoints accepts a filename, so this is the only
     place the name is ever kept. Keyed by job id: the backend deduplicates a repeated
     query onto the job it already has, and the name kept is the first one seen for it.
+    The uploader is the account's local id, not its username: a username is renamed
+    and freed here (docs/adr/0007), so keyed on it a renamed account would lose its
+    uploads and the next holder of a freed name would be shown the old holder's.
     """
     filename = _displayable_filename(filename)
     if not job_id or not filename:
         return
     db = get_db()
-    db.execute("INSERT OR IGNORE INTO query_upload (job_id, filename) VALUES (?, ?);", (str(job_id), filename))
+    db.execute("INSERT OR IGNORE INTO query_upload (job_id, filename, user_id) VALUES (?, ?, ?);", (str(job_id), filename, user_id))
     db.commit()
+
+def get_query_uploads(user_id=None):
+    """The query uploads this instance recorded, newest job first, as (job_id, filename)
+    pairs: those of one account by its id, or every one for `None`, which is the
+    admin's view. Rows from before the uploader was recorded belong to nobody and are
+    listed for the admin only."""
+    db = get_db()
+    if user_id is None:
+        records = db.execute("SELECT job_id, filename FROM query_upload ORDER BY rowid DESC;").fetchall()
+    else:
+        records = db.execute("SELECT job_id, filename FROM query_upload WHERE user_id = ? ORDER BY rowid DESC;", (user_id,)).fetchall()
+    return [(record["job_id"], record["filename"]) for record in records]
 
 def get_query_filename(job_id):
     """The name a query job's upload carried, or None if this instance never saw it."""
