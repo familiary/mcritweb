@@ -42,8 +42,6 @@ VISITOR_PAGES = [
     "/explore/samples/0",
     "/explore/functions/0",
     "/explore/statistics",
-    "/explore/users",
-    "/data/ingest",
     "/data/matches/function/0/1",
     "/analyze/query",
     "/analyze/compare",
@@ -66,7 +64,7 @@ VISITOR_PAGES = [
     f"/data/result/{job_id_of('matches_for_sample_vs')}?samid=3",
     f"/data/result/{job_id_of('matches_for_sample')}?funid=2",
 ]
-CONTRIBUTOR_PAGES = ["/data/submit", "/data/ingest/submit", "/data/ingest/import"]
+CONTRIBUTOR_PAGES = ["/data/submit"]
 ADMIN_PAGES = ["/admin/server", "/admin/users/", "/data/import", f"/data/result/{job_id_of('maintenance_rebuild_index')}"]
 
 
