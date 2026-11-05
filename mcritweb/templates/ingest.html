@@ -18,7 +18,7 @@
 {% block content %}
 {% set can_submit = g.user.role in ('contributor', 'admin') %}
 <h1>Ingest</h1>
-<p class="text-muted">Query a sample against the corpus, submit a binary to it, or import an export. The <a href="{{ url_for('analyze.query') }}">query</a>{% if can_submit %}, <a href="{{ url_for('data.submit') }}">submit</a> and <a href="{{ url_for('data.import_view') }}">import</a> pages{% else %} page{% endif %} do the same on a page each.</p>
+<p class="text-muted">Query a sample against the corpus, submit a binary to it, or import an export. {% if can_submit %}The <a href="{{ url_for('analyze.query') }}">query</a>, <a href="{{ url_for('data.submit') }}">submit</a> and <a href="{{ url_for('data.import_view') }}">import</a> pages do the same, one each.{% else %}The <a href="{{ url_for('analyze.query') }}">query</a> page does the same on its own.{% endif %}</p>
 {# three pages behind one tab row. Each tab is a link to its own URL, so the tab a reader
    is on survives a reload and can be sent to someone; the forms post where the query,
    submit and import pages post, with the same role checks on those routes. #}

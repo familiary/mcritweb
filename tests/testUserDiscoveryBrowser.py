@@ -98,9 +98,12 @@ def test_an_admins_view_of_another_account_scrolls_nowhere_sideways(open_as, wid
 
 
 @pytest.mark.parametrize("width", WIDTHS)
-@pytest.mark.parametrize("path", ["/profile/analyst1", "/explore/users"])
-def test_a_peers_pages_scroll_nowhere_sideways(open_as, path, width):
-    scroll_width, errors = open_as("visitor", path, lambda page, errors: (page.evaluate("() => document.documentElement.scrollWidth"), errors), width=width)
+@pytest.mark.parametrize("role, path", [("visitor", "/profile/analyst1"), ("visitor", "/explore/users"), ("admin", "/explore/users")],
+                         ids=["peer-profile", "directory", "admin-directory"])
+def test_the_directory_and_a_peers_page_scroll_nowhere_sideways(open_as, role, path, width):
+    """The admin's directory has five columns: the table scrolls inside its wrapper on a
+    phone, the page does not."""
+    scroll_width, errors = open_as(role, path, lambda page, errors: (page.evaluate("() => document.documentElement.scrollWidth"), errors), width=width)
     assert scroll_width == width
     assert errors == []
 
