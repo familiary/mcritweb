@@ -100,6 +100,76 @@ def test_an_unknown_function_still_redirects(client, as_role):
     assert response.status_code == 302
 
 
+# --- the referenced APIs -----------------------------------------------------------
+
+#: a reference function whose xcfg carries API references
+API_REFS_FUNCTION = 11
+
+
+def _with_api_refs(fake_mcrit, function_id, xcfg_update):
+    """Swap the function for a copy whose xcfg is changed by `xcfg_update`, so a test
+    does not leave its edit behind in the corpus fixture."""
+    entry = copy.deepcopy(fake_mcrit._functions[function_id])
+    xcfg_update(entry)
+    fake_mcrit._functions[function_id] = entry
+    return entry
+
+
+def test_function_api_refs_reads_the_xcfg_into_sorted_rows():
+    from types import SimpleNamespace
+
+    from mcritweb.views.explore import function_api_refs
+    entry = SimpleNamespace(xcfg={"apirefs": {"4096": "kernel32.dll!Sleep", 16: "ws2_32.dll!send", "nonsense": "x!y", "32": "NoLibrary"}})
+    assert function_api_refs(entry) == [(16, "ws2_32.dll", "send"), (32, "", "NoLibrary"), (4096, "kernel32.dll", "Sleep")]
+    assert function_api_refs(SimpleNamespace(xcfg={"apirefs": {}})) == []
+    # no stored disassembly: unknown, which is not the same as none
+    assert function_api_refs(SimpleNamespace(xcfg={})) is None
+    assert function_api_refs(SimpleNamespace(xcfg=None)) is None
+
+
+def test_the_function_page_lists_the_referenced_apis(client, as_role, fake_mcrit):
+    as_role("visitor")
+    entry = fake_mcrit._functions[API_REFS_FUNCTION]
+    api_refs = entry.xcfg["apirefs"]
+    assert api_refs, "the fixture function is expected to reference APIs"
+    fake_mcrit.calls.clear()
+    page = client.get(f"/explore/functions/{API_REFS_FUNCTION}").data.decode()
+    assert f"Referenced APIs ({len(api_refs)})" in page
+    for offset, api_ref in api_refs.items():
+        library, _, api = api_ref.partition("!")
+        assert f"0x{int(offset):x}</td>" in page
+        assert f">{library}</td>" in page
+        assert f'data-clipboard-value="{api}"' in page
+    # the references live in the xcfg, which the backend only sends when asked
+    assert ("getFunctionById", (API_REFS_FUNCTION,), {"with_xcfg": True}) in fake_mcrit.calls
+
+
+def test_the_referenced_apis_are_escaped(client, as_role, fake_mcrit):
+    as_role("visitor")
+    hostile = '<img src=x onerror=alert(1)>"'
+    _with_api_refs(fake_mcrit, API_REFS_FUNCTION, lambda entry: entry.xcfg.update(apirefs={"16": f"{hostile}!{hostile}"}))
+    page = client.get(f"/explore/functions/{API_REFS_FUNCTION}").data.decode()
+    assert hostile not in page
+    assert "&lt;img src=x onerror=alert(1)&gt;&#34;" in page
+
+
+def test_a_function_without_api_references_says_why(client, as_role, fake_mcrit):
+    as_role("visitor")
+    _with_api_refs(fake_mcrit, API_REFS_FUNCTION, lambda entry: entry.xcfg.update(apirefs={}))
+    page = client.get(f"/explore/functions/{API_REFS_FUNCTION}").data.decode()
+    assert "Referenced APIs" in page and "Referenced APIs (" not in page
+    assert "No API references resolved for this function" in page
+    assert "ApiScout database" in page
+
+
+def test_a_function_without_disassembly_does_not_claim_it_references_no_apis(client, as_role, fake_mcrit):
+    as_role("visitor")
+    _with_api_refs(fake_mcrit, API_REFS_FUNCTION, lambda entry: setattr(entry, "xcfg", {}))
+    page = client.get(f"/explore/functions/{API_REFS_FUNCTION}").data.decode()
+    assert "its API references are not known" in page
+    assert "No API references resolved" not in page
+
+
 # --- the block comparison (#74) ----------------------------------------------------
 
 def test_identical_functions_match_block_for_block(app):

@@ -148,6 +148,7 @@ The page is organized in collapsible sections:
 * **Function Info**: sample and family, offset, name and labels, size, PicHash with how many families/samples/functions share it, and whether a MinHash has been calculated for the function.
 * **MinHash & Shingles**: the MinHash signature itself and, if the backend tracks it (`MINHASH_TRACK_SHINGLES`), which shingler produced how many of its slots.
 * **Basic Blocks & PicBlockHashes**: the basic blocks the backend indexed with their PicBlockHash.
+* **Referenced APIs**: the APIs the function references, each with the offset of the referencing instruction, its library and its name. SMDA takes them from the import table of a file; for a memory dump the MCRIT backend resolves them only when it has been given an ApiScout WinAPI database (`MCRIT_API_COLLECTION_FILES`). A function whose disassembly the backend did not keep has none to show.
 * **Control Flow Graph**: the CFG, with the occurrence of every basic block across the database listed next to it.
 
 ![The MinHash and basic block sections](images/function_sections.png "The MinHash and basic block sections")

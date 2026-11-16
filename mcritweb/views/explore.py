@@ -767,12 +767,36 @@ def modifyFunction():
     return redirect(url_for('explore.function_by_id', function_id=function_id))
 
 
+def function_api_refs(function_entry):
+    """The API references of a function as (offset, library, api) rows, sorted by offset.
+
+    SMDA stores them in the function's xcfg as `{instruction offset: "library!api"}`; JSON
+    turns the offsets into strings. None when the entry carries no xcfg (it was fetched
+    without one, or the backend drops disassembly), since then nothing is known about its
+    API references, as opposed to an empty list for a function that references none."""
+    xcfg = function_entry.xcfg
+    if not xcfg:
+        return None
+    rows = []
+    for offset, api_ref in (xcfg.get("apirefs") or {}).items():
+        try:
+            offset = int(offset)
+        except (TypeError, ValueError):
+            continue
+        library, separator, api = str(api_ref).partition("!")
+        if not separator:
+            library, api = "", library
+        rows.append((offset, library, api))
+    return sorted(rows)
+
+
 @bp.route('/functions/<int(signed=True):function_id>')
 @visitor_required
 @mcrit_server_required
 def function_by_id(function_id):
     client = get_client()
-    function_entry = with_server_errors(client).getFunctionById(function_id)
+    # with its xcfg, which holds the function's API references
+    function_entry = with_server_errors(client).getFunctionById(function_id, with_xcfg=True)
     if function_entry:
         # the page links and describes the function through its sample throughout
         sample_entry = require_result(with_server_errors(client).getSampleById(function_entry.sample_id), "the sample of this function")
@@ -783,6 +807,7 @@ def function_by_id(function_id):
             sample_entry=sample_entry,
             pichash_match_summary=pichash_match_summary,
             can_modify_function=can_modify_functions(client),
+            api_refs=function_api_refs(function_entry),
         )
     else:
         flash("The given Function ID doesn't exist", category="error")

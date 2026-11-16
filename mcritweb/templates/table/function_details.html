@@ -155,3 +155,38 @@ client = McritClient(mcrit_server="{{ api_base }}", apitoken="&lt;your API token
     <p class="mb-0">No PicBlockHashes stored - none of the blocks reaches the size threshold.</p>
   {% endif %}
 {% endmacro %}
+
+
+{#
+  The APIs a function references, as SMDA resolved them: from the import table for a
+  file, from an ApiScout database for a memory dump (mcrit's MCRIT_API_COLLECTION_FILES).
+  `api_refs` is explore.function_api_refs(): (offset, library, api) rows, or None when
+  the function carries no stored disassembly. Library and API names come out of the
+  analysed binary, so they are only ever rendered autoescaped.
+#}
+{% macro api_refs_table(api_refs) %}
+  {% if api_refs is none %}
+    <p class="mb-0">No disassembly stored for this function, so its API references are not known.</p>
+  {% elif api_refs %}
+    <table class="table table-sm table-hover mb-0" style="width: auto;">
+      <thead class="table-light">
+        <tr>
+          <th scope="col">Offset</th>
+          <th scope="col">Library</th>
+          <th scope="col">API</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for offset, library, api in api_refs %}
+        <tr>
+          <td class="font-monospace">0x{{ "%x"|format(offset) }}</td>
+          <td class="font-monospace">{{ library }}</td>
+          <td class="font-monospace">{{ api }} {{ clipboard_btn(api) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="mb-0">No API references resolved for this function. For a memory dump, the MCRIT backend resolves them only when it is given an ApiScout database.</p>
+  {% endif %}
+{% endmacro %}

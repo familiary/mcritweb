@@ -1,6 +1,6 @@
 {% from 'table/links.html' import format_pichash, format_offset, format_family_name_tuple, format_family_id, format_sample_id, format_function_id, format_sha_short_clipboard, clipboard_btn %}
 {% from 'table/column_table.html' import function_column_table %}
-{% from 'table/function_details.html' import api_usage_modal, api_usage_button, minhash_shingles, picblock_table %}
+{% from 'table/function_details.html' import api_usage_modal, api_usage_button, minhash_shingles, picblock_table, api_refs_table %}
 {% extends 'base.html' %}
 {% block style %}
 
@@ -173,6 +173,19 @@ Function: {{ function_id }}
       <div id="collapse-blocks" class="accordion-collapse collapse" aria-labelledby="heading-blocks">
         <div class="accordion-body">
           {{ picblock_table(entry) }}
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item">
+      <h2 class="accordion-header" id="heading-apirefs" style="margin:0">
+        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-apirefs" aria-expanded="false" aria-controls="collapse-apirefs">
+          Referenced APIs{% if api_refs %} ({{ api_refs|length }}){% endif %}
+        </button>
+      </h2>
+      <div id="collapse-apirefs" class="accordion-collapse collapse" aria-labelledby="heading-apirefs">
+        <div class="accordion-body">
+          {{ api_refs_table(api_refs) }}
         </div>
       </div>
     </div>
